@@ -51,5 +51,24 @@ class Interpretation(unittest.TestCase):
         self.assertEqual(interpretation.parse_response('好呀~'), ('好呀~', None))
 
 
+class Split(unittest.TestCase):
+    """main.py was split into modules; AstrBot must still find the plugin and its handlers in main.py."""
+
+    def test_handlers_defined_in_main(self):
+        for name in ('__init__', 'biocore_command', 'on_llm_request', 'on_llm_response'):
+            self.assertIn(name, vars(main.BioCorePlugin), name)
+
+    def test_all_methods_reachable(self):
+        methods = set()
+        for klass in main.BioCorePlugin.__mro__[:-2]:  # drop Star, object
+            methods |= {k for k in vars(klass) if not k.startswith('__')}
+        self.assertEqual(len(methods), 209)  # 210 upstream methods minus __init__
+
+    def test_backup_lists_every_module(self):
+        import mixin_pages
+        src = Path(mixin_pages.__file__).read_text('utf-8')
+        self.assertIn('root.glob("*.py")', src)
+
+
 if __name__ == '__main__':
     unittest.main()
