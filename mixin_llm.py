@@ -313,7 +313,7 @@ class LLMMixin:
         if not self._llm_allowed("tom_probe") or not self._llm_v2_cooldown_ok("tom_probe"):
             return
         try:
-            recent = [str(h.get("text") or "") for h in self._same_place_items(event, core.history)[-6:]]
+            recent = [str(h.get("text") or "") for h in self._window_replies(event, 6)]
             refs = [str(x) for x in (getattr(self, "_last_memory_entries", []) or []) if str(x)][:6]
             proposal = await self._llm_v2_call(
                 "tom_probe",

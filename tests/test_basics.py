@@ -62,8 +62,9 @@ class Split(unittest.TestCase):
         methods = set()
         for klass in main.BioCorePlugin.__mro__[:-2]:  # drop Star, object
             methods |= {k for k in vars(klass) if not k.startswith('__')}
-        # 210 upstream methods minus __init__, plus 13 for one-her (library, migration, discretion, forgetting)
-        self.assertEqual(len(methods), 222)
+        # 210 upstream methods minus __init__, plus 10 for one-her (library, migration, discretion, forgetting)
+        # and 13 for her phone (windows, open loops per window, moving old body texts, forget count)
+        self.assertEqual(len(methods), 232)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

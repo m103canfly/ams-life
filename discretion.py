@@ -14,7 +14,7 @@ and ``verdict(origin, here)`` applies the discretion table of the plan:
     came from            | same place | another group / a private chat
     ---------------------|------------|-----------------------------------------------
     said openly in group | full       | anon: may be mentioned, never "X said ..."
-    told in private      | full       | drop, unless the same person said it openly here
+    told in private      | full       | drop (only ever in that private chat)
     her own / web page   | full       | full
 
 Anything whose origin cannot be worked out is treated as private to an unknown
@@ -111,31 +111,7 @@ def merge(origins) -> dict:
     return make_origin(where, people, refs, visibility)
 
 
-def _bigrams(text) -> set:
-    t = re.sub(r"\s+", "", str(text or ""))
-    return {t[i:i + 2] for i in range(len(t) - 1)} if len(t) > 1 else ({t} if t else set())
-
-
-def said_openly(text, person, public_items, here) -> bool:
-    """Has `person` already said this himself, openly, in `here`?"""
-    if not person or not here.startswith("group:"):
-        return False
-    mine = _bigrams(text)
-    if not mine:
-        return False
-    for item in public_items or []:
-        o = origin_of(item)
-        if o["where"] != here or o["visibility"] != PUBLIC or str(item.get("role") or "user") != "user":
-            continue
-        if str(item.get("sender_id") or "") != str(person):
-            continue
-        theirs = _bigrams(item.get("text"))
-        if theirs and len(mine & theirs) / float(min(len(mine), len(theirs))) >= 0.6:
-            return True
-    return False
-
-
-def verdict(origin, here, *, echoed=False) -> str:
+def verdict(origin, here) -> str:
     """full / anon / drop for bringing an item with `origin` up in place `here`."""
     o = origin if isinstance(origin, dict) else {}
     where = str(o.get("where") or "")
@@ -146,8 +122,6 @@ def verdict(origin, here, *, echoed=False) -> str:
         return FULL
     if vis == PUBLIC and where:
         return ANON
-    if vis == PRIVATE and echoed:
-        return FULL
     return DROP
 
 

@@ -89,8 +89,10 @@ HER_STATE_PATH = STATE_DIR / "her.json"
 STATE_ARCHIVE_DIR = STATE_DIR / "per_session_archive"
 MEMORY_LIBRARY_PATH = MEMORY_DIR / "library.json"
 MEMORY_LEGACY_DIR = MEMORY_DIR / "per_session_legacy"
-# Body fields that hold conversation text; each item is tagged with its origin.
-CORE_TEXT_LISTS = ("history", "open_loops", "autobiography", "event_anchors")
+# ams-life: her phone. Every group and private chat is one window; what was
+# said there (her recent replies, open loops) is kept only in that window.
+# The body keeps no text at all.
+PHONE_DIR = DATA_DIR / "phone"
 # Local image service paths/port are configured through _conf_schema.json.
 # There are no machine-specific fallback paths baked into the plugin.
 IMAGE_CACHE_PATH = DATA_DIR / "image_cache.json"

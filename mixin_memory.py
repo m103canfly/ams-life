@@ -679,6 +679,9 @@ class MemoryMixin:
 
     async def _consolidate_memory(self, event, core=None, force=False):
         try:
+            # ams-life: forgetting may happen while this waits for the model; if
+            # it does, the copy held here is stale and must not be saved back.
+            _forget_mark = len(getattr(self, "_forget_log", None) or [])
             doc = self._load_memory(event)
             entries = doc.get("entries")
             if not isinstance(entries, list) or len(entries) < 2:
@@ -857,8 +860,12 @@ class MemoryMixin:
                     logger.info("[biocore] llm memory candidates applied=%s", _cand_applied)
                 changed = True
             if changed:
+                if self._forgot_since(_forget_mark):
+                    return
                 await self._archive_ranked_events(event, core, entries)
                 await self._maybe_archive_insight(event, core, "compression")
+                if self._forgot_since(_forget_mark):
+                    return
                 try:
                     self._merge_memory_doc(doc, self._load_memory(event))
                 except Exception:
@@ -874,6 +881,17 @@ class MemoryMixin:
                 logger.info("[biocore] memory consolidated groups=%s entries=%s", len(groups), len(entries))
         finally:
             self._consolidating = False
+
+    def _forgot_since(self, mark) -> bool:
+        """Was anything forgotten since `mark`? Then forget it once more, in case work
+        started before (events archived from a stale copy) wrote some of it back."""
+        log = list(getattr(self, "_forget_log", None) or [])
+        if len(log) <= int(mark):
+            return False
+        for person, ids in log[int(mark):]:
+            self._forget(person, ids, again=True)
+        logger.info("[ams-life] memory consolidation dropped: something was forgotten meanwhile; next time again")
+        return True
 
     @staticmethod
     def _memory_command_line(cmd: dict) -> str:
@@ -919,16 +937,6 @@ class MemoryMixin:
                     item = str(item or "").strip()
                     if item:
                         texts.append(item)
-            if core is not None:
-                for key in ("core_self", "narrative_self"):
-                    value = str(getattr(core, key, "") or "").strip()
-                    if value:
-                        texts.append(value)
-                for item in (getattr(core, "autobiography", []) or [])[-8:]:
-                    if isinstance(item, dict):
-                        value = str(item.get("title") or item.get("meaning") or "").strip()
-                        if value:
-                            texts.append(value)
         except Exception:
             pass
         return texts[:24]
@@ -1534,8 +1542,7 @@ class MemoryMixin:
         # ams-life: recall from every other group and private chat in the one
         # library, but only what the discretion table allows here. Things said
         # openly elsewhere come back without naming who said them; things told
-        # in private stay out unless the same person said them openly here.
-        # Nothing is copied into this place.
+        # in private never leave that private chat. Nothing is copied into this place.
         _foreign_lines = []
         try:
             _known_texts = {str(e.get("text") or "") for e in entries
@@ -1548,9 +1555,7 @@ class MemoryMixin:
                 if getattr(self, "safety_enabled", False) and (
                         _entry.get("sensitive") or _entry.get("poison_risk")):
                     continue
-                _verdict = discretion.verdict(
-                    discretion.origin_of(_entry), _here,
-                    echoed=discretion.said_openly(_etext, str(_entry.get("sender_id") or ""), entries, _here))
+                _verdict = discretion.verdict(discretion.origin_of(_entry), _here)
                 if _verdict == discretion.DROP:
                     continue
                 _evec = _entry.get("vector") or []
@@ -1725,8 +1730,7 @@ class MemoryMixin:
     #
     # Deterministic only: no LLM call, no new line, no reply generation. The
     # three data sources are already persisted bio data:
-    #   1) the latest consolidated memory summary / last archived session event
-    #      (fallback: self_timeline past / autobiography title);
+    #   1) the latest consolidated memory summary / last archived session event;
     #   2) unfinished open loops captured *before* the current turn;
     #   3) relationship state (closeness/conflict/repair/phase/absence).
     # It is injected only when the user returns after A4_CONTINUITY_GAP_SECONDS
@@ -1788,16 +1792,6 @@ class MemoryMixin:
                     return text[:80]
         except Exception:
             pass
-        # ams-life: the body is shared by every place now; only use what was
-        # tagged as coming from here (self_timeline has no origin, so it is skipped).
-        try:
-            for item in reversed(self._same_place_items(event, getattr(core, "autobiography", []))):
-                if isinstance(item, dict):
-                    text = str(item.get("title") or item.get("meaning") or "").strip()
-                    if text:
-                        return re.sub(r"\s+", " ", text)[:80]
-        except Exception:
-            pass
         return ""
 
     def _continuity_context(self, event, core, user_data, prior_loops=None):
@@ -1813,8 +1807,7 @@ class MemoryMixin:
         summary = self._continuity_summary(event, core)
         loops = []
         try:
-            source = prior_loops if isinstance(prior_loops, list) else (
-                getattr(core, "open_loops", []) if core is not None else [])
+            source = prior_loops if isinstance(prior_loops, list) else self._window_loops(event)
             open_loops = []
             for item in (source or []):
                 if not isinstance(item, dict):

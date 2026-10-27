@@ -83,7 +83,7 @@
      "urgency": 0.626
     },
     "attachments": [],
-    "big_summary": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "big_summary": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
@@ -102,7 +102,7 @@
      "委屈"
     ],
     "emotion_secondary": "contempt",
-    "event": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "event": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "event_key": "我还是好生气凭什么",
     "id": "evt_1793272440_73067",
     "importance": 0.5,
@@ -114,6 +114,12 @@
       "10001"
      ],
      "source_ids": [
+      "f3cf5ee6569a90ab",
+      "32ed0168a98dd6e5",
+      "ce2f0fced43d9179",
+      "bd2144a04c591af1",
+      "0e573ca31ecededd",
+      "98bbacc6b4e4b328",
       "0d547e081dfdb07d"
      ],
      "visibility": "private",
@@ -136,11 +142,11 @@
     "recall_count": 0,
     "reflection": "要好好记住",
     "session": "default:FriendMessage:10001",
-    "small_summary": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "small_summary": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "source_check": {
      "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 1.143,
+     "length_ratio": 1.136,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -160,8 +166,8 @@
     },
     "source_count": 7,
     "source_texts": [
-     "恭喜恭喜！",
-     "超厉害的！",
+     "上次那首嘛~",
+     "考得怎么样？",
      "我在呢",
      "抱抱你",
      "太过分了",
@@ -1026,7 +1032,7 @@
      "urgency": 0.652
     },
     "attachments": [],
-    "big_summary": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+    "big_summary": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一起打副本吧",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
@@ -1045,7 +1051,7 @@
      "委屈"
     ],
     "emotion_secondary": "contempt",
-    "event": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+    "event": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一起打副本吧",
     "event_key": "小爱我们约好下周一起打",
     "id": "evt_1793272840_50148",
     "importance": 0.5,
@@ -1054,9 +1060,17 @@
     "modalities": [],
     "origin": {
      "people": [
-      "10003"
+      "10003",
+      "10002",
+      "10005"
      ],
      "source_ids": [
+      "95dca9d8d49bc603",
+      "5f2d3fc90ecf09d9",
+      "df67f56093b6af63",
+      "9c01ab2838a32c3c",
+      "d753390d2089cf1b",
+      "632d7be7d6dd9093",
       "10e46405a87361de"
      ],
      "visibility": "public",
@@ -1079,11 +1093,11 @@
     "recall_count": 2,
     "reflection": "要好好记住",
     "session": "default:GroupMessage:900001",
-    "small_summary": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+    "small_summary": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一",
     "source_check": {
      "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 1.15,
+     "length_ratio": 1.102,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -1103,12 +1117,12 @@
     },
     "source_count": 7,
     "source_texts": [
+     "抱抱，下次一定出",
+     "我算算哦",
+     "是诶，大家都去哪了",
+     "是呀，按爱弥斯的设定在聊~",
+     "恭喜恭喜！",
      "超厉害的！",
-     "我在呢",
-     "抱抱你",
-     "太过分了",
-     "先别气坏自己",
-     "我陪着你",
      "小爱 我们约好下周一起打副本吧"
     ],
     "strength": 0.5,
@@ -1957,7 +1971,7 @@
      "urgency": 0.626
     },
     "attachments": [],
-    "big_summary": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "big_summary": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
@@ -1976,7 +1990,7 @@
      "委屈"
     ],
     "emotion_secondary": "contempt",
-    "event": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "event": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "event_key": "我还是好生气凭什么",
     "id": "evt_1793272440_73067",
     "importance": 0.5,
@@ -1988,6 +2002,12 @@
       "10001"
      ],
      "source_ids": [
+      "f3cf5ee6569a90ab",
+      "32ed0168a98dd6e5",
+      "ce2f0fced43d9179",
+      "bd2144a04c591af1",
+      "0e573ca31ecededd",
+      "98bbacc6b4e4b328",
       "0d547e081dfdb07d"
      ],
      "visibility": "private",
@@ -2010,11 +2030,11 @@
     "recall_count": 0,
     "reflection": "要好好记住",
     "session": "default:FriendMessage:10001",
-    "small_summary": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "small_summary": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "source_check": {
      "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 1.143,
+     "length_ratio": 1.136,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -2034,8 +2054,8 @@
     },
     "source_count": 7,
     "source_texts": [
-     "恭喜恭喜！",
-     "超厉害的！",
+     "上次那首嘛~",
+     "考得怎么样？",
      "我在呢",
      "抱抱你",
      "太过分了",
@@ -2902,7 +2922,7 @@
      "urgency": 0.652
     },
     "attachments": [],
-    "big_summary": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+    "big_summary": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一起打副本吧",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
@@ -2921,7 +2941,7 @@
      "委屈"
     ],
     "emotion_secondary": "contempt",
-    "event": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+    "event": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一起打副本吧",
     "event_key": "小爱我们约好下周一起打",
     "id": "evt_1793272840_50148",
     "importance": 0.5,
@@ -2930,9 +2950,17 @@
     "modalities": [],
     "origin": {
      "people": [
-      "10003"
+      "10003",
+      "10002",
+      "10005"
      ],
      "source_ids": [
+      "95dca9d8d49bc603",
+      "5f2d3fc90ecf09d9",
+      "df67f56093b6af63",
+      "9c01ab2838a32c3c",
+      "d753390d2089cf1b",
+      "632d7be7d6dd9093",
       "10e46405a87361de"
      ],
      "visibility": "public",
@@ -2955,11 +2983,11 @@
     "recall_count": 0,
     "reflection": "要好好记住",
     "session": "default:GroupMessage:900001",
-    "small_summary": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+    "small_summary": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一",
     "source_check": {
      "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 1.15,
+     "length_ratio": 1.102,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -2979,12 +3007,12 @@
     },
     "source_count": 7,
     "source_texts": [
+     "抱抱，下次一定出",
+     "我算算哦",
+     "是诶，大家都去哪了",
+     "是呀，按爱弥斯的设定在聊~",
+     "恭喜恭喜！",
      "超厉害的！",
-     "我在呢",
-     "抱抱你",
-     "太过分了",
-     "先别气坏自己",
-     "我陪着你",
      "小爱 我们约好下周一起打副本吧"
     ],
     "strength": 0.5,
@@ -8269,6 +8297,465 @@
     "intimacy_style": "neutral"
    }
   },
+  "phone/group_900001.json": {
+   "open_loops": [
+    {
+     "created_ts": 1793000770.0,
+     "due_hint": "none",
+     "id": "loop_8641a8f2b9",
+     "last_mentioned_ts": 1793000770.0,
+     "mentioned": 1,
+     "origin": {
+      "people": [
+       "10002"
+      ],
+      "source_ids": [
+       "5f2d3fc90ecf09d9"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "resolved_ts": 1793276470.0,
+     "status": "fulfilled",
+     "text": "小爱帮我们算算保底还差多少"
+    },
+    {
+     "created_ts": 1793272870.0,
+     "due_hint": "tomorrow",
+     "id": "loop_861d8a0263",
+     "last_mentioned_ts": 1793272870.0,
+     "mentioned": 1,
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "a473a739b8d584c3"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "resolved_ts": 1793276470.0,
+     "status": "fulfilled",
+     "text": "记得提醒我明天交报告"
+    }
+   ],
+   "place": "group:900001",
+   "recent": [
+    {
+     "origin": {
+      "people": [
+       "10002"
+      ],
+      "source_ids": [
+       "d7aab5b251fc43f5"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "别灰心嘛",
+     "ts": 1793000690.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "95dca9d8d49bc603"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "抱抱，下次一定出",
+     "ts": 1793000730.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10002"
+      ],
+      "source_ids": [
+       "5f2d3fc90ecf09d9"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "我算算哦",
+     "ts": 1793000770.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10002"
+      ],
+      "source_ids": [
+       "df67f56093b6af63"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "是诶，大家都去哪了",
+     "ts": 1793098420.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10005"
+      ],
+      "source_ids": [
+       "9c01ab2838a32c3c"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "是呀，按爱弥斯的设定在聊~",
+     "ts": 1793098480.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10002"
+      ],
+      "source_ids": [
+       "d753390d2089cf1b"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "恭喜恭喜！",
+     "ts": 1793271330.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10002"
+      ],
+      "source_ids": [
+       "632d7be7d6dd9093"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "超厉害的！",
+     "ts": 1793271350.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "10e46405a87361de"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "好呀，说定了~",
+     "ts": 1793272840.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "a473a739b8d584c3"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "记下啦",
+     "ts": 1793272870.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "8bbef4ae3aa24fec"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "role": "assistant",
+     "text": "太好了~",
+     "ts": 1793276470.0
+    }
+   ]
+  },
+  "phone/group_900002.json": {
+   "open_loops": [],
+   "place": "group:900002",
+   "recent": [
+    {
+     "origin": {
+      "people": [
+       "10004"
+      ],
+      "source_ids": [
+       "96f2356d0110f564"
+      ],
+      "visibility": "public",
+      "where": "group:900002"
+     },
+     "role": "assistant",
+     "text": "晚上好~",
+     "ts": 1793004370.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10004"
+      ],
+      "source_ids": [
+       "7015b26f2702bca7"
+      ],
+      "visibility": "public",
+      "where": "group:900002"
+     },
+     "role": "assistant",
+     "text": "辛苦啦，快去歇会儿",
+     "ts": 1793004490.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10004"
+      ],
+      "source_ids": [
+       "0b67eae109057c5c"
+      ],
+      "visibility": "public",
+      "where": "group:900002"
+     },
+     "role": "assistant",
+     "text": "好久不见！",
+     "ts": 1793271280.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10004"
+      ],
+      "source_ids": [
+       "056021c8ff141c29"
+      ],
+      "visibility": "public",
+      "where": "group:900002"
+     },
+     "role": "assistant",
+     "text": "太好了！",
+     "ts": 1793271300.0
+    }
+   ]
+  },
+  "phone/private_10001.json": {
+   "open_loops": [
+    {
+     "created_ts": 1793011690.0,
+     "due_hint": "tomorrow",
+     "id": "loop_d079893554",
+     "last_mentioned_ts": 1793011690.0,
+     "mentioned": 1,
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "faa00a605aa5ec8d"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "resolved_ts": 1793271750.0,
+     "status": "expired",
+     "text": "明天要考试了 好紧张"
+    },
+    {
+     "created_ts": 1793011720.0,
+     "due_hint": "none",
+     "id": "loop_05f96f0431",
+     "last_mentioned_ts": 1793011720.0,
+     "mentioned": 1,
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "f3cf5ee6569a90ab"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "status": "open",
+     "text": "你还记得我早上让你唱什么吗"
+    }
+   ],
+   "place": "private:10001",
+   "recent": [
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "4d92732580e3e608"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "早呀~ 想听哪首？",
+     "ts": 1793000000.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "99136ad47b585874"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "好嘞，哼哼",
+     "ts": 1793000090.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "faa00a605aa5ec8d"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "你可以的！",
+     "ts": 1793011690.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "f3cf5ee6569a90ab"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "上次那首嘛~",
+     "ts": 1793011720.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "32ed0168a98dd6e5"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "考得怎么样？",
+     "ts": 1793098120.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "ce2f0fced43d9179"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "我在呢",
+     "ts": 1793271750.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "bd2144a04c591af1"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "抱抱你",
+     "ts": 1793271770.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "0e573ca31ecededd"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "太过分了",
+     "ts": 1793271790.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "98bbacc6b4e4b328"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "先别气坏自己",
+     "ts": 1793271820.0
+    },
+    {
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [
+       "0d547e081dfdb07d"
+      ],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "role": "assistant",
+     "text": "我陪着你",
+     "ts": 1793272440.0
+    }
+   ]
+  },
   "self_model.json": {
    "_history": [
     {
@@ -8302,13 +8789,23 @@
       "阿星",
       "10003",
       "10003",
-      "10003"
+      "10003",
+      "10002",
+      "10005"
      ],
      "origin": {
       "people": [
-       "10003"
+       "10003",
+       "10002",
+       "10005"
       ],
       "source_ids": [
+       "95dca9d8d49bc603",
+       "5f2d3fc90ecf09d9",
+       "df67f56093b6af63",
+       "9c01ab2838a32c3c",
+       "d753390d2089cf1b",
+       "632d7be7d6dd9093",
        "10e46405a87361de"
       ],
       "visibility": "public",
@@ -8329,6 +8826,12 @@
        "10001"
       ],
       "source_ids": [
+       "f3cf5ee6569a90ab",
+       "32ed0168a98dd6e5",
+       "ce2f0fced43d9179",
+       "bd2144a04c591af1",
+       "0e573ca31ecededd",
+       "98bbacc6b4e4b328",
        "0d547e081dfdb07d"
       ],
       "visibility": "private",
@@ -8355,7 +8858,6 @@
     "urgency": 0.411
    },
    "attention": 0.249,
-   "autobiography": [],
    "boredom": 0.0,
    "boundary_pressure": 0.0,
    "circadian_alertness": 0.671,
@@ -8386,7 +8888,6 @@
    "echo": -0.393,
    "echo_trace": -0.4083,
    "energy": 0.1942,
-   "event_anchors": [],
    "goal_conflict": [],
    "goal_focus": "和重要的人保持亲近",
    "goal_scores": {
@@ -8436,16 +8937,7 @@
      "d": 0.573,
      "emotion": "joy",
      "intensity": 0.243,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.491,
-     "text": "早呀~ 想听哪首？",
      "ts": 1793000000.0,
      "v": 0.141
     },
@@ -8455,16 +8947,7 @@
      "d": 0.603,
      "emotion": "joy",
      "intensity": 0.274,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.538,
-     "text": "好嘞，哼哼",
      "ts": 1793000090.0,
      "v": 0.195
     },
@@ -8474,16 +8957,7 @@
      "d": 0.595,
      "emotion": "neutral",
      "intensity": 0.257,
-     "origin": {
-      "people": [
-       "10002"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.544,
-     "text": "别灰心嘛",
      "ts": 1793000690.0,
      "v": 0.157
     },
@@ -8493,16 +8967,7 @@
      "d": 0.579,
      "emotion": "sadness",
      "intensity": 0.209,
-     "origin": {
-      "people": [
-       "10003"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.542,
-     "text": "抱抱，下次一定出",
      "ts": 1793000730.0,
      "v": 0.016
     },
@@ -8512,16 +8977,7 @@
      "d": 0.591,
      "emotion": "joy",
      "intensity": 0.237,
-     "origin": {
-      "people": [
-       "10002"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.572,
-     "text": "我算算哦",
      "ts": 1793000770.0,
      "v": 0.087
     },
@@ -8531,16 +8987,7 @@
      "d": 0.579,
      "emotion": "neutral",
      "intensity": 0.214,
-     "origin": {
-      "people": [
-       "10004"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900002"
-     },
      "social": 0.561,
-     "text": "晚上好~",
      "ts": 1793004370.0,
      "v": 0.054
     },
@@ -8550,16 +8997,7 @@
      "d": 0.542,
      "emotion": "sadness",
      "intensity": 0.215,
-     "origin": {
-      "people": [
-       "10004"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900002"
-     },
      "social": 0.563,
-     "text": "辛苦啦，快去歇会儿",
      "ts": 1793004490.0,
      "v": -0.085
     },
@@ -8569,16 +9007,7 @@
      "d": 0.525,
      "emotion": "joy",
      "intensity": 0.222,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.576,
-     "text": "你可以的！",
      "ts": 1793011690.0,
      "v": -0.003
     },
@@ -8588,16 +9017,7 @@
      "d": 0.526,
      "emotion": "neutral",
      "intensity": 0.234,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.574,
-     "text": "上次那首嘛~",
      "ts": 1793011720.0,
      "v": -0.044
     },
@@ -8607,16 +9027,7 @@
      "d": 0.561,
      "emotion": "joy",
      "intensity": 0.227,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.59,
-     "text": "考得怎么样？",
      "ts": 1793098120.0,
      "v": 0.063
     },
@@ -8626,16 +9037,7 @@
      "d": 0.556,
      "emotion": "neutral",
      "intensity": 0.208,
-     "origin": {
-      "people": [
-       "10002"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.573,
-     "text": "是诶，大家都去哪了",
      "ts": 1793098420.0,
      "v": 0.004
     },
@@ -8645,16 +9047,7 @@
      "d": 0.533,
      "emotion": "neutral",
      "intensity": 0.215,
-     "origin": {
-      "people": [
-       "10005"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.567,
-     "text": "是呀，按爱弥斯的设定在聊~",
      "ts": 1793098480.0,
      "v": -0.019
     },
@@ -8664,16 +9057,7 @@
      "d": 0.573,
      "emotion": "joy",
      "intensity": 0.234,
-     "origin": {
-      "people": [
-       "10004"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900002"
-     },
      "social": 0.582,
-     "text": "好久不见！",
      "ts": 1793271280.0,
      "v": 0.088
     },
@@ -8683,16 +9067,7 @@
      "d": 0.595,
      "emotion": "joy",
      "intensity": 0.27,
-     "origin": {
-      "people": [
-       "10004"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900002"
-     },
      "social": 0.615,
-     "text": "太好了！",
      "ts": 1793271300.0,
      "v": 0.128
     },
@@ -8702,16 +9077,7 @@
      "d": 0.636,
      "emotion": "joy",
      "intensity": 0.37,
-     "origin": {
-      "people": [
-       "10002"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.653,
-     "text": "恭喜恭喜！",
      "ts": 1793271330.0,
      "v": 0.349
     },
@@ -8721,16 +9087,7 @@
      "d": 0.653,
      "emotion": "joy",
      "intensity": 0.411,
-     "origin": {
-      "people": [
-       "10002"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.674,
-     "text": "超厉害的！",
      "ts": 1793271350.0,
      "v": 0.441
     },
@@ -8740,16 +9097,7 @@
      "d": 0.601,
      "emotion": "sadness",
      "intensity": 0.252,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.618,
-     "text": "我在呢",
      "ts": 1793271750.0,
      "v": 0.067
     },
@@ -8759,16 +9107,7 @@
      "d": 0.587,
      "emotion": "sadness",
      "intensity": 0.323,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.581,
-     "text": "抱抱你",
      "ts": 1793271770.0,
      "v": -0.286
     },
@@ -8778,16 +9117,7 @@
      "d": 0.678,
      "emotion": "anger",
      "intensity": 0.424,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.514,
-     "text": "太过分了",
      "ts": 1793271790.0,
      "v": -0.471
     },
@@ -8797,16 +9127,7 @@
      "d": 0.778,
      "emotion": "anger",
      "intensity": 0.56,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.462,
-     "text": "先别气坏自己",
      "ts": 1793271820.0,
      "v": -0.625
     },
@@ -8816,16 +9137,7 @@
      "d": 0.852,
      "emotion": "anger",
      "intensity": 0.589,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
      "social": 0.43,
-     "text": "我陪着你",
      "ts": 1793272440.0,
      "v": -0.678
     },
@@ -8835,16 +9147,7 @@
      "d": 0.777,
      "emotion": "anger",
      "intensity": 0.457,
-     "origin": {
-      "people": [
-       "10003"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.473,
-     "text": "好呀，说定了~",
      "ts": 1793272840.0,
      "v": -0.488
     },
@@ -8854,16 +9157,7 @@
      "d": 0.728,
      "emotion": "anger",
      "intensity": 0.399,
-     "origin": {
-      "people": [
-       "10003"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.48,
-     "text": "记下啦",
      "ts": 1793272870.0,
      "v": -0.39
     },
@@ -8873,16 +9167,7 @@
      "d": 0.667,
      "emotion": "joy",
      "intensity": 0.257,
-     "origin": {
-      "people": [
-       "10003"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
      "social": 0.552,
-     "text": "太好了~",
      "ts": 1793276470.0,
      "v": -0.091
     }
@@ -9001,79 +9286,6 @@
     "valence": -0.037
    },
    "novelty_need": 0.5,
-   "open_loops": [
-    {
-     "created_ts": 1793000770.0,
-     "due_hint": "none",
-     "id": "loop_8641a8f2b9",
-     "last_mentioned_ts": 1793000770.0,
-     "mentioned": 1,
-     "origin": {
-      "people": [
-       "10002"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
-     "resolved_ts": 1793276470.0,
-     "status": "fulfilled",
-     "text": "小爱帮我们算算保底还差多少"
-    },
-    {
-     "created_ts": 1793011690.0,
-     "due_hint": "tomorrow",
-     "id": "loop_d079893554",
-     "last_mentioned_ts": 1793011690.0,
-     "mentioned": 1,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
-     "resolved_ts": 1793271280.0,
-     "status": "expired",
-     "text": "明天要考试了 好紧张"
-    },
-    {
-     "created_ts": 1793011720.0,
-     "due_hint": "none",
-     "id": "loop_05f96f0431",
-     "last_mentioned_ts": 1793011720.0,
-     "mentioned": 1,
-     "origin": {
-      "people": [
-       "10001"
-      ],
-      "source_ids": [],
-      "visibility": "private",
-      "where": "private:10001"
-     },
-     "status": "open",
-     "text": "你还记得我早上让你唱什么吗"
-    },
-    {
-     "created_ts": 1793272870.0,
-     "due_hint": "tomorrow",
-     "id": "loop_861d8a0263",
-     "last_mentioned_ts": 1793272870.0,
-     "mentioned": 1,
-     "origin": {
-      "people": [
-       "10003"
-      ],
-      "source_ids": [],
-      "visibility": "public",
-      "where": "group:900001"
-     },
-     "resolved_ts": 1793276470.0,
-     "status": "fulfilled",
-     "text": "记得提醒我明天交报告"
-    }
-   ],
    "open_loops_due": 0,
    "opponent": {
     "a": -0.06802944791935565,
@@ -10289,7 +10501,6 @@
        "urgency": 0.411
       },
       "attention": 0.249,
-      "autobiography": [],
       "boredom": 0.0,
       "boundary_pressure": 0.0,
       "circadian_alertness": 0.567,
@@ -10320,7 +10531,6 @@
       "echo": -0.393,
       "echo_trace": -0.4083,
       "energy": 0.1679,
-      "event_anchors": [],
       "goal_conflict": [],
       "goal_focus": "和重要的人保持亲近",
       "goal_scores": {
@@ -10370,16 +10580,7 @@
         "d": 0.573,
         "emotion": "joy",
         "intensity": 0.243,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.491,
-        "text": "早呀~ 想听哪首？",
         "ts": 1793000000.0,
         "v": 0.141
        },
@@ -10389,16 +10590,7 @@
         "d": 0.603,
         "emotion": "joy",
         "intensity": 0.274,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.538,
-        "text": "好嘞，哼哼",
         "ts": 1793000090.0,
         "v": 0.195
        },
@@ -10408,16 +10600,7 @@
         "d": 0.595,
         "emotion": "neutral",
         "intensity": 0.257,
-        "origin": {
-         "people": [
-          "10002"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.544,
-        "text": "别灰心嘛",
         "ts": 1793000690.0,
         "v": 0.157
        },
@@ -10427,16 +10610,7 @@
         "d": 0.579,
         "emotion": "sadness",
         "intensity": 0.209,
-        "origin": {
-         "people": [
-          "10003"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.542,
-        "text": "抱抱，下次一定出",
         "ts": 1793000730.0,
         "v": 0.016
        },
@@ -10446,16 +10620,7 @@
         "d": 0.591,
         "emotion": "joy",
         "intensity": 0.237,
-        "origin": {
-         "people": [
-          "10002"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.572,
-        "text": "我算算哦",
         "ts": 1793000770.0,
         "v": 0.087
        },
@@ -10465,16 +10630,7 @@
         "d": 0.579,
         "emotion": "neutral",
         "intensity": 0.214,
-        "origin": {
-         "people": [
-          "10004"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900002"
-        },
         "social": 0.561,
-        "text": "晚上好~",
         "ts": 1793004370.0,
         "v": 0.054
        },
@@ -10484,16 +10640,7 @@
         "d": 0.542,
         "emotion": "sadness",
         "intensity": 0.215,
-        "origin": {
-         "people": [
-          "10004"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900002"
-        },
         "social": 0.563,
-        "text": "辛苦啦，快去歇会儿",
         "ts": 1793004490.0,
         "v": -0.085
        },
@@ -10503,16 +10650,7 @@
         "d": 0.525,
         "emotion": "joy",
         "intensity": 0.222,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.576,
-        "text": "你可以的！",
         "ts": 1793011690.0,
         "v": -0.003
        },
@@ -10522,16 +10660,7 @@
         "d": 0.526,
         "emotion": "neutral",
         "intensity": 0.234,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.574,
-        "text": "上次那首嘛~",
         "ts": 1793011720.0,
         "v": -0.044
        },
@@ -10541,16 +10670,7 @@
         "d": 0.561,
         "emotion": "joy",
         "intensity": 0.227,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.59,
-        "text": "考得怎么样？",
         "ts": 1793098120.0,
         "v": 0.063
        },
@@ -10560,16 +10680,7 @@
         "d": 0.556,
         "emotion": "neutral",
         "intensity": 0.208,
-        "origin": {
-         "people": [
-          "10002"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.573,
-        "text": "是诶，大家都去哪了",
         "ts": 1793098420.0,
         "v": 0.004
        },
@@ -10579,16 +10690,7 @@
         "d": 0.533,
         "emotion": "neutral",
         "intensity": 0.215,
-        "origin": {
-         "people": [
-          "10005"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.567,
-        "text": "是呀，按爱弥斯的设定在聊~",
         "ts": 1793098480.0,
         "v": -0.019
        },
@@ -10598,16 +10700,7 @@
         "d": 0.573,
         "emotion": "joy",
         "intensity": 0.234,
-        "origin": {
-         "people": [
-          "10004"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900002"
-        },
         "social": 0.582,
-        "text": "好久不见！",
         "ts": 1793271280.0,
         "v": 0.088
        },
@@ -10617,16 +10710,7 @@
         "d": 0.595,
         "emotion": "joy",
         "intensity": 0.27,
-        "origin": {
-         "people": [
-          "10004"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900002"
-        },
         "social": 0.615,
-        "text": "太好了！",
         "ts": 1793271300.0,
         "v": 0.128
        },
@@ -10636,16 +10720,7 @@
         "d": 0.636,
         "emotion": "joy",
         "intensity": 0.37,
-        "origin": {
-         "people": [
-          "10002"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.653,
-        "text": "恭喜恭喜！",
         "ts": 1793271330.0,
         "v": 0.349
        },
@@ -10655,16 +10730,7 @@
         "d": 0.653,
         "emotion": "joy",
         "intensity": 0.411,
-        "origin": {
-         "people": [
-          "10002"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.674,
-        "text": "超厉害的！",
         "ts": 1793271350.0,
         "v": 0.441
        },
@@ -10674,16 +10740,7 @@
         "d": 0.601,
         "emotion": "sadness",
         "intensity": 0.252,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.618,
-        "text": "我在呢",
         "ts": 1793271750.0,
         "v": 0.067
        },
@@ -10693,16 +10750,7 @@
         "d": 0.587,
         "emotion": "sadness",
         "intensity": 0.323,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.581,
-        "text": "抱抱你",
         "ts": 1793271770.0,
         "v": -0.286
        },
@@ -10712,16 +10760,7 @@
         "d": 0.678,
         "emotion": "anger",
         "intensity": 0.424,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.514,
-        "text": "太过分了",
         "ts": 1793271790.0,
         "v": -0.471
        },
@@ -10731,16 +10770,7 @@
         "d": 0.778,
         "emotion": "anger",
         "intensity": 0.56,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.462,
-        "text": "先别气坏自己",
         "ts": 1793271820.0,
         "v": -0.625
        },
@@ -10750,16 +10780,7 @@
         "d": 0.852,
         "emotion": "anger",
         "intensity": 0.589,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
         "social": 0.43,
-        "text": "我陪着你",
         "ts": 1793272440.0,
         "v": -0.678
        },
@@ -10769,16 +10790,7 @@
         "d": 0.777,
         "emotion": "anger",
         "intensity": 0.457,
-        "origin": {
-         "people": [
-          "10003"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.473,
-        "text": "好呀，说定了~",
         "ts": 1793272840.0,
         "v": -0.488
        },
@@ -10788,16 +10800,7 @@
         "d": 0.728,
         "emotion": "anger",
         "intensity": 0.399,
-        "origin": {
-         "people": [
-          "10003"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.48,
-        "text": "记下啦",
         "ts": 1793272870.0,
         "v": -0.39
        },
@@ -10807,16 +10810,7 @@
         "d": 0.667,
         "emotion": "joy",
         "intensity": 0.257,
-        "origin": {
-         "people": [
-          "10003"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
         "social": 0.552,
-        "text": "太好了~",
         "ts": 1793276470.0,
         "v": -0.091
        }
@@ -10935,79 +10929,6 @@
        "valence": -0.037
       },
       "novelty_need": 0.5,
-      "open_loops": [
-       {
-        "created_ts": 1793000770.0,
-        "due_hint": "none",
-        "id": "loop_8641a8f2b9",
-        "last_mentioned_ts": 1793000770.0,
-        "mentioned": 1,
-        "origin": {
-         "people": [
-          "10002"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
-        "resolved_ts": 1793276470.0,
-        "status": "fulfilled",
-        "text": "小爱帮我们算算保底还差多少"
-       },
-       {
-        "created_ts": 1793011690.0,
-        "due_hint": "tomorrow",
-        "id": "loop_d079893554",
-        "last_mentioned_ts": 1793011690.0,
-        "mentioned": 1,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
-        "resolved_ts": 1793271280.0,
-        "status": "expired",
-        "text": "明天要考试了 好紧张"
-       },
-       {
-        "created_ts": 1793011720.0,
-        "due_hint": "none",
-        "id": "loop_05f96f0431",
-        "last_mentioned_ts": 1793011720.0,
-        "mentioned": 1,
-        "origin": {
-         "people": [
-          "10001"
-         ],
-         "source_ids": [],
-         "visibility": "private",
-         "where": "private:10001"
-        },
-        "status": "open",
-        "text": "你还记得我早上让你唱什么吗"
-       },
-       {
-        "created_ts": 1793272870.0,
-        "due_hint": "tomorrow",
-        "id": "loop_861d8a0263",
-        "last_mentioned_ts": 1793272870.0,
-        "mentioned": 1,
-        "origin": {
-         "people": [
-          "10003"
-         ],
-         "source_ids": [],
-         "visibility": "public",
-         "where": "group:900001"
-        },
-        "resolved_ts": 1793276470.0,
-        "status": "fulfilled",
-        "text": "记得提醒我明天交报告"
-       }
-      ],
       "open_loops_due": 0,
       "opponent": {
        "a": -0.06802944791935565,
@@ -12061,7 +11982,7 @@
       "urgency": 0.652
      },
      "attachments": [],
-     "big_summary": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+     "big_summary": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一起打副本吧",
      "boundary_score": 0.0,
      "confidence": 1.0,
      "effective_merge_count": 0,
@@ -12081,7 +12002,7 @@
       "委屈"
      ],
      "emotion_secondary": "contempt",
-     "event": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+     "event": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一起打副本吧",
      "event_key": "小爱我们约好下周一起打",
      "id": "evt_1793272840_50148",
      "importance": 0.5,
@@ -12090,9 +12011,17 @@
      "modalities": [],
      "origin": {
       "people": [
-       "10003"
+       "10003",
+       "10002",
+       "10005"
       ],
       "source_ids": [
+       "95dca9d8d49bc603",
+       "5f2d3fc90ecf09d9",
+       "df67f56093b6af63",
+       "9c01ab2838a32c3c",
+       "d753390d2089cf1b",
+       "632d7be7d6dd9093",
        "10e46405a87361de"
       ],
       "visibility": "public",
@@ -12115,11 +12044,11 @@
      "recall_count": 2,
      "reflection": "要好好记住",
      "session": "default:GroupMessage:900001",
-     "small_summary": "超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我陪着你；小爱 我们约好下周一起打副本吧",
+     "small_summary": "抱抱，下次一定出；我算算哦；是诶，大家都去哪了；是呀，按爱弥斯的设定在聊~；恭喜恭喜！；超厉害的！；小爱 我们约好下周一",
      "source_check": {
       "coverage": 1.0,
       "cross_ref": 1,
-      "length_ratio": 1.15,
+      "length_ratio": 1.102,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
@@ -12139,12 +12068,12 @@
      },
      "source_count": 7,
      "source_texts": [
+      "抱抱，下次一定出",
+      "我算算哦",
+      "是诶，大家都去哪了",
+      "是呀，按爱弥斯的设定在聊~",
+      "恭喜恭喜！",
       "超厉害的！",
-      "我在呢",
-      "抱抱你",
-      "太过分了",
-      "先别气坏自己",
-      "我陪着你",
       "小爱 我们约好下周一起打副本吧"
      ],
      "strength": 0.5,
@@ -13007,7 +12936,7 @@
       "urgency": 0.626
      },
      "attachments": [],
-     "big_summary": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+     "big_summary": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
      "boundary_score": 0.0,
      "confidence": 1.0,
      "effective_merge_count": 0,
@@ -13027,7 +12956,7 @@
       "委屈"
      ],
      "emotion_secondary": "contempt",
-     "event": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+     "event": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
      "event_key": "我还是好生气凭什么",
      "id": "evt_1793272440_73067",
      "importance": 0.5,
@@ -13039,6 +12968,12 @@
        "10001"
       ],
       "source_ids": [
+       "f3cf5ee6569a90ab",
+       "32ed0168a98dd6e5",
+       "ce2f0fced43d9179",
+       "bd2144a04c591af1",
+       "0e573ca31ecededd",
+       "98bbacc6b4e4b328",
        "0d547e081dfdb07d"
       ],
       "visibility": "private",
@@ -13061,11 +12996,11 @@
      "recall_count": 0,
      "reflection": "要好好记住",
      "session": "default:FriendMessage:10001",
-     "small_summary": "恭喜恭喜！；超厉害的！；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+     "small_summary": "上次那首嘛~；考得怎么样？；我在呢；抱抱你；太过分了；先别气坏自己；我还是好生气！！！凭什么啊！！！",
      "source_check": {
       "coverage": 1.0,
       "cross_ref": 1,
-      "length_ratio": 1.143,
+      "length_ratio": 1.136,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
@@ -13085,8 +13020,8 @@
      },
      "source_count": 7,
      "source_texts": [
-      "恭喜恭喜！",
-      "超厉害的！",
+      "上次那首嘛~",
+      "考得怎么样？",
       "我在呢",
       "抱抱你",
       "太过分了",
@@ -15832,13 +15767,23 @@
        "阿星",
        "10003",
        "10003",
-       "10003"
+       "10003",
+       "10002",
+       "10005"
       ],
       "origin": {
        "people": [
-        "10003"
+        "10003",
+        "10002",
+        "10005"
        ],
        "source_ids": [
+        "95dca9d8d49bc603",
+        "5f2d3fc90ecf09d9",
+        "df67f56093b6af63",
+        "9c01ab2838a32c3c",
+        "d753390d2089cf1b",
+        "632d7be7d6dd9093",
         "10e46405a87361de"
        ],
        "visibility": "public",
@@ -15859,6 +15804,12 @@
         "10001"
        ],
        "source_ids": [
+        "f3cf5ee6569a90ab",
+        "32ed0168a98dd6e5",
+        "ce2f0fced43d9179",
+        "bd2144a04c591af1",
+        "0e573ca31ecededd",
+        "98bbacc6b4e4b328",
         "0d547e081dfdb07d"
        ],
        "visibility": "private",

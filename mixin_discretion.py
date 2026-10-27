@@ -17,43 +17,6 @@ _EVENT_TEXT_FIELDS = ("title", "event", "central_details", "meaning_to_her", "re
 
 class DiscretionMixin:
     # ------------------------------------------------------------------
-    # Body texts: the one body is shared by every place, so the texts it
-    # keeps (open loops, recent replies, ...) are tagged with where they
-    # came from and filtered before they are shown anywhere.
-    # ------------------------------------------------------------------
-    def _tag_core_items(self, core, event) -> None:
-        if core is None:
-            return
-        try:
-            sid, _name = self._speaker(event)
-        except Exception:
-            sid = ""
-        origin = discretion.make_origin(self._here(event), [sid])
-        for name in CORE_TEXT_LISTS:
-            for item in getattr(core, name, None) or []:
-                if isinstance(item, dict) and not isinstance(item.get("origin"), dict):
-                    item["origin"] = dict(origin, people=list(origin["people"]))
-
-    def _same_place_items(self, event, items) -> list:
-        here = self._here(event)
-        return [x for x in (items or []) if isinstance(x, dict)
-                and discretion.origin_of(x)["where"] == here]
-
-    def _visible_core_items(self, event, items) -> list:
-        here = self._here(event)
-        out = []
-        for item in items or []:
-            if not isinstance(item, dict):
-                continue
-            v = discretion.verdict(discretion.origin_of(item), here)
-            if v == discretion.DROP:
-                continue
-            if v == discretion.ANON:
-                item = dict(item, text=discretion.anonymize(item.get("text"), discretion.names_in(item)))
-            out.append(item)
-        return out
-
-    # ------------------------------------------------------------------
     # Events (the one global archive; each record carries its origin).
     # ------------------------------------------------------------------
     def _visible_events(self, event, events) -> list:
@@ -119,18 +82,25 @@ class DiscretionMixin:
     # ------------------------------------------------------------------
     # Forgetting: delete for real, by person or by source message.
     # ------------------------------------------------------------------
-    def _forget(self, person: str = "", source_ids=None) -> dict:
-        """Delete every memory, event, note and body text that came from `person`
+    def _forget(self, person: str = "", source_ids=None, again: bool = False) -> dict:
+        """Delete every memory, event, note and phone line that came from `person`
         (or from one of `source_ids`), and his relationship record.
 
         Returns counts per store. Files moved aside by the one-her migration
-        (per-session legacy/archive folders) are not touched here.
+        (per-session legacy/archive folders) are not touched here. Every call
+        is logged (the log length is the forget count), so work that started
+        before it (memory consolidation) knows to drop what it holds instead
+        of saving it back; `again` is that work repeating a logged call.
         """
         person = str(person or "").strip()
         ids = [str(x) for x in (source_ids or []) if str(x or "").strip()]
         if not person and not ids:
             return {}
-        counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "body": 0}
+        if not again:
+            if not isinstance(getattr(self, "_forget_log", None), list):
+                self._forget_log = []
+            self._forget_log.append((person, list(ids)))
+        counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0}
 
         def about(item):
             return discretion.is_about(discretion.origin_of(item), person, ids)
@@ -202,21 +172,23 @@ class DiscretionMixin:
                 if isinstance(x, dict))[:600]
             self._save_self_model()
 
-        # 5) texts kept in the body
-        core = self._core(None)
-        for name in CORE_TEXT_LISTS:
-            items = getattr(core, name, None)
-            if not isinstance(items, list):
+        # 5) her phone: his private window, and lines and loops from him elsewhere
+        for place in self._window_places():
+            if person and place == "private:" + person:
+                win = self._read_window(place)
+                counts["phone"] += len(win["recent"]) + len(win["open_loops"])
+                self._window_file(place).unlink()
                 continue
-            kept_items = [x for x in items if not (isinstance(x, dict) and about(x))]
-            if len(kept_items) != len(items):
-                counts["body"] += len(items) - len(kept_items)
-                setattr(core, name, kept_items)
-        if counts["body"]:
-            try:
-                HER_STATE_PATH.write_text(json.dumps(core.snapshot(), ensure_ascii=False, indent=1),
-                                          encoding="utf-8")
-            except Exception:
-                pass
+            win = self._read_window(place)
+            changed = False
+            for key in ("recent", "open_loops"):
+                kept_items = [x for x in win[key] if not (isinstance(x, dict) and about(x))]
+                if len(kept_items) != len(win[key]):
+                    counts["phone"] += len(win[key]) - len(kept_items)
+                    win[key] = kept_items
+                    changed = True
+            if changed:
+                self._write_window(place, win)
+        self._refresh_loop_pressure(self._core(None))
         logger.info("[ams-life] forgot person=%s sources=%d: %s", "yes" if person else "no", len(ids), counts)
         return counts

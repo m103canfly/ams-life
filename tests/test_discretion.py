@@ -66,7 +66,6 @@ class Table(unittest.TestCase):
         self.assertEqual(d.verdict(private, 'private:7'), d.FULL)
         self.assertEqual(d.verdict(private, 'group:1'), d.DROP)
         self.assertEqual(d.verdict(private, 'private:8'), d.DROP)
-        self.assertEqual(d.verdict(private, 'group:1', echoed=True), d.FULL)
         # her own, web pages
         for o in (own, web):
             for here in ('group:1', 'private:8'):
@@ -86,14 +85,6 @@ class Table(unittest.TestCase):
         o = d.origin_of({'provenance': {'session': 'default:FriendMessage:7', 'sender_id': '7',
                                         'message_refs': ['m1']}})
         self.assertEqual(o, {'where': 'private:7', 'people': ['7'], 'source_ids': ['m1'], 'visibility': d.PRIVATE})
-
-    def test_said_openly(self):
-        said = [{'text': '跟大家说下，我在偷偷准备一个惊喜蛋糕', 'role': 'user', 'sender_id': '7',
-                 'origin': d.make_origin('group:1', ['7'])}]
-        self.assertTrue(d.said_openly('我在偷偷准备一个惊喜蛋糕给大家', '7', said, 'group:1'))
-        self.assertFalse(d.said_openly('我在偷偷准备一个惊喜蛋糕给大家', '8', said, 'group:1'))
-        self.assertFalse(d.said_openly('我在偷偷准备一个惊喜蛋糕给大家', '7', said, 'group:2'))
-        self.assertFalse(d.said_openly('周末去爬山', '7', said, 'group:1'))
 
     def test_anonymize(self):
         self.assertEqual(d.anonymize('芒果：明天考试（10001）', ['芒果', '10001']), '有人：明天考试（有人）')
@@ -125,12 +116,16 @@ class PublicWithoutNames(unittest.TestCase):
             self.assertNotIn(who, b['prompt'])
 
 
-class SaidOpenlyHimself(unittest.TestCase):
-    def test_group_may_bring_up_what_he_said_there_himself(self):
+class SaidInTheGroupToo(unittest.TestCase):
+    """No exception any more: what he told her in private stays in that private chat,
+    even after he says nearly the same thing in a group himself."""
+
+    def test_private_wording_stays_out_of_the_group_he_repeated_it_in(self):
         r = run_case('echo')
         a = r['turns'][2]
         self.assertIn('GroupMessage:900001', a['session'])
-        self.assertIn('惊喜蛋糕给大家', a['prompt'])  # the private wording, allowed now
+        self.assertNotIn('惊喜蛋糕给大家', a['prompt'])
+        self.assertFalse([ln for ln in a['prompt'].split('\n') if '（别处）' in ln and '惊喜蛋糕' in ln])
 
     def test_other_group_still_does_not_hear_the_private_wording(self):
         r = run_case('echo')
@@ -138,6 +133,70 @@ class SaidOpenlyHimself(unittest.TestCase):
         self.assertIn('GroupMessage:900002', b['session'])
         self.assertNotIn('惊喜蛋糕给大家', b['prompt'])
         self.assertNotIn('芒果', b['prompt'])
+
+
+class Phone(unittest.TestCase):
+    """She has a phone: what was said stays in its own chat window; the body keeps no text."""
+
+    def test_group_event_is_made_only_from_that_group(self):
+        r = run_case('strong_event')
+        secret = set().union(*(pieces(t) for t in r['private_texts']))
+        group_events = [e for e in r['events'] if e['origin']['where'] == 'group:900001']
+        self.assertTrue(group_events)
+        for e in group_events:
+            self.assertEqual([p for p in secret if p in flat(e['text'])], [])
+            self.assertEqual(e['origin']['people'], ['10002'])
+            self.assertTrue(e['origin']['source_ids'])
+        for t in r['turns']:
+            if 'GroupMessage' in t['session']:
+                self.assertEqual([p for p in secret if p in flat(t['prompt'])], [], t['session'])
+
+    def test_body_state_file_keeps_no_words(self):
+        r = run_case('strong_event')
+        said = set().union(*(pieces(t, 4) for t in r['all_texts']))
+        self.assertTrue(r['her_state'])
+        self.assertEqual([p for p in said if p in flat(r['her_state'])], [])
+        # her replies are in the window they were said in
+        self.assertIn('好呀，惊喜蛋糕我帮你保密', [x['text'] for x in r['phone']['private:10001']['recent']])
+        self.assertNotIn('好呀，惊喜蛋糕我帮你保密', [x['text'] for x in r['phone']['group:900001']['recent']])
+
+    def test_open_loops_stay_in_their_window(self):
+        r = run_case('loops')
+        w = r['windows_after_talk']
+        private = [x for x in w['private:10001']['open_loops'] if x['text'] == '记得提醒我明天交报告']
+        # the group's "报告我交了" does not close the private reminder ...
+        self.assertEqual(private[0]['status'], 'open')
+        # ... and the group's own reminder is not merged into it
+        self.assertEqual(private[0]['mentioned'], 1)
+        group = w['group:900001']['open_loops']
+        self.assertEqual([(x['text'], x['origin']['where']) for x in group],
+                         [('记得提醒我明天交报告', 'group:900001')])
+        self.assertEqual(w['group:900002']['open_loops'], [])
+        # loops show only in their own window
+        prompts = [t['prompt'] for t in r['turns']]
+        self.assertIn('loops=', prompts[0])
+        self.assertNotIn('loops=', prompts[1])
+        self.assertNotIn('loops=', prompts[3])
+        self.assertNotIn('交报告', prompts[3])
+
+    def test_open_loop_cap_is_per_window(self):
+        r = run_case('loops')
+        w = r['windows_after_many']
+        self.assertEqual(len(w['group:900001']['open_loops']), 20)
+        self.assertEqual(w['private:10001']['open_loops'], r['windows_after_talk']['private:10001']['open_loops'])
+
+    def test_old_one_body_state_is_split_into_windows(self):
+        r = run_case('migrate_her')
+        her = json.dumps(r['her'], ensure_ascii=False)
+        for word in ('保密', '爬山', '一句话', '报告', '蛋糕', '惊喜'):
+            self.assertNotIn(word, her)
+        self.assertEqual([x['text'] for x in r['phone']['private:10001']['recent']], ['蛋糕的事我帮你保密'])
+        self.assertEqual([x['text'] for x in r['phone']['group:900001']['recent']], ['爬山记得带水哦'])
+        self.assertEqual([x['text'] for x in r['phone']['group:900001']['open_loops']], ['记得提醒我交报告'])
+        # lines whose window is unknown go nowhere; the old file is kept in the archive
+        self.assertNotIn('不知道从哪来的一句话', json.dumps(r['phone'], ensure_ascii=False))
+        self.assertNotIn('记得提醒我买蛋糕', json.dumps(r['phone'], ensure_ascii=False))
+        self.assertEqual(r['archive'], ['her.before_phone.json'])
 
 
 class OneBody(unittest.TestCase):
@@ -166,6 +225,12 @@ class Forget(unittest.TestCase):
         self.assertNotIn('10001', after['users'])
         self.assertNotIn('private:10001', after['rooms'])
         self.assertFalse(any('惊喜蛋糕' in m['text'] or '气死' in m['text'] for m in after['memories']))
+        # and her phone: his private window is gone, nothing from him in the group's
+        self.assertIn('private:10001', before['phone'])
+        self.assertNotIn('private:10001', after['phone'])
+        for win in after['phone'].values():
+            for item in win['recent'] + win['open_loops']:
+                self.assertNotIn('10001', item['origin']['people'])
         # other people are untouched
         self.assertEqual(len([m for m in after['memories'] if m['sender_id'] == '10002']), 2)
         self.assertIn('10002', after['users'])
@@ -176,6 +241,21 @@ class Forget(unittest.TestCase):
         texts = [m['text'] for m in r['after_source']['memories']]
         self.assertNotIn('小爱，我们群周末要去爬山', texts)
         self.assertIn('小爱，周末爬山带什么好', texts)
+
+
+class ForgetWhileConsolidating(unittest.TestCase):
+    def test_forgetting_during_consolidation_is_not_undone(self):
+        r = run_case('consolidate')
+        self.assertEqual(len(r['forgot_meanwhile']), 1)
+        self.assertTrue(r['forgot_meanwhile'][0]['memories'])
+        after = r['after']['memories']
+        self.assertFalse(any(m['sender_id'] == '10001' or '10001' in m['origin']['people'] for m in after))
+        self.assertFalse(any('蛋糕' in m['text'] for m in after))
+
+    def test_consolidation_still_saves_when_nothing_was_forgotten(self):
+        r = run_case('consolidate')
+        summaries = [m['text'] for m in r['after_control']['memories'] if m['sender_id'] is None]
+        self.assertTrue(summaries)
 
 
 class Migration(unittest.TestCase):
@@ -194,7 +274,13 @@ class Migration(unittest.TestCase):
         self.assertEqual(r['states_archive'], ['default_FriendMessage_10001.json', 'default_GroupMessage_900001.json'])
         # the most recently updated state is where the one body starts
         self.assertAlmostEqual(r['v'], 0.1)
-        self.assertEqual(r['loops'][0]['origin']['where'], 'group:900001')
+        # what was said in each old session went into that session's window; the body keeps none of it
+        self.assertEqual([x['text'] for x in r['phone']['group:900001']['open_loops']], ['记得提醒我交报告'])
+        self.assertEqual([x['text'] for x in r['phone']['group:900001']['recent']], ['爬山记得带水哦'])
+        self.assertEqual([x['text'] for x in r['phone']['private:10001']['recent']], ['蛋糕的事我帮你保密'])
+        her = json.dumps(r['her'], ensure_ascii=False)
+        for word in ('保密', '爬山', '报告', '蛋糕'):
+            self.assertNotIn(word, her)
 
     def test_migrated_private_memory_stays_out_of_groups(self):
         r = run_case('migrate')

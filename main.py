@@ -59,10 +59,14 @@ try:
     from .mixin_discretion import DiscretionMixin
 except ImportError:
     from mixin_discretion import DiscretionMixin
+try:
+    from .mixin_phone import PhoneMixin
+except ImportError:
+    from mixin_phone import PhoneMixin
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -360,21 +364,38 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         """ams-life: start the single body from the most recently updated per-session state.
 
         Every old states/<session>.json is moved into STATE_ARCHIVE_DIR, never deleted.
+        What was said in a session (reply lines, open loops) goes into that
+        session's window in her phone; the body keeps no text. A one-body state
+        written before the phone existed is split the same way, its old file
+        kept in the archive as her.before_phone.json.
         """
         if HER_STATE_PATH.exists():
+            state = json.loads(HER_STATE_PATH.read_text(encoding="utf-8"))
+            if not self._body_state_has_text(state):
+                return
+            STATE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+            kept = STATE_ARCHIVE_DIR / "her.before_phone.json"
+            if not kept.exists():
+                shutil.copy2(str(HER_STATE_PATH), str(kept))
+            self._move_body_texts_to_phone(state)
+            HER_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
+            logger.info("[ams-life] phone: moved the texts kept in the body into their windows")
             return
         old = sorted((f for f in STATE_DIR.glob("*.json") if f.is_file()),
                      key=lambda f: f.stat().st_mtime, reverse=True)
         if not old:
             return
-        state = json.loads(old[0].read_text(encoding="utf-8"))
-        # The texts kept in the body (open loops, recent replies, ...) came from that one session.
-        _origin = discretion.make_origin(old[0].stem)
-        for _name in CORE_TEXT_LISTS:
-            for _item in (state.get(_name) if isinstance(state, dict) else None) or []:
-                if isinstance(_item, dict):
-                    _item.setdefault("origin", dict(_origin))
-        HER_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
+        state = None
+        for f in old:
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            self._move_body_texts_to_phone(d, f.stem)
+            if state is None:
+                state = d
+        HER_STATE_PATH.write_text(json.dumps(state if isinstance(state, dict) else {}, ensure_ascii=False, indent=1),
+                                  encoding="utf-8")
         STATE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
         for f in old:
             shutil.move(str(f), str(STATE_ARCHIVE_DIR / f.name))
@@ -436,6 +457,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                         core._rng = __import__("random").Random(_seed)
                 except Exception:
                     pass
+            self._refresh_loop_pressure(core)
             self.cores[key] = core
         return self.cores[key]
 
@@ -511,7 +533,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             pass
         # A4: capture open loops from *before* this turn so the continuity
         # opener cannot echo a loop created by the current message.
-        _prior_open_loops = [dict(x) for x in self._visible_core_items(event, getattr(core, "open_loops", []))]
+        _prior_open_loops = [dict(x) for x in self._window_loops(event)]
         text = str(getattr(event, "message_str", "") or "").strip()
         if not text:
             text = str(getattr(req, "prompt", "") or "")
@@ -532,7 +554,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 _query_vec = None
         if text:
             core.observe(text, embedding=_query_vec)
-        self._tag_core_items(core, event)
+            # ams-life: open loops are matched, merged and closed in this window only.
+            self._window_update_loops(event, text, core)
         _user_data = self._touch_user(event, core)
         # Task-15: readiness is computed by L1 only when autonomy is enabled;
         # remember private sessions and start the P0-1 generator lazily.
@@ -567,9 +590,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             pass
         _self_model = self._self_model_for(event)
         try:
-            _recent_turns = [str(h.get("text") or "") for h in self._same_place_items(event, core.history)[-6:]]
+            _own_lines = [str(h.get("text") or "") for h in self._window_replies(event, 12)]
             core.bind_goal_context(memory_text=_mem, self_model=_self_model,
-                                   recent=_recent_turns, text=text)
+                                   recent=_own_lines[-6:], text=text, own_lines=_own_lines)
         except Exception:
             pass
         _events = self._event_context(event)
@@ -600,7 +623,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _base = str(getattr(req, "system_prompt", "") or "")
         _sid, _sname = self._speaker(event)
         _speaker = (("%s（%s）" % (_sname or "未知", _sid)) if _sid else (_sname or ""))
-        _loops = self._visible_core_items(event, getattr(core, "open_loops", None))
+        _loops = self._window_loops(event)
         _compact = interpretation.render_compact(
             core,
             _mem.replace("[BioCore Memory]", "").strip(),
@@ -656,6 +679,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception:
             pass
         try:
+            self._window_add_reply(event, _reply)
+        except Exception as exc:
+            logger.warning("[ams-life] window write failed: %s", exc)
+        try:
             homeostasis.metabolize_reply(core, _reply)
         except Exception:
             pass
@@ -664,7 +691,6 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 asyncio.create_task(self._remember(event, _reply, "assistant", core))
         except Exception:
             pass
-        self._tag_core_items(core, event)
         try:
             STATE_DIR.mkdir(parents=True, exist_ok=True)
             HER_STATE_PATH.write_text(

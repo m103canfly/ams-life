@@ -2182,7 +2182,7 @@ class EventsMixin:
             return
         await self._archive_ranked_events_deterministic(event, core, entries)
 
-    async def _archive_strong_event(self, event, core, texts, summary, attachments=None):
+    async def _archive_strong_event(self, event, core, texts, summary, attachments=None, origin=None):
         if core is None:
             return
         intensity = float(core._intensity())
@@ -2255,6 +2255,9 @@ class EventsMixin:
                 "strength": round(max(0.5, min(1.0, intensity)), 3),
                 "source_texts": [self._mask_if_safety(t) for t in texts[:12]],
             }
+            # ams-life: this window, the people of the lines it was made from, their message ids.
+            if isinstance(origin, dict):
+                record["origin"] = origin
             # task-33: same worthiness gate as the deterministic path.
             _memory_point = True
             try:
@@ -2333,13 +2336,18 @@ class EventsMixin:
                 self._last_strong_event_summary = last_map
             if now - float(last_map.get(key, 0.0) or 0.0) < 600:
                 return
-            texts = [str(h.get("text") or "").strip() for h in (getattr(core, "history", None) or [])[-6:]
-                     if isinstance(h, dict) and str(h.get("text") or "").strip()]
+            # ams-life: her latest replies in this window only, never another chat's.
+            lines = self._window_replies(event, 6)
+            texts = [str(h.get("text") or "").strip() for h in lines]
+            origins = [discretion.origin_of(h) for h in lines]
             if str(text or "").strip():
                 texts.append(str(text).strip())
+                origins.append(self._event_origin(event))
             if not texts:
                 return
             last_map[key] = now
-            await self._archive_strong_event(event, core, texts, str(text or texts[-1])[:160])
+            origin = discretion.merge(origins)
+            origin = discretion.make_origin(self._here(event), origin["people"], origin["source_ids"])
+            await self._archive_strong_event(event, core, texts, str(text or texts[-1])[:160], origin=origin)
         except Exception as exc:
             logger.warning("[biocore] request-path strong event failed: %s", exc)
