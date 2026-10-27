@@ -12,6 +12,7 @@ repository is the unmodified upstream snapshot; every later change is in the git
 
 | Date | Change |
 | --- | --- |
-| 2026-10-27 | Renamed the plugin to `astrbot_plugin_ams_life` (register name, data directory, dashboard routes, backup archive paths, update-check repository). Moved upstream README/CHANGELOG/UPDATE to `docs/upstream/`. |
+| 2026-10-27 | Split `main.py` into `common.py`, `body.py` and eight `mixin_*.py` modules without changing behaviour (golden traces identical). Dashboard backup now archives every `.py` module. |
+| 2026-10-27 | Renamed the plugin to `astrbot_plugin_ams_life` (register name, data directory, dashboard routes, backup archive paths, update-check repository). Moved upstream README/CHANGELOG/UPDATE to `docs/upstream/`. Added an offline test suite (`tests/`) with golden traces recorded from the unmodified code. |
 
 Modified source files carry a header line pointing to this file.

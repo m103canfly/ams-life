@@ -8,8 +8,8 @@
 - **记忆带出处**：她什么都记得，但私下听来的不在别处讲，群友说“忘记我”就真删；
 - **她自己挑地方**：一个注意力循环决定这会儿去哪个群看、在哪开口。
 
-> **状态：第 0 步（准备），还不能部署。** 现在仓库里基本还是 BioCore v1.2.99 的原样代码，
-> 只改了插件名、数据目录和链接。改造计划见 `docs/plan.md`。
+> **状态：第 0 步（准备），还不能部署。** 现在仓库里的行为还和 BioCore v1.2.99 完全一样：
+> 改了插件名、数据目录和链接，把一万行的 `main.py` 原样拆成了几个模块，并用录下来的对话轨迹测试保证拆分前后一字不差。
 
 ## 来源与许可
 
@@ -24,7 +24,14 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 
 | 路径 | 是什么 |
 | --- | --- |
-| `main.py` | AstrBot 插件入口（BioCore 原有，正在拆分） |
+| `main.py` | AstrBot 插件入口：插件类、`__init__`、请求/回复钩子、`/biocore` 指令 |
+| `common.py` | 公共部分：导入、数据目录、常量、工具函数 |
+| `body.py` | 身体状态（BioCore 类）：心情、压力、驱力、衰减 |
+| `mixin_memory.py` | 向量、记忆的存储、打分、召回、巩固 |
+| `mixin_events.py` | 事件档案：总结、值不值得记、去重、洞察 |
+| `mixin_people.py` | 自我描述、每个人的记录和关系 |
+| `mixin_autonomy.py` | 私聊里的主动开口 |
+| `mixin_llm.py` `mixin_settings.py` `mixin_media.py` `mixin_pages.py` | 模型调用、设置、图片语音、面板 |
 | `interpretation.py` `homeostasis.py` `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
 | `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开） |
 | `tests/` | 离线测试，不连 AstrBot、不联网、不调用模型 |
