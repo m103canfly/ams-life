@@ -67,7 +67,7 @@ FULL_CONFIG = {'llm_only_reply_summary': False, 'safety_enabled': True, 'we_memo
 def files_snapshot(root):
     out = {}
     for path in sorted(p for p in root.rglob('*') if p.is_file()):
-        rel = str(path.relative_to(root))
+        rel = path.relative_to(root).as_posix()
         text = path.read_text('utf-8', errors='replace')
         if path.suffix == '.json':
             try:
