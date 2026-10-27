@@ -33,9 +33,13 @@ class Clock:
 def prepare(data_dir, start=1_793_000_000.0):
     """Call before importing main: data dir, time zone, frozen clock, seeded random. Returns the clock."""
     os.environ['AMS_LIFE_DATA_DIR'] = str(data_dir)
-    os.environ['TZ'] = 'Asia/Shanghai'
     if hasattr(time, 'tzset'):
+        os.environ['TZ'] = 'Asia/Shanghai'
         time.tzset()
+    else:
+        # Windows: the C runtime reads TZ on the first localtime() call but only understands POSIX-style values;
+        # 'Asia/Shanghai' would silently mean UTC. 'CST-8' is the same UTC+8 (no DST in China since 1991).
+        os.environ['TZ'] = 'CST-8'
     for path in (str(STUBS), str(ROOT)):
         if path not in sys.path:
             sys.path.insert(0, path)
