@@ -1,0 +1,465 @@
+{
+  "enabled": {
+    "description": "启用 BioCore",
+    "hint": "关闭后不注入任何情绪状态，也不写 feedback。",
+    "type": "bool",
+    "default": true
+  },
+  "inject_intent": {
+    "description": "注入表达意图",
+    "hint": "把 [BioCore] 情绪意图追加到 system_prompt；不生成回复、不改人设。",
+    "type": "bool",
+    "default": true
+  },
+  "proactive_reply": {
+    "description": "主动回复（旧预留）",
+    "hint": "默认关闭。旧预留开关，当前不触发发送；新的噪声→自主行为链路见 proactive_autonomy / proactive_send。",
+    "type": "bool",
+    "default": false
+  },
+  "proactive_autonomy": {
+    "description": "噪声→自主行为就绪度（默认关）",
+    "hint": "默认关闭：不计算 readiness、不启动后台任务、不改变状态轨迹。开启后只在私聊路径计算 threshold/max_chars/impulse 写入 state.proactive_autonomy；群聊永远不触发。",
+    "type": "bool",
+    "default": false
+  },
+  "proactive_send": {
+    "description": "允许主动发送（默认关）",
+    "hint": "默认关闭。proactive_autonomy 与 proactive_send 同时开启且为私聊时，后台 5 分钟 tick 仍须满足 cooldown≥30min、每日≤3、0–8 点静默才发送确定性模板；不新增 LLM 调用。",
+    "type": "bool",
+    "default": false
+  },
+  "autonomy_loop_enabled": {
+    "description": "最小自主循环（默认关）",
+    "hint": "默认关闭：不建状态、不计算、不广播 token、不发送，state 文件与 1.2.98 一致。开启后只在私聊后台 tick 做确定性候选→仲裁→单 token 广播（token-only 默认，不发送）；无新增 LLM 调用。",
+    "type": "bool",
+    "default": false
+  },
+  "autonomy_loop_theta_ig": {
+    "description": "自主循环点燃阈值（默认 0.45）",
+    "hint": "候选 value 需 ≥ 该阈值才广播 token；范围 0.35–0.55（工程取值，非论文常数）。",
+    "type": "float",
+    "default": 0.45
+  },
+  "autonomy_loop_margin": {
+    "description": "自主循环领先幅度（默认 0.08）",
+    "hint": "冠军 value 需领先第二名 ≥ 该值才广播；范围 0.05–0.15。",
+    "type": "float",
+    "default": 0.08
+  },
+  "autonomy_loop_k_delay": {
+    "description": "延迟折扣 k（每分钟，默认 0.02）",
+    "hint": "双曲折扣 1/(1+k·D) 的 k；范围 0.001–0.10。工程近似，不声称心理延迟效应。",
+    "type": "float",
+    "default": 0.02
+  },
+  "autonomy_loop_ior_seconds": {
+    "description": "返回抑制恢复时间（秒，默认 600）",
+    "hint": "token 广播后该模式的抑制恢复 tau；范围 300–1800。另有 60s 同模式不应期。",
+    "type": "int",
+    "default": 600
+  },
+  "autonomy_loop_c0": {
+    "description": "努力成本基础项 c0（默认 0.05）",
+    "hint": "cost = c0 + c1·effort + c2·debt；c0 范围 0–1（工程取值）。",
+    "type": "float",
+    "default": 0.05
+  },
+  "autonomy_loop_c1": {
+    "description": "努力成本 effort 系数 c1（默认 0.20）",
+    "hint": "工程取值；effort 按候选模式 0.05–0.60 映射。",
+    "type": "float",
+    "default": 0.20
+  },
+  "autonomy_loop_c2": {
+    "description": "努力成本 debt 系数 c2（默认 0.15）",
+    "hint": "effort_debt 执行 +0.15、每 tick 恢复 -0.02，clamp [0,0.60]。",
+    "type": "float",
+    "default": 0.15
+  },
+  "autonomy_loop_token_only": {
+    "description": "自主循环仅广播 token（默认开）",
+    "hint": "默认开：只写 state.workspace_token，不发送。关闭且 proactive_autonomy+proactive_send 同时开时，同一 tick 仍最多 1 个出口（走 task-15 发送门槛）。",
+    "type": "bool",
+    "default": true
+  },
+  "noise_seed": {
+    "description": "噪声随机种子（0=随机）",
+    "hint": "默认 0 使用系统随机；仅 proactive_autonomy 开启时生效并写入 state.proactive_autonomy.noise_seed，便于 eval 回放。",
+    "type": "int",
+    "default": 0
+  },
+  "bio_learning": {
+    "description": "L1 学习（默认开，小步长+硬边界）",
+    "hint": "默认开启：调节策略 Q、信任 EMA 自适应学习率、记忆保持模型均按论文小步长更新；学习参数写 state.learning，可用 /biocore learning reset 恢复；关闭后参数完全冻结。",
+    "type": "bool",
+    "default": true
+  },
+  "retention_model": {
+    "description": "记忆保持模型",
+    "hint": "默认 single（1.2.98 旧指数，安全回退）；power_law（Wixted 1991）与 multi_scale（Bernacchia 2011）为实验模型，需 A/B 后再切换。",
+    "type": "string",
+    "default": "single",
+    "options": [
+      "power_law",
+      "multi_scale",
+      "single"
+    ]
+  },
+  "bio_feedback_loops": {
+    "description": "C8+C9 目标↔评价闭环（默认关）",
+    "hint": "默认关闭：与 1.2.98 完全一致。开启后目标进度会回写 appraisal/v/stress，且 appraisal(coping/goal_relevance) 会反过来影响目标进度，形成真闭环；有界、无 LLM。",
+    "type": "bool",
+    "default": false
+  },
+  "attention_gate_enabled": {
+    "description": "记忆激活概率门控（默认关）",
+    "hint": "默认关：与 1.2.98 完全一致。开启后按 ACT-R 逻辑函数门控候选，shift=0 时与旧 score≥0.25 等价。",
+    "type": "bool",
+    "default": false
+  },
+  "attention_gate_s": {
+    "description": "门控温度 s",
+    "hint": "0.20–0.40，默认 0.30。",
+    "type": "float",
+    "default": 0.3
+  },
+  "attention_gate_shift": {
+    "description": "门控阈值平移",
+    "hint": "−0.20–+0.20，默认 0。",
+    "type": "float",
+    "default": 0.0
+  },
+  "fan_penalty_enabled": {
+    "description": "关联度数惩罚（默认关）",
+    "hint": "默认关。开启后 score×1/(1+fan_gain·ln(1+assoc+links))，下限 fan_floor。",
+    "type": "bool",
+    "default": false
+  },
+  "fan_gain": {
+    "description": "fan 惩罚强度",
+    "hint": "0.05–0.20，默认 0.10。",
+    "type": "float",
+    "default": 0.1
+  },
+  "fan_floor": {
+    "description": "fan 惩罚下限",
+    "hint": "0.50–0.85，默认 0.70。",
+    "type": "float",
+    "default": 0.7
+  },
+  "cowan_capacity_enabled": {
+    "description": "working_set 容量=4（默认关）",
+    "hint": "默认关时容量=max(4, top_k*2)。开启后固定 cowan_capacity。",
+    "type": "bool",
+    "default": false
+  },
+  "cowan_capacity": {
+    "description": "容量值",
+    "hint": "3–6，默认 4。",
+    "type": "int",
+    "default": 4
+  },
+  "attention_topk_cap_enabled": {
+    "description": "top_k 上限=4（默认关）",
+    "hint": "默认关。开启后 top_k=min(top_k, attention_topk_cap)。",
+    "type": "bool",
+    "default": false
+  },
+  "attention_topk_cap": {
+    "description": "top_k 上限值",
+    "hint": "3–6，默认 4。",
+    "type": "int",
+    "default": 4
+  },
+  "memory_chain_enabled": {
+    "description": "事件-事件关联链（默认关）",
+    "hint": "默认关：与旧版一致。开启后事件归档最多写 3 条边（时间邻近 1800s + 因果词），30 天半衰；linked_ids fan_out=2/min_weight=0.5。",
+    "type": "bool",
+    "default": false
+  },
+  "memory_chain_multihop": {
+    "description": "多跳扩散（默认关）",
+    "hint": "默认关。开启后 hop≤2、fan_out≤3、decay=0.5、新增≤6；超预算即停。",
+    "type": "bool",
+    "default": false
+  },
+  "chain_budget_enabled": {
+    "description": "关联链接预算（默认关）",
+    "hint": "默认关。开启后 linked_ids fan_out=2、min_weight=0.5（否则 fan_out=3、min_weight=1.0）。",
+    "type": "bool",
+    "default": false
+  },
+  "chain_hops": {
+    "description": "多跳 hop 上限",
+    "hint": "1–2，默认 2。",
+    "type": "int",
+    "default": 2
+  },
+  "chain_fan_out": {
+    "description": "每跳 fan_out",
+    "hint": "1–3，默认 3。",
+    "type": "int",
+    "default": 3
+  },
+  "chain_decay": {
+    "description": "每跳激活衰减",
+    "hint": "0.4–0.6，默认 0.5。",
+    "type": "float",
+    "default": 0.5
+  },
+  "memory_dedup_embedding": {
+    "description": "记忆排重嵌入",
+    "hint": "默认开启。BioCore 使用 AstrBot / 自定义 embedding 做本地记忆召回与余弦排重。",
+    "type": "bool",
+    "default": true
+  },
+  "memory_worthiness_enabled": {
+    "description": "记忆点判定（默认开）",
+    "hint": "默认开启：事件按确定性多角度 W/W_her/K 评分，只有 W≥0.60 且（W_her≥0.45 或 I≥0.75）或 K≥0.70 才生成记忆点；0.40–0.60 只归档；<0.40 或工具问答不生成。关闭 = 完全回到旧行为（不过滤、不写 worthiness）。无新增 LLM。",
+    "type": "bool",
+    "default": true
+  },
+  "safety_enabled": {
+    "description": "安全限制（默认关）",
+    "hint": "默认关闭，私人使用无限制。开启后恢复敏感信息掩码、跨会话隔离、低置信拒答、投毒过滤。",
+    "type": "bool",
+    "default": false
+  },
+  "hybrid_retrieval": {
+    "description": "混合检索（词法 + MMR）",
+    "hint": "默认开启。embedding 余弦之外加入字符二元组词法分，并用 MMR 降低近重复记忆占位；关闭则只用余弦。",
+    "type": "bool",
+    "default": true
+  },
+  "llm_memory_candidates": {
+    "description": "LLM 记忆候选",
+    "hint": "默认开启。记忆巩固时让 LLM 顺带提议 ADD/UPDATE 候选，由生物层确定性策略决定（永不 DELETE，不增加 LLM 调用次数）。",
+    "type": "bool",
+    "default": true
+  },
+  "we_memory_enabled": {
+    "description": "共同记忆（we-memory，默认关）",
+    "hint": "默认关闭。开启后只从已有记忆里确定性抽取暗号/仪式/纪念日/共同物件，必须有 evidence_refs 且置信度≥0.55；不会新增 LLM 调用，也不会跨用户共享。",
+    "type": "bool",
+    "default": false
+  },
+  "persona_id": {
+    "description": "人格提示词来源",
+    "hint": "选择 AstrBot 已有人设用于编译数值倾向；留空跟随当前默认人设。首次使用或更换人设时编译一次，重复加载不调用 LLM。",
+    "type": "string",
+    "default": ""
+  },
+  "llm_only_reply_summary": {
+    "description": "LLM 只用于回复+总结（严格）",
+    "hint": "默认开启。只允许事件总结/记忆总结调用 LLM；人格数值编译、事件排序抽取、长期模式洞察、图片描述都不再额外调用 LLM（用确定性回退）。关闭后恢复全部 LLM 能力。",
+    "type": "bool",
+    "default": true
+  },
+  "kb_enabled": {
+    "description": "启用 AstrBot 知识库",
+    "hint": "开启后，请求时会检索 kb_names 中的知识库并注入 [BioCore Knowledge]。默认关闭。",
+    "type": "bool",
+    "default": false
+  },
+  "kb_names": {
+    "description": "知识库名称",
+    "hint": "填写 AstrBot 知识库名称，每行一个；仅在启用知识库时生效。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": []
+  },
+  "voice_transcription_enabled": {
+    "description": "语音转写",
+    "hint": "使用 AstrBot STT provider 把语音转成文字；没有 provider 时自动跳过。",
+    "type": "bool",
+    "default": true
+  },
+  "image_recognition_enabled": {
+    "description": "图片识别",
+    "hint": "私聊识别所有图片；群聊只有触发词 + 引用图片才识别。",
+    "type": "bool",
+    "default": true
+  },
+  "valence_decay_minutes": {
+    "description": "效价衰减半衰期（分钟）",
+    "hint": "没有新刺激时，情绪效价向基线回落的时间尺度；默认 120 分钟。",
+    "type": "int",
+    "default": 120
+  },
+  "arousal_decay_minutes": {
+    "description": "唤醒衰减半衰期（分钟）",
+    "hint": "唤醒比效价回落快；默认 30 分钟。",
+    "type": "int",
+    "default": 30
+  },
+  "social_decay_minutes": {
+    "description": "社交连接衰减半衰期（分钟）",
+    "hint": "社交连接向基线回落的时间尺度；默认 180 分钟。",
+    "type": "int",
+    "default": 180
+  },
+  "stimulus_decay_seconds": {
+    "description": "短时刺激记忆秒数",
+    "hint": "同类情绪刺激在这个时间内重复出现，会按次衰减，避免同一句话反复拉爆情绪。",
+    "type": "int",
+    "default": 300
+  },
+  "stimulus_habituation": {
+    "description": "刺激重复衰减系数",
+    "hint": "越大，重复内容衰减越快；默认 0.75。",
+    "type": "float",
+    "default": 0.75
+  },
+  "reflection_interval_hours": {
+    "description": "长期洞察旧周期参数（已废弃，仅兜底）",
+    "hint": "已不再是主触发：只有打开「自动长期洞察」后才走事件驱动触发（见 insight_auto_enabled / insight_min_new_events / insight_cooldown_minutes）。此值只用于抬高 24 小时超长兜底的最小间隔（生效值 = max(24, 本值) 小时）。",
+    "type": "int",
+    "default": 6
+  },
+  "insight_auto_enabled": {
+    "description": "自动长期洞察（默认关）",
+    "hint": "默认关闭：只在 Dashboard 点「生成长期洞察」手动生成。打开后才会在记忆压缩/事件归档时，按新增重要事件 ≥3 + 60 分钟冷却 + 24 小时兜底自动生成；LLM 洞察开关关闭时不会在后台写入任何记录。",
+    "type": "bool",
+    "default": false
+  },
+  "insight_min_new_events": {
+    "description": "自动长期洞察：新增重要事件阈值",
+    "hint": "自动长期洞察打开后，自上次洞察以来累计至少这么多条新的重要事件（importance≥0.6）才生成；默认 3，越小越积极。",
+    "type": "int",
+    "default": 3
+  },
+  "insight_cooldown_minutes": {
+    "description": "自动长期洞察：最小冷却分钟",
+    "hint": "自动长期洞察打开后，两次长期洞察之间至少间隔这么久，防止事件密集期连续调用；默认 60 分钟。",
+    "type": "int",
+    "default": 60
+  },
+  "event_summary_delay_hours": {
+    "description": "事件总结延迟小时",
+    "hint": "会话字数超过阈值后，至少等待这么久才做事件总结，避免刚聊完就归档。",
+    "type": "int",
+    "default": 6
+  },
+  "image_llama_server": {
+    "description": "本地 VLM llama-server 路径（可选）",
+    "hint": "仅用于本地图片识别模式；填写此路径和模型后才启用。若使用 AstrBot 通用多模态 Provider/API，留空即可。",
+    "type": "string",
+    "default": ""
+  },
+  "image_llama_model": {
+    "description": "本地 VLM 模型路径（可选）",
+    "hint": "仅用于本地图片识别模式；与 image_llama_server 一起填写后才启用。使用通用 API 时留空。",
+    "type": "string",
+    "default": ""
+  },
+  "image_llama_mmproj": {
+    "description": "本地 VLM mmproj 路径（可选）",
+    "hint": "仅本地 VLM 模式；可选视觉投影 mmproj，留空则不附加。",
+    "type": "string",
+    "default": ""
+  },
+  "image_service_port": {
+    "description": "本地 llama-server 端口（仅本地 VLM 模式）",
+    "hint": "0 = 不启用本地 VLM。只有填写 image_llama_server/model 且端口>0 时，插件才启动 127.0.0.1 本地子进程；这不是通用图片 API 地址。使用 AstrBot 通用多模态 Provider 时保持 0。",
+    "type": "int",
+    "default": 0
+  },
+  "image_service_idle_seconds": {
+    "description": "本地 VLM 空闲回收秒数（仅本地模式）",
+    "hint": "本地图片识别完成后多少秒无请求就关闭 llama-server；使用通用 API 时忽略。",
+    "type": "int",
+    "default": 120
+  },
+  "image_trigger_words": {
+    "description": "图片触发词",
+    "hint": "群聊中命中这些词并引用图片时才识别；每行一个，可自行增加。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": []
+  },
+  "image_cache_max_entries": {
+    "description": "图片描述缓存上限",
+    "hint": "同一张图片识别后复用描述，最多缓存多少条。",
+    "type": "int",
+    "default": 500
+  },
+  "summary_max_chars": {
+    "description": "总结最大字符数（0=不截断）",
+    "hint": "默认 0：事件/记忆总结按完整上下文生成，不设固定上限；仅异常兜底/安全需要时设正数上限（建议不超过 20000，避免异常长输出）。candidates 仍有界。",
+    "type": "int",
+    "default": 0
+  },
+  "bc_prompt_mode": {
+    "description": "提示词模式（原型）",
+    "hint": "telemetry=现有 [BC] 数值 telemetry（默认）；semantic=60–150 字自然语言 brief 原型。异常自动回退 telemetry。",
+    "type": "string",
+    "default": "telemetry",
+    "options": [
+      "telemetry",
+      "semantic"
+    ]
+  },
+  "event_ranking_llm": {
+    "description": "事件排序 LLM 重排（默认关）",
+    "hint": "默认走确定性打分（importance/recency/salience）；仅开启且全局配置了 rerank provider 时才调用 LLM 重排。",
+    "type": "bool",
+    "default": false
+  },
+  "first_run_persona_compile": {
+    "description": "首次人设编译",
+    "hint": "第一次启动读取 AstrBot 人设并用 LLM 转成数值 profile；之后只读缓存。",
+    "type": "bool",
+    "default": true
+  },
+  "attention_gate_mode": {
+    "description": "L17 门控模式（默认 hard）",
+    "hint": "hard 与旧阈值等价；probabilistic 需配 attention_seed 复现。",
+    "type": "string",
+    "default": "hard",
+    "options": [
+      "hard",
+      "probabilistic"
+    ]
+  },
+  "attention_seed": {
+    "description": "L17 概率门控种子（0=随机）",
+    "hint": "默认 0；固定正整数时同输入可复现。",
+    "type": "int",
+    "default": 0
+  },
+  "fan_cap": {
+    "description": "L18 fan 度数上限",
+    "hint": "默认 32；超过按 32 计。",
+    "type": "int",
+    "default": 32
+  },
+  "salience_boost_enabled": {
+    "description": "显著度增量（默认关）",
+    "hint": "默认关；开启后 score×0.90–1.10（仅检索式，不是 attention），recall trace 增加只读 salience 分量。",
+    "type": "bool",
+    "default": false
+  },
+  "sentence_dedup_enabled": {
+    "description": "句级排重（默认关）",
+    "hint": "默认关；仅注入前去重，不删存储；确定性字符 bigram 0.92（embedding 0.90 版与引号/代码块白名单未实现）。",
+    "type": "bool",
+    "default": false
+  },
+  "embedding_cache_enabled": {
+    "description": "嵌入 LRU512 缓存（默认开）",
+    "hint": "默认开；LRU512 + 可配超时（embedding_timeout_ms，默认 1500ms）+ 2000 字统一截断；关闭后不读也不写缓存。safety 开启时已标记 sensitive 的条目在回滚/恢复/事件/摘要再嵌入路径跳过；写入/查询路径不阻断。",
+    "type": "bool",
+    "default": true
+  },
+  "embedding_timeout_ms": {
+    "description": "嵌入超时（毫秒，默认 1500）",
+    "hint": "默认 1500ms；超时返回 None（等同无 embedding），不阻塞回复。范围 100–15000；仅在实测调用侧 p95<200ms 时才建议降到 300ms。",
+    "type": "int",
+    "default": 1500
+  }
+}
