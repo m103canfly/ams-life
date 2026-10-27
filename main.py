@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# ams-life — derived from BioCore v1.2.99 (https://github.com/Johnhmzm/astrbot_plugin_biocore),
+# Copyright (C) 2026 Johnhmzm, AGPL-3.0. Modified by m103canfly since 2026-10-27; see NOTICE.md.
 """AstrBot BioCore plugin: a standalone biological emotion layer.
 
 Independent copy. It does not import the Desktop companion project.
@@ -62,11 +64,11 @@ except Exception:
 PLUGIN_DIR = Path(__file__).resolve().parent
 _LEGACY_DATA_DIR = PLUGIN_DIR / "data"
 _BASE_DATA_DIR = PLUGIN_DIR.parents[1] if len(PLUGIN_DIR.parents) > 1 else PLUGIN_DIR
-_PERSIST_DATA_DIR = _BASE_DATA_DIR / "plugin_data" / "astrbot_plugin_biocore_standalone"
+_PERSIST_DATA_DIR = _BASE_DATA_DIR / "plugin_data" / "astrbot_plugin_ams_life"
 
 
 def _init_data_dir() -> Path:
-    target = Path(os.getenv("BIOCORE_DATA_DIR", str(_PERSIST_DATA_DIR)))
+    target = Path(os.getenv("AMS_LIFE_DATA_DIR") or os.getenv("BIOCORE_DATA_DIR") or str(_PERSIST_DATA_DIR))
     target.mkdir(parents=True, exist_ok=True)
     try:
         if _LEGACY_DATA_DIR.exists() and target.resolve() != _LEGACY_DATA_DIR.resolve():
@@ -3074,7 +3076,7 @@ class _AutonomySendTarget:
         return await self._plugin.context.send_message(self.unified_msg_origin, chain)
 
 
-@register("astrbot_plugin_biocore", "Johnhmzm", "拟态生物情绪核心：注入表达意图，不生成回复", "1.2.99")
+@register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
 class BioCorePlugin(Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
@@ -7550,37 +7552,37 @@ class BioCorePlugin(Star):
         try:
             register = getattr(self.context, "register_web_api", None)
             if register:
-                register("/astrbot_plugin_biocore/page/status", self.page_status, ["GET"],
+                register("/astrbot_plugin_ams_life/page/status", self.page_status, ["GET"],
                          "BioCore dashboard status")
-                register("/astrbot_plugin_biocore/page/self_model", self.page_self_model,
+                register("/astrbot_plugin_ams_life/page/self_model", self.page_self_model,
                          ["GET", "POST"], "BioCore self model editor")
-                register("/astrbot_plugin_biocore/page/toggle", self.page_toggle, ["POST"],
+                register("/astrbot_plugin_ams_life/page/toggle", self.page_toggle, ["POST"],
                          "BioCore dashboard toggle")
-                register("/astrbot_plugin_biocore/page/api_config", self.page_api_config, ["POST"],
+                register("/astrbot_plugin_ams_life/page/api_config", self.page_api_config, ["POST"],
                          "BioCore API config")
-                register("/astrbot_plugin_biocore/page/models", self.page_models, ["POST"],
+                register("/astrbot_plugin_ams_life/page/models", self.page_models, ["POST"],
                          "BioCore model list")
-                register("/astrbot_plugin_biocore/page/kb_config", self.page_kb_config, ["POST"],
+                register("/astrbot_plugin_ams_life/page/kb_config", self.page_kb_config, ["POST"],
                          "BioCore knowledge base config")
-                register("/astrbot_plugin_biocore/page/backup", self.page_backup, ["GET"],
+                register("/astrbot_plugin_ams_life/page/backup", self.page_backup, ["GET"],
                          "BioCore core backup")
-                register("/astrbot_plugin_biocore/page/restore", self.page_restore, ["POST"],
+                register("/astrbot_plugin_ams_life/page/restore", self.page_restore, ["POST"],
                          "BioCore core restore")
-                register("/astrbot_plugin_biocore/page/insight", self.page_insight, ["POST"],
+                register("/astrbot_plugin_ams_life/page/insight", self.page_insight, ["POST"],
                          "BioCore manual cross-event insight")
-                register("/astrbot_plugin_biocore/page/consolidate", self.page_consolidate, ["POST"],
+                register("/astrbot_plugin_ams_life/page/consolidate", self.page_consolidate, ["POST"],
                          "BioCore memory consolidation")
-                register("/astrbot_plugin_biocore/page/event_summary",
+                register("/astrbot_plugin_ams_life/page/event_summary",
                          self.page_event_summary, ["POST"],
                          "BioCore event summary regenerate/edit")
-                register("/astrbot_plugin_biocore/page/memory_point_feedback",
+                register("/astrbot_plugin_ams_life/page/memory_point_feedback",
                          self.page_memory_point_feedback, ["POST"],
                          "BioCore memory-point feedback (important/unimportant/edit/restore)")
-                register("/astrbot_plugin_biocore/page/memory/rollback/<path:session>/<entry_id>",
+                register("/astrbot_plugin_ams_life/page/memory/rollback/<path:session>/<entry_id>",
                          self.page_memory_rollback, ["POST"], "BioCore memory rollback")
-                register("/astrbot_plugin_biocore/page/memory/delete/<path:session>/<entry_id>",
+                register("/astrbot_plugin_ams_life/page/memory/delete/<path:session>/<entry_id>",
                          self.page_memory_delete, ["POST"], "BioCore memory soft delete")
-                register("/astrbot_plugin_biocore/page/memory/restore/<path:session>/<entry_id>",
+                register("/astrbot_plugin_ams_life/page/memory/restore/<path:session>/<entry_id>",
                          self.page_memory_restore, ["POST"], "BioCore memory restore")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
@@ -7619,12 +7621,12 @@ class BioCorePlugin(Star):
                              "_conf_schema.json", "preview.png"):
                     f = root / name
                     if f.is_file():
-                        z.write(f, "astrbot_plugin_biocore_standalone/" + name)
+                        z.write(f, "astrbot_plugin_ams_life/" + name)
                 pages = root / "pages"
                 if pages.is_dir():
                     for f in pages.rglob("*"):
                         if f.is_file() and "__pycache__" not in f.parts:
-                            z.write(f, "astrbot_plugin_biocore_standalone/pages/" + str(f.relative_to(pages)))
+                            z.write(f, "astrbot_plugin_ams_life/pages/" + str(f.relative_to(pages)))
                 for f in DATA_DIR.rglob("*"):
                     if f.is_file() and "__pycache__" not in f.parts:
                         z.write(f, "data/" + str(f.relative_to(DATA_DIR)))

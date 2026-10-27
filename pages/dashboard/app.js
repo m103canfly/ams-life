@@ -1,3 +1,4 @@
+/* ams-life: modified from BioCore v1.2.99 (AGPL-3.0) since 2026-10-27; see NOTICE.md. */
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -2251,9 +2252,9 @@
   }
   const BIO_VERSION = "v1.2.99";
   setTimeout(() => { const _sv = $("sideVersion"); if (_sv) _sv.textContent = BIO_VERSION + " · tendency layer"; }, 0);
-  const BIO_REPO_SLUG = "Johnhmzm/astrbot_plugin_biocore";
+  const BIO_REPO_SLUG = "m103canfly/ams-life";
   const GITEE_KEY = "bio_gitee_repo";
-  let giteeRepo = String(storeGet(GITEE_KEY, "johnhim/astrbot_plugin_biocore") || "").trim();
+  let giteeRepo = String(storeGet(GITEE_KEY, "") || "").trim();
   function applyGiteeRepo(){
     const input = $("giteeRepo"), state = $("giteeState"), link = $("updateOpenGitee");
     if (input) input.value = giteeRepo;
