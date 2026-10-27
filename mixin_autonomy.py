@@ -198,6 +198,7 @@ class AutonomyMixin:
                         or getattr(self, "autonomy_loop_enabled", False)):
                     break
                 try:
+                    self._begin_job()
                     await self._autonomy_tick()
                 except Exception:
                     pass

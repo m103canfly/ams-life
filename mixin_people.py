@@ -56,6 +56,8 @@ class PeopleMixin:
             pass
 
     def _update_self_narrative(self, title: str, reflection: str, origin=None, names=None) -> None:
+        if self._job_stale():
+            return
         try:
             if not (title or reflection):
                 return
@@ -207,7 +209,8 @@ class PeopleMixin:
                         pass
             except Exception:
                 pass
-            path.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+            if not self._job_stale():
+                path.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
             return d
         except Exception:
             return {}

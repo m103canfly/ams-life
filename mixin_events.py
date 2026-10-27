@@ -1278,6 +1278,8 @@ class EventsMixin:
             return []
 
     def _append_insight(self, record: dict) -> None:
+        if self._job_stale():
+            return
         try:
             EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
             with open(INSIGHT_ARCHIVE_PATH, "a", encoding="utf-8") as f:
@@ -1501,6 +1503,8 @@ class EventsMixin:
         return out
 
     def _append_event_archive(self, record: dict) -> None:
+        if self._job_stale():
+            return
         try:
             EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
             if isinstance(record, dict):
@@ -1926,14 +1930,23 @@ class EventsMixin:
         return None
 
     def _find_any_duplicate_event(self, session: str, event_key: str, body: str, ts: float):
-        """Same-session duplicate first, then cross-session global duplicate."""
+        """Same-session duplicate first, then cross-session global duplicate.
+
+        ams-life: a duplicate from another chat window is not merged; merging
+        would carry this window's source texts into an event of another place.
+        """
         prev = self._find_duplicate_event(session, event_key, body, ts)
         if prev is not None:
             return prev
-        return self._find_global_duplicate_event(event_key, body, ts)
+        prev = self._find_global_duplicate_event(event_key, body, ts)
+        if prev is not None and discretion.origin_of(prev)["where"] != discretion.place_of(session):
+            return None
+        return prev
 
     def _merge_archive_duplicate(self, prev: dict, record: dict) -> None:
         """Merge a duplicate event into the existing archive row atomically."""
+        if self._job_stale():
+            return
         try:
             prev_id = str(prev.get("id") or "")
             if not prev_id:
@@ -2336,8 +2349,8 @@ class EventsMixin:
                 self._last_strong_event_summary = last_map
             if now - float(last_map.get(key, 0.0) or 0.0) < 600:
                 return
-            # ams-life: her latest replies in this window only, never another chat's.
-            lines = self._window_replies(event, 6)
+            # ams-life: the latest lines of this window only (anyone's), never another chat's.
+            lines = self._window_lines(event, 6)
             texts = [str(h.get("text") or "").strip() for h in lines]
             origins = [discretion.origin_of(h) for h in lines]
             if str(text or "").strip():

@@ -33,9 +33,11 @@ SCRIPT = [
     (90, dict(text='就唱上次那首吧', sender='10001', name='芒果'), '好嘞，哼哼' + TAG_JOY),
     (600, dict(text='小爱 你说今天抽卡会不会歪', sender='10002', name='柠檬', group=GROUP_A), '别灰心嘛'),
     (40, dict(text='我已经歪了三次了 心态崩了', sender='10003', name='阿星', group=GROUP_A), '抱抱，下次一定出' + TAG_SAD),
+    (20, dict(text='我也歪了 哈哈', sender='10005', name='路人', group=GROUP_A), None),  # does not wake her
     (40, dict(text='小爱帮我们算算保底还差多少', sender='10002', name='柠檬', group=GROUP_A), '我算算哦' + TAG_JOY),
     (3600, dict(text='小爱 晚上好', sender='10004', name='桃子', group=GROUP_B), '晚上好~'),
     (120, dict(text='最近工作好累啊', sender='10004', name='桃子', group=GROUP_B), '辛苦啦，快去歇会儿' + TAG_SAD),
+    (30, dict(text='早点睡吧', sender='10006', name='小鱼', group=GROUP_B), None),  # does not wake her
     (7200, dict(text='明天要考试了 好紧张', sender='10001', name='芒果'), '你可以的！' + TAG_JOY),
     (30, dict(text='你还记得我早上让你唱什么吗', sender='10001', name='芒果'), '上次那首嘛~'),
     (86400, dict(text='小爱 我考完了', sender='10001', name='芒果'), '考得怎么样？' + TAG_JOY),
@@ -94,6 +96,10 @@ def main_run():
     for delay, ev, reply in SCRIPT:
         clock.advance(delay)
         event = harness.FakeEvent(**ev)
+        loop.run_until_complete(plugin.on_message(event))  # AstrBot calls it for every message
+        harness.drain(loop)
+        if reply is None:
+            continue
         req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
         loop.run_until_complete(plugin.on_llm_request(event, req))
         harness.drain(loop)

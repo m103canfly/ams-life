@@ -199,6 +199,102 @@ class Phone(unittest.TestCase):
         self.assertEqual(r['archive'], ['her.before_phone.json'])
 
 
+class Listening(unittest.TestCase):
+    """Her phone has everyone's messages, woken or not, each in its own window."""
+
+    def test_everyones_messages_go_into_their_own_window(self):
+        r = run_case('listen')
+        a = r['phone_heard']['group:900001']['recent']
+        self.assertIn(('10003', '我家猫今天学会开冰箱了'), [(x.get('sender_id'), x['text']) for x in a])
+        self.assertIn('看[图片]', [x['text'] for x in a])          # a picture is a placeholder, no file
+        self.assertNotIn('小爱你看过冰箱猫吗', [x['text'] for x in a])  # her own account is not stored here
+        for place in ('group:900002', 'private:10001'):
+            self.assertNotIn('冰箱', json.dumps(r['phone_heard'][place], ensure_ascii=False))
+        for t in r['turns'][1:]:
+            self.assertNotIn('冰箱', t['prompt'], t['session'])
+            self.assertNotIn('阿星', t['prompt'], t['session'])
+
+    def test_listening_only_stores(self):
+        r = run_case('listen')
+        self.assertEqual(r['listen_calls'], {'provider': 0, 'embed': 0, 'network': 0})
+        self.assertEqual(r['event_done'], {'send': 0, 'stop': 0, 'result': 0})
+        self.assertTrue(r['body_same'])
+
+    def test_window_keeps_six_hours_and_at_most_200_lines(self):
+        r = run_case('listen')
+        full = r['phone_full']['group:900001']['recent']
+        self.assertEqual(len(full), 200)
+        self.assertEqual(full[-1]['text'], '刷屏第204条')
+        later = r['phone_later']
+        self.assertEqual([x['text'] for x in later['group:900001']['recent']], ['过了好久'])
+        # what others said is gone after 6 hours; her own replies stay
+        for place in ('group:900002', 'private:10001'):
+            self.assertEqual([x['role'] for x in later[place]['recent']], ['assistant'])
+
+    def test_forgetting_a_person_removes_his_messages_from_every_window(self):
+        r = run_case('listen')
+        self.assertEqual(r['forgot']['phone'], 2)
+        for win in r['phone_after_forget'].values():
+            for x in win['recent']:
+                self.assertNotEqual(x.get('sender_id'), '10003')
+                self.assertNotIn('10003', x['origin']['people'])
+
+
+class ForgetWhileWaiting(unittest.TestCase):
+    """He is forgotten while work of his is waiting (model, vector service);
+    what that work holds is not written back."""
+
+    def check(self, case):
+        r = run_case(case)
+        self.assertEqual(len(r['fired']), 1, case)
+        a = r['after']
+        self.assertFalse([m for m in a['memories']
+                          if m['sender_id'] == '10001' or '10001' in (m['origin'] or {}).get('people', [])], case)
+        self.assertFalse([e for e in a['events'] if '10001' in e['origin']['people']], case)
+        self.assertNotIn('10001', a['users'], case)
+        self.assertNotIn('private:10001', a['phone'], case)
+        for win in a['phone'].values():
+            self.assertFalse([x for x in win['recent'] + win['open_loops'] if '10001' in x['origin']['people']], case)
+        self.assertFalse([x for x in r['self_model'].get('narrative_items') or []
+                          if '10001' in (x.get('origin') or {}).get('people', [])], case)
+
+    def test_strong_event_waiting_for_its_summary(self):
+        self.check('wait_event')
+
+    def test_request_waiting_for_the_vector_service(self):
+        self.check('wait_embed')
+
+    def test_per_turn_event_archive(self):
+        self.check('wait_archive')
+
+    def test_consolidation_with_nothing_to_group(self):
+        self.check('wait_consolidate')
+
+
+class TwoWindowsAtOnce(unittest.TestCase):
+    def test_interleaved_requests_keep_their_own_recall(self):
+        r = run_case('interleave')
+        self.assertIn('memwho=', r['prompt_a'])
+        self.assertIn('memwho=', r['prompt_b'])
+        for who in ('桃子', '路人'):
+            self.assertNotIn(who, r['prompt_a'])
+        for who in ('柠檬', '阿星'):
+            self.assertNotIn(who, r['prompt_b'])
+
+
+class WindowFiles(unittest.TestCase):
+    def test_window_names_that_used_to_share_a_file_have_their_own(self):
+        r = run_case('files')
+        self.assertEqual(len(r['files']), 2)
+        self.assertEqual(r['one'], ['一号窗口的话'])
+        self.assertEqual(r['two'], ['二号窗口的话'])
+        self.assertEqual(sorted(r['places']), ['other:a:b', 'other:a_b'])
+
+    def test_a_file_of_another_window_is_not_read(self):
+        r = run_case('files')
+        self.assertEqual(r['mismatch'], [])
+
+
 class OneBody(unittest.TestCase):
     def test_happy_in_group_a_is_still_happy_in_group_b(self):
         r = run_case('one_body')

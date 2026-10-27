@@ -383,7 +383,7 @@ class MemoryMixin:
 
     def _save_memory(self, event, doc):
         try:
-            if not isinstance(doc, dict):
+            if not isinstance(doc, dict) or self._job_stale():
                 return
             doc["schema_version"] = MEMORY_SCHEMA_VERSION
             here = self._here(event)
@@ -681,7 +681,7 @@ class MemoryMixin:
         try:
             # ams-life: forgetting may happen while this waits for the model; if
             # it does, the copy held here is stale and must not be saved back.
-            _forget_mark = len(getattr(self, "_forget_log", None) or [])
+            self._begin_job()
             doc = self._load_memory(event)
             entries = doc.get("entries")
             if not isinstance(entries, list) or len(entries) < 2:
@@ -860,11 +860,11 @@ class MemoryMixin:
                     logger.info("[biocore] llm memory candidates applied=%s", _cand_applied)
                 changed = True
             if changed:
-                if self._forgot_since(_forget_mark):
+                if self._job_stale():
                     return
                 await self._archive_ranked_events(event, core, entries)
                 await self._maybe_archive_insight(event, core, "compression")
-                if self._forgot_since(_forget_mark):
+                if self._job_stale():
                     return
                 try:
                     self._merge_memory_doc(doc, self._load_memory(event))
@@ -881,17 +881,6 @@ class MemoryMixin:
                 logger.info("[biocore] memory consolidated groups=%s entries=%s", len(groups), len(entries))
         finally:
             self._consolidating = False
-
-    def _forgot_since(self, mark) -> bool:
-        """Was anything forgotten since `mark`? Then forget it once more, in case work
-        started before (events archived from a stale copy) wrote some of it back."""
-        log = list(getattr(self, "_forget_log", None) or [])
-        if len(log) <= int(mark):
-            return False
-        for person, ids in log[int(mark):]:
-            self._forget(person, ids, again=True)
-        logger.info("[ams-life] memory consolidation dropped: something was forgotten meanwhile; next time again")
-        return True
 
     @staticmethod
     def _memory_command_line(cmd: dict) -> str:
@@ -1163,10 +1152,19 @@ class MemoryMixin:
             pass
         return trace
 
-    async def _memory_recall(self, event, text: str, core=None, extra: str = "", vec=None, voice: str = "", user_data=None) -> str:
-        self._last_memory_meta = {"count": 0, "confidence": 0.0, "source": "unknown",
-                                  "abstain": False, "tiers": {}, "answer_confidence": 0.0,
-                                  "gate": "none", "conflicts": 0}
+    async def _memory_recall(self, event, text: str, core=None, extra: str = "", vec=None, voice: str = "", user_data=None,
+                             turn=None) -> str:
+        """Recall for this turn. ams-life: what the recall found (meta, cause trace,
+        entry ids, memory trace) goes into `turn`, a dict of this request only, so a
+        request in another window waiting meanwhile cannot swap it. The self._last_*
+        copies are only for the status page."""
+        turn = turn if isinstance(turn, dict) else {}
+        self._last_memory_meta = turn["memory_meta"] = {
+            "count": 0, "confidence": 0.0, "source": "unknown",
+            "abstain": False, "tiers": {}, "answer_confidence": 0.0,
+            "gate": "none", "conflicts": 0}
+        turn.setdefault("cause_trace", [])
+        turn.setdefault("memory_entries", [])
         if not self.memory_dedup_embedding or not self._usable_memory_text(text):
             return ""
         doc = self._load_memory(event)
@@ -1189,10 +1187,11 @@ class MemoryMixin:
                 except Exception:
                     pass
             self._save_memory(event, doc)
-            self._last_memory_meta = {"count": 0, "confidence": 0.0, "source": "unknown",
-                                      "abstain": False, "tiers": {}, "answer_confidence": 0.0,
-                                      "gate": "none", "conflicts": 0,
-                                      "write_op": str(_cmd.get("op") or "NOOP")}
+            self._last_memory_meta = turn["memory_meta"] = {
+                "count": 0, "confidence": 0.0, "source": "unknown",
+                "abstain": False, "tiers": {}, "answer_confidence": 0.0,
+                "gate": "none", "conflicts": 0,
+                "write_op": str(_cmd.get("op") or "NOOP")}
             return self._memory_command_line(_cmd)
         if vec is None:
             vec = await self._embed_text(text)
@@ -1394,7 +1393,7 @@ class MemoryMixin:
             scored, self._memory_top_k(core),
             lambda_=(0.72 if getattr(self, "hybrid_retrieval", True) else 1.0))
         try:
-            self._apply_memory_trace(core, [e for _s, e in top])
+            turn["memory_trace"] = self._apply_memory_trace(core, [e for _s, e in top])
         except Exception as exc:
             logger.warning("[biocore] memory trace apply failed: %s", exc)
         # L-T02 / C-T01: auditable retrieval-contribution trace (deterministic,
@@ -1424,9 +1423,9 @@ class MemoryMixin:
                     "conflict": bool(_entry.get("conflict")),
                     "components": self._memory_trace_components(_parts),
                 })
-            self._last_cause_trace = _trace
-            self._last_memory_entries = [str(e.get("id") or "")
-                                         for _s, e in top if str(e.get("id") or "")][:8]
+            self._last_cause_trace = turn["cause_trace"] = _trace
+            self._last_memory_entries = turn["memory_entries"] = [
+                str(e.get("id") or "") for _s, e in top if str(e.get("id") or "")][:8]
             doc["last_recall_trace"] = _trace
             self._save_memory(event, doc)
         except Exception as _trace_exc:
@@ -1613,22 +1612,22 @@ class MemoryMixin:
         except Exception:
             _meta_top = top
             _calibration_meta = {}
-        self._last_memory_meta = memory_meta.summarize_recall(
+        _meta = self._last_memory_meta = turn["memory_meta"] = memory_meta.summarize_recall(
             _meta_top, now, consistency=_consistency)
         if _calibration_meta:
-            self._last_memory_meta.update(_calibration_meta)
+            _meta.update(_calibration_meta)
         # Task-15: recall hit/confidence feeds L1 noise (no-op when off).
         if core is not None:
             try:
-                _cnt = int(self._last_memory_meta.get("count", 0) or 0)
-                _conf = float(self._last_memory_meta.get("confidence", 0.0) or 0.0)
+                _cnt = int(_meta.get("count", 0) or 0)
+                _conf = float(_meta.get("confidence", 0.0) or 0.0)
                 core.integrate_noise(
                     "memory_recall",
                     attention=0.006 * min(1.0, _cnt / 3.0),
                     valence=0.004 * (_conf - 0.5))
             except Exception:
                 pass
-        _gate = str(self._last_memory_meta.get("gate") or "none")
+        _gate = str(_meta.get("gate") or "none")
         lines = []
         for score, e in top:
             _entry_role = str(e.get("role") or "user")
@@ -1648,8 +1647,8 @@ class MemoryMixin:
         lines.extend(_foreign_lines)
         memory_text = "\n".join(lines)
         if getattr(self, "safety_enabled", False) and _gate == "force":
-            self._last_memory_meta["withheld"] = True
-            self._last_memory_meta["abstain"] = True
+            _meta["withheld"] = True
+            _meta["abstain"] = True
             return ""
         return memory_text
 

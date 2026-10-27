@@ -71,10 +71,41 @@ A, B = '900001', '900002'
 JOY = '<bc>{"e":"joy","i":0.95}</bc>'
 
 
+class Heard(harness.FakeEvent):
+    """A message that only reaches on_message; counts anything done to the event."""
+    done = {'send': 0, 'stop': 0, 'result': 0}
+
+    def __init__(self, *a, parts=None, **k):
+        super().__init__(*a, **k)
+        self._parts = parts
+
+    def get_messages(self):
+        return self._parts if self._parts is not None else super().get_messages()
+
+    async def send(self, chain):
+        Heard.done['send'] += 1
+
+    def stop_event(self):
+        Heard.done['stop'] += 1
+
+    def set_result(self, result):
+        Heard.done['result'] += 1
+
+
+def hear(plugin, loop, delay, text, sender, name, group=None, parts=None):
+    """A message in a chat that does not wake her: AstrBot only calls on_message."""
+    clock.advance(delay)
+    event = Heard(text, sender=sender, name=name, group=group, parts=parts)
+    loop.run_until_complete(plugin.on_message(event))
+    harness.drain(loop)
+    return event
+
+
 def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯'):
     clock.advance(delay)
     event = harness.FakeEvent(text, sender=sender, name=name, group=group)
     req = ProviderRequest(prompt=text, system_prompt='你是小爱。')
+    loop.run_until_complete(plugin.on_message(event))  # AstrBot calls it for every message first
     loop.run_until_complete(plugin.on_llm_request(event, req))
     harness.drain(loop)
     loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(reply)))
@@ -85,7 +116,8 @@ def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯'):
 
 def run():
     config = {}
-    if CASE in ('forget', 'strong_event', 'consolidate'):  # summaries on, as in the golden 'full' run
+    if CASE in ('forget', 'strong_event', 'consolidate', 'wait_event', 'wait_embed',
+                'wait_archive', 'wait_consolidate'):  # summaries on, as in the golden 'full' run
         config = {'llm_only_reply_summary': False, 'memory_worthiness_enabled': False}
     plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
@@ -169,6 +201,159 @@ def run():
         loop.run_until_complete(plugin._consolidate_memory(lemon, plugin._core(None), force=True))
         harness.drain(loop)
         out['after_control'] = snapshot(plugin)
+    elif CASE == 'listen':
+        t(0, '小爱 早上好', '10002', '柠檬', A, reply='早呀')
+        core = plugin._core(None)
+        calls = {'provider': 0, 'embed': 0, 'network': 0}
+        real_provider, real_embed, real_net = plugin._provider_for, plugin._embed_text, plugin._ipv4_json
+
+        async def count_provider(*a, **k):
+            calls['provider'] += 1
+            return await real_provider(*a, **k)
+
+        async def count_embed(*a, **k):
+            calls['embed'] += 1
+            return await real_embed(*a, **k)
+
+        def count_net(*a, **k):
+            calls['network'] += 1
+            return real_net(*a, **k)
+        plugin._provider_for, plugin._embed_text, plugin._ipv4_json = count_provider, count_embed, count_net
+        body_before = json.dumps(core.snapshot(), sort_keys=True)
+        from astrbot.api.message_components import Image, Plain
+        hear(plugin, loop, 0, '我家猫今天学会开冰箱了', '10003', '阿星', A)
+        hear(plugin, loop, 0, '看', '10003', '阿星', A, parts=[Plain('看'), Image(url='x')])
+        hear(plugin, loop, 0, '小爱你看过冰箱猫吗', '20002', '小爱', A)  # her own account: not stored here
+        out['body_same'] = json.dumps(core.snapshot(), sort_keys=True) == body_before
+        out['listen_calls'] = dict(calls)
+        out['event_done'] = dict(Heard.done)
+        plugin._provider_for, plugin._embed_text, plugin._ipv4_json = real_provider, real_embed, real_net
+        t(30, '小爱 晚上好', '10004', '桃子', B)
+        t(30, '小爱 在吗', '10001', '芒果')
+        out['phone_heard'] = snapshot(plugin)['phone']
+        out['forgot'] = plugin._forget(person='10003')
+        out['phone_after_forget'] = snapshot(plugin)['phone']
+        for i in range(205):  # more than a window holds
+            hear(plugin, loop, 1, '刷屏第%d条' % i, '10005', '路人', A)
+        out['phone_full'] = snapshot(plugin)['phone']
+        hear(plugin, loop, 6 * 3600 + 60, '过了好久', '10002', '柠檬', A)
+        out['phone_later'] = snapshot(plugin)['phone']
+    elif CASE in ('wait_event', 'wait_embed', 'wait_archive', 'wait_consolidate'):
+        # he says "forget me" while a request of his is still waiting somewhere;
+        # nothing that request (or the work it started) holds may be written back
+        t(0, '小爱，我在偷偷准备一个惊喜蛋糕给大家', '10001', '芒果')
+        for delay, text, tag in ((400, '小爱 我好难过 想哭', '{"e":"sadness","i":0.9}'),
+                                 (20, '今天被骂了 真的很委屈', '{"e":"sadness","i":0.85}'),
+                                 (20, '气死我了！！！他凭什么这样说我', '{"e":"anger","i":0.8}'),
+                                 (30, '真的受够了！！！气死了！！！', '{"e":"anger","i":0.9}')):
+            t(delay, text, '10001', '芒果', reply='我陪着你<bc>%s</bc>' % tag)
+        t(30, '小爱，我们群周末要去爬山', '10002', '柠檬', A)
+        armed, fired = [False], []  # armed right before the wait under test
+
+        def forget_now():
+            if armed[0]:
+                armed[0] = False
+                fired.append(plugin._forget(person='10001'))
+        if CASE == 'wait_event':  # while the strong event waits for its summary (mixin_events strong path)
+            real = plugin._provider_for
+
+            async def provider(kind, event=None):
+                inner = await real(kind, event)
+
+                class Meanwhile:
+                    async def text_chat(self, *a, **k):
+                        if kind == 'event_summary':
+                            forget_now()
+                        return await inner.text_chat(*a, **k)
+                return Meanwhile() if inner is not None else None
+            plugin._provider_for = provider
+        else:  # while the request waits for the vector service
+            real_embed = plugin._embed_text
+
+            real_embedding_for = plugin._embedding_for
+
+            async def embed(*a, **k):
+                forget_now()
+                return await real_embed(*a, **k)
+
+            async def embedding_for(*a, **k):
+                forget_now()
+                return await real_embedding_for(*a, **k)
+            plugin._embed_text, plugin._embedding_for = embed, embedding_for
+        mango = harness.FakeEvent('我还是好生气！！！凭什么啊！！！', sender='10001', name='芒果')
+        clock.advance(620)
+        if CASE in ('wait_archive', 'wait_consolidate'):  # events archived from memory entries
+            for text in ('小爱 谢谢你 我答应你以后别难过了', '对不起 以后我永远喜欢你'):  # promise words
+                t(30, text, '10001', '芒果')
+            lib = plugin._read_library()  # as if said with strong feelings: worth an event
+            for e in lib['entries']:
+                if e.get('sender_id') == '10001':
+                    e['importance'] = 0.9
+            plugin._write_library(lib)
+            plugin._last_event_archive = 0.0
+            loop.run_until_complete(plugin.on_message(mango))
+            armed[0] = True
+            if CASE == 'wait_archive':  # the per-turn archive (mixin_events _maybe_archive_events)
+                plugin._begin_job()  # as on_llm_request does before it starts this task
+                loop.run_until_complete(plugin._maybe_archive_events(mango, plugin._core(None)))
+            else:  # consolidation with nothing to group: it archives events instead
+                loop.run_until_complete(plugin._consolidate_memory(mango, plugin._core(None), force=True))
+            harness.drain(loop)
+        else:
+            loop.run_until_complete(plugin.on_message(mango))
+            armed[0] = True
+            loop.run_until_complete(plugin.on_llm_request(mango, ProviderRequest(prompt=mango.message_str,
+                                                                              system_prompt='你是小爱。')))
+            harness.drain(loop)
+        out['fired'] = fired
+        out['after'] = snapshot(plugin)
+        out['self_model'] = json.loads((DATA / 'self_model.json').read_text('utf-8')) \
+            if (DATA / 'self_model.json').exists() else {}
+    elif CASE == 'interleave':
+        # two groups, each with its own people; then one request in each, interleaved
+        for delay, text, sender, name in ((0, '小爱，我们周末去爬山吧', '10002', '柠檬'),
+                                          (10, '小爱，爬山我也去', '10003', '阿星'),
+                                          (10, '小爱，周末爬山带零食', '10002', '柠檬'),
+                                          (10, '小爱，爬山要早起', '10003', '阿星')):
+            t(delay, text, sender, name, A)
+        for delay, text, sender, name in ((10, '小爱，今晚一起唱歌吧', '10004', '桃子'),
+                                          (10, '小爱，唱歌我也来', '10005', '路人'),
+                                          (10, '小爱，唱歌要点几首', '10004', '桃子'),
+                                          (10, '小爱，唱歌唱到几点', '10005', '路人')):
+            t(delay, text, sender, name, B)
+        real_hints = plugin._maybe_llm_hints
+
+        async def slow_hints(*a, **k):  # each request waits after its recall, the other one runs
+            for _ in range(5):
+                await asyncio.sleep(0)
+            return await real_hints(*a, **k)
+        plugin._maybe_llm_hints = slow_hints
+        clock.advance(30)
+        ea = harness.FakeEvent('小爱，爬山的事定了吗', sender='10002', name='柠檬', group=A)
+        eb = harness.FakeEvent('小爱，唱歌的事定了吗', sender='10004', name='桃子', group=B)
+        ra = ProviderRequest(prompt=ea.message_str, system_prompt='你是小爱。')
+        rb = ProviderRequest(prompt=eb.message_str, system_prompt='你是小爱。')
+        loop.run_until_complete(asyncio.gather(plugin.on_llm_request(ea, ra), plugin.on_llm_request(eb, rb)))
+        harness.drain(loop)
+        out['prompt_a'] = '\n'.join(p.get('text') for p in ra.extra_user_content_parts)
+        out['prompt_b'] = '\n'.join(p.get('text') for p in rb.extra_user_content_parts)
+    elif CASE == 'files':
+        # window names the first phone code mapped to one file ("other_a_b.json")
+        one, two = 'other:a:b', 'other:a_b'
+        plugin._write_window(one, {'recent': [{'ts': clock(), 'role': 'user', 'text': '一号窗口的话'}],
+                                   'open_loops': []})
+        plugin._write_window(two, {'recent': [{'ts': clock(), 'role': 'user', 'text': '二号窗口的话'}],
+                                   'open_loops': []})
+        out['files'] = sorted(p.name for p in (DATA / 'phone').glob('*.json'))
+        out['one'] = [x['text'] for x in plugin._read_window(one)['recent']]
+        out['two'] = [x['text'] for x in plugin._read_window(two)['recent']]
+        # a file that says it belongs to another window is not read
+        path = plugin._window_file('group:7')
+        path.write_text(json.dumps({'place': 'group:8', 'recent': [{'ts': clock(), 'role': 'user',
+                                                                   'text': '别的窗口的话'}]}, ensure_ascii=False),
+                        'utf-8')
+        out['mismatch'] = plugin._read_window('group:7')['recent']
+        out['places'] = plugin._window_places()
     elif CASE == 'migrate_her':
         out['her'] = json.loads((DATA / 'states' / 'her.json').read_text('utf-8'))
         out['archive'] = sorted(p.name for p in (DATA / 'states' / 'per_session_archive').glob('*.json'))

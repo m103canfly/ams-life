@@ -11,11 +11,36 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 
+import contextvars
+
+# ams-life: the forget count when the current job (one request, one reply, one
+# background task) started. A task started from a request inherits its mark.
+_FORGET_MARK = contextvars.ContextVar("ams_life_forget_mark", default=None)
+
 _EVENT_TEXT_FIELDS = ("title", "event", "central_details", "meaning_to_her", "reflection",
                       "big_summary", "small_summary", "peripheral_details")
 
 
 class DiscretionMixin:
+    # ------------------------------------------------------------------
+    # Forget count: work that waited (for the model, the vector service)
+    # holds copies from before; if anything was forgotten meanwhile, its
+    # writes are dropped instead of putting the forgotten things back.
+    # ------------------------------------------------------------------
+    def _forget_count(self) -> int:
+        return len(getattr(self, "_forget_log", None) or [])
+
+    def _begin_job(self) -> None:
+        _FORGET_MARK.set(self._forget_count())
+
+    def _job_stale(self) -> bool:
+        """True when something was forgotten since this job started: do not write."""
+        mark = _FORGET_MARK.get()
+        if mark is None or self._forget_count() <= mark:
+            return False
+        logger.info("[ams-life] write dropped: something was forgotten since this work started")
+        return True
+
     # ------------------------------------------------------------------
     # Events (the one global archive; each record carries its origin).
     # ------------------------------------------------------------------
@@ -82,24 +107,21 @@ class DiscretionMixin:
     # ------------------------------------------------------------------
     # Forgetting: delete for real, by person or by source message.
     # ------------------------------------------------------------------
-    def _forget(self, person: str = "", source_ids=None, again: bool = False) -> dict:
+    def _forget(self, person: str = "", source_ids=None) -> dict:
         """Delete every memory, event, note and phone line that came from `person`
         (or from one of `source_ids`), and his relationship record.
 
         Returns counts per store. Files moved aside by the one-her migration
         (per-session legacy/archive folders) are not touched here. Every call
-        is logged (the log length is the forget count), so work that started
-        before it (memory consolidation) knows to drop what it holds instead
-        of saving it back; `again` is that work repeating a logged call.
+        is logged; the log length is the forget count (see _job_stale).
         """
         person = str(person or "").strip()
         ids = [str(x) for x in (source_ids or []) if str(x or "").strip()]
         if not person and not ids:
             return {}
-        if not again:
-            if not isinstance(getattr(self, "_forget_log", None), list):
-                self._forget_log = []
-            self._forget_log.append((person, list(ids)))
+        if not isinstance(getattr(self, "_forget_log", None), list):
+            self._forget_log = []
+        self._forget_log.append((person, list(ids)))
         counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0}
 
         def about(item):

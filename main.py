@@ -521,10 +521,25 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         event.set_result(MessageEventResult().message(
             "用法：/biocore readiness | /biocore learning | /biocore learning reset").use_t2i(False))
 
+    @filter.event_message_type(filter.EventMessageType.ALL)
+    async def on_message(self, event: AstrMessageEvent):
+        """ams-life: her phone. Every message that reaches the plugin goes into its own
+        chat window, whether it wakes her or not. Store only: no model, no vector
+        service, no reply, no body change; the event is never stopped or changed.
+        (AstrBot stops an event whose handler raises, so nothing may escape here.)"""
+        if not self.enabled:
+            return
+        try:
+            self._begin_job()
+            self._window_add_message(event)
+        except Exception as exc:
+            logger.warning("[ams-life] window store failed: %s", exc)
+
     @filter.on_llm_request()
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
         if not self.enabled or not self.inject_intent:
             return
+        self._begin_job()
         await self._ensure_profile(event)
         core = self._core(event)
         try:
@@ -581,8 +596,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             pass
         _img = await self._image_context(event)
         _voice = await self._voice_context(event)
+        # ams-life: this request's recall results, passed on instead of read back from self
+        _turn = {}
         _mem = await self._memory_recall(event, text, core, _img, vec=_query_vec, voice=_voice,
-                                         user_data=_user_data)
+                                         user_data=_user_data, turn=_turn)
+        _memory_meta = _turn.get("memory_meta") or {}
         try:
             asyncio.create_task(self._maybe_archive_events(event, core))
             asyncio.create_task(self._maybe_archive_strong_event(event, core, text))
@@ -591,8 +609,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _self_model = self._self_model_for(event)
         try:
             _own_lines = [str(h.get("text") or "") for h in self._window_replies(event, 12)]
+            _recent_lines = [str(h.get("text") or "") for h in self._window_lines(event, 6)]
             core.bind_goal_context(memory_text=_mem, self_model=_self_model,
-                                   recent=_own_lines[-6:], text=text, own_lines=_own_lines)
+                                   recent=_recent_lines, text=text, own_lines=_own_lines)
         except Exception:
             pass
         _events = self._event_context(event)
@@ -603,12 +622,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         try:
             _strategy_hint = await self._maybe_llm_hints(
                 event, core, _user_data, _events_raw,
-                getattr(self, "_last_memory_meta", {}) or {}, text)
+                _memory_meta, text, cause_trace=_turn.get("cause_trace"))
         except Exception as exc:
             logger.warning("[biocore] strategy hint failed: %s", exc)
         try:
-            await self._maybe_tom_probe(event, core, text, _user_data,
-                                        getattr(self, "_last_memory_meta", {}) or {})
+            await self._maybe_tom_probe(event, core, text, _user_data, _memory_meta,
+                                        memory_entries=_turn.get("memory_entries"))
         except Exception as exc:
             logger.warning("[biocore] tom probe call failed: %s", exc)
         _kb = ""
@@ -634,17 +653,18 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             _kb,
             _speaker,
             _voice,
-            memory_meta=getattr(self, "_last_memory_meta", {}) or {},
+            memory_meta=_memory_meta,
             open_loops=_loops,
             open_loops_due=sum(
                 1 for _loop in _loops
                 if isinstance(_loop, dict)
                 and str(_loop.get("status") or "open") == "open"
                 and str(_loop.get("due_hint") or "") in ("soon", "tomorrow")),
-            answer_confidence=(getattr(self, "_last_memory_meta", {}) or {}).get("answer_confidence"),
+            answer_confidence=_memory_meta.get("answer_confidence"),
             strategy_hint=_strategy_hint,
             continuity=_continuity,
             prompt_mode=getattr(self, "bc_prompt_mode", "telemetry"),
+            memory_trace=_turn.get("memory_trace"),
         ).strip()
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
@@ -659,6 +679,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
         if not self.enabled:
             return
+        self._begin_job()
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
         _clean, _meta = interpretation.parse_response(_reply)
