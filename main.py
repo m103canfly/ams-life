@@ -55,10 +55,14 @@ try:
     from .mixin_memory import MemoryMixin
 except ImportError:
     from mixin_memory import MemoryMixin
+try:
+    from .mixin_discretion import DiscretionMixin
+except ImportError:
+    from mixin_discretion import DiscretionMixin
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, EventsMixin, PagesMixin, MemoryMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -198,7 +202,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # Safety switch: default OFF for private use. When OFF, no masking,
         # no cross-session isolation, no forced abstention, no poison filter.
         self.safety_enabled = bool(self.config.get("safety_enabled", False))
-        self.cross_session_memory = not self.safety_enabled
+        # ams-life: recall from other groups/private chats no longer follows
+        # safety_enabled; every item goes through the discretion table instead.
         self.sensitive_memory_protection = self.safety_enabled
         # Hybrid lexical+MMR retrieval and LLM-proposed write candidates.
         self.hybrid_retrieval = bool(self.config.get("hybrid_retrieval", True))
@@ -323,6 +328,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         self.api_config = {}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         STATE_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            self._migrate_state_files()
+            self._migrate_memory_library()
+        except Exception as exc:
+            logger.warning("[ams-life] one-her migration failed: %s", exc)
         self._load_profile()
         self._load_settings()
         if "kb_enabled" in self.config:
@@ -346,8 +356,33 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:
             logger.warning("[biocore] api defaults probe failed: %s", exc)
 
-    def _core(self, event) -> BioCore:
-        key = str(getattr(event, "unified_msg_origin", "default") or "default")
+    def _migrate_state_files(self) -> None:
+        """ams-life: start the single body from the most recently updated per-session state.
+
+        Every old states/<session>.json is moved into STATE_ARCHIVE_DIR, never deleted.
+        """
+        if HER_STATE_PATH.exists():
+            return
+        old = sorted((f for f in STATE_DIR.glob("*.json") if f.is_file()),
+                     key=lambda f: f.stat().st_mtime, reverse=True)
+        if not old:
+            return
+        state = json.loads(old[0].read_text(encoding="utf-8"))
+        # The texts kept in the body (open loops, recent replies, ...) came from that one session.
+        _origin = discretion.make_origin(old[0].stem)
+        for _name in CORE_TEXT_LISTS:
+            for _item in (state.get(_name) if isinstance(state, dict) else None) or []:
+                if isinstance(_item, dict):
+                    _item.setdefault("origin", dict(_origin))
+        HER_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
+        STATE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+        for f in old:
+            shutil.move(str(f), str(STATE_ARCHIVE_DIR / f.name))
+        logger.info("[ams-life] one body: started from %s, archived %d per-session states", old[0].name, len(old))
+
+    def _core(self, event=None) -> BioCore:
+        # ams-life: one her. Every group and private chat shares this one body.
+        key = "her"
         if key not in self.cores:
             core = BioCore(self.profile or DEFAULT_PROFILE)
             try:
@@ -357,10 +392,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 pass
             try:
-                safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)[:80]
-                f = STATE_DIR / (safe + ".json")
-                if f.exists():
-                    core.load_state(json.loads(f.read_text(encoding="utf-8")))
+                if HER_STATE_PATH.exists():
+                    core.load_state(json.loads(HER_STATE_PATH.read_text(encoding="utf-8")))
             except Exception:
                 pass
             # Task-15: readiness is owned by plugin config, never restored from
@@ -478,8 +511,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             pass
         # A4: capture open loops from *before* this turn so the continuity
         # opener cannot echo a loop created by the current message.
-        _prior_open_loops = [dict(x) for x in (getattr(core, "open_loops", []) or [])
-                             if isinstance(x, dict)]
+        _prior_open_loops = [dict(x) for x in self._visible_core_items(event, getattr(core, "open_loops", []))]
         text = str(getattr(event, "message_str", "") or "").strip()
         if not text:
             text = str(getattr(req, "prompt", "") or "")
@@ -500,6 +532,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 _query_vec = None
         if text:
             core.observe(text, embedding=_query_vec)
+        self._tag_core_items(core, event)
         _user_data = self._touch_user(event, core)
         # Task-15: readiness is computed by L1 only when autonomy is enabled;
         # remember private sessions and start the P0-1 generator lazily.
@@ -532,16 +565,17 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             asyncio.create_task(self._maybe_archive_strong_event(event, core, text))
         except Exception:
             pass
+        _self_model = self._self_model_for(event)
         try:
-            _recent_turns = [str(h.get("text") or "") for h in (core.history or [])[-6:]]
-            core.bind_goal_context(memory_text=_mem, self_model=self.self_model,
+            _recent_turns = [str(h.get("text") or "") for h in self._same_place_items(event, core.history)[-6:]]
+            core.bind_goal_context(memory_text=_mem, self_model=_self_model,
                                    recent=_recent_turns, text=text)
         except Exception:
             pass
         _events = self._event_context(event)
         # L-T02..L-T12: one bounded strategy/cause/receipt token, plus optional
         # proposal-only LLM refinements (each function default OFF).
-        _events_raw = self._event_archive(9)
+        _events_raw = self._visible_events(event, self._event_archive(9))
         _strategy_hint = ""
         try:
             _strategy_hint = await self._maybe_llm_hints(
@@ -566,20 +600,21 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _base = str(getattr(req, "system_prompt", "") or "")
         _sid, _sname = self._speaker(event)
         _speaker = (("%s（%s）" % (_sname or "未知", _sid)) if _sid else (_sname or ""))
+        _loops = self._visible_core_items(event, getattr(core, "open_loops", None))
         _compact = interpretation.render_compact(
             core,
             _mem.replace("[BioCore Memory]", "").strip(),
             _events.replace("[BioCore Events]", "").strip(),
-            self.self_model,
-            _user_data,
+            _self_model,
+            self._user_view(event, _user_data),
             _img.replace("[BioCore Image]", "").strip(),
             _kb,
             _speaker,
             _voice,
             memory_meta=getattr(self, "_last_memory_meta", {}) or {},
-            open_loops=getattr(core, "open_loops", None),
+            open_loops=_loops,
             open_loops_due=sum(
-                1 for _loop in (getattr(core, "open_loops", None) or [])
+                1 for _loop in _loops
                 if isinstance(_loop, dict)
                 and str(_loop.get("status") or "open") == "open"
                 and str(_loop.get("due_hint") or "") in ("soon", "tomorrow")),
@@ -629,11 +664,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 asyncio.create_task(self._remember(event, _reply, "assistant", core))
         except Exception:
             pass
+        self._tag_core_items(core, event)
         try:
             STATE_DIR.mkdir(parents=True, exist_ok=True)
-            key = str(getattr(event, "unified_msg_origin", "default") or "default")
-            safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)[:80]
-            (STATE_DIR / (safe + ".json")).write_text(
+            HER_STATE_PATH.write_text(
                 json.dumps(core.snapshot(), ensure_ascii=False, indent=1), encoding="utf-8")
         except Exception:
             pass

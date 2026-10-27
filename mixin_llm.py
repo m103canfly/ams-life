@@ -313,7 +313,7 @@ class LLMMixin:
         if not self._llm_allowed("tom_probe") or not self._llm_v2_cooldown_ok("tom_probe"):
             return
         try:
-            recent = [str(h.get("text") or "") for h in (core.history or [])[-6:]]
+            recent = [str(h.get("text") or "") for h in self._same_place_items(event, core.history)[-6:]]
             refs = [str(x) for x in (getattr(self, "_last_memory_entries", []) or []) if str(x)][:6]
             proposal = await self._llm_v2_call(
                 "tom_probe",
@@ -339,7 +339,7 @@ class LLMMixin:
         if not self._llm_v2_cooldown_ok("relationship_impression"):
             return
         try:
-            events = [e for e in self._event_archive(12) if isinstance(e, dict)]
+            events = [e for e in self._visible_events(event, self._event_archive(12)) if isinstance(e, dict)]
             important = [e for e in events
                          if float(e.get("importance", 0.0) or 0.0) >= 0.6]
             if len(important) < 3:
@@ -388,7 +388,7 @@ class LLMMixin:
             if not allowed:
                 return
             titles = [str(e.get("title") or "")
-                      for e in self._event_archive(10) if isinstance(e, dict)]
+                      for e in self._visible_events(event, self._event_archive(10)) if isinstance(e, dict)]
             parsed = await self._llm_v2_call(
                 "diary", interpretation.diary_prompt(digest, titles),
                 lambda raw: interpretation.parse_diary(raw, allowed_event_ids=allowed),
@@ -398,8 +398,12 @@ class LLMMixin:
             diary = self.self_model.get("diary")
             if not isinstance(diary, list):
                 diary = []
+            # ams-life: a diary entry is as private as the most private event it draws on.
+            _sources = [e for e in self._event_archive(80)
+                        if isinstance(e, dict) and str(e.get("id") or "") in allowed]
             diary.append({"ts": time.time(), "date": str(digest.get("date") or ""),
                           "text": parsed["diary"], "evidence": parsed["evidence"],
+                          "origin": discretion.merge([discretion.origin_of(e) for e in _sources]),
                           "generated": True})
             self.self_model["diary"] = diary[-30:]
             self._save_self_model()
@@ -431,8 +435,10 @@ class LLMMixin:
             items = self.self_model.get("relationship_narratives")
             if not isinstance(items, list):
                 items = []
+            _sid, _name = self._speaker(event)
             items.append({"ts": time.time(), "text": parsed["narrative"],
-                          "evidence_refs": parsed["evidence_refs"]})
+                          "evidence_refs": parsed["evidence_refs"],
+                          "origin": discretion.make_origin(self._here(event), [_sid])})
             self.self_model["relationship_narratives"] = items[-5:]
             self._save_self_model()
             self._llm_v2_mark("relationship_narrative")

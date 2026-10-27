@@ -1231,7 +1231,7 @@ class EventsMixin:
             pass
 
     def _event_context(self, event) -> str:
-        events = self._event_archive(9)
+        events = self._visible_events(event, self._event_archive(9))
         if not events:
             return ""
         events = sorted(events, key=lambda e: float(e.get("importance", 0.0) or 0.0) *
@@ -1535,6 +1535,9 @@ class EventsMixin:
                             record["chain_links"] = _links
                     except Exception:
                         pass
+                # ams-life: where it happened, who it is about, which messages it came from.
+                if not isinstance(record.get("origin"), dict):
+                    record["origin"] = discretion.origin_of(record)
             line = json.dumps(record, ensure_ascii=False)
             with open(EVENT_ARCHIVE_PATH, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
@@ -2294,7 +2297,8 @@ class EventsMixin:
             except Exception:
                 pass
             if _memory_point:
-                self._update_self_narrative(title, reflection or meaning)
+                self._update_self_narrative(title, reflection or meaning, origin=record.get("origin"),
+                                            names=discretion.names_in(record))
             logger.info("[biocore] strong event archived: %s mp=%s", title, _memory_point)
         except Exception as exc:
             logger.warning("[biocore] strong event summary failed: %s", exc)

@@ -238,15 +238,87 @@ class MemoryMixin:
             return False
         return True
 
-    def _memory_path(self, event):
-        key = str(getattr(event, "unified_msg_origin", "default") or "default")
-        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)[:80]
+    # ------------------------------------------------------------------
+    # ams-life: one memory library for every group and private chat.
+    #
+    # Every entry carries an origin (discretion.make_origin). Code that works
+    # on "this session" gets a view holding only the entries that came from
+    # this place, exactly like BioCore's old per-session file; saving the view
+    # writes them back and leaves the other places untouched. Per-place
+    # bookkeeping (working set, last recall trace, ...) lives in rooms[place].
+    # ------------------------------------------------------------------
+    def _here(self, event) -> str:
+        return discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
+
+    def _read_library(self) -> dict:
+        try:
+            d = json.loads(MEMORY_LIBRARY_PATH.read_text(encoding="utf-8"))
+            if isinstance(d, dict):
+                if not isinstance(d.get("entries"), list):
+                    d["entries"] = []
+                if not isinstance(d.get("rooms"), dict):
+                    d["rooms"] = {}
+                return d
+        except Exception:
+            pass
+        return {"entries": [], "rooms": {}}
+
+    def _write_library(self, lib) -> None:
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
-        return MEMORY_DIR / (safe + ".json")
+        lib["schema_version"] = MEMORY_SCHEMA_VERSION
+        tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
+        os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
+
+    def _library_places(self) -> list:
+        lib = self._read_library()
+        places = set(lib["rooms"]) | {discretion.origin_of(e)["where"] for e in lib["entries"]}
+        return sorted(p for p in places if p)
+
+    def _migrate_memory_library(self) -> None:
+        """Fold BioCore's memory/<session>.json files into the library (once).
+
+        The old files are moved into MEMORY_LEGACY_DIR, never deleted. BioCore's
+        cross-session copies are skipped: the original is in its own file.
+        """
+        if MEMORY_LIBRARY_PATH.exists() or not MEMORY_DIR.exists():
+            return
+        old = sorted(f for f in MEMORY_DIR.glob("*.json") if f.is_file())
+        if not old:
+            return
+        lib = {"entries": [], "rooms": {}}
+        for f in old:
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if not isinstance(d, dict):
+                continue
+            here = discretion.place_of(f.stem)
+            for e in d.get("entries") or []:
+                if not isinstance(e, dict) or e.get("shared_from_session"):
+                    continue
+                o = discretion.origin_of(e, here)
+                e["origin"] = discretion.make_origin(here, o["people"], o["source_ids"])
+                lib["entries"].append(e)
+            lib["rooms"][here] = {k: v for k, v in d.items() if k not in ("entries", "schema_version")}
+        self._write_library(lib)
+        MEMORY_LEGACY_DIR.mkdir(parents=True, exist_ok=True)
+        for f in old:
+            shutil.move(str(f), str(MEMORY_LEGACY_DIR / f.name))
+        logger.info("[ams-life] one memory library: %d entries from %d session files",
+                    len(lib["entries"]), len(old))
+
+    def _memory_path(self, event):
+        return MEMORY_LIBRARY_PATH
 
     def _load_memory(self, event):
         try:
-            d = json.loads(self._memory_path(event).read_text(encoding="utf-8"))
+            here = self._here(event)
+            lib = self._read_library()
+            d = dict(lib["rooms"].get(here) or {})
+            d["entries"] = [e for e in lib["entries"]
+                            if isinstance(e, dict) and discretion.origin_of(e)["where"] == here]
             if isinstance(d, dict) and isinstance(d.get("entries"), list):
                 d["entries"] = [e for e in d["entries"]
                                 if isinstance(e, dict)
@@ -311,9 +383,20 @@ class MemoryMixin:
 
     def _save_memory(self, event, doc):
         try:
-            if isinstance(doc, dict):
-                doc["schema_version"] = MEMORY_SCHEMA_VERSION
-            self._memory_path(event).write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+            if not isinstance(doc, dict):
+                return
+            doc["schema_version"] = MEMORY_SCHEMA_VERSION
+            here = self._here(event)
+            mine = [e for e in (doc.get("entries") or []) if isinstance(e, dict)]
+            for e in mine:
+                if not isinstance(e.get("origin"), dict):
+                    o = discretion.origin_of(e, here)
+                    e["origin"] = o if o["where"] else discretion.make_origin(here, o["people"], o["source_ids"])
+            lib = self._read_library()
+            lib["entries"] = [e for e in lib["entries"]
+                              if not (isinstance(e, dict) and discretion.origin_of(e)["where"] == here)] + mine
+            lib["rooms"][here] = {k: v for k, v in doc.items() if k not in ("entries", "schema_version")}
+            self._write_library(lib)
         except Exception as exc:
             logger.warning("[biocore] memory save failed: %s", exc)
 
@@ -1007,46 +1090,20 @@ class MemoryMixin:
             logger.warning("[biocore] deletion propagation failed: %s", exc)
 
     def _cross_session_memory_entries(self, event) -> list:
-        """Active memories from the same sender's other sessions (opt-in).
+        """ams-life: active entries from every other place in the library.
 
-        Requires `cross_session_memory` and a sender id whose user file has a
-        bounded `sessions` list (written by `_touch_user`). Returns
-        [(session_key, entry), ...] and never mutates other docs.
+        Returns [(place, entry), ...]; the caller decides with the discretion
+        table what may be used here. Never mutates the library.
         """
-        if not getattr(self, "cross_session_memory", False):
-            return []
         try:
-            sid, _name = self._speaker(event)
-            if not sid:
-                return []
-            path = self._user_path(event)
-            if not path.exists():
-                return []
-            user = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(user, dict):
-                return []
-            current = str(getattr(event, "unified_msg_origin", "") or "")
+            here = self._here(event)
             out = []
-            for key in (user.get("sessions") or [])[-20:]:
-                key = str(key or "").strip()
-                if not key or key == current:
+            for entry in self._read_library()["entries"]:
+                if not isinstance(entry, dict) or entry.get("deleted") or entry.get("summarized"):
                     continue
-                safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)[:80]
-                mpath = MEMORY_DIR / (safe + ".json")
-                if not mpath.exists():
-                    continue
-                try:
-                    other = json.loads(mpath.read_text(encoding="utf-8"))
-                except Exception:
-                    continue
-                if not isinstance(other, dict):
-                    continue
-                for entry in (other.get("entries") or [])[-200:]:
-                    if not isinstance(entry, dict):
-                        continue
-                    if entry.get("deleted") or entry.get("summarized"):
-                        continue
-                    out.append((key, entry))
+                where = discretion.origin_of(entry)["where"]
+                if where and where != here:
+                    out.append((where, entry))
             return out
         except Exception:
             return []
@@ -1167,6 +1224,7 @@ class MemoryMixin:
                 if _admit:
                     scored.append((score, e))
         _sid, _sname = self._speaker(event)
+        _here = self._here(event)
         _source = memory_meta.source_for_input(text=text, extra=extra, voice=voice)
         # Mem0 UPDATE path: an explicit correction is an update request even
         # when embedding similarity is below the exact-duplicate threshold.
@@ -1264,6 +1322,11 @@ class MemoryMixin:
             _ops[_write_op] = int(_ops.get(_write_op, 0) or 0) + 1
             duplicate["write_ops"] = _ops
             duplicate["provenance"] = self._memory_provenance(event, now)
+            _old_origin = discretion.origin_of(duplicate, _here)
+            duplicate["origin"] = discretion.make_origin(
+                _old_origin["where"] or _here, list(_old_origin["people"]) + [_sid],
+                list(_old_origin["source_ids"]) + list(duplicate["provenance"].get("message_refs") or []),
+                _old_origin["visibility"])
             duplicate["last_write_ts"] = now
             self._apply_memory_encoding(duplicate, core, now, text)
             if _write_op != "NOOP":
@@ -1278,6 +1341,7 @@ class MemoryMixin:
                           "image_caption": str(extra or "").strip()[:1600],
                           "voice_text": str(voice or "").strip()[:1200],
                           "provenance": self._memory_provenance(event, now),
+                          "origin": discretion.make_origin(_here, [_sid], self._message_refs(event)),
                           "importance": _importance,
                           "memory_source": _source,
                           "memory_confidence": memory_meta.initial_confidence(_source, _importance),
@@ -1467,59 +1531,46 @@ class MemoryMixin:
             self._save_memory(event, doc)
         except Exception:
             pass
-        # Opt-in cross-session recall: promote the same sender's memories from
-        # other sessions into this session (marked, capped, never leaking to
-        # other senders). Default off in config.
+        # ams-life: recall from every other group and private chat in the one
+        # library, but only what the discretion table allows here. Things said
+        # openly elsewhere come back without naming who said them; things told
+        # in private stay out unless the same person said them openly here.
+        # Nothing is copied into this place.
         _foreign_lines = []
         try:
-            if getattr(self, "cross_session_memory", False):
-                _known_texts = {str(e.get("text") or "") for e in entries
-                                if isinstance(e, dict) and not e.get("deleted")}
-                _foreign = []
-                for _skey, _entry in self._cross_session_memory_entries(event):
-                    _etext = str(_entry.get("text") or "").strip()
-                    if not _etext or _etext in _known_texts:
-                        continue
-                    if getattr(self, "safety_enabled", False):
-                        if _entry.get("sensitive"):
-                            continue
-                        if str(_entry.get("role") or "") in ("assistant", "summary"):
-                            continue
-                        if str(_entry.get("scope") or "user") == "session":
-                            continue
-                    _evec = _entry.get("vector") or []
-                    _ecos = self._cosine(vec, _evec) if _evec else 0.0
-                    if _ecos < PARTIAL_MATCH_THRESHOLD:
-                        continue
-                    _escore = self._memory_score(core, _entry, _ecos)
-                    if _escore < RETRIEVAL_THRESHOLD:
-                        continue
-                    _foreign.append((_escore, _skey, _entry))
-                _foreign.sort(key=lambda item: item[0], reverse=True)
-                for _escore, _skey, _entry in _foreign[:2]:
-                    _copy = dict(_entry)
-                    _copy["id"] = _sha256(_skey + "|" + str(_entry.get("text"))[:200])[:12]
-                    _copy["shared_from_session"] = _skey
-                    _copy["ts"] = now
-                    _copy["hits"] = 1
-                    _copy["last_used"] = now
-                    _copy["memory_tier"] = "warm"
-                    try:
-                        _copy["memory_confidence"] = min(
-                            0.55, float(_entry.get("memory_confidence", 0.6) or 0.6))
-                    except Exception:
-                        _copy["memory_confidence"] = 0.5
-                    if not _copy.get("memory_source"):
-                        _copy["memory_source"] = "inferred"
-                    entries.append(_copy)
-                    _known_texts.add(_etext)
-                    _foreign_lines.append("- （其他会话）%s：%s" % (
-                        str(_copy.get("memory_source") or "inferred"), _etext[:200]))
-                    memory_meta.append_write_log(doc, op="ADD",
-                                                 entry_id=_copy["id"],
-                                                 reason="cross_session", ts=now)
-                if _foreign_lines:
-                    self._save_memory(event, doc)
+            _known_texts = {str(e.get("text") or "") for e in entries
+                            if isinstance(e, dict) and not e.get("deleted")}
+            _foreign = []
+            for _where, _entry in self._cross_session_memory_entries(event):
+                _etext = str(_entry.get("text") or "").strip()
+                if not _etext or _etext in _known_texts:
+                    continue
+                if getattr(self, "safety_enabled", False) and (
+                        _entry.get("sensitive") or _entry.get("poison_risk")):
+                    continue
+                _verdict = discretion.verdict(
+                    discretion.origin_of(_entry), _here,
+                    echoed=discretion.said_openly(_etext, str(_entry.get("sender_id") or ""), entries, _here))
+                if _verdict == discretion.DROP:
+                    continue
+                _evec = _entry.get("vector") or []
+                _ecos = self._cosine(vec, _evec) if _evec else 0.0
+                if _ecos < PARTIAL_MATCH_THRESHOLD:
+                    continue
+                _escore = self._memory_score(core, _entry, _ecos)
+                if _escore < RETRIEVAL_THRESHOLD:
+                    continue
+                _foreign.append((_escore, _verdict, _entry))
+            _foreign.sort(key=lambda item: item[0], reverse=True)
+            for _escore, _verdict, _entry in _foreign[:2]:
+                _erole = str(_entry.get("role") or "user")
+                _who = "你" if _erole in ("assistant", "summary") else (
+                    str(_entry.get("sender_name") or _entry.get("sender_id") or "").strip() or "有人")
+                _line = "%s：%s" % (_who, str(_entry.get("text") or "").strip().replace("\n", " ")[:200])
+                if _verdict == discretion.ANON:
+                    _line = discretion.anonymize(_line, discretion.names_in(_entry))
+                _foreign_lines.append("- （别处）" + _line)
+                _known_texts.add(str(_entry.get("text") or "").strip())
         except Exception:
             _foreign_lines = []
         # G1/L12: bounded calibration -> confidence consumer. The recalled
@@ -1656,6 +1707,10 @@ class MemoryMixin:
                         "sender_name": _sname if role == "user" else "",
                         "attachments": self._attachments_from_messages(event) if role == "user" else [],
                         "provenance": _prov,
+                        # her reply belongs to the place and to the person she answered
+                        "origin": discretion.make_origin(
+                            self._here(event), [_sid],
+                            _prov.get("message_refs") if role == "user" else []),
                         "importance": self._memory_importance(core, role),
                         "last_used": now, "next_review_ts": now + 86400, "review_count": 0})
         self._apply_memory_encoding(entries[-1], core, now, text)
@@ -1733,17 +1788,10 @@ class MemoryMixin:
                     return text[:80]
         except Exception:
             pass
+        # ams-life: the body is shared by every place now; only use what was
+        # tagged as coming from here (self_timeline has no origin, so it is skipped).
         try:
-            timeline = getattr(core, "self_timeline", {}) if core is not None else {}
-            past = timeline.get("past") if isinstance(timeline, dict) else None
-            for item in reversed(past or []):
-                text = re.sub(r"\s+", " ", str(item or "")).strip()
-                if text:
-                    return text[:80]
-        except Exception:
-            pass
-        try:
-            for item in reversed(list(getattr(core, "autobiography", []) or [])):
+            for item in reversed(self._same_place_items(event, getattr(core, "autobiography", []))):
                 if isinstance(item, dict):
                     text = str(item.get("title") or item.get("meaning") or "").strip()
                     if text:

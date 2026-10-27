@@ -46,6 +46,10 @@ try:
 except Exception:
     import relationship_meta
 try:
+    from . import discretion
+except Exception:
+    import discretion
+try:
     from . import homeostasis
 except Exception:
     import homeostasis
@@ -79,6 +83,14 @@ PROFILE_PATH = DATA_DIR / "persona_profile.json"
 API_CONFIG_PATH = DATA_DIR / "api_config.json"
 STATE_DIR = DATA_DIR / "states"
 MEMORY_DIR = DATA_DIR / "memory"
+# ams-life: one her. One body state and one memory library for every group and
+# private chat; the per-session files of BioCore are moved aside on first start.
+HER_STATE_PATH = STATE_DIR / "her.json"
+STATE_ARCHIVE_DIR = STATE_DIR / "per_session_archive"
+MEMORY_LIBRARY_PATH = MEMORY_DIR / "library.json"
+MEMORY_LEGACY_DIR = MEMORY_DIR / "per_session_legacy"
+# Body fields that hold conversation text; each item is tagged with its origin.
+CORE_TEXT_LISTS = ("history", "open_loops", "autobiography", "event_anchors")
 # Local image service paths/port are configured through _conf_schema.json.
 # There are no machine-specific fallback paths baked into the plugin.
 IMAGE_CACHE_PATH = DATA_DIR / "image_cache.json"

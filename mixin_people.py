@@ -20,6 +20,8 @@ class PeopleMixin:
             "boundaries": ["不接受被当作没有感受的工具", "不会被一次互动改写全部立场"],
             "consistency": ["情绪会变，但核心立场不因单次互动翻转"],
             "narrative": "",
+            # ams-life: the narrative again, one line per event, each with its origin
+            "narrative_items": [],
             "version": 0,
             "_history": [],
         }
@@ -53,13 +55,19 @@ class PeopleMixin:
         except Exception:
             pass
 
-    def _update_self_narrative(self, title: str, reflection: str) -> None:
+    def _update_self_narrative(self, title: str, reflection: str, origin=None, names=None) -> None:
         try:
             if not (title or reflection):
                 return
             line = ("%s：%s" % (title, reflection)).strip("： ")
             old = str(self.self_model.get("narrative") or "").strip()
             self.self_model["narrative"] = (line + ("；" + old if old else ""))[:600]
+            items = self.self_model.get("narrative_items")
+            items = [x for x in items if isinstance(x, dict)] if isinstance(items, list) else []
+            self.self_model["narrative_items"] = ([{
+                "text": line[:300], "ts": time.time(),
+                "origin": origin if isinstance(origin, dict) else discretion.make_origin(""),
+                "names": [str(x) for x in (names or [])][:24]}] + items)[:20]
             self._save_self_model()
         except Exception:
             pass
@@ -158,7 +166,7 @@ class PeopleMixin:
                     _we_memory = []
                 _milestones = []
                 try:
-                    for _ev in self._event_archive(20):
+                    for _ev in self._visible_events(event, self._event_archive(20)):
                         _mk = relationship_meta.milestone_from_text(
                             str(_ev.get("title") or "") + " " + str(_ev.get("event") or ""))
                         if _mk:
