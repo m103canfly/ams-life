@@ -220,14 +220,17 @@ class Listening(unittest.TestCase):
         self.assertEqual(r['event_done'], {'send': 0, 'stop': 0, 'result': 0})
         self.assertTrue(r['body_same'])
 
-    def test_window_keeps_six_hours_and_at_most_200_lines(self):
+    def test_window_keeps_24_hours_and_at_most_1000_lines(self):
         r = run_case('listen')
         full = r['phone_full']['group:900001']['recent']
-        self.assertEqual(len(full), 200)
-        self.assertEqual(full[-1]['text'], '刷屏第204条')
+        self.assertEqual(len(full), 1000)
+        self.assertEqual(full[-1]['text'], '刷屏第1004条')
+        # after 23 hours what others said is still there ...
+        self.assertIn('刷屏第1004条', [x['text'] for x in r['phone_23h']['group:900001']['recent']])
+        self.assertIn('小爱 在吗', [x['text'] for x in r['phone_23h']['private:10001']['recent']])
         later = r['phone_later']
-        self.assertEqual([x['text'] for x in later['group:900001']['recent']], ['过了好久'])
-        # what others said is gone after 6 hours; her own replies stay
+        self.assertEqual([x['text'] for x in later['group:900001']['recent']], ['快一天了', '过了好久'])
+        # ... after 24 hours it is gone; her own replies stay
         for place in ('group:900002', 'private:10001'):
             self.assertEqual([x['role'] for x in later[place]['recent']], ['assistant'])
 

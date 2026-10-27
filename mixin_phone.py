@@ -22,9 +22,9 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 
-WINDOW_MAX = 200                    # lines per window, everyone's
+WINDOW_MAX = 1000                   # lines per window, everyone's (AstrBot's group context keeps 1000 too)
 WINDOW_OWN_MAX = 80                 # her own replies per window (as core.history kept before)
-WINDOW_OTHERS_SECONDS = 6 * 3600    # what others said stays 6 hours
+WINDOW_OTHERS_SECONDS = 24 * 3600   # what others said stays 24 hours
 WINDOW_LINE_CHARS = 80              # her reply lines
 WINDOW_MESSAGE_CHARS = 300          # others' messages
 # What non-text parts of a message become in the window (no files are kept).

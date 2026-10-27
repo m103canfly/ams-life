@@ -233,10 +233,12 @@ def run():
         out['phone_heard'] = snapshot(plugin)['phone']
         out['forgot'] = plugin._forget(person='10003')
         out['phone_after_forget'] = snapshot(plugin)['phone']
-        for i in range(205):  # more than a window holds
+        for i in range(1005):  # more than a window holds
             hear(plugin, loop, 1, '刷屏第%d条' % i, '10005', '路人', A)
         out['phone_full'] = snapshot(plugin)['phone']
-        hear(plugin, loop, 6 * 3600 + 60, '过了好久', '10002', '柠檬', A)
+        hear(plugin, loop, 23 * 3600, '快一天了', '10002', '柠檬', A)
+        out['phone_23h'] = snapshot(plugin)['phone']
+        hear(plugin, loop, 3600 + 60, '过了好久', '10002', '柠檬', A)
         out['phone_later'] = snapshot(plugin)['phone']
     elif CASE in ('wait_event', 'wait_embed', 'wait_archive', 'wait_consolidate'):
         # he says "forget me" while a request of his is still waiting somewhere;
