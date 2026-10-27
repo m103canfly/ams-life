@@ -52,6 +52,8 @@ SCRIPT = [
      '我在呢<bc>{"e":"sadness","i":0.9,"n":"be_heard"}</bc>'),
     (20, dict(text='今天被骂了 真的很委屈', sender='10001', name='芒果'), '抱抱你<bc>{"e":"sadness","i":0.85}</bc>'),
     (20, dict(text='气死我了！！！他凭什么这样说我', sender='10001', name='芒果'), '太过分了<bc>{"e":"anger","i":0.8}</bc>'),
+    (30, dict(text='真的受够了！！！气死了！！！', sender='10001', name='芒果'), '先别气坏自己<bc>{"e":"anger","i":0.9}</bc>'),
+    (620, dict(text='我还是好生气！！！凭什么啊！！！', sender='10001', name='芒果'), '我陪着你<bc>{"e":"anger","i":0.9}</bc>'),
     (400, dict(text='小爱 我们约好下周一起打副本吧', sender='10003', name='阿星', group=GROUP_A), '好呀，说定了~'),
     (30, dict(text='记得提醒我明天交报告', sender='10003', name='阿星', group=GROUP_A), '记下啦'),
     (3600, dict(text='小爱 报告我交了', sender='10003', name='阿星', group=GROUP_A), '太好了~' + TAG_JOY),
@@ -59,7 +61,7 @@ SCRIPT = [
 
 FULL_CONFIG = {'llm_only_reply_summary': False, 'safety_enabled': True, 'we_memory_enabled': True,
                'proactive_autonomy': True, 'autonomy_loop_enabled': True, 'noise_seed': 7,
-               'bc_prompt_mode': 'semantic'}
+               'bc_prompt_mode': 'semantic', 'memory_worthiness_enabled': False}
 
 
 def files_snapshot(root):

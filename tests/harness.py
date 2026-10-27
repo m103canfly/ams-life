@@ -93,12 +93,16 @@ class FakeProvider:
         self.prompts.append(str(prompt)[:80])
         p = str(prompt)
         if '聊天记录总结成一个 JSON' in p:
+            # summarise by echoing the source lines, so the plugin's source check finds them
+            lines = [ln[2:].strip() for ln in p.splitlines() if ln.startswith('- ')]
+            body = '；'.join(lines)
             return FakeResponse(json.dumps({
-                'title': '一起聊游戏', 'event': '大家在聊抽卡和配队', 'meaning_to_her': '觉得热闹',
-                'reflection': '和大家一起很开心', 'big_summary': '大家在聊抽卡和配队，她也加入了',
-                'small_summary': '聊抽卡', 'emotion_nuance': [],
-                'emotion_layers': [{'emotion': 'joy', 'intensity': 0.6, 'confidence': 0.8,
-                                    'centrality': 0.7, 'evidence': '一起笑'}]}, ensure_ascii=False))
+                'title': (lines[-1] if lines else '一件事')[:12], 'event': body, 'meaning_to_her': '她很在意这件事',
+                'reflection': '要好好记住', 'big_summary': body, 'small_summary': body[:60],
+                'emotion_nuance': ['委屈'],
+                'emotion_layers': [{'emotion': 'anger', 'intensity': 0.8, 'confidence': 0.9,
+                                    'centrality': 0.8, 'evidence': (lines[-1] if lines else '')[:20]}]},
+                ensure_ascii=False))
         if '长期记忆整理成一个 JSON' in p:
             return FakeResponse(json.dumps({'summary': '常和群友聊游戏', 'candidates': [
                 {'text': '喜欢聊抽卡', 'source': 'told', 'confidence': 0.8, 'kind': 'add'}]}, ensure_ascii=False))
