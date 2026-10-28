@@ -95,6 +95,16 @@ class Import(unittest.TestCase):
             self.assertEqual(s['registry']['rows']['people'], 2)
 
 
+    def test_old_forgets_let_in(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old = Path(tmp) / 'old'
+            fake.build_old(old)
+            s = import_old.build(old, Path(tmp) / 'b', old_forgets='let-in')
+            self.assertEqual(s['registry']['rows']['people'], 0)
+            self.assertNotIn('archive.day_line:forgotten_or_revoked', s['skipped'])
+            self.assertIn(fake.STAR, (Path(tmp) / 'b' / 'people.jsonl').read_text('utf-8'))
+
+
 class Guard(unittest.TestCase):
     def test_refuses_live_data_repo_and_full_folders(self):
         with tempfile.TemporaryDirectory() as tmp:

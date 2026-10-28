@@ -1,13 +1,15 @@
 """Read the old companion plugin's data and write an import bundle (step 1, part 3).
 
     python -I tools/import_old.py --old <folder holding plugin_data/snow_companion> --out <new empty folder>
-        [--skip-archive-place group:<id> ...] [--replay-registries]
+        [--skip-archive-place group:<id> ...] [--old-forgets keep-out|let-in] [--replay-registries]
 
 The old stores are opened read-only. Nothing is written into ams-life's data folder:
 the bundle is a neutral set of JSON-lines files, every record with its origin, which the
 plugin's own loader turns into memories, events and impressions later. Bundle:
 
-    forget_registry.sqlite3  who and what must not be kept (forget_registry.py)
+    forget_registry.sqlite3  who and what must not be kept (forget_registry.py): what the old companion
+                             was asked to forget stays forgotten (the owner's decision; --old-forgets
+                             let-in leaves the registry empty and keeps nothing out)
     events.jsonl             what happened in a group each day / week     (old archive: day_line, day_headline, week)
     memories.jsonl           running jokes, notebook facts, one-to-one memories
     groups.jsonl             what each group is like                       (old group profile)
@@ -317,7 +319,7 @@ def import_cognition(b, path):
 
 
 # ----------------------------------------------------------------------
-def build(old, out, skip_places=(), replay_registries=False, ledger="snapshot") -> dict:
+def build(old, out, skip_places=(), replay_registries=False, ledger="snapshot", old_forgets="keep-out") -> dict:
     """Read the old data under `old` (the folder holding plugin_data/), write the bundle into `out`."""
     out = _guard.output_dir(out, "the import bundle")
     snow = Path(old) / "plugin_data" / "snow_companion"
@@ -334,12 +336,13 @@ def build(old, out, skip_places=(), replay_registries=False, ledger="snapshot") 
     reg = forget_registry.ForgetRegistry(out / forget_registry.FILE_NAME)
     registry_counts = {}
     # the forget registry first: everything after is checked against it
-    if inputs["notebook_forget"].exists():
+    keep_out = old_forgets == "keep-out"
+    if keep_out and inputs["notebook_forget"].exists():
         registry_counts["notebook_forget"] = forget_registry.import_notebook_tombstones(reg, inputs["notebook_forget"])
-    if inputs["ledger_registry"].exists():
+    if keep_out and inputs["ledger_registry"].exists():
         registry_counts["ledger_registry"] = forget_registry.import_ledger_registry(reg, inputs["ledger_registry"])
     for i, path in enumerate(replay, 1):
-        if replay_registries:
+        if keep_out and replay_registries:
             registry_counts["replay_%d" % i] = forget_registry.import_notebook_tombstones(
                 reg, path, note="legacy:replay-test")
     b = Bundle(out, reg)
@@ -357,7 +360,8 @@ def build(old, out, skip_places=(), replay_registries=False, ledger="snapshot") 
         b.close()
     summary = {
         "made": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "options": {"skip_archive_places": len(skip_places), "replay_registries": bool(replay_registries),
+        "options": {"skip_archive_places": len(skip_places), "old_forgets": old_forgets,
+                    "replay_registries": bool(replay_registries),
                     "ledger": ledger, "forget_me": forget_registry.FORGET_ME},
         "inputs": {k: {"sha256": sha256(p), "bytes": p.stat().st_size} for k, p in inputs.items() if p.exists()},
         "replay_registries_found": len(replay),
@@ -378,11 +382,14 @@ def main(argv=None):
     ap.add_argument("--out", required=True, help="new or empty folder for the bundle (not in AstrBot's data, not in the repo)")
     ap.add_argument("--skip-archive-place", action="append", default=[], metavar="PLACE",
                     help="do not import the old archive of this place, e.g. group:<id> (repeatable)")
+    ap.add_argument("--old-forgets", choices=("keep-out", "let-in"), default="keep-out",
+                    help="keep out what the old companion was asked to forget (default) or import without it")
     ap.add_argument("--replay-registries", action="store_true",
                     help="also count the forget registries left by old replay tests under extra/ (default: no)")
     ap.add_argument("--ledger", choices=("snapshot", "work"), default="snapshot")
     args = ap.parse_args(argv)
-    summary = build(args.old, args.out, args.skip_archive_place, args.replay_registries, args.ledger)
+    summary = build(args.old, args.out, args.skip_archive_place, args.replay_registries, args.ledger,
+                    args.old_forgets)
     sys.stdout.reconfigure(encoding="utf-8")
     print(json.dumps({k: summary[k] for k in ("registry", "written", "skipped")}, ensure_ascii=False, indent=1))
 

@@ -27,7 +27,7 @@ class Rows(unittest.TestCase):
         self.assertTrue(self.reg.may_keep('10001', G2, at=50))       # only in that group
         self.assertTrue(self.reg.may_keep('10002', G1, at=50))       # only him
 
-    def test_after_forget_me_depends_on_the_reading(self):
+    def test_later_messages_depend_on_the_reading(self):
         self.reg.forget_person('10001', G1, stamp=100)
         self.assertEqual(self.reg.why_not('10001', G1, at=200), 'optout')                  # default: not again
         self.assertEqual(self.reg.why_not('10001', G1, at=200, forget_me=fr.FORGET_ME_CUTOFF), '')
@@ -73,6 +73,16 @@ class Rows(unittest.TestCase):
         self.assertEqual(self.reg.forget_message('m1', G1), 0)
         self.assertEqual(self.reg.rows()[0]['place'], G1)
         self.assertEqual(self.reg.stats()['source'], 1)
+
+    def test_owner_deletes_from_the_panel(self):
+        seqs = self.reg.owner_delete(person='10001', stamp=100)
+        self.assertEqual(len(seqs), 1)
+        self.assertFalse(self.reg.may_keep('10001', G2, at=50))      # a person: everywhere
+        self.assertFalse(self.reg.may_keep('10001', G2, at=150))     # and not again (default reading)
+        self.reg.owner_delete(source_ids=['m1', 'm2', ''], place=G1, stamp=200)
+        self.assertEqual(self.reg.why_not(source_id='m2', place=G1), 'source')
+        self.assertEqual({r['note'] for r in self.reg.rows()}, {'owner:panel'})
+        self.assertEqual(self.reg.owner_delete(source_ids=['m1'], place=G1), [0])
 
     def test_bad_rows(self):
         with self.assertRaises(ValueError):

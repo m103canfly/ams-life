@@ -2,27 +2,33 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """The forget registry: who and what she must not keep, from now on.
 
-Deleting is done by the plugin (``_forget``); this file remembers *that* it was
-asked, so nothing comes back later: a message that arrives after the deletion,
-a replay of old chat logs, an import of the old companion's data.
+No one can make her forget by saying so in a chat (the owner's decision). What
+goes in here:
+- what the old companion was asked to forget: it stays forgotten, so the import
+  of its data and the replay of old chat logs leave it out;
+- what the owner deletes from the panel (a person, or one memory): the panel
+  calls owner_delete(), and the plugin deletes with ``_forget``. This file
+  remembers *that* it was deleted, so nothing comes back later: a message that
+  arrives afterwards, a replay, an import.
 
 One SQLite table, append-only, read in order:
 
     kind      place               qq      source_id   stamp
-    'qq'      'group:1' or '*'    10001   -           t    "forget me": all of his up to t is gone
-    'source'  'group:1' or '*'    -       m123        t    "forget this": that one message
-    'optout'  ...                 10001   -           t    "don't remember me": nothing of his from t on
-    'optin'   ...                 10001   -           t    "you may remember me again": ends an optout
+    'qq'      'group:1' or '*'    10001   -           t    a person: all of his up to t is gone
+    'source'  'group:1' or '*'    -       m123        t    one message
+    'optout'  ...                 10001   -           t    nothing of his from t on
+    'optin'   ...                 10001   -           t    ends an optout
 
 ``place`` is a place as discretion.place_of() writes it; '*' means everywhere.
-A 'qq' row with qq '*' forgets everyone in that place up to t.
+A 'qq' row with qq '*' forgets everyone in that place up to t. The old companion
+also let people opt out and back in themselves; those kinds are kept so its
+registries convert as they are, but nothing new writes them.
 
-What "forget me" means for what he says *after* asking is the owner's call and
-not decided yet, so it is a way of reading the rows, not part of them:
+What a 'qq' row means for what the person says *later* is a way of reading the
+rows, not part of them:
 
-    FORGET_ME_OPTOUT (default): a 'qq' row also keeps everything after it out,
-                                until he says he may be remembered again;
-    FORGET_ME_CUTOFF:           only what came before is gone (the old plugin).
+    FORGET_ME_OPTOUT (default): it also keeps everything after it out, until an 'optin';
+    FORGET_ME_CUTOFF:           only what came before is gone (the old companion).
 
 Only the standard library; no AstrBot.
 """
@@ -117,6 +123,17 @@ class ForgetRegistry:
                                (kind, place, qq, source_id, stamp, str(note or "")))
         self._db.commit()
         return int(cur.lastrowid)
+
+    def owner_delete(self, person="", source_ids=(), place=EVERYWHERE, stamp=None) -> list:
+        """The owner deleted a person (everywhere) or one memory (the messages it came from)
+        from the panel. Returns the seqs written (0 for a row that was already there)."""
+        seqs = []
+        if str(person or "").strip():
+            seqs.append(self.forget_person(person, EVERYWHERE, stamp=stamp, note="owner:panel"))
+        for sid in source_ids or ():
+            if str(sid or "").strip():
+                seqs.append(self.forget_message(sid, place, stamp=stamp, note="owner:panel"))
+        return seqs
 
     def forget_person(self, qq, place=EVERYWHERE, stamp=None, note="") -> int:
         return self.add("qq", place, qq=qq, stamp=stamp, note=note)

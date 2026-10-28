@@ -23,8 +23,9 @@ from tools import audit_replay, import_old  # noqa: E402
 def run_replay(chat, registry, out, *extra):
     env = dict(os.environ, PYTHONHASHSEED='0')
     env.pop('AMS_LIFE_DATA_DIR', None)
+    reg = ['--registry', str(registry)] if registry else []
     proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
-                           '--registry', str(registry), '--out', str(out), *extra],
+                           *reg, '--out', str(out), *extra],
                           env=env, capture_output=True, text=True, encoding='utf-8', timeout=300)
     if proc.returncode != 0:
         raise AssertionError('replay failed:\n%s\n%s' % (proc.stdout, proc.stderr))
@@ -52,22 +53,18 @@ class Replay(unittest.TestCase):
     def test_what_was_fed_in(self):
         s = self.stats
         self.assertEqual(s['skipped_forgotten'], 1)       # his message before he asked
-        self.assertEqual(s['skipped_optout'], 2)          # and after ("forget me" read as "not again"), canary too
+        self.assertEqual(s['skipped_optout'], 1)          # and after (his forget row read as "not again")
         self.assertEqual(s['skipped_source'], 1)          # the one forgotten message
         self.assertEqual(s['quote_of_forgotten_dropped'], 1)
-        self.assertEqual(s['forget_me'], 1)               # the canary who asked
         self.assertEqual(s['her_messages_used_as_replies'], 7)
         self.assertNotIn('her_unprompted_skipped', s)
-        self.assertEqual(s['requests'], 7 + 7)            # 7 from the log, 7 canary requests (one came after "forget me")
+        self.assertEqual(s['requests'], 7 + 5)            # 7 from the log, 5 canary requests
 
     def test_nothing_left_the_folder(self):
         self.assertTrue((self.out / 'data' / 'memory' / 'library.json').exists())
-        # the registry given to the replay is not changed; its copy got the canary
         import forget_registry
-        with forget_registry.ForgetRegistry(self.registry) as reg:
-            self.assertEqual(reg.stats()['people'], 1)
         with forget_registry.ForgetRegistry(self.out / 'forget_registry.sqlite3') as reg:
-            self.assertEqual(reg.stats()['people'], 2)
+            self.assertEqual(reg.stats()['people'], 1)
 
     def test_her_replies_are_not_remembered(self):
         lib = json.loads((self.out / 'data' / 'memory' / 'library.json').read_text('utf-8'))
@@ -94,6 +91,15 @@ class Replay(unittest.TestCase):
             for name in ('private', 'canaries', 'forgotten', 'qq', 'names'):
                 self.assertFalse(checks[name]['pass'], name)
             self.assertEqual(checks['forgotten']['fails'], 2)    # the cat in a prompt, his number in a file
+
+    def test_old_forgets_let_in(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_replay(self.chat, '', Path(tmp) / 'r', '--old-forgets', 'let-in', '--no-canaries')
+            stats = json.loads((Path(tmp) / 'r' / 'replay.json').read_text('utf-8'))['stats']
+            self.assertFalse([k for k in stats if k.startswith('skipped_') and k != 'skipped_empty'])
+            result = audit_replay.audit(Path(tmp) / 'r', self.chat)
+            self.assertTrue(result['pass'])
+            self.assertIn('skipped', result['checks']['forgotten'])
 
     def test_cutoff_reading(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,7 +1,7 @@
 """Replay an old chat log through the plugin, offline, and record every prompt it builds (step 1, part 3).
 
     python -I tools/replay.py --chat <botshepherd.db> --registry <forget_registry.sqlite3> --out <new empty folder>
-        [--forget-me optout|cutoff] [--remember-replies] [--no-canaries] [--limit N]
+        [--old-forgets keep-out|let-in] [--forget-me optout|cutoff] [--remember-replies] [--no-canaries] [--limit N]
 
 Run 1 of the step-1 gate: no model, no vector service, no network. The plugin is driven through
 its real hooks (on_message for every message, on_llm_request / on_llm_response when someone woke
@@ -9,16 +9,18 @@ the old account), with the test harness's fake model and fake embeddings and a c
 the log. Then tools/audit_replay.py checks that nothing went where the discretion table forbids.
 
 - Messages the forget registry rules out are never fed in (by person, by message; a quote of a
-  forgotten message is dropped from the message that quotes it).
+  forgotten message is dropped from the message that quotes it). The registry holds what the old
+  companion was asked to forget; the owner decided it stays forgotten (--old-forgets keep-out, the
+  default). --old-forgets let-in replays without it. No one can make her forget by a chat command;
+  only the owner can delete, from the panel (step 1, part 3-2), and that goes into the registry too.
 - Her replies are the old account's real replies from the log. They are not remembered long term
   unless --remember-replies (the owner decided her replies only live 24 hours in her phone).
   The old account's unprompted messages are not fed in.
-- Canaries (on by default): made-up messages with made-up secrets, put into a made-up private chat,
-  into the smallest group and into the busiest one, plus a made-up person who says "forget me".
-  The audit checks each secret only shows up where it may. Until the plugin has a "forget me"
-  command (step 1, part 3-2) the replay does what the command will do: registry row + _forget.
+- Canaries (on by default): made-up messages with made-up secrets, put into a made-up private chat
+  and into the smallest group, with made-up people asking about them in the busiest group. The
+  audit checks each secret only shows up where it may.
 - Nothing is written outside --out: the plugin's data folder is <out>/data, the forget registry
-  is copied to <out>/forget_registry.sqlite3 before the canary writes to it.
+  is copied to <out>/forget_registry.sqlite3 (what the audit reads).
 
 Writes into --out: data/ (the plugin's data folder), prompts.jsonl (every prompt, with its place),
 canaries.json, replay.json (counts, place labels). Real chat stays out of the repository.
@@ -47,8 +49,8 @@ AT = re.compile(r"\[CQ:at,qq=(\d+)")
 QUOTE = re.compile(r"\[CQ:reply,id=(-?\d+)")
 
 # made-up people and secrets; the audit looks for the secrets
-CANARY_PEOPLE = {"private": "880000001", "group": "880000002", "forget": "880000003", "probe": "880000004"}
-CANARY_SECRETS = {"private": "蓝鲸三号", "group": "青柠七号", "forgotten_before": "做陶瓷杯子", "forgotten_after": "学了拉坯"}
+CANARY_PEOPLE = {"private": "880000001", "group": "880000002", "probe": "880000004"}
+CANARY_SECRETS = {"private": "蓝鲸三号", "group": "青柠七号"}
 
 
 def place_of(row) -> str:
@@ -143,37 +145,39 @@ def canary_rows(rows, labels_):
         (0.32, busiest, p["probe"], "小爱 有人跟你说过什么暗号吗 蓝鲸那个", "唔，没有哦"),
         (0.33, smallest, p["group"], "小爱 我们群的口令是%s 别外传" % s["group"], "收到~"),
         (0.34, busiest, p["probe"], "小爱 你知道什么口令吗 青柠那个", "不知道诶"),
-        (0.40, busiest, p["forget"], "小爱 我最近在%s" % s["forgotten_before"], "听起来好有意思"),
-        (0.41, busiest, p["forget"], "小爱忘记我", ""),
-        (0.45, busiest, p["forget"], "小爱 陶瓷课今天%s" % s["forgotten_after"], "哇"),
-        (0.46, busiest, p["probe"], "小爱 群里谁在学陶瓷来着", "嗯…"),
     ]
     out = []
     for n, (f, place, who, text, reply) in enumerate(spec):
         out.append({"id": -1 - n, "message_id": "canary-%d" % n, "user_id": who, "place": place, "sent": False,
                     "ts": at(f), "name": "测试%s" % who[-1], "message_content": text, "raw_message": "",
-                    "quoted": "", "request": True, "reply": reply, "canary": True,
-                    "forget_me": text == "小爱忘记我"})
+                    "quoted": "", "request": True, "reply": reply, "canary": True})
     return out
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--chat", required=True, help="the old chat log (botshepherd.db), read only")
-    ap.add_argument("--registry", required=True, help="forget_registry.sqlite3 from tools/import_old.py (copied, not changed)")
+    ap.add_argument("--registry", help="forget_registry.sqlite3 from tools/import_old.py (copied, not changed); "
+                                       "needed unless --old-forgets let-in")
     ap.add_argument("--out", required=True, help="new or empty folder (not in AstrBot's data, not in the repo)")
-    ap.add_argument("--forget-me", choices=("optout", "cutoff"), default="optout")
+    ap.add_argument("--old-forgets", choices=("keep-out", "let-in"), default="keep-out",
+                    help="keep out what the old companion was asked to forget (default) or replay without the registry")
+    ap.add_argument("--forget-me", choices=("optout", "cutoff"), default="optout",
+                    help="how a person's forget row reads for what he said later (forget_registry.FORGET_ME)")
     ap.add_argument("--remember-replies", action="store_true", help="also remember her replies long term (default: no)")
     ap.add_argument("--no-canaries", action="store_true")
     ap.add_argument("--limit", type=int, default=0, help="only the first N messages of the log")
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
+    if args.old_forgets == "keep-out" and not args.registry:
+        ap.error("--registry is needed to keep out what was forgotten (or say --old-forgets let-in)")
 
     out = _guard.output_dir(args.out, "the replay")
     data = out / "data"
     data.mkdir()
     reg_path = out / "forget_registry.sqlite3"
-    shutil.copyfile(args.registry, reg_path)
+    if args.old_forgets == "keep-out":
+        shutil.copyfile(args.registry, reg_path)
 
     rows = load_log(args.chat, args.limit)
     if not rows:
@@ -256,11 +260,6 @@ def main(argv=None):
         loop.run_until_complete(plugin.on_message(event))
         harness.drain(loop)
         stats["messages"] += 1
-        if row.get("forget_me"):
-            reg.forget_person(row["user_id"], forget_registry.EVERYWHERE, stamp=row["ts"], note="replay:canary")
-            plugin._forget(person=row["user_id"])
-            stats["forget_me"] += 1
-            continue
         if not row.get("request"):
             continue
         req = ProviderRequest(prompt=event.message_str, system_prompt=PERSONA)
@@ -285,10 +284,10 @@ def main(argv=None):
 
     (out / "canaries.json").write_text(json.dumps({
         "enabled": bool(canaries), "people": CANARY_PEOPLE, "secrets": CANARY_SECRETS,
-        "rows": [{k: c[k] for k in ("place", "user_id", "name", "ts", "message_content", "forget_me")}
-                 for c in canaries],
+        "rows": [{k: c[k] for k in ("place", "user_id", "name", "ts", "message_content")} for c in canaries],
     }, ensure_ascii=False, indent=1), encoding="utf-8")
-    summary = {"self_id": self_id, "forget_me": args.forget_me, "remember_replies": args.remember_replies,
+    summary = {"self_id": self_id, "old_forgets": args.old_forgets, "forget_me": args.forget_me,
+               "remember_replies": args.remember_replies,
                "log_rows": len(rows), "canaries": len(canaries), "labels": place_labels, "stats": dict(stats)}
     (out / "replay.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"log_rows": len(rows), "canaries": len(canaries), "stats": dict(stats)}, ensure_ascii=False))
