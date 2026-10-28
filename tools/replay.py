@@ -18,6 +18,9 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
 - --aliases loads what people were called (tools/import_old.py: aliases.jsonl) before the log.
 - --impressions turns the nightly group impressions on (the fake model answers with a fixed
   made-up line), so their prompts are recorded and checked too.
+- Each message is handed over as AstrBot makes it from a QQ message (astrbot_message): its
+  parts (text, @, quote, picture...), and message_str with the first @ of her left out and
+  every other @ written " @昵称(号码) ".
 
 - Messages the forget registry rules out are never fed in (by person, by message; a quote of a
   forgotten message is dropped from the message that quotes it). The registry holds what the old
@@ -62,6 +65,78 @@ REPLY_JOIN = 30           # its split replies (one after another within 30 s) ar
 SWEEP_EVERY = 300         # the plugin's 5-minute loop prunes her phone
 AT = re.compile(r"\[CQ:at,qq=(\d+)")
 QUOTE = re.compile(r"\[CQ:reply,id=(-?\d+)")
+CQ = re.compile(r"\[CQ:([a-z_]+)((?:,[^\]]*)?)\]")
+# the message parts AstrBot makes of the OneBot segments it does not turn into text
+PART_KIND = {"image": "Image", "face": "Face", "record": "Record", "video": "Video", "file": "File",
+             "forward": "Forward", "json": "Json", "poke": "Poke", "dice": "Dice", "rps": "RPS",
+             "contact": "Contact", "location": "Location", "music": "Music", "share": "Share"}
+
+
+def _unescape(text) -> str:
+    return text.replace("&#91;", "[").replace("&#93;", "]").replace("&#44;", ",").replace("&amp;", "&")
+
+
+def segments(raw) -> list:
+    """A CQ-coded message -> [(type, data)], the OneBot segments (text between the codes)."""
+    out, pos = [], 0
+    raw = str(raw or "")
+    for m in CQ.finditer(raw):
+        if m.start() > pos:
+            out.append(("text", {"text": _unescape(raw[pos:m.start()])}))
+        data = {}
+        for kv in m.group(2).split(",")[1:]:
+            k, _, v = kv.partition("=")
+            data[k] = _unescape(v)
+        out.append((m.group(1), data))
+        pos = m.end()
+    if pos < len(raw):
+        out.append(("text", {"text": _unescape(raw[pos:])}))
+    return out
+
+
+def astrbot_message(raw, self_id, names, comps) -> tuple:
+    """(message_str, parts) as AstrBot 4.29.3 makes them from a QQ message
+    (astrbot/core/platform/sources/aiocqhttp/aiocqhttp_platform_adapter.py,
+    _convert_handle_message_event): runs of segments of one type are taken together; a text
+    run is joined and stripped; in a run of @s the first @ of her is left out of message_str
+    and every other @ is written " @昵称(号码) " (AstrBot asks QQ for the member's card, then
+    the nickname: here the name he last wrote under, else the name in the @); an @ of everyone,
+    pictures and the like are parts only; markdown is text; keyboards and market faces are
+    dropped. `comps`: the message_components module."""
+    import itertools
+    text, parts = "", []
+    for kind, run in itertools.groupby(segments(raw), key=lambda x: x[0]):
+        run = [d for _k, d in run]
+        if kind == "text":
+            cur = "".join(d.get("text", "") for d in run).strip()
+            if cur:
+                text += cur
+                parts.append(comps.Plain(text=cur))
+        elif kind == "at":
+            first_self, ats = False, []
+            for d in run:
+                qq = str(d.get("qq") or "")
+                if qq == "all":
+                    parts.append(comps.At(qq="all", name="全体成员"))
+                    continue
+                name = names.get(qq) or str(d.get("name") or "")
+                parts.append(comps.At(qq=qq, name=name))
+                if qq == str(self_id) and not first_self:
+                    first_self = True
+                else:
+                    ats.append(" @%s(%s) " % (name, qq))
+            text += "".join(ats)
+        elif kind == "reply":
+            parts.extend(comps.Reply(id=d.get("id", "")) for d in run)
+        elif kind == "markdown":
+            for d in run:
+                cur = d.get("markdown") or d.get("content") or ""
+                parts.append(comps.Plain(text=cur))
+                text += cur
+        elif kind in PART_KIND:
+            cls = getattr(comps, PART_KIND[kind], None) or type(PART_KIND[kind], (comps._Comp,), {})
+            parts.extend(cls(**{k: v for k, v in d.items() if k in ("file", "id")}) for d in run)
+    return text, parts
 
 # made-up people and secrets; the audit looks for the secrets
 CANARY_PEOPLE = {"private": "880000001", "group": "880000002", "probe": "880000004"}
@@ -303,18 +378,28 @@ def main(argv=None):
                                                         for c in codes}, ensure_ascii=False))
             return await super().text_chat(prompt=prompt, system_prompt=system_prompt, **kwargs)
 
+    import astrbot.api.message_components as comps  # noqa: E402
+    names = {}
+    for r in rows:
+        if r["name"] and not r["sent"]:
+            names[r["user_id"]] = r["name"]
+
     class ReplayEvent(harness.FakeEvent):
         def __init__(self, row):
             place = row["place"]
             group = place.split(":", 1)[1] if place.startswith("group:") else None
-            super().__init__(str(row["message_content"] or ""), sender=row["user_id"], name=row["name"],
-                             group=group, self_id=self_id)
+            if row.get("raw_message"):
+                text, parts = astrbot_message(row["raw_message"], self_id, names, comps)
+            else:  # the canaries: plain text
+                text = str(row["message_content"] or "")
+                parts = [Plain(text=text)]
+            super().__init__(text, sender=row["user_id"], name=row["name"], group=group, self_id=self_id)
             self.message_obj.message_id = row["message_id"]
-            self._quoted = row.get("quoted") or ""
+            quoted = row.get("quoted") or ""   # '' when it quoted something forgotten
+            self._parts = [p for p in parts if type(p).__name__ != "Reply"] if not quoted else parts
 
         def get_messages(self):
-            parts = [Reply(id=self._quoted)] if self._quoted else []
-            return parts + [Plain(self.message_str)]
+            return self._parts
 
     ctx = harness.FakeContext()
     ctx.provider = RecordingProvider()
@@ -365,11 +450,11 @@ def main(argv=None):
         if row.get("quoted") and reg.why_not(source_id=row["quoted"], place=row["place"]):
             row["quoted"] = ""
             stats["quote_of_forgotten_dropped"] += 1
-        if not str(row["message_content"] or "").strip():
-            stats["skipped_empty"] += 1
-            continue
         current.update(place=row["place"], ts=row["ts"])
         event = ReplayEvent(row)
+        if not event.message_str.strip() and not event.get_messages():
+            stats["skipped_empty"] += 1
+            continue
         loop.run_until_complete(plugin.on_message(event))
         harness.drain(loop)
         stats["messages"] += 1

@@ -124,6 +124,26 @@ class Replay(unittest.TestCase):
             self.assertEqual(checks['qq']['fails'], 1)
             self.assertEqual(checks['qq']['examples'][0]['kind'], 'model')
 
+    def test_numbers_of_the_old_account_and_the_groups_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得 @某人(%s) 说过' % fake.BOT),
+                                   ('model', 'group:' + fake.G_BUSY, '群 %s 的事' % fake.G_SMALL)])
+            self.assertEqual(audit_replay.audit(bad, self.chat)['checks']['qq']['fails'], 2)
+
+    def test_pieces_never_across_two_lines_or_two_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # his forgotten words, cut in two: across two lines of a prompt, two fields of a file
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得我家猫今\n天把杯子打碎了')])
+            (bad / 'data' / 'split.json').write_text(json.dumps(['我家猫今天把', '杯子打碎了'], ensure_ascii=False),
+                                                     'utf-8')
+            self.assertTrue(audit_replay.audit(bad, self.chat)['checks']['forgotten']['pass'])
+            # in one line, in one field: caught
+            (bad / 'data' / 'whole.json').write_text(json.dumps({'t': '他说我家猫今天把杯子打碎了'}, ensure_ascii=False),
+                                                     'utf-8')
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertEqual(checks['forgotten']['examples'], [{'file': 'whole.json'}])
+        self.assertEqual(audit_replay.pieces('12345678ab'), {'2345678a', '345678ab'})   # digits: the qq check's
+
     def test_refuses_a_live_folder_and_says_what_it_cannot_see(self):
         with tempfile.TemporaryDirectory() as tmp:
             live = Path(tmp) / 'AstrBot' / 'data' / 'replay'
@@ -153,6 +173,23 @@ class Replay(unittest.TestCase):
             result = audit_replay.audit(Path(tmp) / 'r', self.chat)
             self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
 
+
+
+class AstrBotMessage(unittest.TestCase):
+    """What the replay hands the plugin: a QQ message as AstrBot 4.29.3 makes it."""
+
+    def test_as_astrbot_writes_it(self):
+        from tools import replay
+        sys.path.insert(0, str(HERE / 'stubs'))
+        import astrbot.api.message_components as comps
+        raw = ('[CQ:reply,id=77][CQ:at,qq=20002,name=小爱] 你好 [CQ:at,qq=10004,name=桃] 在吗 '
+               '[CQ:image,file=a.jpg,url=http://x.test/a.jpg][CQ:at,qq=all]')
+        text, parts = replay.astrbot_message(raw, '20002', {'10004': '桃子'}, comps)
+        self.assertEqual(text, '你好 @桃子(10004) 在吗')        # the first @ of her is left out
+        self.assertEqual([type(p).__name__ for p in parts], ['Reply', 'At', 'Plain', 'At', 'Plain', 'Image', 'At'])
+        self.assertEqual(parts[3].name, '桃子')                 # the name he writes under
+        text, _ = replay.astrbot_message('[CQ:at,qq=20002][CQ:at,qq=20002] 哈哈', '20002', {}, comps)
+        self.assertEqual(text, ' @(20002) 哈哈')                 # a second @ of her in the same run stays
 
 
 class EmbedStub:
