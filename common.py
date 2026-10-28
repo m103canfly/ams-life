@@ -193,8 +193,8 @@ AMBIENT_BUSY_COUNT = 30        # ... this many or more is as lively as it gets
 # Her heart (step 1-2): only what she writes herself, in her notebook.
 NOTEBOOK_MAX = 20              # entries
 NOTEBOOK_CHARS = 40            # characters per entry
-NOTEBOOK_EDITS = 3             # changes per night (add / edit / delete)
-NOTEBOOK_OVERLAP = 0.2         # an entry this close (character pairs) to a material draws on it
+NOTEBOOK_EDITS = 3             # changes per night in all sittings (add / edit / delete)
+NOTEBOOK_PRIVATE_MAX = 3       # private chats she writes about a night (the busiest)
 OWNER_RULES_MAX = 10           # the owner's rules (written in the panel, shown everywhere)
 OWNER_RULES_CHARS = 100
 # The sentences BioCore wrote for her; cleared, her heart is not written for her.

@@ -375,41 +375,81 @@ class LLMMixin:
             logger.warning("[biocore] relationship impression failed: %s", exc)
 
     # ------------------------------------------------------------------
-    # Her notebook (step 1-2): only she writes it, once a night.
+    # Her notebook (step 1-2): only she writes it, once a night, in separate
+    # sittings so that what she knows from a private chat stays there by
+    # construction (the owner, PR #4 round 3):
+    #   * "group": her body's day and what was said openly in the groups;
+    #     nothing of any private chat is in its material;
+    #   * one sitting per private chat talked in today (at most
+    #     NOTEBOOK_PRIVATE_MAX, the busiest): her body's day and that chat's
+    #     events; what she writes there belongs to that chat.
+    # An entry's origin is all the material of its sitting merged (her own
+    # only when that material is her body alone); the model's "uses" never
+    # narrows it. Her own "private / can be told" mark is kept, not used.
     # ------------------------------------------------------------------
-    def _notebook_due(self, now=None) -> bool:
+    def _notebook_time_reached(self, now=None) -> bool:
         if not self._llm_allowed("notebook"):
             return False
-        now = time.time() if now is None else now
-        local = time.localtime(now)
+        local = time.localtime(time.time() if now is None else now)
         try:
             hh, mm = [int(x) for x in str(getattr(self, "notebook_time", "23:30") or "23:30").split(":")[:2]]
         except Exception:
             hh, mm = 23, 30
-        if (local.tm_hour, local.tm_min) < (hh, mm):
-            return False
-        return str((self.self_model or {}).get("notebook_last_date") or "") != time.strftime("%Y-%m-%d", local)
+        return (local.tm_hour, local.tm_min) >= (hh, mm)
 
-    def _notebook_materials(self, core, now=None) -> list:
-        """What she can look at tonight, each with an id and an origin: how her body went
-        today (her own) and today's events (as private or public as they are)."""
+    def _notebook_night(self, now=None) -> dict:
+        """Tonight's record: which sittings were tried (marked before each call) and how
+        many changes were made, kept in self_model.json so a restart does not call again."""
+        date = time.strftime("%Y-%m-%d", time.localtime(time.time() if now is None else now))
+        night = (self.self_model or {}).get("notebook_night")
+        if not isinstance(night, dict) or night.get("date") != date:
+            night = {"date": date, "tried": [], "changes": 0}
+            self.self_model["notebook_night"] = night
+        return night
+
+    def _today_events(self, now=None) -> list:
+        local = time.localtime(time.time() if now is None else now)
+        midnight = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1))
+        return [e for e in reversed(self._event_archive(120))
+                if isinstance(e, dict) and float(e.get("ts", 0) or 0) >= midnight]
+
+    def _notebook_sittings(self, now=None) -> list:
+        """Tonight's sittings: "group" first, then the busiest private chats with events today."""
         now = time.time() if now is None else now
+        places = {}
+        for e in self._today_events(now):
+            where = discretion.origin_of(e)["where"]
+            if where.startswith("private:"):
+                places[where] = 0
         local = time.localtime(now)
         midnight = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1))
+        for place in places:
+            places[place] = len([x for x in self._read_window(place)["recent"]
+                                 if float(x.get("ts", 0) or 0) >= midnight])
+        busiest = sorted(places, key=lambda p: (-places[p], p))[:NOTEBOOK_PRIVATE_MAX]
+        return ["group"] + busiest
+
+    def _notebook_materials(self, core, sitting, now=None) -> list:
+        """The material of one sitting, each with an id and an origin: her body's day (her
+        own), and today's events that belong to it: the groups' open ones for "group"
+        (nothing private, nothing of unknown origin), or that private chat's own."""
         mats = []
         trend = self._body_trend_text(core)
         if trend:
             mats.append({"id": "m1", "text": "身体：" + trend,
                          "origin": discretion.make_origin(discretion.SELF), "names": [], "ref": "body"})
-        for e in reversed(self._event_archive(80)):
-            if not isinstance(e, dict) or float(e.get("ts", 0) or 0) < midnight:
+        for e in self._today_events(now):
+            origin = discretion.origin_of(e)
+            if sitting == "group":
+                if origin["visibility"] != discretion.PUBLIC:
+                    continue
+            elif origin["where"] != sitting or origin["visibility"] != discretion.PRIVATE:
                 continue
             body = str(e.get("meaning_to_her") or e.get("reflection") or e.get("small_summary")
                        or e.get("event") or "")
             text = ("%s：%s" % (str(e.get("title") or "一件事"), body)).strip("：")
             mats.append({"id": "m%d" % (len(mats) + 1), "text": "事件：" + text[:160],
-                         "origin": discretion.origin_of(e), "names": discretion.names_in(e),
-                         "ref": str(e.get("id") or "")})
+                         "origin": origin, "names": discretion.names_in(e), "ref": str(e.get("id") or "")})
             if len(mats) >= 13:
                 break
         return mats
@@ -434,63 +474,101 @@ class LLMMixin:
             parts.append("说了不少话")
         return "，".join(parts) + "。"
 
-    def _notebook_origin(self, text, uses, materials, old=None) -> tuple:
-        """The origin of one entry: the materials it says it used, plus any it did not name
-        but plainly draws on (shared character pairs); if it names none, all of tonight's.
-        Her own body alone keeps it hers; otherwise her own part does not widen it."""
-        by_id = {m["id"]: m for m in materials}
-        used = [by_id[x] for x in (uses or []) if x in by_id] if uses is not None else list(materials)
-        for m in materials:
-            if m not in used and BioCore._text_similarity(text, m["text"]) >= NOTEBOOK_OVERLAP:
-                used.append(m)
-        origins = [m["origin"] for m in used]
-        if isinstance(old, dict):
-            origins.append(discretion.origin_of(old))
-        names = sorted({n for m in used for n in (m.get("names") or [])}
-                       | set((old or {}).get("names") or []))
-        others = [o for o in origins if o.get("visibility") != discretion.SELF]
+    @staticmethod
+    def _sitting_origin(sitting, materials) -> dict:
+        """All the material of the sitting merged; her own only when that is her body alone.
+        A private chat's sitting belongs to that chat whatever it was given."""
+        others = [m["origin"] for m in materials if m["origin"].get("visibility") != discretion.SELF]
+        if sitting != "group":
+            people = [p for o in others for p in o.get("people") or []] + [sitting.split(":", 1)[1]]
+            ids = [i for o in others for i in o.get("source_ids") or []]
+            return discretion.make_origin(sitting, people, ids, discretion.PRIVATE)
         if not others:
-            return discretion.make_origin(discretion.SELF), names, [m["ref"] for m in used]
-        return discretion.merge(others), names, [m["ref"] for m in used]
+            return discretion.make_origin(discretion.SELF)
+        return discretion.merge(others)
+
+    @staticmethod
+    def _notebook_shown(entries, sitting) -> list:
+        """Which entries a sitting may see and change: in "group" her own and the open ones;
+        in a private chat's, her own and that chat's (so nothing private is copied out)."""
+        shown = []
+        for i, x in enumerate(entries):
+            o = discretion.origin_of(x)
+            if o["visibility"] == discretion.SELF or o["where"] == discretion.SELF:
+                shown.append(i)
+            elif sitting == "group" and o["visibility"] == discretion.PUBLIC:
+                shown.append(i)
+            elif sitting != "group" and o["where"] == sitting:
+                shown.append(i)
+        return shown
 
     async def _maybe_write_notebook(self, now=None) -> bool:
-        """Once a night (after notebook_time, local), at most one model call a day: the day
-        is marked before the call, so a failed call or a restart does not call again."""
-        if not self._notebook_due(now):
+        """Tonight's sittings after notebook_time (local), each at most once a day: a sitting
+        is marked as tried before its call, so a failure or a restart does not call again.
+        At most NOTEBOOK_EDITS changes a night and NOTEBOOK_MAX entries in all."""
+        if not self._notebook_time_reached(now):
             return False
         now = time.time() if now is None else now
-        self.self_model["notebook_last_date"] = time.strftime("%Y-%m-%d", time.localtime(now))
-        self._save_self_model()
+        night = self._notebook_night(now)
         core = self._core(None)
-        entries = [x for x in (self.self_model.get("notebook") or []) if isinstance(x, dict)]
-        materials = self._notebook_materials(core, now)
         persona = await self._persona_text(None)
-        changes = await self._llm_v2_call(
-            "notebook",
-            interpretation.notebook_prompt([x.get("text") for x in entries], materials,
-                                           NOTEBOOK_MAX, NOTEBOOK_CHARS, NOTEBOOK_EDITS),
-            lambda raw: interpretation.parse_notebook_changes(
-                raw, len(entries), [m["id"] for m in materials], NOTEBOOK_CHARS, NOTEBOOK_EDITS),
-            None, system_prompt=persona or None)
-        if not changes or self._job_stale():
-            return False
-        gone = set()
-        for change in changes:
-            if change["op"] == "delete":
-                gone.add(change["no"] - 1)
-            elif change["op"] == "edit":
-                old = entries[change["no"] - 1]
-                origin, names, refs = self._notebook_origin(change["text"], change["uses"], materials, old)
-                entries[change["no"] - 1] = dict(old, text=change["text"], ts=now, origin=origin,
-                                                 names=names, uses=refs)
-            elif len(entries) - len(gone) < NOTEBOOK_MAX:
-                origin, names, refs = self._notebook_origin(change["text"], change["uses"], materials)
-                entries.append({"id": _sha256("%s|%s" % (now, change["text"]))[:12], "text": change["text"],
-                                "ts": now, "origin": origin, "names": names, "uses": refs})
-        self.self_model["notebook"] = [x for i, x in enumerate(entries) if i not in gone][:NOTEBOOK_MAX]
-        self._save_self_model()
-        logger.info("[ams-life] notebook: %d change(s)", len(changes))
-        return True
+        wrote = False
+        for sitting in self._notebook_sittings(now):
+            budget = NOTEBOOK_EDITS - int(night.get("changes", 0) or 0)
+            if sitting in night["tried"] or budget <= 0:
+                continue
+            if sitting != "group" and len([s for s in night["tried"] if s != "group"]) >= NOTEBOOK_PRIVATE_MAX:
+                break
+            night["tried"].append(sitting)
+            self._save_self_model()
+            entries = [x for x in (self.self_model.get("notebook") or []) if isinstance(x, dict)]
+            shown = self._notebook_shown(entries, sitting)
+            materials = self._notebook_materials(core, sitting, now)
+            changes = await self._llm_v2_call(
+                "notebook",
+                interpretation.notebook_prompt([entries[i].get("text") for i in shown], materials,
+                                               sitting != "group", NOTEBOOK_MAX, NOTEBOOK_CHARS, budget),
+                lambda raw: interpretation.parse_notebook_changes(
+                    raw, len(shown), [m["id"] for m in materials], NOTEBOOK_CHARS, budget),
+                None, system_prompt=persona or None)
+            if not changes or self._job_stale():
+                continue
+            origin = self._sitting_origin(sitting, materials)
+            names = sorted({n for m in materials for n in (m.get("names") or [])})
+            refs = {m["id"]: m["ref"] for m in materials}
+            entries = [x for x in (self.self_model.get("notebook") or []) if isinstance(x, dict)]
+            gone = set()
+            for change in changes:
+                mark = {"private_mark": change.get("private")}
+                uses = [refs[x] for x in (change.get("uses") or []) if x in refs]
+                if change["op"] == "delete":
+                    gone.add(shown[change["no"] - 1])
+                elif change["op"] == "edit":
+                    i = shown[change["no"] - 1]
+                    old = entries[i]
+                    entries[i] = dict(old, text=change["text"], ts=now, uses=uses, sitting=sitting,
+                                      origin=self._sitting_origin_with(origin, old),
+                                      names=sorted(set(names) | set(old.get("names") or [])), **mark)
+                elif len(entries) - len(gone) < NOTEBOOK_MAX:
+                    entries.append({"id": _sha256("%s|%s|%s" % (now, sitting, change["text"]))[:12],
+                                    "text": change["text"], "ts": now, "origin": origin, "names": names,
+                                    "uses": uses, "sitting": sitting, **mark})
+                else:
+                    continue
+                night["changes"] = int(night.get("changes", 0) or 0) + 1
+            self.self_model["notebook"] = [x for i, x in enumerate(entries) if i not in gone][:NOTEBOOK_MAX]
+            self._save_self_model()
+            logger.info("[ams-life] notebook (%s): %d change(s)", "group" if sitting == "group" else "private",
+                        len(changes))
+            wrote = True
+        return wrote
+
+    @staticmethod
+    def _sitting_origin_with(origin, old) -> dict:
+        """An edited entry: this sitting's origin and the entry's own, merged (her own part
+        never widens it)."""
+        both = [o for o in (origin, discretion.origin_of(old)) if o.get("visibility") != discretion.SELF]
+        return discretion.merge(both) if both else discretion.make_origin(discretion.SELF)
 
     async def _maybe_relationship_narrative(self, event, core):
         """L-T12: manual/periodic bounded relationship narrative (default OFF)."""

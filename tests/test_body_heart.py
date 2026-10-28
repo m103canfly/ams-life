@@ -277,31 +277,71 @@ class Heart(unittest.TestCase):
 
 
 class Notebook(unittest.TestCase):
-    def test_each_entry_is_as_private_as_what_it_used(self):
-        r = run_case('notebook')
-        book = {x['text']: x['origin'] for x in r['notebook']}
-        self.assertEqual(book['芒果在偷偷准备惊喜蛋糕，我要保密']['where'], 'private:10001')  # found by overlap
-        self.assertEqual(book['今天心情平平']['visibility'], 'self')
-        self.assertEqual(book['周末大家要去爬山']['where'], 'group:900001')
-        self.assertIn('惊喜蛋糕，我要保密', r['private'])
-        for prompt in (r['group_a'], r['group_b']):
-            self.assertNotIn('蛋糕', prompt)
-            self.assertIn('[她的本子] 今天心情平平', prompt)
+    """She writes in sittings: once for what was said openly in the groups, once for each
+    private chat of the day. What a sitting writes belongs to all of its material; the
+    model's own "uses" and "private" do not decide where an entry comes up."""
 
-    def test_one_model_call_a_day_failures_and_restarts_included(self):
+    def test_the_group_sitting_sees_nothing_private(self):
+        r = run_case('notebook')
+        self.assertEqual(r['sittings'], ['group', 'private:10001', 'private:10007'])
+        group = r['prompts']['group']
+        for word in ('蛋糕', '搬家', '芒果', '小鹿'):
+            self.assertNotIn(word, group)
+        self.assertIn('爬山', group)
+        self.assertNotIn('搬家', r['prompts']['private:10001'])  # nor one chat's sitting another's
+
+    def test_a_private_sittings_entries_stay_in_that_chat(self):
+        r = run_case('notebook')
+        book = {x['text']: x for x in r['notebook']}
+        for text in ('朋友在准备一个甜甜的秘密', '芒果在准备惊喜蛋糕，要保密'):
+            self.assertEqual(book[text]['origin']['where'], 'private:10001')
+            self.assertIn(text, r['private_mango'])
+            for prompt in (r['group_a'], r['group_b'], r['private_deer']):
+                self.assertNotIn(text, prompt)
+        self.assertEqual(book['周末大家要去爬山']['origin']['where'], 'group:900001')
+        self.assertIn('周末大家要去爬山', r['group_b'])
+
+    def test_said_another_way_and_marked_tellable_it_still_stays(self):
+        # the review's case: no "uses", her own mark says it can be told
+        r = run_case('notebook')
+        entry = [x for x in r['notebook'] if x['text'] == '朋友在准备一个甜甜的秘密'][0]
+        self.assertIs(entry['private_mark'], False)
+        self.assertEqual(entry['origin']['where'], 'private:10001')
+        for prompt in (r['group_a'], r['group_b'], r['private_deer']):
+            self.assertNotIn('甜甜的秘密', prompt)
+
+    def test_her_private_mark_is_kept(self):
+        r = run_case('notebook')
+        marks = {x['text']: x['private_mark'] for x in r['notebook']}
+        self.assertEqual(marks, {'周末大家要去爬山': False, '朋友在准备一个甜甜的秘密': False,
+                                 '芒果在准备惊喜蛋糕，要保密': True})
+
+    def test_her_body_alone_is_hers_anywhere(self):
+        r = run_case('notebook_body')
+        self.assertEqual(r['notebook'][0]['origin']['visibility'], 'self')
+        for prompt in r['prompts']:
+            self.assertIn('[她的本子] 今天很安静', prompt)
+
+    def test_calls_once_per_sitting_a_day_failures_and_restarts_included(self):
         r = run_case('notebook')
         self.assertTrue(r['wrote'])
+        # the night's three changes were used up by the first two sittings
+        self.assertEqual(r['calls_first_night'], ['group', 'private:10001'])
         self.assertFalse(r['again_same_night'])
-        self.assertEqual(r['calls_first_night'], 1)
         self.assertFalse(r['restart_same_day'])
         self.assertFalse(r['next_day_failed'])
         self.assertFalse(r['after_failure_same_day'])
-        self.assertEqual(r['calls_total'], 2)
+        self.assertEqual(r['calls_total'], 4)  # two the first night, two failed the next
         self.assertEqual(r['system_prompt'], '你是小爱。')  # in her own voice
+
+    def test_at_most_three_private_chats_the_busiest(self):
+        r = run_case('notebook_many')
+        self.assertEqual(r['sittings'], ['group', 'private:10101', 'private:10103', 'private:10100'])
+        self.assertEqual(r['calls'], 4)
 
     def test_three_changes_forty_characters_twenty_entries(self):
         r = run_case('notebook')
-        self.assertEqual(len(r['notebook']), 3)  # the fourth change was one too many
+        self.assertEqual(len(r['notebook']), 3)  # a fourth change was one too many
         r = run_case('notebook_full')
         texts = [x['text'] for x in r['notebook']]
         self.assertEqual(len(texts), 19)  # full: the add is dropped; one deleted
@@ -313,8 +353,8 @@ class Notebook(unittest.TestCase):
 
     def test_forgetting_reaches_her_notebook(self):
         r = run_case('notebook')
-        self.assertEqual(r['forgot']['notes'], 1)
-        self.assertEqual(r['notebook_after_forget'], ['今天心情平平', '周末大家要去爬山'])
+        self.assertEqual(r['forgot']['notes'], 2)
+        self.assertEqual(r['notebook_after_forget'], ['周末大家要去爬山'])
 
 
 class Insights(unittest.TestCase):

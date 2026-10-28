@@ -5219,7 +5219,7 @@
    "narrative": "",
    "narrative_items": [],
    "notebook": [],
-   "notebook_last_date": "",
+   "notebook_night": {},
    "version": 1,
    "who_am_i": ""
   },
@@ -10175,7 +10175,7 @@
     "narrative": "",
     "narrative_items": [],
     "notebook": [],
-    "notebook_last_date": "",
+    "notebook_night": {},
     "relationship_narratives": [],
     "version": 1,
     "who_am_i": ""

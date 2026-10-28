@@ -24,7 +24,7 @@ class PeopleMixin:
             "narrative": "",
             "narrative_items": [],
             "notebook": [],
-            "notebook_last_date": "",   # the day she last tried to write (a failed try counts)
+            "notebook_night": {},       # tonight's sittings tried (a failed try counts) and changes made
             "heart": 1,
             "version": 0,
             "_history": [],

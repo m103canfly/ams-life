@@ -501,27 +501,38 @@ def run():
         out['raw_events'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
                              if x.strip()] if (DATA / 'archives' / 'events.jsonl').exists() else []
         out['self_model'] = json.loads((DATA / 'self_model.json').read_text('utf-8'))
-    elif CASE in ('notebook', 'notebook_full'):
+    elif CASE in ('notebook', 'notebook_full', 'notebook_many', 'notebook_body'):
         plugin.llm_functions = {'notebook': {'enabled': True}}
         plugin.notebook_time = '00:00'
         plugin._begin_job()
-        A_PLACE, P_PLACE = 'group:' + A, 'private:10001'
-        plugin._append_event_archive({
-            'id': 'evt_cake', 'ts': clock.now, 'session': 'default:FriendMessage:10001',
-            'title': '偷偷准备惊喜蛋糕', 'event': '芒果在偷偷准备一个惊喜蛋糕给大家',
-            'meaning_to_her': '芒果在偷偷准备惊喜蛋糕', 'event_key': 'cake',
-            'origin': main.discretion.make_origin(P_PLACE, ['10001'], ['m_cake'])})
-        plugin._append_event_archive({
-            'id': 'evt_hike', 'ts': clock.now, 'session': 'default:GroupMessage:' + A,
-            'title': '周末去爬山', 'event': '柠檬说群里周末一起去爬山', 'meaning_to_her': '群里周末要去爬山',
-            'event_key': 'hike', 'origin': main.discretion.make_origin(A_PLACE, ['10002'], ['m_hike'])})
+        A_PLACE = 'group:' + A
+
+        def event(eid, place, people, title, meaning, n_lines=0):
+            session = ('default:GroupMessage:' + place.split(':')[1] if place.startswith('group:')
+                       else 'default:FriendMessage:' + place.split(':')[1])
+            plugin._append_event_archive({
+                'id': eid, 'ts': clock.now, 'session': session, 'title': title, 'event': meaning,
+                'meaning_to_her': meaning, 'event_key': eid,
+                'origin': main.discretion.make_origin(place, people, ['m_' + eid])})
+            if n_lines:  # how busy the chat was today
+                plugin._write_window(place, {'recent': [{'ts': clock.now, 'role': 'user', 'text': '…'}] * n_lines,
+                                             'open_loops': []})
+        if CASE in ('notebook', 'notebook_full'):
+            event('cake', 'private:10001', ['10001'], '偷偷准备惊喜蛋糕', '芒果在偷偷准备一个惊喜蛋糕给大家', 5)
+            event('move', 'private:10007', ['10007'], '小鹿要搬家', '小鹿下周要搬家，还没告诉别人', 3)
+            event('hike', A_PLACE, ['10002'], '周末去爬山', '柠檬说群里周末一起去爬山')
+        if CASE == 'notebook_many':
+            for i, n in enumerate((2, 9, 1, 7)):  # four private chats; the three busiest are written
+                event('p%d' % i, 'private:1010%d' % i, ['1010%d' % i], '私事%d' % i, '第%d个人的私事' % i, n)
         calls = []
-        answers = []
+        answers = {}
 
         class NotebookModel:
             async def text_chat(self, prompt='', system_prompt=None, **k):
-                calls.append({'prompt': prompt, 'system': system_prompt})
-                answer = answers.pop(0) if answers else '{}'
+                sitting = 'group' if '各个群' in prompt else (
+                    'private:10001' if '惊喜蛋糕' in prompt else ('private:10007' if '搬家' in prompt else 'other'))
+                calls.append({'sitting': sitting, 'prompt': prompt, 'system': system_prompt})
+                answer = answers.get(sitting, '{}')
                 if isinstance(answer, Exception):
                     raise answer
                 return harness.FakeResponse(answer)
@@ -530,25 +541,31 @@ def run():
         async def provider(kind, event=None):
             return NotebookModel() if kind == 'notebook' else await real_provider(kind, event)
         plugin._provider_for = provider
-        out['materials'] = [{'id': m['id'], 'text': m['text'], 'origin': m['origin']}
-                            for m in plugin._notebook_materials(plugin._core(None))]
+        out['sittings'] = plugin._notebook_sittings()
+
+        def changes(*items):
+            return json.dumps({'changes': list(items)}, ensure_ascii=False)
         if CASE == 'notebook':
-            answers.append(json.dumps({'changes': [
-                {'op': 'add', 'text': '芒果在偷偷准备惊喜蛋糕，我要保密', 'uses': []},  # names none: overlap finds it
-                {'op': 'add', 'text': '今天心情平平', 'uses': ['m1']},
-                {'op': 'add', 'text': '周末大家要去爬山', 'uses': ['m3']},
-                {'op': 'add', 'text': '这一条超过了三处', 'uses': ['m1']},
-            ]}, ensure_ascii=False))
+            answers['group'] = changes({'op': 'add', 'text': '周末大家要去爬山', 'private': False, 'uses': ['m2']})
+            answers['private:10001'] = changes(
+                # the review's case: the private thing said another way, marked "can be told", no uses
+                {'op': 'add', 'text': '朋友在准备一个甜甜的秘密', 'private': False, 'uses': []},
+                {'op': 'add', 'text': '芒果在准备惊喜蛋糕，要保密', 'private': True, 'uses': ['m2']})
+            answers['private:10007'] = changes(
+                {'op': 'add', 'text': '小鹿要搬家了', 'private': True, 'uses': ['m2']},
+                {'op': 'add', 'text': '这一条超过了一晚三处', 'private': True})
             out['wrote'] = loop.run_until_complete(plugin._maybe_write_notebook())
             out['again_same_night'] = loop.run_until_complete(plugin._maybe_write_notebook())
-            out['calls_first_night'] = len(calls)
-            out['notebook'] = [{'text': x['text'], 'origin': x['origin']} for x in plugin.self_model['notebook']]
+            out['calls_first_night'] = [c['sitting'] for c in calls]
+            out['prompts'] = {c['sitting']: c['prompt'] for c in calls}
+            out['notebook'] = [{k: x.get(k) for k in ('text', 'origin', 'private_mark', 'sitting')}
+                               for x in plugin.self_model['notebook']]
             t(0, '小爱 早上好', '10002', '柠檬', A)
-            t(10, '小爱 在吗', '10001', '芒果')
             t(10, '小爱 晚上好', '10004', '桃子', B)
-            out['group_a'] = out['turns'][0]['prompt']
-            out['private'] = out['turns'][1]['prompt']
-            out['group_b'] = out['turns'][2]['prompt']
+            t(10, '小爱 在吗', '10001', '芒果')
+            t(10, '小爱 在吗', '10007', '小鹿')
+            out['group_a'], out['group_b'], out['private_mango'], out['private_deer'] = [
+                x['prompt'] for x in out['turns'][-4:]]
             # a restart the same day does not call again; a failed call next day counts as that day's
             plugin2 = main.BioCorePlugin(harness.FakeContext(), config=config)
             plugin2.llm_functions = {'notebook': {'enabled': True}}
@@ -557,24 +574,36 @@ def run():
             plugin2._ipv4_json = harness.fake_ipv4_json
             out['restart_same_day'] = loop.run_until_complete(plugin2._maybe_write_notebook())
             clock.advance(86400)
-            answers.append(RuntimeError('model down'))
+            event('cake2', 'private:10001', ['10001'], '蛋糕做好了', '芒果把惊喜蛋糕做好了', 2)
+            answers.clear()
+            answers['group'] = RuntimeError('model down')
+            answers['private:10001'] = RuntimeError('model down')
             out['next_day_failed'] = loop.run_until_complete(plugin2._maybe_write_notebook())
             out['after_failure_same_day'] = loop.run_until_complete(plugin2._maybe_write_notebook())
             out['calls_total'] = len(calls)
             out['system_prompt'] = calls[0]['system']
             out['forgot'] = plugin2._forget(person='10001')
             out['notebook_after_forget'] = [x['text'] for x in plugin2.self_model['notebook']]
-        else:
+        elif CASE == 'notebook_full':
             plugin.self_model['notebook'] = [
                 {'id': 'n%d' % i, 'text': '旧的第%d条' % i, 'ts': 0, 'origin': main.discretion.make_origin('self')}
                 for i in range(20)]
-            answers.append(json.dumps({'changes': [
+            answers['group'] = changes(
                 {'op': 'add', 'text': '本子满了这条加不进去', 'uses': ['m1']},
                 {'op': 'edit', 'no': 2, 'text': '改过的第二条' + '很长' * 30, 'uses': ['m2']},
-                {'op': 'delete', 'no': 3},
-            ]}, ensure_ascii=False))
+                {'op': 'delete', 'no': 3})
             loop.run_until_complete(plugin._maybe_write_notebook())
             out['notebook'] = [{'text': x['text'], 'origin': x['origin']} for x in plugin.self_model['notebook']]
+        elif CASE == 'notebook_many':
+            loop.run_until_complete(plugin._maybe_write_notebook())
+            out['calls'] = len(calls)
+        else:  # notebook_body: nothing happened anywhere today; only her body to look at
+            answers['group'] = changes({'op': 'add', 'text': '今天很安静', 'private': False, 'uses': ['m1']})
+            loop.run_until_complete(plugin._maybe_write_notebook())
+            out['notebook'] = [{'text': x['text'], 'origin': x['origin']} for x in plugin.self_model['notebook']]
+            t(0, '小爱 早上好', '10002', '柠檬', A)
+            t(10, '小爱 在吗', '10001', '芒果')
+            out['prompts'] = [x['prompt'] for x in out['turns'][-2:]]
     elif CASE == 'insight':
         plugin.llm_functions = {'insight': {'enabled': True}}
         plugin._begin_job()

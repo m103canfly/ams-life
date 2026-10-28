@@ -1225,24 +1225,30 @@ def parse_tom_update(raw, allowed_refs=None) -> dict:
     }
 
 
-def notebook_prompt(entries, materials, max_entries=20, max_chars=40, max_edits=3) -> str:
-    """Her notebook, at night: what is in it, today's material, and what she may change.
-    It is hers: nothing tells her what to think, only how to write the answer down."""
+def notebook_prompt(entries, materials, private_sitting=False, max_entries=20, max_chars=40, max_edits=3) -> str:
+    """Her notebook, at night, one sitting: what of it she sees now, the sitting's
+    material, and what she may change. It is hers: nothing tells her what to think,
+    only how to write the answer down. She marks each entry private or not; the mark is
+    kept, it does not decide where the entry comes up (the sitting does)."""
     book = "\n".join("%d. %s" % (i + 1, _hint(x, max_chars)) for i, x in enumerate(entries or [])) or "（还是空的）"
     mats = "\n".join("%s. %s" % (m.get("id"), _hint(m.get("text"), 160)) for m in (materials or [])) or "（今天没有）"
+    where = ("这一次看的是你跟一个人私聊里的事；这里写下的，只会在跟这个人私聊时想起。"
+             if private_sitting else "这一次看的是各个群里大家当众说的事。")
     return ("这是你自己的本子，只有你自己写，也只有你自己看。现在是晚上，你可以看看今天的材料，"
-            "想想要不要改本子；写什么、不写什么都由你。\n"
-            "本子现在有这些条：\n%s\n今天的材料：\n%s\n"
+            "想想要不要改本子；写什么、不写什么都由你。%s\n"
+            "本子里这些条：\n%s\n今天的材料：\n%s\n"
             "最多改 %d 处（加一条、改一条、删一条都算一处），每条不超过 %d 字，本子最多 %d 条。不想改就不改。\n"
             "只输出 JSON："
-            '{"changes":[{"op":"add","text":"……","uses":["m1"]},{"op":"edit","no":1,"text":"……","uses":[]},'
-            '{"op":"delete","no":2}]}\n'
-            "uses 写这一条用到了哪些材料的编号。" % (book, mats, max_edits, max_chars, max_entries))
+            '{"changes":[{"op":"add","text":"……","private":false,"uses":["m2"]},'
+            '{"op":"edit","no":1,"text":"……","private":true,"uses":["m1","m3"]},{"op":"delete","no":2}]}\n'
+            "private 写你觉得这一条是不是私事；uses 写这一条用到了哪些材料的编号。"
+            % (where, book, mats, max_edits, max_chars, max_entries))
 
 
 def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_edits=3) -> list:
     """At most `max_edits` valid changes; texts cut to `max_chars`; unknown numbers dropped.
-    A change without a valid `uses` list gets uses=None (the caller treats it as all)."""
+    `uses` (only known material ids) and `private` (True / False / None) are kept as she
+    wrote them, for reference; neither decides an entry's origin."""
     data = _extract_json_object(raw)
     if not isinstance(data, dict) or not isinstance(data.get("changes"), list):
         return []
@@ -1271,12 +1277,9 @@ def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_
                 continue
             change["text"] = text
             uses = item.get("uses")
-            if isinstance(uses, list) and uses and all(str(x) in known for x in uses):
-                change["uses"] = [str(x) for x in uses]
-            elif isinstance(uses, list) and not uses:
-                change["uses"] = []
-            else:
-                change["uses"] = None
+            change["uses"] = [str(x) for x in uses if str(x) in known] if isinstance(uses, list) else []
+            private = item.get("private")
+            change["private"] = private if isinstance(private, bool) else None
         out.append(change)
     return out
 
