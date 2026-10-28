@@ -53,7 +53,7 @@ SCRIPT = [
      '超厉害的！好高兴<bc>{"e":"joy","i":0.9,"x":"open"}</bc>'),
     (400, dict(text='小爱 我好难过 想哭', sender='10001', name='芒果'),
      '我在呢，听着也好难过<bc>{"e":"sadness","i":0.9,"n":"be_heard"}</bc>'),
-    (20, dict(text='今天的画没赶上展出 真的很委屈', sender='10001', name='芒果'), '抱抱你，好委屈啊<bc>{"e":"sadness","i":0.85}</bc>'),
+    (20, dict(text='今天被骂了 真的很委屈', sender='10001', name='芒果'), '抱抱你，好委屈啊<bc>{"e":"sadness","i":0.85}</bc>'),
     (20, dict(text='气死我了！！！他凭什么这样说我', sender='10001', name='芒果'), '太过分了，我也生气<bc>{"e":"anger","i":0.8}</bc>'),
     (30, dict(text='真的受够了！！！气死了！！！', sender='10001', name='芒果'), '先别气坏自己<bc>{"e":"anger","i":0.9}</bc>'),
     (620, dict(text='我还是好生气！！！凭什么啊！！！', sender='10001', name='芒果'), '我陪着你，真让人生气<bc>{"e":"anger","i":0.9}</bc>'),

@@ -73,19 +73,19 @@
    {
     "appraisal": {
      "agency": 0.5,
-     "coping": 0.501,
+     "coping": 0.5,
      "expectedness": 1.0,
      "goal_relevance": 0.022,
      "norm_compatibility": 0.5,
      "novelty": 0.0,
-     "urgency": 0.487
+     "urgency": 0.526
     },
     "attachments": [],
-    "big_summary": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "big_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
-    "emotion_intensity": 0.3632,
+    "emotion_intensity": 0.3958,
     "emotion_layers": [
      {
       "centrality": 0.8,
@@ -100,7 +100,7 @@
      "委屈"
     ],
     "emotion_secondary": "contempt",
-    "event": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "event": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "event_key": "我还是好生气凭什么",
     "id": "evt_1793272490_73067",
     "importance": 0.5,
@@ -112,7 +112,7 @@
       "10001"
      ],
      "source_ids": [
-      "m今天的画没赶",
+      "m今天被骂了 ",
       "m气死我了！！",
       "m真的受够了！",
       "m我还是好生气"
@@ -137,11 +137,11 @@
     "recall_count": 0,
     "reflection": "要好好记住",
     "session": "default:FriendMessage:10001",
-    "small_summary": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气",
+    "small_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！",
     "source_check": {
      "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 1.072,
+     "length_ratio": 1.076,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -161,7 +161,7 @@
     },
     "source_count": 7,
     "source_texts": [
-     "今天的画没赶上展出 真的很委屈",
+     "今天被骂了 真的很委屈",
      "抱抱你，好委屈啊",
      "气死我了！！！他凭什么这样说我",
      "太过分了，我也生气",
@@ -177,12 +177,12 @@
    {
     "appraisal": {
      "agency": 0.5,
-     "coping": 0.501,
+     "coping": 0.5,
      "expectedness": 1.0,
      "goal_relevance": 0.022,
      "norm_compatibility": 0.5,
      "novelty": 0.0,
-     "urgency": 0.487
+     "urgency": 0.526
     },
     "attachments": [],
     "big_summary": "真的受够了！！！气死了！！！ 先别气坏自己",
@@ -190,19 +190,19 @@
     "centrality": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
-    "emotion_intensity": 0.3632,
+    "emotion_intensity": 0.3958,
     "emotion_layers": [
      {
       "emotion": "anger",
-      "p": 0.9214
+      "p": 0.9496
      },
      {
       "emotion": "contempt",
-      "p": 0.0658
+      "p": 0.0396
      },
      {
       "emotion": "disgust",
-      "p": 0.0128
+      "p": 0.0108
      }
     ],
     "emotion_layers_source": "core",
@@ -237,7 +237,7 @@
     ],
     "event_key": "真的受够了",
     "id": "evt_1793272490_88152",
-    "importance": 0.554,
+    "importance": 0.581,
     "last_recall": 1793272490.0,
     "meaning_to_her": "",
     "milestone": {},
@@ -324,7 +324,7 @@
      "真的受够了！！！气死了！！！",
      "先别气坏自己"
     ],
-    "strength": 0.554,
+    "strength": 0.581,
     "summary_status": "fallback",
     "time_span": {
      "end_ts": 1793271870.0,
@@ -337,19 +337,19 @@
    {
     "appraisal": {
      "agency": 0.5,
-     "coping": 0.501,
+     "coping": 0.5,
      "expectedness": 1.0,
      "goal_relevance": 0.89,
      "norm_compatibility": 0.62,
      "novelty": 0.0,
-     "urgency": 0.566
+     "urgency": 0.599
     },
     "attachments": [],
     "big_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
-    "emotion_intensity": 0.3613,
+    "emotion_intensity": 0.3901,
     "emotion_layers": [
      {
       "centrality": 0.8,
@@ -435,25 +435,315 @@
     "summary_status": "llm",
     "title": "小爱 我们约好下周一起打",
     "ts": 1793272890.0
+   },
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.89,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.599
+    },
+    "attachments": [],
+    "big_summary": "小爱 我们约好下周一起打副本吧",
+    "central_details": "小爱 我们约好下周一起打副本吧",
+    "centrality": 0.0,
+    "confidence": 1.0,
+    "emotion": "anger",
+    "emotion_intensity": 0.3901,
+    "emotion_layers": [
+     {
+      "emotion": "anger",
+      "p": 0.7431
+     },
+     {
+      "emotion": "contempt",
+      "p": 0.2477
+     },
+     {
+      "emotion": "disgust",
+      "p": 0.0092
+     }
+    ],
+    "emotion_layers_source": "core",
+    "emotion_nuance": [],
+    "emotion_secondary": "contempt",
+    "event": "小爱 我们约好下周一起打副本吧",
+    "event_embedding": [
+     0.27735,
+     0.0,
+     0.0,
+     0.27735,
+     0.27735,
+     -0.27735,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.27735,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.27735,
+     0.0,
+     0.0,
+     0.27735,
+     -0.27735,
+     -0.27735,
+     0.0,
+     -0.5547,
+     0.0
+    ],
+    "event_key": "小爱我们约好下周一起打副本吧",
+    "id": "evt_1793272890_91556",
+    "importance": 0.562,
+    "last_recall": 1793276520.0,
+    "meaning_to_her": "",
+    "milestone": {},
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10003"
+     ],
+     "source_ids": [
+      "m小爱 我们约"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "peripheral_details": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 我们约"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "default:GroupMessage:900001",
+     "sources": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "ts": 1793272890.0
+    },
+    "ranking_mode": "deterministic_embedding",
+    "recall_count": 2,
+    "reflection": "",
+    "session": "default:GroupMessage:900001",
+    "small_summary": "小爱 我们约好下周一起打副本吧",
+    "source_check": {
+     "coverage": 0.23,
+     "cross_ref": 1,
+     "length_ratio": 0.01,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 1,
+    "source_texts": [
+     "小爱 我们约好下周一起打副本吧"
+    ],
+    "strength": 0.562,
+    "summary_status": "fallback",
+    "time_span": {
+     "end_ts": 1793272890.0,
+     "span_seconds": 0.0,
+     "start_ts": 1793272890.0
+    },
+    "title": "小爱 我们约好下周一起打副本吧",
+    "ts": 1793272890.0
+   },
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.53,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.406
+    },
+    "attachments": [],
+    "big_summary": "记得提醒我明天交报告",
+    "central_details": "记得提醒我明天交报告",
+    "centrality": 0.0,
+    "confidence": 1.0,
+    "emotion": "neutral",
+    "emotion_intensity": 0.2551,
+    "emotion_layers": [
+     {
+      "emotion": "confusion",
+      "p": 0.4446
+     },
+     {
+      "emotion": "disappointment",
+      "p": 0.2734
+     },
+     {
+      "emotion": "guilt",
+      "p": 0.2722
+     },
+     {
+      "emotion": "neutral",
+      "p": 0.0099
+     }
+    ],
+    "emotion_layers_source": "core",
+    "emotion_nuance": [],
+    "emotion_secondary": "confusion",
+    "event": "记得提醒我明天交报告",
+    "event_embedding": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.28868,
+     -0.57735,
+     0.0,
+     0.0,
+     -0.28868,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.28868,
+     0.57735,
+     0.0,
+     0.28868,
+     0.0
+    ],
+    "event_key": "记得提醒我明天交报告",
+    "id": "evt_1793276520_99936",
+    "importance": 0.564,
+    "last_recall": 1793276520.0,
+    "meaning_to_her": "",
+    "milestone": {},
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10003"
+     ],
+     "source_ids": [
+      "m记得提醒我明",
+      "m小爱 报告我"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "peripheral_details": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 报告我",
+      "m记得提醒我明"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "default:GroupMessage:900001",
+     "sources": [
+      {
+       "message_refs": [
+        "m记得提醒我明"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272920.0
+      }
+     ],
+     "ts": 1793276520.0
+    },
+    "ranking_mode": "deterministic_embedding",
+    "recall_count": 0,
+    "reflection": "",
+    "session": "default:GroupMessage:900001",
+    "small_summary": "记得提醒我明天交报告",
+    "source_check": {
+     "coverage": 0.172,
+     "cross_ref": 1,
+     "length_ratio": 0.006,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m记得提醒我明"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272920.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 1,
+    "source_texts": [
+     "记得提醒我明天交报告"
+    ],
+    "strength": 0.564,
+    "summary_status": "fallback",
+    "time_span": {
+     "end_ts": 1793272920.0,
+     "span_seconds": 0.0,
+     "start_ts": 1793272920.0
+    },
+    "title": "记得提醒我明天交报告",
+    "ts": 1793276520.0
    }
   ],
   "archives/sessions/default_FriendMessage_10001/events.jsonl": [
    {
     "appraisal": {
      "agency": 0.5,
-     "coping": 0.501,
+     "coping": 0.5,
      "expectedness": 1.0,
      "goal_relevance": 0.022,
      "norm_compatibility": 0.5,
      "novelty": 0.0,
-     "urgency": 0.487
+     "urgency": 0.526
     },
     "attachments": [],
-    "big_summary": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "big_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
-    "emotion_intensity": 0.3632,
+    "emotion_intensity": 0.3958,
     "emotion_layers": [
      {
       "centrality": 0.8,
@@ -468,7 +758,7 @@
      "委屈"
     ],
     "emotion_secondary": "contempt",
-    "event": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+    "event": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
     "event_key": "我还是好生气凭什么",
     "id": "evt_1793272490_73067",
     "importance": 0.5,
@@ -480,7 +770,7 @@
       "10001"
      ],
      "source_ids": [
-      "m今天的画没赶",
+      "m今天被骂了 ",
       "m气死我了！！",
       "m真的受够了！",
       "m我还是好生气"
@@ -505,11 +795,11 @@
     "recall_count": 0,
     "reflection": "要好好记住",
     "session": "default:FriendMessage:10001",
-    "small_summary": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气",
+    "small_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！",
     "source_check": {
      "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 1.072,
+     "length_ratio": 1.076,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -529,7 +819,7 @@
     },
     "source_count": 7,
     "source_texts": [
-     "今天的画没赶上展出 真的很委屈",
+     "今天被骂了 真的很委屈",
      "抱抱你，好委屈啊",
      "气死我了！！！他凭什么这样说我",
      "太过分了，我也生气",
@@ -545,12 +835,12 @@
    {
     "appraisal": {
      "agency": 0.5,
-     "coping": 0.501,
+     "coping": 0.5,
      "expectedness": 1.0,
      "goal_relevance": 0.022,
      "norm_compatibility": 0.5,
      "novelty": 0.0,
-     "urgency": 0.487
+     "urgency": 0.526
     },
     "attachments": [],
     "big_summary": "真的受够了！！！气死了！！！ 先别气坏自己",
@@ -558,19 +848,19 @@
     "centrality": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
-    "emotion_intensity": 0.3632,
+    "emotion_intensity": 0.3958,
     "emotion_layers": [
      {
       "emotion": "anger",
-      "p": 0.9214
+      "p": 0.9496
      },
      {
       "emotion": "contempt",
-      "p": 0.0658
+      "p": 0.0396
      },
      {
       "emotion": "disgust",
-      "p": 0.0128
+      "p": 0.0108
      }
     ],
     "emotion_layers_source": "core",
@@ -605,7 +895,7 @@
     ],
     "event_key": "真的受够了",
     "id": "evt_1793272490_88152",
-    "importance": 0.554,
+    "importance": 0.581,
     "last_recall": 1793272490.0,
     "meaning_to_her": "",
     "milestone": {},
@@ -692,7 +982,7 @@
      "真的受够了！！！气死了！！！",
      "先别气坏自己"
     ],
-    "strength": 0.554,
+    "strength": 0.581,
     "summary_status": "fallback",
     "time_span": {
      "end_ts": 1793271870.0,
@@ -707,19 +997,19 @@
    {
     "appraisal": {
      "agency": 0.5,
-     "coping": 0.501,
+     "coping": 0.5,
      "expectedness": 1.0,
      "goal_relevance": 0.89,
      "norm_compatibility": 0.62,
      "novelty": 0.0,
-     "urgency": 0.566
+     "urgency": 0.599
     },
     "attachments": [],
     "big_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
     "boundary_score": 0.0,
     "confidence": 1.0,
     "emotion": "anger",
-    "emotion_intensity": 0.3613,
+    "emotion_intensity": 0.3901,
     "emotion_layers": [
      {
       "centrality": 0.8,
@@ -805,6 +1095,296 @@
     "summary_status": "llm",
     "title": "小爱 我们约好下周一起打",
     "ts": 1793272890.0
+   },
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.89,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.599
+    },
+    "attachments": [],
+    "big_summary": "小爱 我们约好下周一起打副本吧",
+    "central_details": "小爱 我们约好下周一起打副本吧",
+    "centrality": 0.0,
+    "confidence": 1.0,
+    "emotion": "anger",
+    "emotion_intensity": 0.3901,
+    "emotion_layers": [
+     {
+      "emotion": "anger",
+      "p": 0.7431
+     },
+     {
+      "emotion": "contempt",
+      "p": 0.2477
+     },
+     {
+      "emotion": "disgust",
+      "p": 0.0092
+     }
+    ],
+    "emotion_layers_source": "core",
+    "emotion_nuance": [],
+    "emotion_secondary": "contempt",
+    "event": "小爱 我们约好下周一起打副本吧",
+    "event_embedding": [
+     0.27735,
+     0.0,
+     0.0,
+     0.27735,
+     0.27735,
+     -0.27735,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.27735,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.27735,
+     0.0,
+     0.0,
+     0.27735,
+     -0.27735,
+     -0.27735,
+     0.0,
+     -0.5547,
+     0.0
+    ],
+    "event_key": "小爱我们约好下周一起打副本吧",
+    "id": "evt_1793272890_91556",
+    "importance": 0.562,
+    "last_recall": 1793272890.0,
+    "meaning_to_her": "",
+    "milestone": {},
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10003"
+     ],
+     "source_ids": [
+      "m小爱 我们约"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "peripheral_details": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 我们约"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "default:GroupMessage:900001",
+     "sources": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "ts": 1793272890.0
+    },
+    "ranking_mode": "deterministic_embedding",
+    "recall_count": 0,
+    "reflection": "",
+    "session": "default:GroupMessage:900001",
+    "small_summary": "小爱 我们约好下周一起打副本吧",
+    "source_check": {
+     "coverage": 0.23,
+     "cross_ref": 1,
+     "length_ratio": 0.01,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 1,
+    "source_texts": [
+     "小爱 我们约好下周一起打副本吧"
+    ],
+    "strength": 0.562,
+    "summary_status": "fallback",
+    "time_span": {
+     "end_ts": 1793272890.0,
+     "span_seconds": 0.0,
+     "start_ts": 1793272890.0
+    },
+    "title": "小爱 我们约好下周一起打副本吧",
+    "ts": 1793272890.0
+   },
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.53,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.406
+    },
+    "attachments": [],
+    "big_summary": "记得提醒我明天交报告",
+    "central_details": "记得提醒我明天交报告",
+    "centrality": 0.0,
+    "confidence": 1.0,
+    "emotion": "neutral",
+    "emotion_intensity": 0.2551,
+    "emotion_layers": [
+     {
+      "emotion": "confusion",
+      "p": 0.4446
+     },
+     {
+      "emotion": "disappointment",
+      "p": 0.2734
+     },
+     {
+      "emotion": "guilt",
+      "p": 0.2722
+     },
+     {
+      "emotion": "neutral",
+      "p": 0.0099
+     }
+    ],
+    "emotion_layers_source": "core",
+    "emotion_nuance": [],
+    "emotion_secondary": "confusion",
+    "event": "记得提醒我明天交报告",
+    "event_embedding": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.28868,
+     -0.57735,
+     0.0,
+     0.0,
+     -0.28868,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.28868,
+     0.57735,
+     0.0,
+     0.28868,
+     0.0
+    ],
+    "event_key": "记得提醒我明天交报告",
+    "id": "evt_1793276520_99936",
+    "importance": 0.564,
+    "last_recall": 1793276520.0,
+    "meaning_to_her": "",
+    "milestone": {},
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10003"
+     ],
+     "source_ids": [
+      "m记得提醒我明",
+      "m小爱 报告我"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "peripheral_details": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 报告我",
+      "m记得提醒我明"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "default:GroupMessage:900001",
+     "sources": [
+      {
+       "message_refs": [
+        "m记得提醒我明"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272920.0
+      }
+     ],
+     "ts": 1793276520.0
+    },
+    "ranking_mode": "deterministic_embedding",
+    "recall_count": 0,
+    "reflection": "",
+    "session": "default:GroupMessage:900001",
+    "small_summary": "记得提醒我明天交报告",
+    "source_check": {
+     "coverage": 0.172,
+     "cross_ref": 1,
+     "length_ratio": 0.006,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m记得提醒我明"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "default:GroupMessage:900001",
+       "ts": 1793272920.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 1,
+    "source_texts": [
+     "记得提醒我明天交报告"
+    ],
+    "strength": 0.564,
+    "summary_status": "fallback",
+    "time_span": {
+     "end_ts": 1793272920.0,
+     "span_seconds": 0.0,
+     "start_ts": 1793272920.0
+    },
+    "title": "记得提醒我明天交报告",
+    "ts": 1793276520.0
    }
   ],
   "forget_registry.sqlite3": {
@@ -1663,7 +2243,7 @@
      "hits": 1,
      "id": "d458efaa4759",
      "importance": 0.45480444855053953,
-     "inhibition": 0.2658,
+     "inhibition": 0.1292,
      "inhibition_ts": 1793271870.0,
      "last_used": 1793011740.0,
      "legacy_backfilled": true,
@@ -1701,7 +2281,7 @@
      "sender_name": "",
      "sensitive": false,
      "sensitivity": 0.0,
-     "suppression_count": 2,
+     "suppression_count": 1,
      "text": "你可以的！",
      "ts": 1793011740.0,
      "verification": {
@@ -2111,20 +2691,20 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.41,
-     "encoding_emotion": "neutral",
-     "encoding_emotion_secondary": "confusion",
-     "encoding_regulation": "none",
-     "encoding_valence": -0.166,
+     "encoding_arousal": 0.462,
+     "encoding_emotion": "sadness",
+     "encoding_emotion_secondary": "disappointment",
+     "encoding_regulation": "express",
+     "encoding_valence": -0.213,
      "hits": 1,
-     "id": "8726d29ba239",
+     "id": "c3dc72426bd5",
      "image_caption": "",
-     "importance": 0.5101156028644019,
+     "importance": 0.5399875908485862,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271820.0,
-     "memory_confidence": 0.8208,
+     "memory_confidence": 0.8232,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793358220.0,
@@ -2133,7 +2713,7 @@
        "10001"
       ],
       "source_ids": [
-       "m今天的画没赶"
+       "m今天被骂了 "
       ],
       "visibility": "private",
       "where": "private:10001"
@@ -2144,7 +2724,7 @@
      "poison_signals": [],
      "provenance": {
       "message_refs": [
-       "m今天的画没赶"
+       "m今天被骂了 "
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
@@ -2161,7 +2741,7 @@
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
-     "text": "今天的画没赶上展出 真的很委屈",
+     "text": "今天被骂了 真的很委屈",
      "ts": 1793271820.0,
      "verification": {
       "conflict": false,
@@ -2175,14 +2755,14 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.395,
+     "encoding_arousal": 0.447,
      "encoding_emotion": "sadness",
      "encoding_emotion_secondary": "disappointment",
      "encoding_regulation": "express",
-     "encoding_valence": -0.226,
+     "encoding_valence": -0.273,
      "hits": 1,
      "id": "69e8b991e8a2",
-     "importance": 0.4678790425779617,
+     "importance": 0.4947638317637275,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "legacy_backfilled": true,
@@ -2195,7 +2775,7 @@
        "10001"
       ],
       "source_ids": [
-       "m今天的画没赶"
+       "m今天被骂了 "
       ],
       "visibility": "private",
       "where": "private:10001"
@@ -2240,15 +2820,15 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.402,
+     "encoding_arousal": 0.46,
      "encoding_emotion": "sadness",
      "encoding_emotion_secondary": "disappointment",
      "encoding_regulation": "express",
-     "encoding_valence": -0.277,
+     "encoding_valence": -0.325,
      "hits": 1,
      "id": "6fcefbf2ab75",
      "image_caption": "",
-     "importance": 0.5496934375576201,
+     "importance": 0.5823680718334753,
      "inhibition": 0.0,
      "last_recall": 1793271870.0,
      "last_recall_regulation": "express",
@@ -2262,7 +2842,7 @@
        "weight": 1.0
       }
      ],
-     "memory_confidence": 0.8228,
+     "memory_confidence": 0.8254,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793427390.0,
@@ -2318,14 +2898,14 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.477,
+     "encoding_arousal": 0.535,
      "encoding_emotion": "sadness",
      "encoding_emotion_secondary": "disappointment",
      "encoding_regulation": "express",
-     "encoding_valence": -0.33,
+     "encoding_valence": -0.379,
      "hits": 1,
      "id": "816a9609616e",
-     "importance": 0.5169315938018582,
+     "importance": 0.5463387646501277,
      "inhibition": 0.0,
      "last_used": 1793271840.0,
      "legacy_backfilled": true,
@@ -2380,22 +2960,22 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.551,
+     "encoding_arousal": 0.612,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.344,
+     "encoding_valence": -0.392,
      "hits": 1,
      "id": "27c13fc68348",
      "image_caption": "",
-     "importance": 0.61896320259893,
+     "importance": 0.652300377461566,
      "inhibition": 0.0,
      "last_recall": 1793272490.0,
      "last_recall_regulation": "express",
      "last_used": 1793271870.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271870.0,
-     "memory_confidence": 0.8283,
+     "memory_confidence": 0.831,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793428010.0,
@@ -2450,14 +3030,14 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.551,
+     "encoding_arousal": 0.612,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.353,
+     "encoding_valence": -0.402,
      "hits": 1,
      "id": "f0d084291b8a",
-     "importance": 0.5456333897424923,
+     "importance": 0.5759701205433224,
      "inhibition": 0.0,
      "last_used": 1793271870.0,
      "legacy_backfilled": true,
@@ -2511,20 +3091,20 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.566,
+     "encoding_arousal": 0.61,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.317,
+     "encoding_valence": -0.36,
      "hits": 1,
      "id": "52162a18315f",
      "image_caption": "",
-     "importance": 0.6024815010702997,
+     "importance": 0.6284323359830736,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272490.0,
-     "memory_confidence": 0.8282,
+     "memory_confidence": 0.8303,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793358890.0,
@@ -2575,14 +3155,14 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.631,
+     "encoding_arousal": 0.675,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "label_emotion",
-     "encoding_valence": -0.385,
+     "encoding_valence": -0.429,
      "hits": 1,
      "id": "4c899b2e38b3",
-     "importance": 0.5778190752131284,
+     "importance": 0.6015943942932303,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "next_review_ts": 1793358890.0,
@@ -3532,20 +4112,20 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.592,
+     "encoding_arousal": 0.629,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.296,
+     "encoding_valence": -0.335,
      "hits": 1,
      "id": "570efb8958d6",
      "image_caption": "",
-     "importance": 0.6061063917704552,
+     "importance": 0.6290115132008927,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272890.0,
-     "memory_confidence": 0.8285,
+     "memory_confidence": 0.8303,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793359290.0,
@@ -3596,14 +4176,14 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.592,
+     "encoding_arousal": 0.629,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.296,
+     "encoding_valence": -0.335,
      "hits": 1,
      "id": "0fecc1318983",
-     "importance": 0.5455819768473543,
+     "importance": 0.566196586134748,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "legacy_backfilled": true,
@@ -3658,22 +4238,22 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.601,
+     "encoding_arousal": 0.64,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.237,
+     "encoding_valence": -0.274,
      "hits": 1,
      "id": "dd2efe219da9",
      "image_caption": "",
-     "importance": 0.6094221831636618,
+     "importance": 0.6323252747841216,
      "inhibition": 0.0,
      "last_recall": 1793276520.0,
      "last_recall_regulation": "none",
      "last_used": 1793272920.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272920.0,
-     "memory_confidence": 0.8276,
+     "memory_confidence": 0.8294,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793432040.0,
@@ -3733,20 +4313,20 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.411,
+     "encoding_arousal": 0.422,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.127,
+     "encoding_valence": -0.151,
      "hits": 1,
      "id": "a96519791895",
      "image_caption": "",
-     "importance": 0.5004590877191942,
+     "importance": 0.5105886873980044,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793276520.0,
-     "memory_confidence": 0.82,
+     "memory_confidence": 0.8208,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793362920.0,
@@ -3797,14 +4377,14 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.411,
+     "encoding_arousal": 0.422,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.132,
+     "encoding_valence": -0.157,
      "hits": 1,
      "id": "5729e514586d",
-     "importance": 0.4514940296529832,
+     "importance": 0.46087069151285204,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "next_review_ts": 1793362920.0,
@@ -3854,7 +4434,7 @@
      "last_continuity": {
       "open_loops": [],
       "relationship_used": true,
-      "summary": "小爱 我们约好下周一起打：她很在意这件事",
+      "summary": "小爱 我们约好下周一起打副本吧：小爱 我们约好下周一起打副本吧",
       "ts": 1793276520.0
      },
      "last_recall_trace": [
@@ -3867,14 +4447,14 @@
         "retention": 0.9857,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0034
+        "source_weight": 1.0036
        },
        "conflict": false,
        "cosine": 0.547723,
        "entry_id": "dd2efe219da9",
-       "importance": 0.5939,
+       "importance": 0.6167,
        "rank": 1,
-       "score": 0.4367,
+       "score": 0.4447,
        "source": "direct",
        "tier": "hot"
       },
@@ -4110,14 +4690,14 @@
         "retention": 0.9985,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0026
+        "source_weight": 1.003
        },
        "conflict": false,
        "cosine": 0.763675,
        "entry_id": "6fcefbf2ab75",
-       "importance": 0.5496,
+       "importance": 0.5823,
        "rank": 1,
-       "score": 0.664,
+       "score": 0.6813,
        "source": "direct",
        "tier": "hot"
       },
@@ -4130,14 +4710,14 @@
         "retention": 0.9975,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0035
+        "source_weight": 1.0039
        },
        "conflict": false,
        "cosine": 0.708949,
        "entry_id": "27c13fc68348",
-       "importance": 0.6039,
+       "importance": 0.6372,
        "rank": 2,
-       "score": 0.5799,
+       "score": 0.5953,
        "source": "direct",
        "tier": "hot"
       },
@@ -4157,13 +4737,13 @@
        "entry_id": "d5e9100403d4",
        "importance": 0.4698,
        "rank": 3,
-       "score": 0.4479,
+       "score": 0.4474,
        "source": "direct",
        "tier": "warm"
       }
      ],
      "working_set": [
-      "8726d29ba239",
+      "c3dc72426bd5",
       "69e8b991e8a2",
       "816a9609616e",
       "f0d084291b8a",
@@ -4246,7 +4826,7 @@
        "ts": 1793271800.0
       },
       {
-       "id": "8726d29ba239",
+       "id": "c3dc72426bd5",
        "op": "ADD",
        "reason": "new",
        "ts": 1793271820.0
@@ -5231,36 +5811,6 @@
      ]
     ],
     [
-     "8726d29ba239",
-     24,
-     [
-      0.0,
-      -0.436436,
-      0.0,
-      0.0,
-      0.0,
-      -0.218218,
-      0.0,
-      0.0,
-      0.0,
-      -0.218218,
-      0.0,
-      0.0,
-      0.218218,
-      0.0,
-      -0.436436,
-      -0.218218,
-      0.0,
-      -0.218218,
-      0.218218,
-      0.0,
-      -0.436436,
-      -0.218218,
-      0.218218,
-      0.218218
-     ]
-    ],
-    [
      "8d86027eef6d",
      24,
      [
@@ -5528,6 +6078,36 @@
       -0.5,
       0.0,
       0.0
+     ]
+    ],
+    [
+     "c3dc72426bd5",
+     24,
+     [
+      0.0,
+      -0.301511,
+      0.0,
+      0.301511,
+      -0.301511,
+      -0.301511,
+      0.0,
+      0.0,
+      0.0,
+      -0.301511,
+      0.0,
+      0.0,
+      0.301511,
+      0.0,
+      -0.301511,
+      -0.301511,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.301511,
+      0.0,
+      0.301511,
+      0.301511
      ]
     ],
     [
@@ -6105,13 +6685,13 @@
      "ts": 1793271800.0
     },
     {
-     "msg_id": "m今天的画没赶",
+     "msg_id": "m今天被骂了 ",
      "origin": {
       "people": [
        "10001"
       ],
       "source_ids": [
-       "m今天的画没赶"
+       "m今天被骂了 "
       ],
       "visibility": "private",
       "where": "private:10001"
@@ -6119,7 +6699,7 @@
      "role": "user",
      "sender_id": "10001",
      "sender_name": "芒果",
-     "text": "今天的画没赶上展出 真的很委屈",
+     "text": "今天被骂了 真的很委屈",
      "ts": 1793271820.0
     },
     {
@@ -6128,7 +6708,7 @@
        "10001"
       ],
       "source_ids": [
-       "m今天的画没赶"
+       "m今天被骂了 "
       ],
       "visibility": "private",
       "where": "private:10001"
@@ -6239,6 +6819,23 @@
    ],
    "umo": "default:FriendMessage:10001"
   },
+  "redline_counts.json": {
+   "by_line": {
+    "hardship": 2
+   },
+   "by_store": {
+    "event": {
+     "hardship": 1
+    },
+    "memory": {
+     "hardship": 1
+    }
+   },
+   "seen": [
+    "5b5503d91d9f",
+    "6cd0b9bad5c5"
+   ]
+  },
   "self_model.json": {
    "_history": [
     {
@@ -6258,25 +6855,25 @@
    "who_am_i": ""
   },
   "states/her.json": {
-   "a": 0.4106,
+   "a": 0.4224,
    "allostatic_load": 0.0,
    "ambient": 0.0333,
    "appraisal": {
     "agency": 0.5,
-    "coping": 0.501,
+    "coping": 0.5,
     "expectedness": 1.0,
     "goal_relevance": 0.53,
     "norm_compatibility": 0.62,
     "novelty": 0.0,
-    "urgency": 0.403
+    "urgency": 0.406
    },
-   "attention": 0.329,
+   "attention": 0.347,
    "boredom": 0.0,
    "boundary_pressure": 0.0,
    "compound": "希望",
-   "coping": 0.501,
+   "coping": 0.5,
    "core_self": "",
-   "d": 0.5944,
+   "d": 0.6084,
    "daily_digests": [
     {
      "date": "2026-10-26",
@@ -6297,9 +6894,9 @@
      "mean_v": -0.0662
     }
    ],
-   "echo": -0.2615,
-   "echo_trace": -0.2914,
-   "energy": 0.3577,
+   "echo": -0.2826,
+   "echo_trace": -0.3172,
+   "energy": 0.3657,
    "goal_conflict": [],
    "goal_focus": "和重要的人保持亲近",
    "goal_scores": {
@@ -6514,93 +7111,93 @@
      "v": -0.074
     },
     {
-     "a": 0.395,
+     "a": 0.447,
      "compound": "失落",
-     "d": 0.515,
+     "d": 0.544,
      "emotion": "sadness",
-     "intensity": 0.261,
-     "social": 0.561,
+     "intensity": 0.295,
+     "social": 0.549,
      "ts": 1793271820.0,
-     "v": -0.226
+     "v": -0.273
     },
     {
-     "a": 0.477,
-     "compound": "失落",
-     "d": 0.596,
-     "emotion": "sadness",
-     "intensity": 0.326,
-     "social": 0.517,
-     "ts": 1793271840.0,
-     "v": -0.33
-    },
-    {
-     "a": 0.551,
+     "a": 0.535,
      "compound": "失落",
      "d": 0.626,
-     "emotion": "anger",
-     "intensity": 0.362,
-     "social": 0.514,
-     "ts": 1793271870.0,
-     "v": -0.353
+     "emotion": "sadness",
+     "intensity": 0.365,
+     "social": 0.506,
+     "ts": 1793271840.0,
+     "v": -0.379
     },
     {
-     "a": 0.631,
+     "a": 0.612,
      "compound": "失落",
-     "d": 0.706,
+     "d": 0.657,
      "emotion": "anger",
-     "intensity": 0.41,
-     "social": 0.492,
+     "intensity": 0.402,
+     "social": 0.505,
+     "ts": 1793271870.0,
+     "v": -0.402
+    },
+    {
+     "a": 0.675,
+     "compound": "失落",
+     "d": 0.733,
+     "emotion": "anger",
+     "intensity": 0.446,
+     "social": 0.486,
      "ts": 1793272490.0,
-     "v": -0.385
+     "v": -0.429
     },
     {
-     "a": 0.592,
+     "a": 0.629,
      "compound": "希望",
-     "d": 0.664,
+     "d": 0.689,
      "emotion": "anger",
-     "intensity": 0.361,
-     "social": 0.517,
+     "intensity": 0.39,
+     "social": 0.513,
      "ts": 1793272890.0,
-     "v": -0.296
+     "v": -0.335
     },
     {
-     "a": 0.601,
+     "a": 0.64,
      "compound": "希望",
-     "d": 0.633,
+     "d": 0.657,
      "emotion": "anger",
-     "intensity": 0.339,
-     "social": 0.518,
+     "intensity": 0.367,
+     "social": 0.514,
      "ts": 1793272920.0,
-     "v": -0.237
+     "v": -0.274
     },
     {
-     "a": 0.411,
+     "a": 0.422,
      "compound": "希望",
-     "d": 0.594,
+     "d": 0.608,
      "emotion": "neutral",
-     "intensity": 0.241,
-     "social": 0.541,
+     "intensity": 0.255,
+     "social": 0.539,
      "ts": 1793276520.0,
-     "v": -0.132
+     "v": -0.157
     }
    ],
    "homeostasis": {
-    "L_int": 0.0225,
+    "L_int": 0.0219,
     "action": {
      "mode": "engage",
      "reason": "baseline",
-     "strength": 0.5485
+     "strength": 0.5482
     },
     "drives": {
      "curiosity": 0.82,
      "seen": 0.045,
-     "social": 0.5945
+     "social": 0.5927
     },
-    "readiness": 0.4823,
+    "readiness": 0.4817,
     "set_points": {
      "curiosity": 0.811306,
      "seen": 0.082736,
-     "social": 0.573517
+     "social": 0.573509
     },
     "setpoint_ticks": 24,
     "tick": 24,
@@ -6623,30 +7220,30 @@
     "evidence": {
      "regulation_q": {
       "express": {
-       "n": 2,
-       "sum_pe": 0.1647762789511149
+       "n": 3,
+       "sum_pe": 0.2591706129302455
       },
       "label_emotion": {
        "n": 1,
-       "sum_pe": 0.09478843650037039
+       "sum_pe": 0.10215934453996331
       }
      }
     },
-    "last_update": 1793272490.0,
+    "last_update": 1793271870.0,
     "log": [
      {
-      "new": 0.00398,
+      "new": 0.00433,
       "old": 0.0,
       "param": "regulation_q.express",
       "reason": "delta_stress",
       "samples": 5,
-      "ts": 1793272490.0
+      "ts": 1793271870.0
      }
     ],
     "params": {
      "learning_rate": 0.2,
      "regulation_q": {
-      "express": 0.00398
+      "express": 0.00433
      },
      "trust_alpha": 0.3
     },
@@ -6655,10 +7252,10 @@
    },
    "meta_emotion": "",
    "momentum": {
-    "a": 0.03548147696754313,
-    "d": 0.020852575563039863,
-    "social": -0.011706858539837413,
-    "v": -0.03858021858759457
+    "a": 0.04215567130348063,
+    "d": 0.02530203845366487,
+    "social": -0.01393158998514991,
+    "v": -0.04391957405634457
    },
    "narrative_self": "",
    "noise": {
@@ -6671,10 +7268,10 @@
    "novelty_need": 0.5,
    "open_loops_due": 0,
    "opponent": {
-    "a": -0.05467872915986766,
-    "d": -0.027153246695695722,
-    "social": 0.01708094902749597,
-    "v": 0.06555858206121946
+    "a": -0.06802944791935565,
+    "d": -0.03605372586868773,
+    "social": 0.02153118861399197,
+    "v": 0.07623915706880988
    },
    "plutchik": {
     "anger": [
@@ -6732,10 +7329,10 @@
     "daily_cap": 3,
     "enabled": true,
     "gain": 1.0,
-    "impulse": 0.2027,
-    "impulse_ema": 0.2028,
+    "impulse": 0.2055,
+    "impulse_ema": 0.2056,
     "last_sent_ts": 0.0,
-    "max_chars": 96,
+    "max_chars": 97,
     "noise_seed": 7,
     "quiet_hours": [
      0,
@@ -6745,12 +7342,12 @@
     "sent_count": 0,
     "sent_day": "",
     "sources": {
-     "attachment_safe": 0.4418,
+     "attachment_safe": 0.441,
      "autonomy_gain": 1.0,
-     "closeness": 0.5486,
-     "closeness_effective": 0.5166,
-     "drive_dev": 0.0225,
-     "echo_trace": 0.21,
+     "closeness": 0.5481,
+     "closeness_effective": 0.516,
+     "drive_dev": 0.0219,
+     "echo_trace": 0.2269,
      "noise": {
       "attention": 0.0,
       "energy": 0.0,
@@ -6758,45 +7355,45 @@
       "stress": 0.0,
       "valence": 0.0
      },
-     "stress_load": 0.1545,
+     "stress_load": 0.1549,
      "trust": 0.5
     },
-    "threshold": 0.7592,
+    "threshold": 0.7583,
     "updated_ts": 1793276520.0
    },
    "reflection": {
-    "a": 0.048493357449515856,
-    "d": 0.01513016405341853,
+    "a": 0.061605371721563364,
+    "d": 0.021821949280806482,
     "social": 0,
-    "v": -0.06471965196811037
+    "v": -0.0772100599693844
    },
-   "refusal_readiness": 0.101,
+   "refusal_readiness": 0.103,
    "regulation": "none",
    "regulation_stats": {
     "express": {
-     "cost": 0.014,
+     "cost": 0.016,
      "last_update": 1793272920.0,
-     "stress_delta": -0.01612,
-     "success": 7,
-     "uses": 7
+     "stress_delta": -0.01979,
+     "success": 8,
+     "uses": 8
     },
     "label_emotion": {
      "cost": 0.001,
      "last_update": 1793272490.0,
-     "stress_delta": -0.00317,
+     "stress_delta": -0.00347,
      "success": 1,
      "uses": 1
     }
    },
    "ripple": {
-    "energy": 0.127,
-    "lower": 0.153,
+    "energy": 0.134,
+    "lower": 0.168,
     "overlap": 0.1,
     "upper": 0.1
    },
    "sec": {
-    "coping_potential": 0.501,
-    "implication": 0.257,
+    "coping_potential": 0.5,
+    "implication": 0.258,
     "normative": 0.62,
     "relevance": 0.371
    },
@@ -6806,7 +7403,7 @@
     "past": [],
     "present": ""
    },
-   "social": 0.5408,
+   "social": 0.5393,
    "spectrum": [
     {
      "distance": 0.139,
@@ -6814,12 +7411,12 @@
      "name": "困惑"
     },
     {
-     "distance": 0.23,
+     "distance": 0.226,
      "key": "disappointment",
      "name": "失望"
     },
     {
-     "distance": 0.232,
+     "distance": 0.227,
      "key": "guilt",
      "name": "内疚"
     }
@@ -6833,17 +7430,17 @@
     {
      "key": "confusion",
      "name": "困惑",
-     "p": 0.4538
+     "p": 0.449
     },
     {
      "key": "disappointment",
      "name": "失望",
-     "p": 0.2743
+     "p": 0.2761
     },
     {
      "key": "guilt",
      "name": "内疚",
-     "p": 0.2719
+     "p": 0.2749
     }
    ],
    "spiking": {
@@ -6852,10 +7449,10 @@
     "variance": 0.0229
    },
    "stimuli": [],
-   "stress": 0.258,
+   "stress": 0.2587,
    "talked": 0.3217,
    "ticks": 24,
-   "v": -0.1319
+   "v": -0.1569
   },
   "users/10001.json": {
    "absence": {
@@ -6881,9 +7478,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3131,
-     "avoidant": 0.245,
-     "safe": 0.4419
+     "anxious": 0.3138,
+     "avoidant": 0.2452,
+     "safe": 0.441
     },
     "calibration": {
      "sources": {}
@@ -6939,25 +7536,25 @@
        "ts": 1793271800.0
       },
       {
-       "conflict": 0.2782,
+       "conflict": 0.2885,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271820.0
       },
       {
-       "conflict": 0.2923,
+       "conflict": 0.3027,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271840.0
       },
       {
-       "conflict": 0.3023,
+       "conflict": 0.3136,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271870.0
       },
       {
-       "conflict": 0.3002,
+       "conflict": 0.3091,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793272490.0
@@ -6971,8 +7568,8 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5354,
-     "conflict": 0.3002,
+     "closeness": 0.5321,
+     "conflict": 0.3091,
      "predictability": 1.0,
      "repair": 0.0,
      "trust": 0.5
@@ -7027,32 +7624,32 @@
       "ts": 1793271800.0
      },
      {
-      "closeness": 0.5512,
-      "conflict": 0.2782,
+      "closeness": 0.5467,
+      "conflict": 0.2885,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
       "ts": 1793271820.0
      },
      {
-      "closeness": 0.5424,
-      "conflict": 0.2923,
+      "closeness": 0.5379,
+      "conflict": 0.3027,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
       "ts": 1793271840.0
      },
      {
-      "closeness": 0.532,
-      "conflict": 0.3023,
+      "closeness": 0.5274,
+      "conflict": 0.3136,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
       "ts": 1793271870.0
      },
      {
-      "closeness": 0.5354,
-      "conflict": 0.3002,
+      "closeness": 0.5321,
+      "conflict": 0.3091,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -7062,7 +7659,7 @@
     "transactive_map": {
      "上次那首嘛": 1,
      "今天想听你唱歌": 1,
-     "今天的画没赶上展出": 1,
+     "今天被骂了": 1,
      "他凭什么这样说我": 1,
      "你可以的": 1,
      "你还记得我早上让你唱什么吗": 1,
@@ -7295,9 +7892,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.313,
+     "anxious": 0.3138,
      "avoidant": 0.2452,
-     "safe": 0.4418
+     "safe": 0.441
     },
     "calibration": {
      "sources": {}
@@ -7337,19 +7934,19 @@
        "ts": 1793000730.0
       },
       {
-       "conflict": 0.2939,
+       "conflict": 0.3015,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793272890.0
       },
       {
-       "conflict": 0.2885,
+       "conflict": 0.2952,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793272920.0
       },
       {
-       "conflict": 0.2727,
+       "conflict": 0.2761,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793276520.0
@@ -7363,8 +7960,8 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5486,
-     "conflict": 0.2727,
+     "closeness": 0.5481,
+     "conflict": 0.2761,
      "predictability": 1.0,
      "repair": 0.0,
      "trust": 0.5
@@ -7379,24 +7976,24 @@
       "ts": 1793000730.0
      },
      {
-      "closeness": 0.5362,
-      "conflict": 0.2939,
+      "closeness": 0.5337,
+      "conflict": 0.3015,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
       "ts": 1793272890.0
      },
      {
-      "closeness": 0.5369,
-      "conflict": 0.2885,
+      "closeness": 0.5347,
+      "conflict": 0.2952,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
       "ts": 1793272920.0
      },
      {
-      "closeness": 0.5486,
-      "conflict": 0.2727,
+      "closeness": 0.5481,
+      "conflict": 0.2761,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -7847,7 +8444,7 @@
     {
      "intent": {
       "compound": "希望",
-      "dominance": 0.58,
+      "dominance": 0.59,
       "emotion": "neutral",
       "energy": "normal",
       "expression": "normal",
@@ -7863,12 +8460,12 @@
         "name": "困惑"
        },
        {
-        "distance": 0.202,
+        "distance": 0.207,
         "key": "nostalgia",
         "name": "怀念"
        },
        {
-        "distance": 0.206,
+        "distance": 0.212,
         "key": "calmness",
         "name": "平静"
        }
@@ -7877,25 +8474,25 @@
      },
      "key": "her",
      "snapshot": {
-      "a": 0.37,
+      "a": 0.3718,
       "allostatic_load": 0.0,
       "ambient": 0.0333,
       "appraisal": {
        "agency": 0.5,
-       "coping": 0.501,
+       "coping": 0.5,
        "expectedness": 1.0,
        "goal_relevance": 0.53,
        "norm_compatibility": 0.62,
        "novelty": 0.0,
-       "urgency": 0.403
+       "urgency": 0.406
       },
-      "attention": 0.329,
+      "attention": 0.347,
       "boredom": 0.0,
       "boundary_pressure": 0.0,
       "compound": "希望",
-      "coping": 0.501,
+      "coping": 0.5,
       "core_self": "",
-      "d": 0.5788,
+      "d": 0.5878,
       "daily_digests": [
        {
         "date": "2026-10-26",
@@ -7916,9 +8513,9 @@
         "mean_v": -0.0662
        }
       ],
-      "echo": -0.2615,
-      "echo_trace": -0.2914,
-      "energy": 0.3366,
+      "echo": -0.2826,
+      "echo_trace": -0.3172,
+      "energy": 0.3391,
       "goal_conflict": [],
       "goal_focus": "和重要的人保持亲近",
       "goal_scores": {
@@ -8133,93 +8730,93 @@
         "v": -0.074
        },
        {
-        "a": 0.395,
+        "a": 0.447,
         "compound": "失落",
-        "d": 0.515,
+        "d": 0.544,
         "emotion": "sadness",
-        "intensity": 0.261,
-        "social": 0.561,
+        "intensity": 0.295,
+        "social": 0.549,
         "ts": 1793271820.0,
-        "v": -0.226
+        "v": -0.273
        },
        {
-        "a": 0.477,
-        "compound": "失落",
-        "d": 0.596,
-        "emotion": "sadness",
-        "intensity": 0.326,
-        "social": 0.517,
-        "ts": 1793271840.0,
-        "v": -0.33
-       },
-       {
-        "a": 0.551,
+        "a": 0.535,
         "compound": "失落",
         "d": 0.626,
-        "emotion": "anger",
-        "intensity": 0.362,
-        "social": 0.514,
-        "ts": 1793271870.0,
-        "v": -0.353
+        "emotion": "sadness",
+        "intensity": 0.365,
+        "social": 0.506,
+        "ts": 1793271840.0,
+        "v": -0.379
        },
        {
-        "a": 0.631,
+        "a": 0.612,
         "compound": "失落",
-        "d": 0.706,
+        "d": 0.657,
         "emotion": "anger",
-        "intensity": 0.41,
-        "social": 0.492,
+        "intensity": 0.402,
+        "social": 0.505,
+        "ts": 1793271870.0,
+        "v": -0.402
+       },
+       {
+        "a": 0.675,
+        "compound": "失落",
+        "d": 0.733,
+        "emotion": "anger",
+        "intensity": 0.446,
+        "social": 0.486,
         "ts": 1793272490.0,
-        "v": -0.385
+        "v": -0.429
        },
        {
-        "a": 0.592,
+        "a": 0.629,
         "compound": "希望",
-        "d": 0.664,
+        "d": 0.689,
         "emotion": "anger",
-        "intensity": 0.361,
-        "social": 0.517,
+        "intensity": 0.39,
+        "social": 0.513,
         "ts": 1793272890.0,
-        "v": -0.296
+        "v": -0.335
        },
        {
-        "a": 0.601,
+        "a": 0.64,
         "compound": "希望",
-        "d": 0.633,
+        "d": 0.657,
         "emotion": "anger",
-        "intensity": 0.339,
-        "social": 0.518,
+        "intensity": 0.367,
+        "social": 0.514,
         "ts": 1793272920.0,
-        "v": -0.237
+        "v": -0.274
        },
        {
-        "a": 0.411,
+        "a": 0.422,
         "compound": "希望",
-        "d": 0.594,
+        "d": 0.608,
         "emotion": "neutral",
-        "intensity": 0.241,
-        "social": 0.541,
+        "intensity": 0.255,
+        "social": 0.539,
         "ts": 1793276520.0,
-        "v": -0.132
+        "v": -0.157
        }
       ],
       "homeostasis": {
-       "L_int": 0.0225,
+       "L_int": 0.0219,
        "action": {
         "mode": "engage",
         "reason": "baseline",
-        "strength": 0.5485
+        "strength": 0.5482
        },
        "drives": {
         "curiosity": 0.82,
         "seen": 0.045,
-        "social": 0.5945
+        "social": 0.5927
        },
-       "readiness": 0.4823,
+       "readiness": 0.4817,
        "set_points": {
         "curiosity": 0.811306,
         "seen": 0.082736,
-        "social": 0.573517
+        "social": 0.573509
        },
        "setpoint_ticks": 24,
        "tick": 24,
@@ -8242,30 +8839,30 @@
        "evidence": {
         "regulation_q": {
          "express": {
-          "n": 2,
-          "sum_pe": 0.1647762789511149
+          "n": 3,
+          "sum_pe": 0.2591706129302455
          },
          "label_emotion": {
           "n": 1,
-          "sum_pe": 0.09478843650037039
+          "sum_pe": 0.10215934453996331
          }
         }
        },
-       "last_update": 1793272490.0,
+       "last_update": 1793271870.0,
        "log": [
         {
-         "new": 0.00398,
+         "new": 0.00433,
          "old": 0.0,
          "param": "regulation_q.express",
          "reason": "delta_stress",
          "samples": 5,
-         "ts": 1793272490.0
+         "ts": 1793271870.0
         }
        ],
        "params": {
         "learning_rate": 0.2,
         "regulation_q": {
-         "express": 0.00398
+         "express": 0.00433
         },
         "trust_alpha": 0.3
        },
@@ -8274,10 +8871,10 @@
       },
       "meta_emotion": "",
       "momentum": {
-       "a": 0.03548147696754313,
-       "d": 0.020852575563039863,
-       "social": -0.011706858539837413,
-       "v": -0.03858021858759457
+       "a": 0.04215567130348063,
+       "d": 0.02530203845366487,
+       "social": -0.01393158998514991,
+       "v": -0.04391957405634457
       },
       "narrative_self": "",
       "noise": {
@@ -8290,10 +8887,10 @@
       "novelty_need": 0.5,
       "open_loops_due": 0,
       "opponent": {
-       "a": -0.05467872915986766,
-       "d": -0.027153246695695722,
-       "social": 0.01708094902749597,
-       "v": 0.06555858206121946
+       "a": -0.06802944791935565,
+       "d": -0.03605372586868773,
+       "social": 0.02153118861399197,
+       "v": 0.07623915706880988
       },
       "plutchik": {
        "anger": [
@@ -8351,10 +8948,10 @@
        "daily_cap": 3,
        "enabled": true,
        "gain": 1.0,
-       "impulse": 0.2027,
-       "impulse_ema": 0.2028,
+       "impulse": 0.2055,
+       "impulse_ema": 0.2056,
        "last_sent_ts": 0.0,
-       "max_chars": 96,
+       "max_chars": 97,
        "noise_seed": 7,
        "quiet_hours": [
         0,
@@ -8364,12 +8961,12 @@
        "sent_count": 0,
        "sent_day": "",
        "sources": {
-        "attachment_safe": 0.4418,
+        "attachment_safe": 0.441,
         "autonomy_gain": 1.0,
-        "closeness": 0.5486,
-        "closeness_effective": 0.5166,
-        "drive_dev": 0.0225,
-        "echo_trace": 0.21,
+        "closeness": 0.5481,
+        "closeness_effective": 0.516,
+        "drive_dev": 0.0219,
+        "echo_trace": 0.2269,
         "noise": {
          "attention": 0.0,
          "energy": 0.0,
@@ -8377,45 +8974,45 @@
          "stress": 0.0,
          "valence": 0.0
         },
-        "stress_load": 0.1545,
+        "stress_load": 0.1549,
         "trust": 0.5
        },
-       "threshold": 0.7592,
+       "threshold": 0.7583,
        "updated_ts": 1793276520.0
       },
       "reflection": {
-       "a": 0.048493357449515856,
-       "d": 0.01513016405341853,
+       "a": 0.061605371721563364,
+       "d": 0.021821949280806482,
        "social": 0,
-       "v": -0.06471965196811037
+       "v": -0.0772100599693844
       },
-      "refusal_readiness": 0.101,
+      "refusal_readiness": 0.103,
       "regulation": "none",
       "regulation_stats": {
        "express": {
-        "cost": 0.014,
+        "cost": 0.016,
         "last_update": 1793272920.0,
-        "stress_delta": -0.01612,
-        "success": 7,
-        "uses": 7
+        "stress_delta": -0.01979,
+        "success": 8,
+        "uses": 8
        },
        "label_emotion": {
         "cost": 0.001,
         "last_update": 1793272490.0,
-        "stress_delta": -0.00317,
+        "stress_delta": -0.00347,
         "success": 1,
         "uses": 1
        }
       },
       "ripple": {
-       "energy": 0.127,
-       "lower": 0.153,
+       "energy": 0.134,
+       "lower": 0.168,
        "overlap": 0.1,
        "upper": 0.1
       },
       "sec": {
-       "coping_potential": 0.501,
-       "implication": 0.257,
+       "coping_potential": 0.5,
+       "implication": 0.258,
        "normative": 0.62,
        "relevance": 0.371
       },
@@ -8425,7 +9022,7 @@
        "past": [],
        "present": ""
       },
-      "social": 0.5433,
+      "social": 0.5422,
       "spectrum": [
        {
         "distance": 0.164,
@@ -8433,12 +9030,12 @@
         "name": "困惑"
        },
        {
-        "distance": 0.202,
+        "distance": 0.207,
         "key": "nostalgia",
         "name": "怀念"
        },
        {
-        "distance": 0.206,
+        "distance": 0.212,
         "key": "calmness",
         "name": "平静"
        }
@@ -8452,17 +9049,17 @@
        {
         "key": "confusion",
         "name": "困惑",
-        "p": 0.3834
+        "p": 0.3897
        },
        {
         "key": "nostalgia",
         "name": "怀念",
-        "p": 0.3113
+        "p": 0.3088
        },
        {
         "key": "calmness",
         "name": "平静",
-        "p": 0.3053
+        "p": 0.3015
        }
       ],
       "spiking": {
@@ -8471,10 +9068,10 @@
        "variance": 0.0229
       },
       "stimuli": [],
-      "stress": 0.2525,
+      "stress": 0.2522,
       "talked": 0.259,
       "ticks": 24,
-      "v": -0.0824
+      "v": -0.098
      },
      "working_set": {
       "capacity": 8,
@@ -8490,12 +9087,304 @@
     {
      "appraisal": {
       "agency": 0.5,
-      "coping": 0.501,
+      "coping": 0.5,
+      "expectedness": 1.0,
+      "goal_relevance": 0.53,
+      "norm_compatibility": 0.62,
+      "novelty": 0.0,
+      "urgency": 0.406
+     },
+     "attachments": [],
+     "big_summary": "记得提醒我明天交报告",
+     "central_details": "记得提醒我明天交报告",
+     "centrality": 0.0,
+     "confidence": 1.0,
+     "effective_merge_count": 0,
+     "emotion": "neutral",
+     "emotion_intensity": 0.2551,
+     "emotion_layers": [
+      {
+       "emotion": "confusion",
+       "p": 0.4446
+      },
+      {
+       "emotion": "disappointment",
+       "p": 0.2734
+      },
+      {
+       "emotion": "guilt",
+       "p": 0.2722
+      },
+      {
+       "emotion": "neutral",
+       "p": 0.0099
+      }
+     ],
+     "emotion_layers_source": "core",
+     "emotion_nuance": [],
+     "emotion_secondary": "confusion",
+     "event": "记得提醒我明天交报告",
+     "event_embedding": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.28868,
+      -0.57735,
+      0.0,
+      0.0,
+      -0.28868,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.28868,
+      0.57735,
+      0.0,
+      0.28868,
+      0.0
+     ],
+     "event_key": "记得提醒我明天交报告",
+     "id": "evt_1793276520_99936",
+     "importance": 0.564,
+     "last_recall": 1793276520.0,
+     "meaning_to_her": "",
+     "milestone": {},
+     "modalities": [],
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "m记得提醒我明",
+       "m小爱 报告我"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "peripheral_details": "",
+     "provenance": {
+      "message_refs": [
+       "m小爱 报告我",
+       "m记得提醒我明"
+      ],
+      "sender_id": "10003",
+      "sender_name": "阿星",
+      "senders": [
+       "10003"
+      ],
+      "session": "default:GroupMessage:900001",
+      "sources": [
+       {
+        "message_refs": [
+         "m记得提醒我明"
+        ],
+        "sender_id": "10003",
+        "sender_name": "阿星",
+        "session": "default:GroupMessage:900001",
+        "ts": 1793272920.0
+       }
+      ],
+      "ts": 1793276520.0
+     },
+     "ranking_mode": "deterministic_embedding",
+     "recall_count": 0,
+     "reflection": "",
+     "session": "default:GroupMessage:900001",
+     "small_summary": "记得提醒我明天交报告",
+     "source_check": {
+      "coverage": 0.172,
+      "cross_ref": 1,
+      "length_ratio": 0.006,
+      "novelty": 0.0,
+      "overlap": 1.0,
+      "source_items": [
+       {
+        "message_refs": [
+         "m记得提醒我明"
+        ],
+        "sender_id": "10003",
+        "sender_name": "阿星",
+        "session": "default:GroupMessage:900001",
+        "ts": 1793272920.0
+       }
+      ],
+      "speaker_ok": true,
+      "status": "ok",
+      "time_ok": true
+     },
+     "source_count": 1,
+     "source_texts": [
+      "记得提醒我明天交报告"
+     ],
+     "strength": 0.564,
+     "summary_status": "fallback",
+     "time_span": {
+      "end_ts": 1793272920.0,
+      "span_seconds": 0.0,
+      "start_ts": 1793272920.0
+     },
+     "title": "记得提醒我明天交报告",
+     "ts": 1793276520.0
+    },
+    {
+     "appraisal": {
+      "agency": 0.5,
+      "coping": 0.5,
       "expectedness": 1.0,
       "goal_relevance": 0.89,
       "norm_compatibility": 0.62,
       "novelty": 0.0,
-      "urgency": 0.566
+      "urgency": 0.599
+     },
+     "attachments": [],
+     "big_summary": "小爱 我们约好下周一起打副本吧",
+     "central_details": "小爱 我们约好下周一起打副本吧",
+     "centrality": 0.0,
+     "confidence": 1.0,
+     "effective_merge_count": 0,
+     "emotion": "anger",
+     "emotion_intensity": 0.3901,
+     "emotion_layers": [
+      {
+       "emotion": "anger",
+       "p": 0.7431
+      },
+      {
+       "emotion": "contempt",
+       "p": 0.2477
+      },
+      {
+       "emotion": "disgust",
+       "p": 0.0092
+      }
+     ],
+     "emotion_layers_source": "core",
+     "emotion_nuance": [],
+     "emotion_secondary": "contempt",
+     "event": "小爱 我们约好下周一起打副本吧",
+     "event_embedding": [
+      0.27735,
+      0.0,
+      0.0,
+      0.27735,
+      0.27735,
+      -0.27735,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.27735,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.27735,
+      0.0,
+      0.0,
+      0.27735,
+      -0.27735,
+      -0.27735,
+      0.0,
+      -0.5547,
+      0.0
+     ],
+     "event_key": "小爱我们约好下周一起打副本吧",
+     "id": "evt_1793272890_91556",
+     "importance": 0.562,
+     "last_recall": 1793276520.0,
+     "meaning_to_her": "",
+     "milestone": {},
+     "modalities": [],
+     "origin": {
+      "people": [
+       "10003"
+      ],
+      "source_ids": [
+       "m小爱 我们约"
+      ],
+      "visibility": "public",
+      "where": "group:900001"
+     },
+     "peripheral_details": "",
+     "provenance": {
+      "message_refs": [
+       "m小爱 我们约"
+      ],
+      "sender_id": "10003",
+      "sender_name": "阿星",
+      "senders": [
+       "10003"
+      ],
+      "session": "default:GroupMessage:900001",
+      "sources": [
+       {
+        "message_refs": [
+         "m小爱 我们约"
+        ],
+        "sender_id": "10003",
+        "sender_name": "阿星",
+        "session": "default:GroupMessage:900001",
+        "ts": 1793272890.0
+       }
+      ],
+      "ts": 1793272890.0
+     },
+     "ranking_mode": "deterministic_embedding",
+     "recall_count": 2,
+     "reflection": "",
+     "session": "default:GroupMessage:900001",
+     "small_summary": "小爱 我们约好下周一起打副本吧",
+     "source_check": {
+      "coverage": 0.23,
+      "cross_ref": 1,
+      "length_ratio": 0.01,
+      "novelty": 0.0,
+      "overlap": 1.0,
+      "source_items": [
+       {
+        "message_refs": [
+         "m小爱 我们约"
+        ],
+        "sender_id": "10003",
+        "sender_name": "阿星",
+        "session": "default:GroupMessage:900001",
+        "ts": 1793272890.0
+       }
+      ],
+      "speaker_ok": true,
+      "status": "ok",
+      "time_ok": true
+     },
+     "source_count": 1,
+     "source_texts": [
+      "小爱 我们约好下周一起打副本吧"
+     ],
+     "strength": 0.562,
+     "summary_status": "fallback",
+     "time_span": {
+      "end_ts": 1793272890.0,
+      "span_seconds": 0.0,
+      "start_ts": 1793272890.0
+     },
+     "title": "小爱 我们约好下周一起打副本吧",
+     "ts": 1793272890.0
+    },
+    {
+     "appraisal": {
+      "agency": 0.5,
+      "coping": 0.5,
+      "expectedness": 1.0,
+      "goal_relevance": 0.89,
+      "norm_compatibility": 0.62,
+      "novelty": 0.0,
+      "urgency": 0.599
      },
      "attachments": [],
      "big_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
@@ -8503,7 +9392,7 @@
      "confidence": 1.0,
      "effective_merge_count": 0,
      "emotion": "anger",
-     "emotion_intensity": 0.3613,
+     "emotion_intensity": 0.3901,
      "emotion_layers": [
       {
        "centrality": 0.8,
@@ -8593,12 +9482,12 @@
     {
      "appraisal": {
       "agency": 0.5,
-      "coping": 0.501,
+      "coping": 0.5,
       "expectedness": 1.0,
       "goal_relevance": 0.022,
       "norm_compatibility": 0.5,
       "novelty": 0.0,
-      "urgency": 0.487
+      "urgency": 0.526
      },
      "attachments": [],
      "big_summary": "真的受够了！！！气死了！！！ 先别气坏自己",
@@ -8607,19 +9496,19 @@
      "confidence": 1.0,
      "effective_merge_count": 0,
      "emotion": "anger",
-     "emotion_intensity": 0.3632,
+     "emotion_intensity": 0.3958,
      "emotion_layers": [
       {
        "emotion": "anger",
-       "p": 0.9214
+       "p": 0.9496
       },
       {
        "emotion": "contempt",
-       "p": 0.0658
+       "p": 0.0396
       },
       {
        "emotion": "disgust",
-       "p": 0.0128
+       "p": 0.0108
       }
      ],
      "emotion_layers_source": "core",
@@ -8654,7 +9543,7 @@
      ],
      "event_key": "真的受够了",
      "id": "evt_1793272490_88152",
-     "importance": 0.554,
+     "importance": 0.581,
      "last_recall": 1793272490.0,
      "meaning_to_her": "",
      "milestone": {},
@@ -8741,7 +9630,7 @@
       "真的受够了！！！气死了！！！",
       "先别气坏自己"
      ],
-     "strength": 0.554,
+     "strength": 0.581,
      "summary_status": "fallback",
      "time_span": {
       "end_ts": 1793271870.0,
@@ -8754,20 +9643,20 @@
     {
      "appraisal": {
       "agency": 0.5,
-      "coping": 0.501,
+      "coping": 0.5,
       "expectedness": 1.0,
       "goal_relevance": 0.022,
       "norm_compatibility": 0.5,
       "novelty": 0.0,
-      "urgency": 0.487
+      "urgency": 0.526
      },
      "attachments": [],
-     "big_summary": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+     "big_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
      "boundary_score": 0.0,
      "confidence": 1.0,
      "effective_merge_count": 0,
      "emotion": "anger",
-     "emotion_intensity": 0.3632,
+     "emotion_intensity": 0.3958,
      "emotion_layers": [
       {
        "centrality": 0.8,
@@ -8782,7 +9671,7 @@
       "委屈"
      ],
      "emotion_secondary": "contempt",
-     "event": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
+     "event": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！！；先别气坏自己；我还是好生气！！！凭什么啊！！！",
      "event_key": "我还是好生气凭什么",
      "id": "evt_1793272490_73067",
      "importance": 0.5,
@@ -8794,7 +9683,7 @@
        "10001"
       ],
       "source_ids": [
-       "m今天的画没赶",
+       "m今天被骂了 ",
        "m气死我了！！",
        "m真的受够了！",
        "m我还是好生气"
@@ -8819,11 +9708,11 @@
      "recall_count": 0,
      "reflection": "要好好记住",
      "session": "default:FriendMessage:10001",
-     "small_summary": "今天的画没赶上展出 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气",
+     "small_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！",
      "source_check": {
       "coverage": 1.0,
       "cross_ref": 1,
-      "length_ratio": 1.072,
+      "length_ratio": 1.076,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
@@ -8843,7 +9732,7 @@
      },
      "source_count": 7,
      "source_texts": [
-      "今天的画没赶上展出 真的很委屈",
+      "今天被骂了 真的很委屈",
       "抱抱你，好委屈啊",
       "气死我了！！！他凭什么这样说我",
       "太过分了，我也生气",
@@ -8878,14 +9767,14 @@
       "retention": 0.9857,
       "schema": 0.0,
       "sensitive": 1.0,
-      "source_weight": 1.0034
+      "source_weight": 1.0036
      },
      "conflict": false,
      "cosine": 0.547723,
      "entry_id": "dd2efe219da9",
-     "importance": 0.5939,
+     "importance": 0.6167,
      "rank": 1,
-     "score": 0.4367,
+     "score": 0.4447,
      "source": "direct",
      "tier": "hot"
     },
@@ -8912,10 +9801,10 @@
    ],
    "last_memory_meta": {
     "abstain": false,
-    "answer_confidence": 0.7741,
+    "answer_confidence": 0.775,
     "calibration_delta": 0.0,
     "calibration_sources": 0,
-    "confidence": 0.8236,
+    "confidence": 0.8245,
     "conflicts": 0,
     "consistency": 1.0,
     "count": 2,
@@ -8935,9 +9824,9 @@
      "dd2efe219da9",
      "812c96d53379"
     ],
-    "stress_delta": 0.0005,
+    "stress_delta": 0.0006,
     "ts": 1793276520.0,
-    "valence": -0.096
+    "valence": -0.119
    },
    "last_strategy_hint": "",
    "llm_functions": {
@@ -9791,25 +10680,25 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5089,
-       "encoding_emotion": "neutral",
-       "encoding_emotion_secondary": "confusion",
+       "effective_importance": 0.5387,
+       "encoding_emotion": "sadness",
+       "encoding_emotion_secondary": "disappointment",
        "hits": 1,
-       "id": "8726d29ba239",
-       "importance": 0.51,
+       "id": "c3dc72426bd5",
+       "importance": 0.54,
        "last_recall": 0.0,
        "last_used": 1793271820.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8208,
+       "memory_confidence": 0.8232,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
        "previous_versions": [],
        "provenance": {
         "message_refs": [
-         "m今天的画没赶"
+         "m今天被骂了 "
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
@@ -9820,7 +10709,7 @@
        "scope": "user",
        "self_defining": false,
        "summarized": false,
-       "text": "今天的画没赶上展出 真的很委屈",
+       "text": "今天被骂了 真的很委屈",
        "ts": 1793271820.0,
        "verification": "verified"
       },
@@ -9828,12 +10717,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4667,
+       "effective_importance": 0.4935,
        "encoding_emotion": "sadness",
        "encoding_emotion_secondary": "disappointment",
        "hits": 1,
        "id": "69e8b991e8a2",
-       "importance": 0.468,
+       "importance": 0.495,
        "last_recall": 0.0,
        "last_used": 1793271820.0,
        "last_write_op": "",
@@ -9866,18 +10755,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 1,
-       "effective_importance": 0.5484,
+       "effective_importance": 0.5809,
        "encoding_emotion": "sadness",
        "encoding_emotion_secondary": "disappointment",
        "hits": 1,
        "id": "6fcefbf2ab75",
-       "importance": 0.55,
+       "importance": 0.582,
        "last_recall": 1793271870.0,
        "last_used": 1793271840.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 1,
-       "memory_confidence": 0.8228,
+       "memory_confidence": 0.8254,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9903,12 +10792,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5157,
+       "effective_importance": 0.545,
        "encoding_emotion": "sadness",
        "encoding_emotion_secondary": "disappointment",
        "hits": 1,
        "id": "816a9609616e",
-       "importance": 0.517,
+       "importance": 0.546,
        "last_recall": 0.0,
        "last_used": 1793271840.0,
        "last_write_op": "",
@@ -9941,18 +10830,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6176,
+       "effective_importance": 0.6508,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "27c13fc68348",
-       "importance": 0.619,
+       "importance": 0.652,
        "last_recall": 1793272490.0,
        "last_used": 1793271870.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8283,
+       "memory_confidence": 0.831,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9978,12 +10867,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5443,
+       "effective_importance": 0.5746,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "f0d084291b8a",
-       "importance": 0.546,
+       "importance": 0.576,
        "last_recall": 0.0,
        "last_used": 1793271870.0,
        "last_write_op": "",
@@ -10016,18 +10905,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6011,
+       "effective_importance": 0.627,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "52162a18315f",
-       "importance": 0.602,
+       "importance": 0.628,
        "last_recall": 0.0,
        "last_used": 1793272490.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8282,
+       "memory_confidence": 0.8303,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -10053,12 +10942,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5765,
+       "effective_importance": 0.6002,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "4c899b2e38b3",
-       "importance": 0.578,
+       "importance": 0.602,
        "last_recall": 0.0,
        "last_used": 1793272490.0,
        "last_write_op": "",
@@ -10616,18 +11505,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6048,
+       "effective_importance": 0.6276,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "570efb8958d6",
-       "importance": 0.606,
+       "importance": 0.629,
        "last_recall": 0.0,
        "last_used": 1793272890.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8285,
+       "memory_confidence": 0.8303,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -10653,12 +11542,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5444,
+       "effective_importance": 0.565,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "0fecc1318983",
-       "importance": 0.546,
+       "importance": 0.566,
        "last_recall": 0.0,
        "last_used": 1793272890.0,
        "last_write_op": "",
@@ -10691,18 +11580,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6087,
+       "effective_importance": 0.6316,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "dd2efe219da9",
-       "importance": 0.609,
+       "importance": 0.632,
        "last_recall": 1793276520.0,
        "last_used": 1793272920.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8276,
+       "memory_confidence": 0.8294,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -10731,18 +11620,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4999,
+       "effective_importance": 0.51,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "a96519791895",
-       "importance": 0.5,
+       "importance": 0.511,
        "last_recall": 0.0,
        "last_used": 1793276520.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.82,
+       "memory_confidence": 0.8208,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -10768,12 +11657,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.451,
+       "effective_importance": 0.4603,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "5729e514586d",
-       "importance": 0.451,
+       "importance": 0.461,
        "last_recall": 0.0,
        "last_used": 1793276520.0,
        "last_write_op": "",
@@ -10829,6 +11718,20 @@
     "social_baseline": 0.44,
     "stress_reactivity": 0.45
    },
+   "red_lines": {
+    "by_line": {
+     "hardship": 2
+    },
+    "by_store": {
+     "event": {
+      "hardship": 1
+     },
+     "memory": {
+      "hardship": 1
+     }
+    },
+    "filter": false
+   },
    "relationships": [
     {
      "belief_state": {
@@ -10849,9 +11752,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.313,
+       "anxious": 0.3138,
        "avoidant": 0.2452,
-       "safe": 0.4418
+       "safe": 0.441
       },
       "calibration": {
        "sources": {}
@@ -10891,19 +11794,19 @@
          "ts": 1793000730.0
         },
         {
-         "conflict": 0.2939,
+         "conflict": 0.3015,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793272890.0
         },
         {
-         "conflict": 0.2885,
+         "conflict": 0.2952,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793272920.0
         },
         {
-         "conflict": 0.2727,
+         "conflict": 0.2761,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793276520.0
@@ -10916,8 +11819,8 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5486,
-       "conflict": 0.2727,
+       "closeness": 0.5481,
+       "conflict": 0.2761,
        "predictability": 1.0,
        "repair": 0.0,
        "trust": 0.5
@@ -10932,24 +11835,24 @@
         "ts": 1793000730.0
        },
        {
-        "closeness": 0.5362,
-        "conflict": 0.2939,
+        "closeness": 0.5337,
+        "conflict": 0.3015,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
         "ts": 1793272890.0
        },
        {
-        "closeness": 0.5369,
-        "conflict": 0.2885,
+        "closeness": 0.5347,
+        "conflict": 0.2952,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
         "ts": 1793272920.0
        },
        {
-        "closeness": 0.5486,
-        "conflict": 0.2727,
+        "closeness": 0.5481,
+        "conflict": 0.2761,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -11019,9 +11922,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3131,
-       "avoidant": 0.245,
-       "safe": 0.4419
+       "anxious": 0.3138,
+       "avoidant": 0.2452,
+       "safe": 0.441
       },
       "calibration": {
        "sources": {}
@@ -11077,25 +11980,25 @@
          "ts": 1793271800.0
         },
         {
-         "conflict": 0.2782,
+         "conflict": 0.2885,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271820.0
         },
         {
-         "conflict": 0.2923,
+         "conflict": 0.3027,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271840.0
         },
         {
-         "conflict": 0.3023,
+         "conflict": 0.3136,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271870.0
         },
         {
-         "conflict": 0.3002,
+         "conflict": 0.3091,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793272490.0
@@ -11108,8 +12011,8 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5354,
-       "conflict": 0.3002,
+       "closeness": 0.5321,
+       "conflict": 0.3091,
        "predictability": 1.0,
        "repair": 0.0,
        "trust": 0.5
@@ -11164,32 +12067,32 @@
         "ts": 1793271800.0
        },
        {
-        "closeness": 0.5512,
-        "conflict": 0.2782,
+        "closeness": 0.5467,
+        "conflict": 0.2885,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
         "ts": 1793271820.0
        },
        {
-        "closeness": 0.5424,
-        "conflict": 0.2923,
+        "closeness": 0.5379,
+        "conflict": 0.3027,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
         "ts": 1793271840.0
        },
        {
-        "closeness": 0.532,
-        "conflict": 0.3023,
+        "closeness": 0.5274,
+        "conflict": 0.3136,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
         "ts": 1793271870.0
        },
        {
-        "closeness": 0.5354,
-        "conflict": 0.3002,
+        "closeness": 0.5321,
+        "conflict": 0.3091,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -11199,7 +12102,7 @@
       "transactive_map": {
        "上次那首嘛": 1,
        "今天想听你唱歌": 1,
-       "今天的画没赶上展出": 1,
+       "今天被骂了": 1,
        "他凭什么这样说我": 1,
        "你可以的": 1,
        "你还记得我早上让你唱什么吗": 1,
@@ -11846,7 +12749,7 @@
   {
    "clean": "抱抱你，好委屈啊",
    "inject": [
-    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[没做完的] 你还记得我早上让你唱什么吗"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] （别处）有人说过：我换工作了 现在轻松多了\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -11870,7 +12773,7 @@
   {
    "clean": "我陪着你，真让人生气",
    "inject": [
-    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 芒果说过：气死我了！！！他凭什么这样说我；芒果说过：真的受够了！！！气死了！！！；她自己说过：我在呢，听着也好难过\n[没做完的] 你还记得我早上让你唱什么吗"
+    "[她现在] 心里有点沉。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 芒果说过：气死我了！！！他凭什么这样说我；芒果说过：真的受够了！！！气死了！！！；她自己说过：我在呢，听着也好难过\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -11886,7 +12789,7 @@
   {
    "clean": "记下啦",
    "inject": [
-    "[她现在] 心里有点发紧。\n[她跟对方] 认识\n[最近的事] 小爱 我们约好下周一起打：太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧；意义：她很在意这件事；反思：要好好记住\n[没做完的] 小爱帮我们算算保底还差多少；记得提醒我明天交报告"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识\n[最近的事] 小爱 我们约好下周一起打副本吧：小爱 我们约好下周一起打副本吧；小爱 我们约好下周一起打：太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧；意义：她很在意这件事；反思：要好好记住\n[没做完的] 小爱帮我们算算保底还差多少；记得提醒我明天交报告"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -11894,7 +12797,7 @@
   {
    "clean": "太好了~",
    "inject": [
-    "[她现在] 心里有点发紧。各处这会儿都挺安静。\n[她跟对方] 认识\n[她想起来的] 阿星说过：记得提醒我明天交报告；柠檬说过：啊啊啊啊 好激动 小爱快夸我；（别处）有人说过：好久不见小爱\n[最近的事] 小爱 我们约好下周一起打：太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧；意义：她很在意这件事；反思：要好好记住\n[上次聊到] 小爱 我们约好下周一起打：她很在意这件事"
+    "[她现在] 心里有点发紧。各处这会儿都挺安静。\n[她跟对方] 认识\n[她想起来的] 阿星说过：记得提醒我明天交报告；柠檬说过：啊啊啊啊 好激动 小爱快夸我；（别处）有人说过：好久不见小爱\n[最近的事] 小爱 我们约好下周一起打副本吧：小爱 我们约好下周一起打副本吧；小爱 我们约好下周一起打：太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧；意义：她很在意这件事；反思：要好好记住\n[上次聊到] 小爱 我们约好下周一起打副本吧：小爱 我们约好下周一起打副本吧"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"

@@ -12,6 +12,7 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 import contextvars
+import hashlib
 
 # ams-life: the forget count when the current job (one request, one reply, one
 # background task) started. A task started from a request inherits its mark.
@@ -352,13 +353,55 @@ class DiscretionMixin:
             logger.info("[ams-life] numbers taken out of what she keeps: %s files", counts)
         return counts
 
-    def _red_line(self, text, what) -> bool:
-        """Does `text` cross a red line (health, money, love life, family...)? Then it is not
-        kept; the log says which line only, never the text."""
+    def _red_line(self, text, what) -> str:
+        """The red line (health, money, love life, family...) `text` crosses, when it must not
+        be kept for it -- only while the switch redline_filter is on (off by default). Either
+        way a hit is counted, by line and by store, once per text: numbers only."""
         line = redline.hit(text)
-        if line:
-            logger.info("[ams-life] not kept (%s): red line %s", what, line)
-        return bool(line)
+        if not line:
+            return ""
+        self._count_red_line(line, what, text)
+        if not getattr(self, "redline_filter", False):
+            return ""
+        logger.info("[ams-life] not kept (%s): red line %s", what, line)
+        return line
+
+    def _red_lines_for(self, what):
+        """_red_line as impressions.py takes it: text -> the line it may not cross, or ''."""
+        return lambda text: self._red_line(text, what)
+
+    def _red_line_counts(self) -> dict:
+        try:
+            data = json.loads(REDLINE_COUNTS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        for key in ("by_line", "by_store"):
+            if not isinstance(data.get(key), dict):
+                data[key] = {}
+        if not isinstance(data.get("seen"), list):
+            data["seen"] = []
+        return data
+
+    def _count_red_line(self, line, what, text) -> None:
+        """One more hit of `line` in `what` (memory, event, insight, notes, impressions), unless
+        this text was counted there before (a short hash is kept for that, never the text)."""
+        key = hashlib.sha1(("%s|%s" % (what, text)).encode("utf-8")).hexdigest()[:12]
+        try:
+            data = self._red_line_counts()
+            if key in data["seen"]:
+                return
+            data["seen"] = (data["seen"] + [key])[-20000:]
+            data["by_line"][line] = int(data["by_line"].get(line, 0) or 0) + 1
+            store = data["by_store"].setdefault(what, {})
+            store[line] = int(store.get(line, 0) or 0) + 1
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = REDLINE_COUNTS_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            os.replace(str(tmp), str(REDLINE_COUNTS_PATH))
+        except Exception as exc:
+            logger.warning("[ams-life] red-line count not written: %s", exc)
 
     def _anonymized(self, text, names) -> str:
         """`text` without any name of the people in `names` (ids or names): each id brings

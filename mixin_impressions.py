@@ -163,7 +163,8 @@ class ImpressionsMixin:
                 lines = self._read_window(place)["recent"]
                 done[place] = await impressions.nightly(self._impression_store(), place, lines, ask, day,
                                                         registry=self._registry(),
-                                                        extra_names=self._material_names(place, lines))
+                                                        extra_names=self._material_names(place, lines),
+                                                        red=self._red_lines_for("impressions"))
             except Exception as exc:
                 logger.warning("[ams-life] impressions for %s failed: %s", place, exc)
         if any(r.get("called") for r in done.values()):

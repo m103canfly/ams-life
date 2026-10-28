@@ -73,6 +73,16 @@ class Pick(unittest.TestCase):
         self.assertIn('@P2 你抽了吗', text)
         self.assertIn('我的号是 #', text)
 
+    def test_red_lines_by_the_callers_rule(self):
+        picked = im.pick_people(window(), DAY)
+        held, _ = im.material(picked)
+        open_, _ = im.material(picked, red=lambda t: '')
+        self.assertNotIn('工资', held)                      # standalone: the red lines themselves
+        self.assertIn('工资', open_)
+        self.assertEqual(im.check_topic('工资'), '')
+        self.assertEqual(im.check_topic('工资', red=lambda t: ''), '工资')
+        self.assertEqual(im.check_style('性格内向', red=lambda t: ''), '')   # judgements are another list
+
     def test_english_names_are_whole_words_in_the_material(self):
         picked = im.pick_people([line('10002', '柠檬', 'Alice 和 Al 都来了', i) for i in range(12)], DAY)
         text, _codes = im.material(picked, {'10007': {'Al'}})

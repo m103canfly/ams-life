@@ -68,10 +68,22 @@ class WhatSheKeeps(unittest.TestCase):
         self.assertEqual(r['phone'][4:6], ['@某人 某人你还在吗', '某人昨天也这么说'])
         self.assertFalse([t for t in r['phone'] + r['library'] if '阿星' in t or '10003' in t])
 
-    def test_red_lines_are_not_kept(self):
+    def test_red_lines_are_counted_not_held_back_by_default(self):
+        # the owner, 10-28: nothing is held back in the first version, the hits are counted
         r = run_case('redline')
+        self.assertIn('小爱 我最近失眠好严重 每天都睡不着', r['library'])
+        self.assertEqual(r['counts']['by_line'], {'health': 1})
+        self.assertEqual(r['counts']['by_store'], {'memory': {'health': 1}})
+        self.assertEqual(r['page'], {'filter': False, 'by_line': {'health': 1}, 'by_store': {'memory': {'health': 1}}})
+        for word in ('失眠', '睡不着', '10002', '柠檬'):                # no text, nobody
+            self.assertNotIn(word, r['counts_file'])
+
+    def test_red_lines_are_not_kept_when_the_switch_is_on(self):
+        r = run_case('redline_on')
         self.assertEqual(r['library'], ['小爱 我周末想去海边看日落'])
         self.assertIn('小爱 我最近失眠好严重 每天都睡不着', r['phone'])   # her phone keeps everyone's words, 24 hours
+        self.assertEqual(r['counts']['by_line'], {'health': 1})
+        self.assertTrue(r['page']['filter'])
 
 
 class OldNumbers(unittest.TestCase):

@@ -94,6 +94,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # "group_impressions" LLM function, off by default); what they are called joins
         # the names made anonymous elsewhere
         self.impressions_time = str(self.config.get("impressions_time", "23:15") or "23:15").strip()
+        # the red lines: one switch, off by default (the owner, 10-28: nothing is held back in
+        # the first version; the hits are counted by line for the owner to look at)
+        self.redline_filter = bool(self.config.get("redline_filter", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))

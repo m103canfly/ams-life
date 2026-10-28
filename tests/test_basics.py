@@ -77,8 +77,9 @@ class Split(unittest.TestCase):
         # review of PR #10: +2 (_material_names, _forget_registered);
         # step 1-3-5, no numbers and no red lines in what she keeps: +11 (_note_her, _gone_people,
         # _known_numbers, _scrubber, _scrub, _SCRUB_KEYS, _scrub_tree, _migrate_numbers, _red_line,
-        # _KEPT_TEXT_KEYS, _keep_record_text)
-        self.assertEqual(len(methods), 306)
+        # _KEPT_TEXT_KEYS, _keep_record_text); the red-line switch and its counts: +3 (_red_lines_for,
+        # _red_line_counts, _count_red_line)
+        self.assertEqual(len(methods), 309)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

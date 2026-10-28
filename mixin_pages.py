@@ -677,6 +677,10 @@ class PagesMixin:
             # ams-life step 1-3: the group members she knows, per group (read-only; the
             # owner can delete what she thinks of someone, never rewrite it)
             "impressions": self._impressions_for_page(),
+            # red-line hits by line (numbers only) and whether they are held back
+            "red_lines": {"filter": bool(getattr(self, "redline_filter", False)),
+                          "by_line": self._red_line_counts()["by_line"],
+                          "by_store": self._red_line_counts()["by_store"]},
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,
                 **dict(getattr(self, "_last_memory_meta", {}) or {})},

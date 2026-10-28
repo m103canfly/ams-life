@@ -28,7 +28,7 @@ from astrbot.api.message_components import At, Plain  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
 ctx = harness.FakeContext()
-plugin = main.BioCorePlugin(ctx, config={})
+plugin = main.BioCorePlugin(ctx, config={'redline_filter': True} if CASE == 'redline_on' else {})
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -85,12 +85,17 @@ if CASE == 'at':
     result['library'] = library()
     result['loops'] = [x.get('text') for x in plugin._read_window('group:' + G1).get('open_loops') or []]
 
-if CASE == 'redline':
+if CASE in ('redline', 'redline_on'):
     turn([Plain(text='小爱 我最近失眠好严重 每天都睡不着')], '小爱 我最近失眠好严重 每天都睡不着', '10002', '柠檬',
          reply='抱抱你')
     turn([Plain(text='小爱 我周末想去海边看日落')], '小爱 我周末想去海边看日落', '10002', '柠檬', reply='好呀')
+    plugin._write_library(plugin._read_library())                       # written again: not counted again
     result['phone'] = phone()
     result['library'] = library()
+    result['counts_file'] = (DATA / 'redline_counts.json').read_text('utf-8')
+    result['counts'] = json.loads(result['counts_file'])
+    status = loop.run_until_complete(plugin.page_status())
+    result['page'] = status['data']['red_lines']
 
 if CASE == 'migrate':
     # kept before this change: numbers in the library, her phone and a relationship record
