@@ -61,6 +61,19 @@ def prepare(data_dir, start=1_793_000_000.0):
     return clock
 
 
+def astrbot_user_message(req):
+    """What AstrBot (4.29.3) makes of this turn's user message from a ProviderRequest: what
+    the model is sent, and what the conversation history keeps. A part marked "_no_save"
+    is sent (without the mark: provider/sources/openai_source.py) but not kept
+    (agent/message.py, dump_messages_with_checkpoints)."""
+    blocks = [{'type': 'text', 'text': req.prompt}] if getattr(req, 'prompt', None) else []
+    for part in getattr(req, 'extra_user_content_parts', None) or []:
+        blocks.append(dict(part) if isinstance(part, dict) else {'type': 'text', 'text': str(part)})
+    sent = [{k: v for k, v in b.items() if k != '_no_save'} for b in blocks]
+    kept = [{k: v for k, v in b.items() if k != '_no_save'} for b in blocks if not b.get('_no_save')]
+    return sent, kept
+
+
 def fake_vector(text, dims=24):
     """Deterministic bag-of-characters embedding: similar texts get similar vectors."""
     vec = [0.0] * dims
