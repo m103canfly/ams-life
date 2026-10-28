@@ -121,8 +121,8 @@ def verdict(origin, here) -> str:
         return FULL
     if where and where == place_of(here):
         return FULL
-    if vis == PUBLIC and where:
-        return ANON
+    if vis == PUBLIC:
+        return ANON  # said openly (one place, or several merged): without names
     return DROP
 
 

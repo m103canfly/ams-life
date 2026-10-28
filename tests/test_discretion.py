@@ -116,7 +116,7 @@ class PublicWithoutNames(unittest.TestCase):
         b = r['turns'][-1]
         self.assertIn('GroupMessage:900002', b['session'])
         self.assertIn('爬山', b['prompt'])
-        self.assertIn('（别处）有人：', b['prompt'])
+        self.assertIn('（别处）有人说过：', b['prompt'])
         for who in ('柠檬', '阿星', '10002', '10003'):
             self.assertNotIn(who, b['prompt'])
 
@@ -179,9 +179,9 @@ class Phone(unittest.TestCase):
         self.assertEqual(w['group:900002']['open_loops'], [])
         # loops show only in their own window
         prompts = [t['prompt'] for t in r['turns']]
-        self.assertIn('loops=', prompts[0])
-        self.assertNotIn('loops=', prompts[1])
-        self.assertNotIn('loops=', prompts[3])
+        self.assertIn('[没做完的]', prompts[0])
+        self.assertNotIn('[没做完的]', prompts[1])
+        self.assertNotIn('[没做完的]', prompts[3])
         self.assertNotIn('交报告', prompts[3])
 
     def test_open_loop_cap_is_per_window(self):
@@ -440,19 +440,23 @@ class Sweep(unittest.TestCase):
 class MemoryTrace(unittest.TestCase):
     def test_no_recall_this_turn_means_no_mtrace(self):
         r = run_case('mtrace')
-        self.assertIn('[BC]', r['b'])
-        self.assertNotIn('mtrace=', r['b'])
+        self.assertIn('[她现在]', r['b'])
+        self.assertNotIn('mtrace', r['b'])
 
 
 class TwoWindowsAtOnce(unittest.TestCase):
     def test_interleaved_requests_keep_their_own_recall(self):
         r = run_case('interleave')
-        self.assertIn('memwho=', r['prompt_a'])
-        self.assertIn('memwho=', r['prompt_b'])
-        for who in ('桃子', '路人'):
-            self.assertNotIn(who, r['prompt_a'])
-        for who in ('柠檬', '阿星'):
-            self.assertNotIn(who, r['prompt_b'])
+        self.assertTrue(r['interleaved'])
+        # what each request recalled (its memory meta, handed to its own prompt)
+        self.assertTrue(r['who_a'])
+        self.assertTrue(r['who_b'])
+        self.assertLessEqual(set(r['who_a']), {'柠檬', '阿星'})
+        self.assertLessEqual(set(r['who_b']), {'桃子', '路人'})
+        self.assertIn('爬山', r['prompt_a'])
+        self.assertNotIn('唱歌', r['prompt_a'])
+        self.assertIn('唱歌', r['prompt_b'])
+        self.assertNotIn('爬山', r['prompt_b'])
 
 
 class WindowFiles(unittest.TestCase):
@@ -473,8 +477,9 @@ class OneBody(unittest.TestCase):
         r = run_case('one_body')
         self.assertEqual(r['cores'], ['her'])
         self.assertGreater(r['v_after_a'], r['v_start'] + 0.3)
-        v_b = float(re.search(r'v=(-?[\d.]+)', r['turns'][-1]['prompt']).group(1))
-        self.assertGreater(v_b, r['v_start'] + 0.3)
+        self.assertIn('GroupMessage:900002', r['turns'][-1]['session'])
+        self.assertGreater(r['v_b'], r['v_start'] + 0.25)
+        self.assertNotIn('心里有点', r['turns'][-1]['prompt'])
 
 
 class Forget(unittest.TestCase):

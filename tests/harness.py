@@ -179,6 +179,7 @@ class FakeEvent:
         self.unified_msg_origin = (f'default:GroupMessage:{group}' if group else f'default:FriendMessage:{sender}')
         self.message_obj = type('Obj', (), {'self_id': self_id, 'message_id': 'm' + text[:6]})()
         self.result = None
+        self.is_at_or_wake_command = True  # a turn wakes her (AstrBot's wake check)
 
     def get_sender_id(self):
         return self._sender
