@@ -318,16 +318,26 @@ class DiscretionMixin:
         return obj
 
     def _migrate_numbers(self) -> dict:
-        """Numbers kept before step 1-3-5 (an @ with a number, anyone's number in a text, a
-        deleted person's name) are taken out of the library, her phone, events and insights,
-        the relationship records and her notes. Each file that changes is copied into
-        MEMORY_ARCHIVE_DIR first (never deleted); nothing to change: nothing is written."""
+        """At start: numbers kept before step 1-3-5 (an @ with a number, anyone's number in a
+        text, a deleted person's name) are taken out of everything she keeps (_scrub_stores);
+        each file that changes is copied into MEMORY_ARCHIVE_DIR first (never deleted)."""
+        return self._scrub_stores(keep_copies=True)
+
+    def _scrub_stores(self, keep_copies=False) -> dict:
+        """Everything she keeps scrubbed again (_scrub: no number she knows of, someone deleted
+        is 某人): the library, her phone, events (and each place's copy) and insights, the
+        relationship records and her notes; nothing to change: nothing is written. With
+        keep_copies each file that changes is copied into MEMORY_ARCHIVE_DIR first (at start);
+        without (the owner has just deleted someone) nothing is copied: a copy would keep his
+        name. Returns how many files changed, by store."""
         scrub = self._scrubber()
         stamp = time.strftime("%Y%m%d-%H%M%S")
         folder = MEMORY_ARCHIVE_DIR / ("before-numbers-" + stamp)
         counts = {}
 
         def archive(path):
+            if not keep_copies:
+                return
             if path == MEMORY_LIBRARY_PATH:
                 dest = MEMORY_ARCHIVE_DIR / ("library.before-numbers-%s.json" % stamp)
             else:
@@ -889,27 +899,10 @@ class DiscretionMixin:
         reg.owner_delete(person=person)
         reg.remember_names(person, names)
         counts = self._forget(person=person)
-        counts["phone_named"] = self._scrub_windows()   # what others said of him: 某人, now
+        # what others said of him, wherever she keeps it: 某人, now (not at the next restart,
+        # and with no copy made first)
+        counts["named"] = self._scrub_stores(keep_copies=False)
         return counts
-
-    def _scrub_windows(self) -> int:
-        """Every window's lines and open loops scrubbed again (_scrub: someone deleted is 某人),
-        written back atomically; returns how many changed."""
-        scrub, changed = self._scrubber(), 0
-        for place in self._window_places():
-            win = self._read_window(place)
-            n = 0
-            for key in ("recent", "open_loops"):
-                for x in win[key]:
-                    if isinstance(x, dict) and isinstance(x.get("text"), str):
-                        new = scrub(x["text"])
-                        if new != x["text"]:
-                            x["text"] = new
-                            n += 1
-            if n:
-                self._write_window(place, win)
-                changed += n
-        return changed
 
     def _owner_forget_memory(self, entry_id) -> dict:
         """Delete one memory: it, and everything else that came from the messages it came

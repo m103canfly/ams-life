@@ -282,9 +282,9 @@ class ForgetRegistry:
 
     def remember_names(self, qq, names, stamp=None) -> int:
         """The names `qq` went by, as salted hashes (2 to 24 characters, not all digits, not his
-        number). Returns how many were new."""
+        number; lower case, so "Tom" is "tom" too). Returns how many were new."""
         qq = str(qq or "").strip()
-        names = {str(n).strip() for n in names or () if str(n or "").strip()}
+        names = {str(n).strip().lower() for n in names or () if str(n or "").strip()}
         names = {n for n in names if NAME_MIN <= len(n) <= NAME_MAX and not n.isdigit() and n != qq}
         if not qq or not names:
             return 0
@@ -319,7 +319,7 @@ class ForgetRegistry:
         for size, digests in table.items():
             for i in range(len(text) - size + 1):
                 part = text[i:i + size]
-                qq = digests.get(self._digest(salt, part))
+                qq = digests.get(self._digest(salt, part.lower()))
                 if not qq:
                     continue
                 if part.isascii() and ((i and _ASCII_WORD.match(text[i - 1]))
