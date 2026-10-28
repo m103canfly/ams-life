@@ -1290,8 +1290,23 @@ class EventsMixin:
         except Exception:
             return []
 
+    _KEPT_TEXT_KEYS = ("text", "event", "title", "small_summary", "big_summary", "meaning_to_her", "reflection",
+                       "summary", "insight", "lesson")
+
+    def _keep_record_text(self, record, what) -> bool:
+        """Before an event or an insight is written: numbers out of its text; False when it
+        crosses a red line (then it is not written)."""
+        if not isinstance(record, dict):
+            return True
+        for k in self._KEPT_TEXT_KEYS:
+            if isinstance(record.get(k), str):
+                record[k] = self._scrub(record[k])
+        if isinstance(record.get("source_texts"), list):
+            record["source_texts"] = [self._scrub(x) if isinstance(x, str) else x for x in record["source_texts"]]
+        return not self._red_line(" ".join(str(record.get(k) or "") for k in self._KEPT_TEXT_KEYS), what)
+
     def _append_insight(self, record: dict) -> None:
-        if self._job_stale() or not self._new_item_kept(record):
+        if self._job_stale() or not self._new_item_kept(record) or not self._keep_record_text(record, "insight"):
             return
         try:
             EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
@@ -1507,7 +1522,7 @@ class EventsMixin:
         return [list(seg) for seg in segments[-3:]]
 
     def _append_event_archive(self, record: dict) -> None:
-        if self._job_stale() or not self._new_item_kept(record):
+        if self._job_stale() or not self._new_item_kept(record) or not self._keep_record_text(record, "event"):
             return
         try:
             EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)

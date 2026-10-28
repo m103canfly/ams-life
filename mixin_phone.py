@@ -151,17 +151,24 @@ class PhoneMixin:
             pass
         return ""
 
-    @staticmethod
-    def _message_text(event) -> str:
-        """The message as text; pictures, stickers and the like become a short placeholder."""
+    def _message_text(self, event) -> str:
+        """The message as text; pictures, stickers and the like become a short placeholder.
+        No numbers (_scrub): an @ is "@昵称", her own name for an @ of her, "@某人" with no
+        name or for someone deleted."""
         parts = []
+        self._note_her(event)
+        her, gone = getattr(self, "_her_ids", None) or set(), self._gone_people()
         try:
             for comp in event.get_messages() or []:
                 kind = type(comp).__name__
                 if kind == "Plain":
                     parts.append(str(getattr(comp, "text", "") or ""))
                 elif kind == "At":
-                    parts.append("@" + str(getattr(comp, "name", "") or getattr(comp, "qq", "") or ""))
+                    qq, name = str(getattr(comp, "qq", "") or ""), str(getattr(comp, "name", "") or "").strip()
+                    if qq in gone and name:
+                        self.__dict__.setdefault("_gone_names", {}).setdefault(qq, set()).add(name)
+                    parts.append("@" + (HER_NAME if qq in her else discretion.SOMEBODY if qq in gone or not name
+                                        else name))
                 elif kind == "AtAll":
                     parts.append("@全体成员")
                 elif kind == "Reply":
@@ -173,7 +180,7 @@ class PhoneMixin:
         text = "".join(parts).strip()
         if not text:
             text = str(getattr(event, "message_str", "") or "").strip()
-        return text
+        return self._scrub(text, event)
 
     # ------------------------------------------------------------------
     # What the phone tells her body: numbers only, never text
@@ -268,6 +275,7 @@ class PhoneMixin:
         if not text or not here or self._job_stale():
             return
         win = self._read_window(here)
+        text = self._scrub(text, event)
         win["recent"].append({"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS],
                               "origin": self._event_origin(event)})
         self._write_window(here, win)

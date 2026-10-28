@@ -492,8 +492,11 @@ class PagesMixin:
     @staticmethod
     def _archived_library_copies() -> int:
         """The library as it was before a migration, kept in memory/archive/ (the owner decided
-        a delete leaves these alone); the panel says they still hold the old data."""
-        return len(list(MEMORY_ARCHIVE_DIR.glob("*.json"))) if MEMORY_ARCHIVE_DIR.exists() else 0
+        a delete leaves these alone), and the folders of other files kept before the numbers
+        were taken out; the panel says they still hold the old data."""
+        if not MEMORY_ARCHIVE_DIR.exists():
+            return 0
+        return len(list(MEMORY_ARCHIVE_DIR.glob("*.json"))) + len([p for p in MEMORY_ARCHIVE_DIR.iterdir() if p.is_dir()])
 
     async def page_impression_delete(self, person=None):
         """The owner deletes what she thinks of someone (panel only; the page asks to confirm

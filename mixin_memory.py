@@ -281,7 +281,11 @@ class MemoryMixin:
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         lib["schema_version"] = MEMORY_SCHEMA_VERSION
         try:
-            kept = [e for e in lib.get("entries") or [] if self._origin_kept(e)]
+            kept = [e for e in lib.get("entries") or [] if self._origin_kept(e)
+                    and not (isinstance(e, dict) and self._red_line(e.get("text"), "memory"))]
+            for e in kept:
+                if isinstance(e, dict) and isinstance(e.get("text"), str):
+                    e["text"] = self._scrub(e["text"])
         except forget_registry.Unreadable as exc:
             # never filter with a registry that cannot be read: nothing is written this time
             logger.warning("[ams-life] forget registry unreadable, library not written: %s", exc)

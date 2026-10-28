@@ -168,7 +168,7 @@ def run():
         t(30, '蛋糕要做草莓味的', '10001', '芒果', reply='草莓味的惊喜蛋糕听起来好甜')
         # strong feelings in a group right after: an event gets archived there
         group_lines = (('小爱 我好难过 想哭', '{"e":"sadness","i":0.9}'),
-                       ('今天被骂了 真的很委屈', '{"e":"sadness","i":0.85}'),
+                       ('今天的画没赶上展出 真的很委屈', '{"e":"sadness","i":0.85}'),
                        ('气死我了！！！他凭什么这样说我', '{"e":"anger","i":0.8}'),
                        ('真的受够了！！！气死了！！！', '{"e":"anger","i":0.9}'))
         for text, tag in group_lines:
@@ -494,7 +494,7 @@ def run():
         out['private'] = out['turns'][1]['prompt']
     elif CASE == 'strong_no_narrative':
         t(0, '小爱 我好难过 想哭', '10001', '芒果', reply='我陪着你，听着也好难过')
-        for delay, text in ((20, '今天被骂了 真的很委屈'), (20, '气死我了！！！他凭什么这样说我'),
+        for delay, text in ((20, '今天的画没赶上展出 真的很委屈'), (20, '气死我了！！！他凭什么这样说我'),
                             (30, '真的受够了！！！气死了！！！')):
             t(delay, text, '10001', '芒果', reply='我陪着你，听着也好难过')
         t(620, '我还是好生气！！！凭什么啊！！！', '10001', '芒果', reply='我陪着你，听着也好难过')
@@ -940,7 +940,7 @@ def run():
         t(0, '小爱，我在偷偷准备一个惊喜蛋糕给大家', '10001', '芒果')
         # the strong-feeling stretch of the golden scenario, so events get archived
         for delay, text, tag in ((400, '小爱 我好难过 想哭', '{"e":"sadness","i":0.9}'),
-                                 (20, '今天被骂了 真的很委屈', '{"e":"sadness","i":0.85}'),
+                                 (20, '今天的画没赶上展出 真的很委屈', '{"e":"sadness","i":0.85}'),
                                  (20, '气死我了！！！他凭什么这样说我', '{"e":"anger","i":0.8}'),
                                  (30, '真的受够了！！！气死了！！！', '{"e":"anger","i":0.9}'),
                                  (620, '我还是好生气！！！凭什么啊！！！', '{"e":"anger","i":0.9}')):

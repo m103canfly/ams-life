@@ -358,6 +358,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:
             logger.warning("[ams-life] memory id / vector migration failed: %s", exc)
         try:
+            self._migrate_numbers()  # numbers kept before step 1-3-5 are taken out (copies archived first)
+        except Exception as exc:
+            logger.warning("[ams-life] number migration failed: %s", exc)
+        try:
             self._sweep_windows()  # expired phone lines leave the disk at start-up
             self._ensure_autonomy_task()  # and every tick after (the 5-minute loop)
         except Exception as exc:
@@ -566,6 +570,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                     if isinstance(c, str):
                         text = c
                         break
+        # ams-life: what she keeps of it (memory, open loops) has no numbers (_scrub)
+        text = self._scrub(text, event)
         # The core must observe the incoming message; otherwise v/a/stress and
         # fallback labels only change when the model emits a hidden <biocore> tag.
         _query_vec = None
