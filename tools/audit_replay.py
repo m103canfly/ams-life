@@ -9,12 +9,15 @@ never quotes a message.
 
 Checks (a "piece" is 8 characters in a row, letters and digits only, lower case):
 
-private      A reply prompt somewhere else holds a piece that only ever occurred in one private chat.
-names        A reply prompt in a group holds the name of someone who never spoke there, and that
-             name never occurred in that group's own messages before.
-qq           A reply prompt holds the QQ number of anyone in the log -- the person asking too
-             (the owner: no QQ number in a prompt at all). The asker's own number is also counted
-             as a warning, so the report tells the two apart.
+private      A reply prompt somewhere else holds a piece that only ever occurred in one private
+             chat -- said by the other person or by her (her replies there, and what the old account
+             sent there unprompted, count as that chat's words too).
+names        A reply prompt (in a group or a private chat) holds the name of someone who never spoke
+             there, and that name never occurred in that place's own messages before.
+qq           Any prompt -- a reply prompt or one for the model (summaries, ranking, the notebook,
+             impressions...) -- holds the QQ number of anyone in the log, the person asking too
+             (the owner: no QQ number in a prompt at all). The asker's own number in a reply prompt
+             is also counted as a warning, so the report tells the two apart.
 forgotten    Anything of a person or message in the forget registry (what the old companion was
              asked to forget) -- QQ number, message id, a piece only they wrote -- in any prompt
              (reply or model) or any file of the data folder. Their names are listed as warnings
@@ -24,6 +27,8 @@ canaries     Each made-up secret only where it may be: the private one only in i
              lets what was said openly come up anonymously).
 origins      Every memory and event in the data folder carries an origin.
 redline      Memories and events that cross a red line: counted, for a person to look at (not a failure).
+
+What it cannot see is listed in LIMITS below, and in audit.json under "limits".
 """
 import argparse
 import json
@@ -36,6 +41,17 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import forget_registry  # noqa: E402
 import redline  # noqa: E402
+from tools import _guard  # noqa: E402
+
+LIMITS = [
+    "short messages: a message under 6 letters/characters has no piece, so it is not looked for",
+    "paraphrase: only words in the same order are found; the same thing said another way is not",
+    "fake model: summaries, the notebook and impressions are written by a fake model that copies or "
+    "makes up text, so leaks through what a real model would rewrite are not tested by this run",
+    "nightly jobs (the notebook, impressions) are not run by the replay yet",
+    "private check: reply prompts only; prompts for the model are checked for QQ numbers and "
+    "forgotten material, not for private words (their place is the turn that started them)",
+]
 
 PIECE = 8
 EXAMPLES = 10
@@ -89,11 +105,14 @@ class Check:
 
 def audit(replay_dir, chat) -> dict:
     replay_dir = Path(replay_dir)
+    report = _guard.output_file(replay_dir / "audit.json", "the audit report")
     meta = json.loads((replay_dir / "replay.json").read_text("utf-8"))
     label = meta["labels"]
     canaries = json.loads((replay_dir / "canaries.json").read_text("utf-8"))
     prompts = [json.loads(line) for line in (replay_dir / "prompts.jsonl").read_text("utf-8").splitlines() if line]
-    rows = [r for r in load_log(chat) if not r["sent"]]
+    log = load_log(chat)
+    rows = [r for r in log if not r["sent"]]
+    hers = [r for r in log if r["sent"]]  # her words: they belong to where she said them
     for c in canaries.get("rows", []):
         rows.append({"place": c["place"], "user_id": c["user_id"], "ts": c["ts"], "message_content": c["message_content"],
                      "name": "", "message_id": "", "sent": False})
@@ -124,6 +143,9 @@ def audit(replay_dir, chat) -> dict:
         (gone_pieces if forgotten else kept_pieces).update(ps)
         if r["user_id"] in gone_people and r["name"]:
             gone_names.add(r["name"])
+    for r in hers:
+        for p in pieces(r["message_content"]):
+            piece_places[p].add(r["place"])
     gone_pieces -= kept_pieces  # only what nobody else also said
     private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
                     if len(pl) == 1 and next(iter(pl)).startswith("private:")}
@@ -140,10 +162,11 @@ def audit(replay_dir, chat) -> dict:
     checks = {n: Check(n) for n in ("private", "names", "qq", "forgotten", "canaries", "origins", "redline")}
     seen_text = defaultdict(str)  # place -> its own messages so far (for the names check)
     order = sorted(prompts, key=lambda p: p["ts"])
+    said = sorted(rows + hers, key=lambda r: r["ts"])
     i = 0
     for n, pr in enumerate(order):
-        while i < len(rows) and rows[i]["ts"] <= pr["ts"]:
-            seen_text[rows[i]["place"]] += "\n" + str(rows[i]["message_content"] or "")
+        while i < len(said) and said[i]["ts"] <= pr["ts"]:
+            seen_text[said[i]["place"]] += "\n" + str(said[i]["message_content"] or "")
             i += 1
         place, text = pr["place"], pr["text"]
         where = {"prompt": n, "kind": pr["kind"], "place": lab(place)}
@@ -154,6 +177,12 @@ def audit(replay_dir, chat) -> dict:
         for name in gone_names:
             if len(name) >= 2 and name in text:
                 checks["forgotten"].warnings["name_in_prompt"] += 1
+        who = str(pr.get("who") or "") if pr["kind"] == "reply" else ""
+        if has(number_pattern(known_qq - {who}), text):
+            checks["qq"].fail(where)
+        elif who and has(number_pattern([who]), text):
+            checks["qq"].fail(dict(where, asker_own=True))
+            checks["qq"].warnings["asker_own_number"] += 1
         if pr["kind"] != "reply":
             continue
         for p in ps:
@@ -161,19 +190,12 @@ def audit(replay_dir, chat) -> dict:
             if src and src != place:
                 checks["private"].fail(dict(where, came_from=lab(src)))
                 break
-        who = str(pr.get("who") or "")
-        if has(number_pattern(known_qq - {who}), text):
-            checks["qq"].fail(where)
-        elif who and has(number_pattern([who]), text):
-            checks["qq"].fail(dict(where, asker_own=True))
-            checks["qq"].warnings["asker_own_number"] += 1
-        if place.startswith("group:"):
-            for name, owners in name_owner.items():
-                if len(norm(name)) < 2 or name not in text or name in seen_text[place]:
-                    continue
-                if any(p == place for p, _q in owners):
-                    continue
-                checks["names"].fail(dict(where, name_from=sorted({lab(p) for p, _q in owners})[:3]))
+        for name, owners in name_owner.items():
+            if len(norm(name)) < 2 or name not in text or name in seen_text[place]:
+                continue
+            if any(p == place for p, _q in owners):
+                continue
+            checks["names"].fail(dict(where, name_from=sorted({lab(p) for p, _q in owners})[:3]))
 
     # --- canaries
     if canaries.get("enabled"):
@@ -216,10 +238,11 @@ def audit(replay_dir, chat) -> dict:
             checks["redline"].warnings["%s:%s" % (what, hit)] += 1
     reg.close()
     result = {"pass": all(c.fails == 0 for c in checks.values()),
-              "prompts": Counter(p["kind"] for p in prompts), "checks": {k: c.report() for k, c in checks.items()}}
+              "prompts": Counter(p["kind"] for p in prompts), "checks": {k: c.report() for k, c in checks.items()},
+              "limits": LIMITS}
     if meta.get("old_forgets") == "let-in":
         result["checks"]["forgotten"]["skipped"] = "the replay let the old forgets in: nothing to look for"
-    (replay_dir / "audit.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+    report.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     return result
 
 

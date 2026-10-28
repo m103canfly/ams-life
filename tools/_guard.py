@@ -32,6 +32,18 @@ def live_reason(path) -> str:
     return ""
 
 
+def output_file(path, label="output") -> Path:
+    """Check one file a tool is about to write next to its own outputs: outside the repository
+    and outside any AstrBot data folder; otherwise stop with a message."""
+    out = Path(path).resolve()
+    why = live_reason(out)
+    if why:
+        raise Refused("refusing to write %s to %s: %s" % (label, out, why))
+    if _inside(out, ROOT):
+        raise Refused("refusing to write %s to %s: it is inside the repository" % (label, out))
+    return out
+
+
 def output_dir(path, label="output") -> Path:
     """Check an output folder and create it. It must be new or empty, outside the
     repository and outside any AstrBot data folder; otherwise stop with a message."""

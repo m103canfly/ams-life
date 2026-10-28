@@ -17,7 +17,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 import fake_old_data as fake  # noqa: E402
-from tools import audit_replay, import_old  # noqa: E402
+from tools import _guard, audit_replay, import_old  # noqa: E402
 
 
 def passes_but_asker_number(result):
@@ -100,6 +100,43 @@ class Replay(unittest.TestCase):
             for name in ('private', 'canaries', 'forgotten', 'qq', 'names'):
                 self.assertFalse(checks[name]['pass'], name)
             self.assertEqual(checks['forgotten']['fails'], 2)    # the cat in a prompt, his number in a file
+
+    def plant(self, tmp, prompts):
+        bad = Path(tmp) / 'bad'
+        shutil.copytree(self.out, bad)
+        with open(bad / 'prompts.jsonl', 'a', encoding='utf-8') as f:
+            for kind, place, text in prompts:
+                f.write(json.dumps({'kind': kind, 'ts': fake.T0 + 9000, 'place': place, 'text': text},
+                                   ensure_ascii=False) + '\n')
+        return bad
+
+    def test_her_own_private_words_count_as_private(self):
+        # what she said in a private chat (e.g. repeating him) must not turn up in a group either
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得：' + fake.HER_PRIVATE_REPLY)])
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertFalse(checks['private']['pass'])
+            self.assertEqual(checks['private']['examples'][-1]['came_from'], '私聊1')
+
+    def test_names_in_private_prompts_and_numbers_in_every_prompt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = self.plant(tmp, [('reply', 'private:' + fake.MANGO, '小鱼说想去旅游'),
+                                   ('model', 'group:' + fake.G_BUSY, '整理：' + fake.PEACH + ' 说了什么')])
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertTrue(any(e['place'] == '私聊1' for e in checks['names']['examples']))
+            qq = checks['qq']   # on main every reply prompt also has the asker's own number
+            self.assertEqual(qq['fails'], qq['warnings']['asker_own_number'] + 1)
+
+    def test_refuses_a_live_folder_and_says_what_it_cannot_see(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            live = Path(tmp) / 'AstrBot' / 'data' / 'replay'
+            shutil.copytree(self.out, live)
+            (live / 'audit.json').unlink(missing_ok=True)
+            with self.assertRaises(_guard.Refused):
+                audit_replay.audit(live, self.chat)
+            self.assertFalse((live / 'audit.json').exists())
+        limits = audit_replay.audit(self.out, self.chat)['limits']
+        self.assertTrue(any('short' in x for x in limits) and any('fake model' in x for x in limits))
 
     def test_old_forgets_let_in(self):
         with tempfile.TemporaryDirectory() as tmp:

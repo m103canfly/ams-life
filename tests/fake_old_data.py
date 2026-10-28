@@ -13,6 +13,7 @@ G_BUSY, G_SMALL, G_TEST = '900001', '900002', '900009'
 MANGO, LEMON, STAR, PEACH, FISH = '10001', '10002', '10003', '10004', '10005'   # STAR asked to be forgotten
 NAMES = {MANGO: '芒果', LEMON: '柠檬', STAR: '阿星', PEACH: '桃子', FISH: '小鱼'}
 PRIVATE_SECRET = '我下周要去外地看极光三天'
+HER_PRIVATE_REPLY = '好呀，你去外地看极光要多穿点衣服哦'
 
 
 def _db(path, script, rows):
@@ -146,7 +147,7 @@ CHAT = [
     (300, MANGO, G_BUSY, '小爱 你说下次会出货吗', True, '', '会的会的~'),
     (400, PEACH, G_SMALL, '今晚有流星雨 一起看吗', False, '', ''),
     (460, FISH, G_SMALL, '小爱 流星雨几点开始呀', True, '', '大概十点吧~'),
-    (600, MANGO, None, PRIVATE_SECRET, True, '', '好呀，玩得开心'),
+    (600, MANGO, None, PRIVATE_SECRET, True, '', HER_PRIVATE_REPLY),
     (700, MANGO, None, '记得别跟群里说哦', True, '', '嗯嗯，不说'),
     (5100, STAR, G_BUSY, '刚下班 好累', False, '', ''),                  # after his cutoff
     (5200, LEMON, G_BUSY, '这句后来被要求忘掉了', False, '', ''),         # forgotten message 5003 below
