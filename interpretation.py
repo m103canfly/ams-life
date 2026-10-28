@@ -425,8 +425,9 @@ def render_compact(core, memory="", events="", self_model=None, user=None,
     except Exception:
         pass
     try:
-        # ams-life: the trace of this turn's recall when the caller has it
-        _trace = memory_trace if isinstance(memory_trace, dict) else getattr(core, "_last_memory_trace", None)
+        # ams-life: only this turn's own recall; never the body's shared last trace,
+        # which may come from another window. No recall this turn, no mtrace.
+        _trace = memory_trace
         if isinstance(_trace, dict):
             _tv = float(_trace.get("valence", 0.0) or 0.0)
             if _tv >= 0.3:

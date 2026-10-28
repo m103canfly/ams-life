@@ -33,6 +33,13 @@ class DiscretionMixin:
     def _begin_job(self) -> None:
         _FORGET_MARK.set(self._forget_count())
 
+    def _continue_job(self) -> None:
+        """A later step of the same message (the reply) keeps the mark its request set
+        (AstrBot runs one message, request to reply, in one task); only when this
+        context has none does it start one."""
+        if _FORGET_MARK.get() is None:
+            self._begin_job()
+
     def _job_stale(self) -> bool:
         """True when something was forgotten since this job started: do not write."""
         mark = _FORGET_MARK.get()

@@ -228,11 +228,12 @@ class Listening(unittest.TestCase):
         # after 23 hours what others said is still there ...
         self.assertIn('刷屏第1004条', [x['text'] for x in r['phone_23h']['group:900001']['recent']])
         self.assertIn('小爱 在吗', [x['text'] for x in r['phone_23h']['private:10001']['recent']])
+        self.assertIn('assistant', [x['role'] for x in r['phone_23h']['private:10001']['recent']])
         later = r['phone_later']
         self.assertEqual([x['text'] for x in later['group:900001']['recent']], ['快一天了', '过了好久'])
-        # ... after 24 hours it is gone; her own replies stay
+        # ... after 24 hours it is gone, her own replies too
         for place in ('group:900002', 'private:10001'):
-            self.assertEqual([x['role'] for x in later[place]['recent']], ['assistant'])
+            self.assertEqual(later[place]['recent'], [])
 
     def test_forgetting_a_person_removes_his_messages_from_every_window(self):
         r = run_case('listen')
@@ -272,6 +273,84 @@ class ForgetWhileWaiting(unittest.TestCase):
 
     def test_consolidation_with_nothing_to_group(self):
         self.check('wait_consolidate')
+
+
+class ForgetWhileReplying(unittest.TestCase):
+    def test_forgotten_while_the_model_answers_him(self):
+        # the reply step keeps the mark its request set, so nothing of him is written back
+        r = run_case('wait_reply')
+        self.assertEqual(r['forgot']['relationship'], 1)
+        a = r['after']
+        self.assertFalse([m for m in a['memories']
+                          if m['sender_id'] == '10001' or '10001' in (m['origin'] or {}).get('people', [])])
+        self.assertNotIn('爬山记得带水哦', [m['text'] for m in a['memories']])
+        self.assertNotIn('10001', a['users'])
+        for win in a['phone'].values():
+            self.assertFalse([x for x in win['recent'] + win['open_loops'] if '10001' in x['origin']['people']])
+            self.assertNotIn('爬山记得带水哦', [x['text'] for x in win['recent']])
+        # someone else in the same group is untouched
+        self.assertIn('小爱 早上好', [x['text'] for x in a['phone']['group:900001']['recent']])
+
+
+class QuotedMessages(unittest.TestCase):
+    """Each message is known by its own id; the id of a message it quotes is kept apart."""
+
+    def test_source_ids_are_the_messages_own(self):
+        r = run_case('quote')
+        self.assertEqual(r['ids']['second'], ['m' + '小爱 这个我也想去'[:6]])  # message_obj.message_id
+        self.assertNotEqual(r['ids']['first'], r['ids']['second'])
+        win = r['before']['phone']['group:900001']['recent']
+        line = [x for x in win if x['text'] == '小爱 这个我也想去'][0]
+        self.assertEqual(line['origin']['source_ids'], r['ids']['second'])
+        self.assertEqual(line['reply_to'], r['ids']['first'][0])
+        mem = [m for m in r['before']['memories'] if m['text'] == '小爱 这个我也想去'][0]
+        self.assertEqual(mem['origin']['source_ids'], r['ids']['second'])
+
+    def test_forgetting_the_quoted_message_keeps_the_one_quoting_it(self):
+        r = run_case('quote')
+        a = r['after_quoted']
+        self.assertEqual([m['text'] for m in a['memories']], ['小爱 这个我也想去'])
+        texts = [x['text'] for x in a['phone']['group:900001']['recent']]
+        self.assertIn('小爱 这个我也想去', texts)
+        self.assertNotIn('周末一起去爬山吧', texts)
+
+    def test_forgetting_a_message_by_its_own_id_removes_it(self):
+        r = run_case('quote')
+        a = r['after_own']
+        self.assertEqual(a['memories'], [])
+        self.assertNotIn('小爱 这个我也想去', [x['text'] for x in a['phone']['group:900001']['recent']])
+
+
+class Sweep(unittest.TestCase):
+    """Expired lines leave the disk, even in a window nobody writes to any more."""
+
+    def test_lines_are_on_disk_until_something_prunes_them(self):
+        r = run_case('sweep')
+        for place in ('group:900001', 'group:900002', 'private:10001'):
+            self.assertEqual(len(r['disk_start'][place]), 2)
+            self.assertEqual(len(r['disk_day_later'][place]), 2)
+
+    def test_reading_a_window_writes_it_back_pruned(self):
+        r = run_case('sweep')
+        self.assertEqual(r['disk_after_read']['private:10001'], [])
+        self.assertEqual(len(r['disk_after_read']['group:900002']), 2)
+
+    def test_the_five_minute_loop_sweeps_every_window(self):
+        r = run_case('sweep')
+        self.assertTrue(r['loop_running'])
+        self.assertEqual(r['disk_after_tick'], {'group:900001': [], 'group:900002': [], 'private:10001': []})
+
+    def test_start_up_sweeps_too(self):
+        r = run_case('sweep')
+        self.assertEqual(r['disk_before_start']['group:900001'], ['有人吗'])
+        self.assertEqual(r['disk_after_start']['group:900001'], [])
+
+
+class MemoryTrace(unittest.TestCase):
+    def test_no_recall_this_turn_means_no_mtrace(self):
+        r = run_case('mtrace')
+        self.assertIn('[BC]', r['b'])
+        self.assertNotIn('mtrace=', r['b'])
 
 
 class TwoWindowsAtOnce(unittest.TestCase):

@@ -1611,37 +1611,21 @@ class EventsMixin:
             pass
         return out
 
-    def _message_refs(self, event) -> list:
-        refs = []
-        try:
-            for msg in event.get_messages() or []:
-                got = False
-                for attr in ("id", "message_id", "msg_id", "message_seq"):
-                    try:
-                        value = getattr(msg, attr, None)
-                    except Exception:
-                        value = None
-                    if value:
-                        refs.append(str(value)[:80])
-                        got = True
-                        break
-                if not got:
-                    text = str(getattr(msg, "text", "") or "")
-                    if text:
-                        refs.append(_sha256(text)[:16])
-        except Exception:
-            pass
-        return refs[:8]
-
     def _memory_provenance(self, event, ts=None) -> dict:
         try:
             _sid, _sname = self._speaker(event)
         except Exception:
             _sid, _sname = "", ""
-        return {"sender_id": _sid, "sender_name": _sname,
+        # ams-life: message_refs is this message's own id (what forgetting by message
+        # looks for); the id of a message it quotes goes in reply_to, never in the refs.
+        prov = {"sender_id": _sid, "sender_name": _sname,
                 "session": str(getattr(event, "unified_msg_origin", "") or ""),
                 "ts": float(ts if ts is not None else time.time()),
-                "message_refs": self._message_refs(event)}
+                "message_refs": self._source_ids(event)}
+        quoted = self._reply_to(event)
+        if quoted:
+            prov["reply_to"] = quoted
+        return prov
 
     def _event_provenance(self, event, entries=None, ts=None) -> dict:
         prov = self._memory_provenance(event, ts)

@@ -337,6 +337,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._migrate_memory_library()
         except Exception as exc:
             logger.warning("[ams-life] one-her migration failed: %s", exc)
+        try:
+            self._sweep_windows()  # expired phone lines leave the disk at start-up
+            self._ensure_autonomy_task()  # and every tick after (the 5-minute loop)
+        except Exception as exc:
+            logger.warning("[ams-life] phone sweep failed: %s", exc)
         self._load_profile()
         self._load_settings()
         if "kb_enabled" in self.config:
@@ -532,8 +537,16 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         try:
             self._begin_job()
             self._window_add_message(event)
+            self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
         except Exception as exc:
             logger.warning("[ams-life] window store failed: %s", exc)
+
+    async def terminate(self):
+        """AstrBot calls this when the plugin is unloaded or reloaded: stop the 5-minute loop
+        (it now runs whenever the plugin is on)."""
+        task = getattr(self, "_autonomy_task", None)
+        if task is not None and not task.done():
+            task.cancel()
 
     @filter.on_llm_request()
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
@@ -679,7 +692,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
         if not self.enabled:
             return
-        self._begin_job()
+        self._continue_job()
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
         _clean, _meta = interpretation.parse_response(_reply)

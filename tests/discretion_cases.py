@@ -16,6 +16,7 @@ import harness  # noqa: E402
 
 DATA, OUT, CASE = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 clock = harness.prepare(DATA)
+NOW = clock.now  # her old replies were written within the last day, so the phone keeps them
 
 if CASE == 'migrate':
     # BioCore's per-session layout, written before the plugin starts.
@@ -37,10 +38,10 @@ if CASE == 'migrate':
     import os
     (DATA / 'states' / 'default_GroupMessage_900001.json').write_text(
         json.dumps({'v': 0.1, 'open_loops': [{'text': '记得提醒我交报告', 'status': 'open'}],
-                    'history': [{'ts': 1.0, 'emotion': 'joy', 'v': 0.1, 'text': '爬山记得带水哦'}]},
+                    'history': [{'ts': NOW - 3600, 'emotion': 'joy', 'v': 0.1, 'text': '爬山记得带水哦'}]},
                    ensure_ascii=False), 'utf-8')
     (DATA / 'states' / 'default_FriendMessage_10001.json').write_text(
-        json.dumps({'v': 0.4, 'history': [{'ts': 0.5, 'emotion': 'joy', 'v': 0.4, 'text': '蛋糕的事我帮你保密'}],
+        json.dumps({'v': 0.4, 'history': [{'ts': NOW - 7200, 'emotion': 'joy', 'v': 0.4, 'text': '蛋糕的事我帮你保密'}],
                     'stimuli': [{'labels': ['joy'], 'text': '我在偷偷准备一个惊喜蛋糕给大家', 'n': 1, 'ts': 0.5}]},
                    ensure_ascii=False), 'utf-8')
     os.utime(DATA / 'states' / 'default_FriendMessage_10001.json', (1000, 1000))
@@ -53,9 +54,9 @@ if CASE == 'migrate_her':
     PRIVATE_ORIGIN = {'where': 'private:10001', 'people': ['10001'], 'source_ids': ['r1'], 'visibility': 'private'}
     (DATA / 'states' / 'her.json').write_text(json.dumps({
         'v': 0.2,
-        'history': [{'ts': 1.0, 'emotion': 'joy', 'v': 0.2, 'text': '蛋糕的事我帮你保密', 'origin': PRIVATE_ORIGIN},
-                    {'ts': 2.0, 'emotion': 'joy', 'v': 0.2, 'text': '爬山记得带水哦', 'origin': GROUP_ORIGIN},
-                    {'ts': 3.0, 'emotion': 'joy', 'v': 0.2, 'text': '不知道从哪来的一句话'}],
+        'history': [{'ts': NOW - 3000, 'emotion': 'joy', 'v': 0.2, 'text': '蛋糕的事我帮你保密', 'origin': PRIVATE_ORIGIN},
+                    {'ts': NOW - 2000, 'emotion': 'joy', 'v': 0.2, 'text': '爬山记得带水哦', 'origin': GROUP_ORIGIN},
+                    {'ts': NOW - 1000, 'emotion': 'joy', 'v': 0.2, 'text': '不知道从哪来的一句话'}],
         'open_loops': [{'text': '记得提醒我交报告', 'status': 'open', 'origin': GROUP_ORIGIN},
                        {'text': '记得提醒我买蛋糕', 'status': 'open'}],
         'event_anchors': [{'key': 'k', 'title': '惊喜蛋糕'}],
@@ -101,9 +102,10 @@ def hear(plugin, loop, delay, text, sender, name, group=None, parts=None):
     return event
 
 
-def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯'):
+def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯', parts=None):
     clock.advance(delay)
-    event = harness.FakeEvent(text, sender=sender, name=name, group=group)
+    event = (Heard(text, sender=sender, name=name, group=group, parts=parts) if parts is not None
+             else harness.FakeEvent(text, sender=sender, name=name, group=group))
     req = ProviderRequest(prompt=text, system_prompt='你是小爱。')
     loop.run_until_complete(plugin.on_message(event))  # AstrBot calls it for every message first
     loop.run_until_complete(plugin.on_llm_request(event, req))
@@ -111,7 +113,7 @@ def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯'):
     loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(reply)))
     harness.drain(loop)
     prompt = '\n'.join(p.get('text') if isinstance(p, dict) else str(p) for p in req.extra_user_content_parts)
-    return {'session': event.unified_msg_origin, 'prompt': prompt, 'refs': plugin._message_refs(event)}
+    return {'session': event.unified_msg_origin, 'prompt': prompt, 'refs': plugin._source_ids(event)}
 
 
 def run():
@@ -240,6 +242,75 @@ def run():
         out['phone_23h'] = snapshot(plugin)['phone']
         hear(plugin, loop, 3600 + 60, '过了好久', '10002', '柠檬', A)
         out['phone_later'] = snapshot(plugin)['phone']
+    elif CASE == 'wait_reply':
+        # he says "forget me" while she is still waiting for the model's answer to him
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        event = harness.FakeEvent('小爱 我周末要去爬山', sender='10001', name='芒果', group=A)
+        req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
+
+        async def one_message():  # AstrBot runs one message, request to reply, in one task
+            await plugin.on_message(event)
+            await plugin.on_llm_request(event, req)
+            out['forgot'] = plugin._forget(person='10001')
+            await plugin.on_llm_response(event, LLMResponse('爬山记得带水哦'))
+        loop.run_until_complete(one_message())
+        harness.drain(loop)
+        out['after'] = snapshot(plugin)
+    elif CASE == 'quote':
+        # 芒果 quotes 柠檬's message; forgetting by message id finds each by its own id only
+        first = t(0, '周末一起去爬山吧', '10002', '柠檬', A)
+        from astrbot.api.message_components import Plain, Reply
+        quoted_id = first['refs'][0]
+        second = t(30, '小爱 这个我也想去', '10001', '芒果', A,
+                   parts=[Reply(id=quoted_id), Plain('小爱 这个我也想去')])
+        out['ids'] = {'first': first['refs'], 'second': second['refs']}
+        out['before'] = snapshot(plugin)
+        out['forgot_quoted'] = plugin._forget(source_ids=[quoted_id])
+        out['after_quoted'] = snapshot(plugin)
+        out['forgot_own'] = plugin._forget(source_ids=second['refs'])
+        out['after_own'] = snapshot(plugin)
+    elif CASE == 'sweep':
+        # windows nobody writes to any more: their lines still leave the disk after 24 hours
+        t(0, '小爱 早上好', '10002', '柠檬', A, reply='早呀')
+        t(10, '小爱 晚上好', '10004', '桃子', B, reply='晚上好')
+        t(10, '小爱 在吗', '10001', '芒果', reply='在的')
+        out['disk_start'] = disk_phone()
+        clock.advance(24 * 3600 + 60)
+        out['disk_day_later'] = disk_phone()
+        plugin._read_window('private:10001')  # reading a window writes it back pruned
+        out['disk_after_read'] = disk_phone()
+        import mixin_autonomy
+        task = plugin._autonomy_task
+        out['loop_running'] = bool(task is not None and not task.done())
+        task.cancel()
+        mixin_autonomy.AUTONOMY_TICK_SECONDS = 0.01
+
+        async def ticks():  # the plugin's own 5-minute loop, run fast
+            plugin._ensure_autonomy_task()
+            await asyncio.sleep(0.2)
+        loop.run_until_complete(ticks())
+        out['disk_after_tick'] = disk_phone()
+        plugin._autonomy_task.cancel()
+        mixin_autonomy.AUTONOMY_TICK_SECONDS = 300
+        hear(plugin, loop, 0, '有人吗', '10002', '柠檬', A)
+        plugin._autonomy_task.cancel()
+        clock.advance(24 * 3600 + 60)
+        out['disk_before_start'] = disk_phone()
+        main.BioCorePlugin(harness.FakeContext(), config=config)  # start-up sweeps too
+        out['disk_after_start'] = disk_phone()
+    elif CASE == 'mtrace':
+        # a heavy recall in group A must not colour group B's turn, whose recall returns early
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        heavy = {'count': 3, 'valence': -0.8, 'stress_delta': 0.03, 'entry_ids': [], 'ts': clock.now}
+        plugin._core(None)._last_memory_trace = dict(heavy)  # as if A had just recalled it
+        plugin._last_memory_trace = dict(heavy)
+        real_embed = plugin._embed_text
+
+        async def no_vector(*a, **k):  # the vector service does not answer: recall returns early
+            return []
+        plugin._embed_text = no_vector
+        out['b'] = t(30, '小爱 晚上好', '10004', '桃子', B)['prompt']
+        plugin._embed_text = real_embed
     elif CASE in ('wait_event', 'wait_embed', 'wait_archive', 'wait_consolidate'):
         # he says "forget me" while a request of his is still waiting somewhere;
         # nothing that request (or the work it started) holds may be written back
@@ -407,6 +478,15 @@ def run():
     for task in asyncio.all_tasks(loop):
         task.cancel()
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str), 'utf-8')
+
+
+def disk_phone():
+    """What the window files on disk hold, read raw (not through the plugin's pruning)."""
+    out = {}
+    for path in sorted((DATA / 'phone').glob('*.json')):
+        win = json.loads(path.read_text('utf-8'))
+        out[win.get('place')] = [x.get('text') for x in win.get('recent') or []]
+    return out
 
 
 def snapshot(plugin):

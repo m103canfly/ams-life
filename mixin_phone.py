@@ -7,8 +7,10 @@ Three layers, after "she has a phone of her own":
 - phone: every group and every private chat is one window. Everything said
   there (everyone's messages, woken or not, her replies) and the open loops
   are kept only in that window, one file per window under PHONE_DIR. Wherever
-  she is, she only sees that window. What others said is kept for
-  WINDOW_OTHERS_SECONDS only; each window holds at most WINDOW_MAX lines.
+  she is, she only sees that window. Every line (anyone's, hers too) is kept
+  for WINDOW_SECONDS only; each window holds at most WINDOW_MAX lines. Older
+  lines leave the file too: when a window is read or written, and in a sweep
+  over every window (at start-up and every few minutes).
 - body: moods and drives only; it keeps no text at all (see body.py).
 - memory: what she keeps, each item with an origin (mixin_memory, discretion).
 
@@ -23,8 +25,7 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 WINDOW_MAX = 1000                   # lines per window, everyone's (AstrBot's group context keeps 1000 too)
-WINDOW_OWN_MAX = 80                 # her own replies per window (as core.history kept before)
-WINDOW_OTHERS_SECONDS = 24 * 3600   # what others said stays 24 hours
+WINDOW_SECONDS = 24 * 3600          # every line stays 24 hours, hers too; older things live in memory
 WINDOW_LINE_CHARS = 80              # her reply lines
 WINDOW_MESSAGE_CHARS = 300          # others' messages
 # What non-text parts of a message become in the window (no files are kept).
@@ -59,11 +60,18 @@ class PhoneMixin:
             win = {}
         if not isinstance(win, dict) or str(win.get("place") or "") != str(place):
             win = {}  # not this window's file: start empty rather than read another chat
+        mine = bool(win)
         win["place"] = str(place)
         for key in ("recent", "open_loops"):
             if not isinstance(win.get(key), list):
                 win[key] = []
+        before = len(win["recent"])
         win["recent"] = self._window_pruned(win["recent"])
+        if mine and len(win["recent"]) != before:
+            try:
+                self._write_window(place, win)  # expired lines leave the disk too
+            except Exception as exc:
+                logger.warning("[ams-life] window prune write failed: %s", exc)
         return win
 
     def _write_window(self, place, win) -> None:
@@ -77,20 +85,21 @@ class PhoneMixin:
 
     @staticmethod
     def _window_pruned(lines, now=None) -> list:
-        """Others' messages older than WINDOW_OTHERS_SECONDS go; her replies keep the last
-        WINDOW_OWN_MAX; the window keeps the last WINDOW_MAX lines."""
+        """Lines older than WINDOW_SECONDS go, whoever said them; the window keeps the
+        last WINDOW_MAX lines."""
         now = time.time() if now is None else now
-        lines = [x for x in (lines or []) if isinstance(x, dict)]
-        own = [x for x in lines if x.get("role") == "assistant"][-WINDOW_OWN_MAX:]
-        own_ids = {id(x) for x in own}
-        kept = []
-        for x in lines:
-            if x.get("role") == "assistant":
-                if id(x) in own_ids:
-                    kept.append(x)
-            elif now - float(x.get("ts", 0) or 0) <= WINDOW_OTHERS_SECONDS:
-                kept.append(x)
+        kept = [x for x in (lines or []) if isinstance(x, dict)
+                and now - float(x.get("ts", 0) or 0) <= WINDOW_SECONDS]
         return kept[-WINDOW_MAX:]
+
+    def _sweep_windows(self) -> None:
+        """Go over every window and drop what has expired, so a window nobody writes to
+        any more does not keep old lines on disk (reading a window writes it back pruned)."""
+        for place in self._window_places():
+            try:
+                self._read_window(place)
+            except Exception as exc:
+                logger.warning("[ams-life] window sweep failed: %s", exc)
 
     def _window_places(self) -> list:
         out = []
@@ -109,11 +118,7 @@ class PhoneMixin:
             sid, _name = self._speaker(event)
         except Exception:
             sid = ""
-        try:
-            refs = self._message_refs(event)
-        except Exception:
-            refs = []
-        return discretion.make_origin(self._here(event), [sid], refs)
+        return discretion.make_origin(self._here(event), [sid], self._source_ids(event))
 
     @staticmethod
     def _message_id(event) -> str:
@@ -121,6 +126,26 @@ class PhoneMixin:
             return str(getattr(getattr(event, "message_obj", None), "message_id", "") or "")
         except Exception:
             return ""
+
+    def _source_ids(self, event) -> list:
+        """What forgetting by message finds this message by: its own message id, or a
+        hash of its text when the platform gives none. Never the id of a message it quotes."""
+        own = self._message_id(event)
+        if own:
+            return [own[:80]]
+        text = str(getattr(event, "message_str", "") or "").strip() or self._message_text(event)
+        return [_sha256(text)[:16]] if text else []
+
+    @staticmethod
+    def _reply_to(event) -> str:
+        """The id of the message this one quotes, if any. Kept apart: forgetting never reads it."""
+        try:
+            for comp in event.get_messages() or []:
+                if type(comp).__name__ == "Reply":
+                    return str(getattr(comp, "id", "") or "")[:80]
+        except Exception:
+            pass
+        return ""
 
     @staticmethod
     def _message_text(event) -> str:
@@ -168,10 +193,14 @@ class PhoneMixin:
         text = self._message_text(event)
         if not text:
             return
+        line = {"ts": time.time(), "role": "user", "sender_id": str(sid or ""),
+                "sender_name": str(name or ""), "msg_id": self._message_id(event),
+                "text": text[:WINDOW_MESSAGE_CHARS], "origin": self._event_origin(event)}
+        quoted = self._reply_to(event)
+        if quoted:
+            line["reply_to"] = quoted
         win = self._read_window(here)
-        win["recent"].append({"ts": time.time(), "role": "user", "sender_id": str(sid or ""),
-                              "sender_name": str(name or ""), "msg_id": self._message_id(event),
-                              "text": text[:WINDOW_MESSAGE_CHARS], "origin": self._event_origin(event)})
+        win["recent"].append(line)
         self._write_window(here, win)
 
     def _window_add_reply(self, event, text) -> None:

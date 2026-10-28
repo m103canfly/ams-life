@@ -1348,7 +1348,7 @@ class MemoryMixin:
                           "image_caption": str(extra or "").strip()[:1600],
                           "voice_text": str(voice or "").strip()[:1200],
                           "provenance": self._memory_provenance(event, now),
-                          "origin": discretion.make_origin(_here, [_sid], self._message_refs(event)),
+                          "origin": discretion.make_origin(_here, [_sid], self._source_ids(event)),
                           "importance": _importance,
                           "memory_source": _source,
                           "memory_confidence": memory_meta.initial_confidence(_source, _importance),
