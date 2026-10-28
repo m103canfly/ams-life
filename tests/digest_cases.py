@@ -212,9 +212,15 @@ if CASE == 'gone_names':
     turn('大家好', '10003', '阿星', group=G1, msg_id='g0')
     turn('周末打副本 阿星来不来', '10002', '柠檬', group=G1, msg_id='g1')
     turn('好呀', '10001', '芒果', group=G1, msg_id='g2')
-    loop.run_until_complete(plugin.page_forget_person('10003'))   # the owner, from the panel
+    result['phone_before_delete'] = phone('group:' + G1)
+    result['deleted'] = loop.run_until_complete(plugin.page_forget_person('10003'))   # the owner, from the panel
+    result['phone_at_once'] = phone('group:' + G1)
     turn('阿星今天在吗', '10002', '柠檬', group=G1, msg_id='g3')
     result['phone_before_restart'] = phone('group:' + G1)
+    # a line that still has his name (a window file put back as it was): the material has a code
+    win = plugin._read_window('group:' + G1)
+    win['recent'].insert(0, dict(win['recent'][0], text='阿星说他周末有空', msg_id='g1b'))
+    plugin._write_window('group:' + G1, win)
     # the night, before a restart: his name, said by others before he was deleted, is a code
     result['material_names'] = plugin._material_names('group:' + G1, plugin._read_window('group:' + G1)['recent'])
     digest_on()
@@ -229,6 +235,19 @@ if CASE == 'gone_names':
     turn('阿星呢', '10001', '芒果', group=G1, msg_id='g4')
     result['phone_after_restart'] = phone('group:' + G1)
     result['registry_has_name'] = '阿星'.encode('utf-8') in (DATA / forget_registry.FILE_NAME).read_bytes()
+
+if CASE == 'everyday':
+    # someone whose card is an everyday word
+    turn('我也来', '10006', '周末', group=G1, msg_id='e0')
+    turn('周末一起打副本', '10002', '柠檬', group=G1, msg_id='e1')
+    turn('@周末 来不来', '10002', '柠檬', group=G1, msg_id='e2')
+    turn('周末说他不来', '10001', '芒果', group=G1, msg_id='e3')
+    loop.run_until_complete(plugin.page_forget_person('10006'))
+    result['at_once'] = phone('group:' + G1)
+    plugin = new_plugin()
+    turn('周末去哪玩', '10001', '芒果', group=G1, msg_id='e4')
+    turn('周末：我也不来了', '10002', '柠檬', group=G1, msg_id='e5')
+    result['after_restart'] = phone('group:' + G1)[-2:]
 
 if CASE == 'marks':
     chat()

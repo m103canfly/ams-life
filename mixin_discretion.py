@@ -888,7 +888,28 @@ class DiscretionMixin:
         reg = self._registry()
         reg.owner_delete(person=person)
         reg.remember_names(person, names)
-        return self._forget(person=person)
+        counts = self._forget(person=person)
+        counts["phone_named"] = self._scrub_windows()   # what others said of him: 某人, now
+        return counts
+
+    def _scrub_windows(self) -> int:
+        """Every window's lines and open loops scrubbed again (_scrub: someone deleted is 某人),
+        written back atomically; returns how many changed."""
+        scrub, changed = self._scrubber(), 0
+        for place in self._window_places():
+            win = self._read_window(place)
+            n = 0
+            for key in ("recent", "open_loops"):
+                for x in win[key]:
+                    if isinstance(x, dict) and isinstance(x.get("text"), str):
+                        new = scrub(x["text"])
+                        if new != x["text"]:
+                            x["text"] = new
+                            n += 1
+            if n:
+                self._write_window(place, win)
+                changed += n
+        return changed
 
     def _owner_forget_memory(self, entry_id) -> dict:
         """Delete one memory: it, and everything else that came from the messages it came

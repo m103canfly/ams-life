@@ -54,6 +54,29 @@ class Import(unittest.TestCase):
         self.assertNotIn('replay_1', manifest['registry']['imported'])           # not counted unless asked
         self.assertEqual(set(manifest['inputs']), {'notebook_forget', 'ledger_registry', 'cognition'})
 
+    def test_names_of_the_forgotten_as_hashes(self):
+        import forget_registry
+        with tempfile.TemporaryDirectory() as tmp:
+            old = Path(tmp) / 'old'
+            fake.build_old(old)
+            # the old chat log: he also wrote under another nickname there
+            info = json.dumps({'user_id': int(fake.STAR), 'nickname': '小星星', 'card': ''}, ensure_ascii=False)
+            chat = Path(tmp) / 'chat.db'
+            fake._db(chat, fake.LOG_SCHEMA, [('messages', [(1, '1', fake.BOT, fake.STAR, fake.G_BUSY, 'group', 'normal',
+                                                           'message', '在吗', '在吗', info, int(fake.T0), 'RECV',
+                                                           'conn', 1, '2026-10-04 00:00:00')])])
+            summary = import_old.build(old, Path(tmp) / 'bundle', chat=chat)
+            # his card and what he was called (the alias table), and the nickname in the chat log
+            self.assertEqual(summary['registry']['names'], {'people': 1, 'name_hashes': 3})
+            with forget_registry.ForgetRegistry(Path(tmp) / 'bundle' / forget_registry.FILE_NAME) as reg:
+                for said, name in (('阿星来了', '阿星'), ('星星说的', '星星'), ('小星星在吗', '小星星')):
+                    self.assertEqual(reg.names_in(said).get(name), fake.STAR)
+            for path in (Path(tmp) / 'bundle').iterdir():   # only hashes: no name anywhere in the bundle
+                raw = path.read_bytes()
+                for name in ('阿星', '星星', '小星星'):
+                    self.assertNotIn(name.encode('utf-8'), raw, path.name)
+            self.assertIn('chat', json.loads((Path(tmp) / 'bundle' / 'manifest.json').read_text('utf-8'))['inputs'])
+
     def test_replay_registries_when_asked(self):
         with tempfile.TemporaryDirectory() as tmp:
             old = Path(tmp) / 'old'

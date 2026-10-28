@@ -132,6 +132,13 @@ class Names(unittest.TestCase):
             for name in ('阿星', 'Tom'):
                 self.assertNotIn(name.encode('utf-8'), raw)
 
+    def test_an_everyday_word_only_where_it_means_him(self):
+        with fr.ForgetRegistry(None) as reg:
+            reg.remember_names('10006', ['周末'])
+            self.assertEqual(reg.names_in('周末一起打副本'), {})
+            self.assertEqual(reg.names_in('周末说他不来'), {'周末': '10006'})
+            self.assertEqual(reg.names_in('@周末 来不来'), {'周末': '10006'})
+
     def test_each_registry_its_own_salt(self):
         with fr.ForgetRegistry(None) as one, fr.ForgetRegistry(None) as two:
             one.remember_names('10003', ['阿星'])

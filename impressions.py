@@ -217,11 +217,12 @@ def masker(code_of, names):
     """text -> text as the model may see it: every QQ number in `code_of` ({qq: code}) and
     every name in `names` ({qq: names}, each qq in code_of) its code, long numbers '#',
     pictures and the like '[图]', any other @ '@某人'."""
-    swaps = sorted(((n, code_of[q]) for q, ns in names.items() for n in ns if len(n) >= 2),
-                   key=lambda x: -len(x[0]))
-    # a one-character name only where it plainly names someone (as discretion.anonymize does)
+    swaps = sorted(((n, code_of[q]) for q, ns in names.items() for n in ns
+                    if len(n) >= 2 and not discretion.plain_word(n)), key=lambda x: -len(x[0]))
+    # a one-character name, or one that is an everyday word, only where it plainly names
+    # someone (as discretion.anonymize does)
     singles = [(discretion._one_char_name(n), code_of[q]) for q, ns in sorted(names.items()) for n in sorted(ns)
-               if len(n) == 1 and not n.isdigit()]
+               if n and not n.isdigit() and discretion.plain_word(n)]
     qqs = sorted(code_of.items(), key=lambda x: -len(x[0]))
 
     def mask(text):

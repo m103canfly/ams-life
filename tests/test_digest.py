@@ -261,6 +261,10 @@ class Nightly(unittest.TestCase):
 
     def test_a_deleted_persons_name(self):
         r = run_case('gone_names')
+        # what others said of him before: 某人 as soon as the owner deletes him
+        self.assertEqual(r['phone_before_delete'][1], '周末打副本 阿星来不来')
+        self.assertEqual(r['phone_at_once'][0], '周末打副本 某人来不来')
+        self.assertEqual(r['deleted']['data']['counts']['phone_named'], 1)
         # what is kept of what others say of him: 某人, after a restart too
         self.assertEqual(r['phone_before_restart'][-1], '某人今天在吗')
         self.assertEqual(r['phone_after_restart'][-1], '某人呢')
@@ -268,11 +272,18 @@ class Nightly(unittest.TestCase):
         # in the nightly material (impressions and the note of the day) a code
         self.assertEqual(r['material_names'].get('10003'), ['阿星'])
         self.assertNotIn('阿星', r['prompt'])
-        self.assertIn('1 P1：周末打副本 Q1来不来', r['prompt'])
+        self.assertIn('1 P1：Q1说他周末有空', r['prompt'])
+        self.assertIn('2 P1：周末打副本 某人来不来', r['prompt'])
         # what names him is not kept; the rest is
         self.assertEqual(r['night'], {'group:900001': {'called': 1, 'written': 1}})
         self.assertEqual(r['events'], ['芒果说好呀'])
         self.assertFalse(r['registry_has_name'])                   # only hashes of his names
+
+    def test_a_name_that_is_an_everyday_word(self):
+        r = run_case('everyday')
+        # only where it plainly means him: after an @, or as the one who says something
+        self.assertEqual(r['at_once'], ['周末一起打副本', '@某人 来不来', '某人说他不来'])  # his own line: gone
+        self.assertEqual(r['after_restart'], ['周末去哪玩', '某人：我也不来了'])
 
     def test_tonights_marks_with_the_registry_unreadable(self):
         r = run_case('marks')

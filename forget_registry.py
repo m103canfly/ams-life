@@ -311,7 +311,8 @@ class ForgetRegistry:
 
     def names_in(self, text) -> dict:
         """{name: qq} for every stretch of `text` that is a stored name (a name of letters and
-        digits only where it stands as a word of its own)."""
+        digits only where it stands as a word of its own; one that is an everyday word only
+        where it plainly means someone, see discretion.plain_word)."""
         text = str(text or "")
         salt, table = self._name_table()
         out = {}
@@ -324,6 +325,8 @@ class ForgetRegistry:
                 if part.isascii() and ((i and _ASCII_WORD.match(text[i - 1]))
                                        or (i + size < len(text) and _ASCII_WORD.match(text[i + size]))):
                     continue
+                if discretion.plain_word(part) and not discretion._one_char_name(part).search(text):
+                    continue   # an everyday word: only where it plainly means someone
                 out[part] = qq
         return out
 
