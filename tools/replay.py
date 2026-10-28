@@ -30,10 +30,16 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
   default persona (data_v4.db, read only) as hers. Its key is read into memory when the replay
   starts and only goes into the request header; it is never printed, logged or written, and
   is not taken on the command line. The provider's address is the one other address the
-  replay may reach (no proxy). --model-limit is a hard limit on calls (failed ones count, none
-  is retried); once reached, or once a kind's --model-cap is, the plugin gets an empty answer
-  and nothing is sent. Every call's kind, tokens and answer go to answers.jsonl; replay.json
-  has the totals and the connections made, by address.
+  replay may reach (no proxy, no redirect: a 3xx is a failed call). --model-limit is a hard
+  limit on calls of every run of this pass together (failed ones count, none is retried): the
+  calls are counted in a ledger next to --out (<out>/../model-calls.json, or --model-ledger),
+  counted before each call is sent, and a run starts only with what is left. Once that is reached, or
+  a kind's --model-cap, the plugin gets an empty answer and nothing is sent. After three
+  failures in a row the replay stops there and says so (exit code 3). Every call's kind,
+  tokens and answer go to answers.jsonl; replay.json has the totals and the connections
+  made, by address.
+- The plugin's own 5-minute loop is not started: the replay's sweeps do its work, at the
+  log's times.
 - Each message is handed over as AstrBot makes it from a QQ message (astrbot_message): its
   parts (text, @, quote, picture...), and message_str with the first @ of her left out and
   every other @ written " @昵称(号码) ".
@@ -49,7 +55,7 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
 - Canaries (on by default): made-up messages with made-up secrets, put into a made-up private chat
   and into the smallest group, with made-up people asking about them in the busiest group. The
   audit checks each secret only shows up where it may.
-- Nothing is written outside --out: the plugin's data folder is <out>/data, the forget registry
+- Nothing is written outside --out (but the model ledger of run 2): the plugin's data folder is <out>/data, the forget registry
   is copied to <out>/forget_registry.sqlite3 (what the audit reads) and into the data folder (what
   the plugin itself checks before it writes anything, as when it is installed).
 
@@ -237,6 +243,30 @@ def local_embedder(url, model, counts):
     return call
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None   # urllib then raises the 3xx as an HTTPError
+
+
+class Ledger:
+    """Model calls of every run of one pass, in a JSON file next to the runs' folders:
+    {"runs": {run: calls}, "total"}. Written before each call is sent, so a run that breaks
+    off counts too."""
+
+    def __init__(self, path, run):
+        self.path, self.run = Path(path), str(run)
+        data = json.loads(self.path.read_text("utf-8")) if self.path.exists() else {}
+        self.runs = {str(k): int(v) for k, v in (data.get("runs") or {}).items()}
+        self.before = sum(n for k, n in self.runs.items() if k != self.run)
+
+    def record(self, calls) -> None:
+        self.runs[self.run] = int(calls)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"runs": self.runs, "total": sum(self.runs.values())}, ensure_ascii=False,
+                                  indent=1), encoding="utf-8")
+        tmp.replace(self.path)
+
+
 def astrbot_model(data_dir, provider_id):
     """The chat provider `provider_id` of the AstrBot whose data folder is `data_dir` (read
     only): (address, model name, post). post(messages) sends one OpenAI-style chat request and
@@ -255,7 +285,8 @@ def astrbot_model(data_dir, provider_id):
     if not (base.startswith("https://") and model and key):
         raise SystemExit("provider %r: no https address, model or key in AstrBot's config" % provider_id)
     url = base + "/chat/completions"
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # straight there, no proxy
+    # straight there: no proxy, and no redirect (urllib would take the key along; a 3xx fails)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
     def post(messages):
         body = json.dumps({"model": model, "messages": messages, "stream": False}).encode("utf-8")
@@ -298,10 +329,11 @@ class ModelGate:
 
     STOP_AFTER = 3
 
-    def __init__(self, post, limit, caps, stats, answers, clock, current):
+    def __init__(self, post, limit, caps, stats, answers, clock, current, ledger=None):
         self.post, self.limit, self.caps, self.stats = post, int(limit), dict(caps), stats
-        self.answers, self.clock, self.current = answers, clock, current
+        self.answers, self.clock, self.current, self.ledger = answers, clock, current, ledger
         self.calls = self.failed_in_a_row = 0
+        self.stopped = False   # STOP_AFTER failures in a row: the replay stops
 
     def chat(self, kind, prompt, system_prompt=None) -> str:
         s = self.stats
@@ -317,6 +349,8 @@ class ModelGate:
         self.calls += 1
         s["model_calls"] += 1
         s["model_calls_" + kind] += 1
+        if self.ledger is not None:
+            self.ledger.record(self.calls)   # before it is sent
         messages = ([{"role": "system", "content": str(system_prompt)}] if system_prompt else []) + [
             {"role": "user", "content": str(prompt)}]
         rec = {"call": self.calls, "kind": kind, "ts": self.clock.now, "place": self.current["place"]}
@@ -337,6 +371,7 @@ class ModelGate:
             s["model_failed"] += 1
             s["model_failed_" + rec["failure"]] += 1
             self.failed_in_a_row += 1
+            self.stopped = self.failed_in_a_row >= self.STOP_AFTER
         s["model_ms"] += int((time.perf_counter() - start) * 1000)
         self.answers.write(json.dumps(rec, ensure_ascii=False) + "\n")
         self.answers.flush()
@@ -466,7 +501,10 @@ def main(argv=None):
     ap.add_argument("--notebook", action="store_true", help="let her write her notebook each night")
     ap.add_argument("--astrbot", help="run 2: the data folder of the AstrBot whose chat provider answers (read only)")
     ap.add_argument("--model", help="run 2: that provider's id, e.g. deepseek/deepseek-flash")
-    ap.add_argument("--model-limit", type=int, default=0, help="run 2: at most this many model calls in all")
+    ap.add_argument("--model-limit", type=int, default=0,
+                    help="run 2: at most this many model calls in all, every run of this pass together")
+    ap.add_argument("--model-ledger", help="run 2: where the calls of every run are counted "
+                                           "(default: model-calls.json next to --out)")
     ap.add_argument("--model-cap", action="append", default=[], metavar="KIND=N",
                     help="run 2: at most N calls of one kind (event_summary, memory_summary, group_impressions, "
                          "notebook...)")
@@ -496,6 +534,11 @@ def main(argv=None):
         u = urllib.parse.urlsplit(model_base)
         allowed.add((u.hostname, u.port or 443))
         persona = astrbot_persona(args.astrbot) or PERSONA
+        ledger = Ledger(args.model_ledger or Path(args.out).resolve().parent / "model-calls.json",
+                        "%s %s" % (Path(args.out).name, time.strftime("%Y-%m-%d %H:%M:%S")))
+        if ledger.before >= args.model_limit:
+            raise SystemExit("the model limit (%d) is used up by the runs before (%d calls): not run"
+                             % (args.model_limit, ledger.before))
     started = time.perf_counter()
     loop = asyncio.new_event_loop()   # before the guard: on Windows it connects to itself
     asyncio.set_event_loop(loop)
@@ -585,7 +628,7 @@ def main(argv=None):
     gate = None
     if post:
         answers = open(out / "answers.jsonl", "w", encoding="utf-8")
-        gate = ModelGate(post, args.model_limit, caps, stats, answers, clock, current)
+        gate = ModelGate(post, args.model_limit - ledger.before, caps, stats, answers, clock, current, ledger)
 
     class ModelProvider(harness.FakeProvider):
         """Run 2: the real model, through the gate, for one kind of call."""
@@ -610,6 +653,10 @@ def main(argv=None):
     plugin = plugin_main.BioCorePlugin(ctx, config={})
     plugin._ipv4_json = (local_embedder(args.embed_url, args.embed_model, stats) if args.embed_url
                          else harness.fake_ipv4_json)
+    # her own 5-minute loop runs on the real clock and would do the nightly jobs at no place
+    # the replay can tell; five_minutes() does its work at the log's times instead
+    plugin._ensure_autonomy_task = lambda: None
+
     async def provider_for(kind, event=None):  # each call knows its kind, for the counts
         return ModelProvider(str(kind)) if gate else RecordingProvider(str(kind))
     plugin._provider_for = provider_for
@@ -669,17 +716,29 @@ def main(argv=None):
         if args.notebook:
             current.update(place="nightly", ts=clock.now)
             plugin._begin_job()
-            if loop.run_until_complete(plugin._maybe_write_notebook(now=clock.now)):
-                stats["notebook_nights_written"] += 1
-            harness.drain(loop)
+            try:
+                if loop.run_until_complete(plugin._maybe_write_notebook(now=clock.now)):
+                    stats["notebook_nights_written"] += 1
+                harness.drain(loop)
+            finally:
+                current["place"] = "nightly"   # a private chat's sitting set it to that chat
+        places_after.add(current["place"])
 
+    places_after = set()
+    stopped = lambda: bool(gate and gate.stopped)  # noqa: E731
     for row in timeline:
+        if stopped():
+            break
         clock.now = max(clock.now, row["ts"])
         while clock.now >= next_sweep:
             saved, clock.now = clock.now, next_sweep
             five_minutes()
             clock.now = saved
             next_sweep += SWEEP_EVERY
+            if stopped():
+                break
+        if stopped():
+            break
         if row["sent"]:
             stats["her_messages_used_as_replies" if row.get("used_as_reply") else "her_unprompted_skipped"] += 1
             continue
@@ -714,7 +773,10 @@ def main(argv=None):
             loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(row["reply"])))
             harness.drain(loop)
             stats["replies"] += 1
-    five_minutes()
+    if not stopped():
+        five_minutes()
+    own = getattr(plugin, "_autonomy_task", None)
+    own_loop = bool(own is not None and not own.done())
     for task in asyncio.all_tasks(loop):
         task.cancel()
     prompts.close()
@@ -736,11 +798,20 @@ def main(argv=None):
                "aliases": bool(args.aliases), "digest": args.digest, "notebook": args.notebook,
                "model": ("%s (%s)" % (model_name, model_base)) if post else "fake",
                "model_limit": args.model_limit if post else 0, "model_caps": caps,
+               "model_calls_before": ledger.before if post else 0,
+               "stopped": "%d model failures in a row" % ModelGate.STOP_AFTER if stopped() else "",
+               "own_loop": own_loop, "places_after_nightly_jobs": sorted(places_after),
                "seconds": round(time.perf_counter() - started, 1),
                "connections": dict(connections), "refused_hosts": sorted(set(refused)),
                "log_rows": len(rows), "canaries": len(canaries), "labels": place_labels, "stats": dict(stats)}
     (out / "replay.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"log_rows": len(rows), "canaries": len(canaries), "stats": dict(stats)}, ensure_ascii=False))
+    if stopped():
+        loud = ("!!! 模型连续失败 %d 次，回放在这里停下了，没有跑完。查一下 Key 和网络，别直接重跑。"
+                "（%d model failures in a row: the replay stopped here, unfinished.)" % ((ModelGate.STOP_AFTER,) * 2))
+        print(loud)
+        print(loud, file=sys.stderr)
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":

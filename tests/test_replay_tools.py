@@ -181,7 +181,11 @@ class Replay(unittest.TestCase):
                 audit_replay.audit(live, self.chat)
             self.assertFalse((live / 'audit.json').exists())
         limits = audit_replay.audit(self.out, self.chat)['limits']
-        self.assertTrue(any('short' in x for x in limits) and any('fake model' in x for x in limits))
+        self.assertTrue(any('short' in x for x in limits) and any('a real one' in x for x in limits))
+
+    def test_her_own_loop_is_not_started(self):
+        summary = json.loads((self.out / 'replay.json').read_text('utf-8'))
+        self.assertEqual((summary['own_loop'], summary['stopped']), (False, ''))
 
     def test_old_forgets_let_in(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -287,6 +291,10 @@ class ReplayOptions(unittest.TestCase):
             raw = ('[CQ:at,qq=%s] ' % fake.BOT if i == 12 else '') + text
             rows.append((i + 1, str(9100 + i), fake.BOT, who, fake.G_SMALL, 'group', 'normal', 'message', raw, text,
                          info, int(night + i * 200), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))
+        # and 芒果 in a private chat just before
+        info = json.dumps({'user_id': int(fake.MANGO), 'nickname': fake.NAMES[fake.MANGO]}, ensure_ascii=False)
+        rows.append((14, '9113', fake.BOT, fake.MANGO, None, 'private', 'friend', 'message', '小爱 今天的副本你打了吗',
+                     '小爱 今天的副本你打了吗', info, int(night - 120), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))
         cls.chat = tmp / 'night.db'
         fake._db(cls.chat, fake.LOG_SCHEMA, [('messages', rows)])
         cls.stub = EmbedStub()
@@ -330,8 +338,12 @@ class ReplayOptions(unittest.TestCase):
             finally:
                 stub.close()
             stats = json.loads((out / 'replay.json').read_text('utf-8'))['stats']
-            self.assertEqual((stats['digest_calls'], stats['digest_events']), (1, 1))
-            self.assertEqual(stats['model_calls_fake_daily_digest'], 1)
+            self.assertEqual((stats['digest_calls'], stats['digest_events']), (2, 2))
+            self.assertEqual(stats['model_calls_fake_daily_digest'], 2)
+            summary = json.loads((out / 'replay.json').read_text('utf-8'))
+            # after the private chat's notebook sitting, the place is back to "nightly"
+            self.assertEqual(summary['places_after_nightly_jobs'], ['nightly'])
+            self.assertFalse(summary['own_loop'])
             calls = [json.loads(x).get('call') for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
                      if json.loads(x)['kind'] == 'model']
             nightly = [c for c in calls if c in ('daily_digest', 'group_impressions', 'notebook')]
@@ -339,12 +351,39 @@ class ReplayOptions(unittest.TestCase):
             # the note of a window is recorded as that window's (what the audit checks it against)
             places = {json.loads(x)['place'] for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
                       if json.loads(x).get('call') == 'daily_digest'}
-            self.assertEqual(places, {'group:' + fake.G_SMALL})
+            self.assertEqual(places, {'group:' + fake.G_SMALL, 'private:' + fake.MANGO})
             evs = [json.loads(x) for x in (out / 'data' / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()]
             self.assertEqual([(e['kind'], e['origin']['where'], e['origin']['visibility']) for e in evs],
-                             [('daily_digest', 'group:' + fake.G_SMALL, 'public')])
+                             [('daily_digest', 'group:' + fake.G_SMALL, 'public'),
+                              ('daily_digest', 'private:' + fake.MANGO, 'private')])
             result = audit_replay.audit(out, self.chat)
             self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
+
+    @unittest.skipUnless((ROOT / 'mixin_digest.py').exists(), 'the daily digest is not in this plugin yet')
+    def test_three_failures_in_a_row_stop_the_replay(self):
+        import socket
+        with socket.socket() as s:   # a port on this computer nothing listens on
+            s.bind(('127.0.0.1', 0))
+            port = s.getsockname()[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            made_up_astrbot(Path(tmp) / 'astrbot', 'https://127.0.0.1:%d/v1' % port)
+            out = Path(tmp) / 'runs' / 'r1'
+            out.parent.mkdir()
+            proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(self.chat),
+                                   '--old-forgets', 'let-in', '--no-canaries', '--out', str(out),
+                                   '--digest', '--impressions', '--notebook',
+                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash', '--model-limit', '800'],
+                                  env=dict(os.environ, PYTHONHASHSEED='0'), capture_output=True, text=True,
+                                  encoding='utf-8', timeout=300)
+            self.assertEqual(proc.returncode, 3, proc.stderr)
+            self.assertIn('模型连续失败 3 次', proc.stderr)
+            summary = json.loads((out / 'replay.json').read_text('utf-8'))
+            self.assertEqual(summary['stopped'], '3 model failures in a row')
+            self.assertEqual((summary['stats']['model_calls'], summary['stats']['model_failed']), (3, 3))
+            self.assertNotIn('model_refused_after_failures', summary['stats'])   # nothing asked after it
+            ledger = json.loads((out.parent / 'model-calls.json').read_text('utf-8'))
+            self.assertEqual(ledger['total'], 3)
+            self.assertNotIn(KEY, proc.stdout + proc.stderr)
 
     def test_only_a_service_on_this_computer(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -390,7 +429,7 @@ class ReplayOptions(unittest.TestCase):
 KEY = 'sk-made-up-key-0000'
 
 
-def made_up_astrbot(folder):
+def made_up_astrbot(folder, base='https://model.example.com/v1/'):
     """An AstrBot data folder with one made-up chat provider and persona."""
     import sqlite3
     folder.mkdir()
@@ -398,7 +437,7 @@ def made_up_astrbot(folder):
         'provider': [{'id': 'emb', 'type': 'openai_embedding', 'enable': True},
                      {'id': 'ds/flash', 'enable': True, 'provider_source_id': 'ds', 'model': 'flash'}],
         'provider_sources': [{'id': 'ds', 'type': 'openai_chat_completion', 'key': ['', KEY],
-                              'api_base': 'https://model.example.com/v1/', 'timeout': 30, 'enable': True}],
+                              'api_base': base, 'timeout': 30, 'enable': True}],
         'agent_runner': {'config': {'persona': {'persona_id': '小爱人设'}}}}), encoding='utf-8')
     db = sqlite3.connect(str(folder / 'data_v4.db'))
     db.execute('CREATE TABLE personas (persona_id TEXT, system_prompt TEXT)')
@@ -437,7 +476,11 @@ class RealModel(unittest.TestCase):
         url, headers, body, timeout = sent[0]
         self.assertEqual((url, headers['Authorization'], body['model'], timeout),
                          ('https://model.example.com/v1/chat/completions', 'Bearer ' + KEY, 'flash', 30))
-        self.assertEqual([h.proxies for h in handlers], [{}])          # no proxy: straight to that address
+        proxies = [h.proxies for h in handlers if isinstance(h, urllib.request.ProxyHandler)]
+        self.assertEqual(proxies, [{}])                                 # no proxy: straight to that address
+        no_redirect = [h for h in handlers if isinstance(h, urllib.request.HTTPRedirectHandler)]
+        self.assertEqual(len(no_redirect), 1)                           # and no redirect: a 3xx fails
+        self.assertIsNone(no_redirect[0].redirect_request(None, None, 302, 'Found', {}, 'https://elsewhere.test/'))
         self.assertNotIn(KEY, repr((base, model, persona, str(no_such.exception))))
 
     def test_hard_limit_caps_and_no_retry(self):
@@ -492,6 +535,41 @@ class RealModel(unittest.TestCase):
         self.assertEqual(got, ['', '好', '', '', '', '', ''])
         self.assertEqual(len(calls), 5)                                # one failure, then three in a row: stop
         self.assertEqual((stats['model_failed_timeout'], stats['model_refused_after_failures']), (4, 2))
+        self.assertTrue(gate.stopped)
+
+    def test_the_limit_is_for_every_run_together(self):
+        import io
+        from collections import Counter
+        from tools import replay
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'model-calls.json'
+            path.write_text(json.dumps({'runs': {'r1 earlier': 5}}), encoding='utf-8')
+            ledger = replay.Ledger(path, 'r2 now')
+            self.assertEqual(ledger.before, 5)
+            sent = []
+
+            def post(messages):
+                sent.append(json.loads(path.read_text('utf-8'))['total'])   # counted before it is sent
+                return {'choices': [{'message': {'content': '好'}}]}
+            gate = replay.ModelGate(post, 7 - ledger.before, {}, Counter(), io.StringIO(),
+                                    type('C', (), {'now': 0.0})(), {'place': ''}, ledger)
+            got = [gate.chat('notebook', str(i)) for i in range(4)]
+            self.assertEqual(got, ['好', '好', '', ''])
+            self.assertEqual(sent, [6, 7])
+            self.assertEqual(json.loads(path.read_text('utf-8')), {'runs': {'r1 earlier': 5, 'r2 now': 2}, 'total': 7})
+
+    def test_used_up_by_the_runs_before(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            made_up_astrbot(Path(tmp) / 'astrbot')
+            chat = fake.build_chat(Path(tmp) / 'chat.db')
+            (Path(tmp) / 'model-calls.json').write_text(json.dumps({'runs': {'r1': 600, 'r2': 200}}), encoding='utf-8')
+            proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
+                                   '--old-forgets', 'let-in', '--out', str(Path(tmp) / 'r3'),
+                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash', '--model-limit', '800'],
+                                  capture_output=True, text=True, encoding='utf-8', timeout=60)
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn('used up', proc.stderr)
+            self.assertFalse((Path(tmp) / 'r3').exists())
 
     def test_a_real_model_needs_a_limit(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -52,12 +52,15 @@ from tools import _guard  # noqa: E402
 LIMITS = [
     "short messages: a message under 6 letters/characters has no piece, so it is not looked for",
     "paraphrase: only words in the same order are found; the same thing said another way is not",
-    "fake model: summaries, the notebook and impressions are written by a fake model that copies or "
-    "makes up text, so leaks through what a real model would rewrite are not tested by this run",
-    "nightly jobs: the notebook's is not run by the replay (off by default); impressions only with "
-    "--impressions, answered by the fake model",
-    "private check: reply prompts only; prompts for the model are checked for QQ numbers and "
-    "forgotten material, not for private words (their place is the turn that started them)",
+    "the model: in run 1 a fake one copies or makes up text; in run 2 a real one (replay.json: model) "
+    "writes summaries, the notes of the day, impressions and the notebook in its own words, and what it "
+    "retells in other words is not found (see paraphrase); its answers (answers.jsonl) are not read, "
+    "only what they left in the data folder",
+    "nightly jobs: only those the replay turned on (replay.json: digest, impressions, notebook)",
+    "private check: reply prompts only; prompts for the model are checked for QQ numbers, forgotten "
+    "material and the canaries, not for private words. A prompt's place is the turn that started it; a "
+    "nightly job's is 'nightly', but the note of one window and a private chat's notebook sitting are "
+    "that window's",
 ]
 
 PIECE = 8
