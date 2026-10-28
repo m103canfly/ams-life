@@ -38,7 +38,7 @@ if CASE in ('sweep', 'sweep_off'):
     (DATA / 'memory' / 'library.json').write_text(json.dumps(lib, ensure_ascii=False), 'utf-8')
 
 ctx = harness.FakeContext()
-plugin = main.BioCorePlugin(ctx, config={'redline_filter': True} if CASE in ('redline_on', 'sweep') else {})
+plugin = main.BioCorePlugin(ctx, config={'redline_filter': True} if CASE in ('redline_on', 'sweep', 'changed_on') else {})
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -117,6 +117,19 @@ if CASE in ('redline', 'redline_on'):
     loop.run_until_complete(plugin.page_forget_person('10002'))          # deleted: no longer counted
     result['page_after_delete'] = loop.run_until_complete(plugin.page_status())['data']['red_lines']
     result['files'] = sorted(p.name for p in DATA.iterdir())
+
+if CASE in ('changed', 'changed_on'):
+    # memories already kept whose words are changed afterwards (merged, tidied up)
+    turn([Plain(text='小爱 我周末想去海边看日落')], '小爱 我周末想去海边看日落', '10002', '柠檬', reply='好呀')
+    turn([Plain(text='小爱 今晚吃什么好呢')], '小爱 今晚吃什么好呢', '10002', '柠檬', reply='吃面吧')
+    lib = plugin._read_library()
+    for e in lib['entries']:
+        if '海边' in e['text']:
+            e['text'] = '小爱 我周末想和 @桃子(10004) 去海边看日落 我号 10002'
+        elif '今晚' in e['text']:
+            e['text'] = '小爱 我最近失眠好严重 每天都睡不着'
+    plugin._write_library(lib)
+    result['library'] = library()
 
 if CASE in ('sweep', 'sweep_off'):
     result['library'] = library()

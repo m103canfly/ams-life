@@ -83,6 +83,16 @@ class TheGraph(unittest.TestCase):
         self.assertEqual(r['window_titles'], ['群1', '群2', '跟芒果的私聊'])
         self.assertEqual(r['missing']['status'], 'error')
 
+    def test_a_card_of_digits_is_no_name(self):
+        r = run_case('number_card')
+        him = [t for t, p in r['people'].items() if p['qq'] == {'qq': '10006'}]
+        self.assertEqual(len(him), 1)
+        self.assertRegex(him[0], r'^人\d+$')                 # "人N", not the digits
+        self.assertNotIn('10006', r['people'][him[0]]['detail'])
+        self.assertNotIn('10006', r['text'])
+        self.assertEqual(r['search'], [])                      # nor found by them
+        self.assertIn('芒果', r['people'])                      # others keep their names
+
     def test_search_gives_ids_only(self):
         r = run_case('graph')
         self.assertEqual(len(r['search']['吉他']), 1)

@@ -166,6 +166,23 @@ if CASE == 'graph':
     result['numbers'] = ['10001', '10002', '10003', '10004', G1, G2]
     result['names'] = ['芒果', '柠檬', '阿星', '桃子']
 
+if CASE == 'number_card':
+    # someone whose group card is a string of digits (made up): the title is not that string
+    turn('小爱 我也想去爬山', '10006', '10006', group=G1, reply='一起呀', msg_id='m-number')
+    store = plugin._impression_store()
+    data = store.load('group:' + G1)
+    data['people']['10006'] = {'name': '10006', 'aliases': [], 'style': '刚来', 'topics': ['爬山'],
+                               'stats': {'msgs': 1, 'days': 1}, 'updated': '2026-10-28'}
+    store.save('group:' + G1, data)
+    g = graph()
+    result['text'] = json.dumps(g, ensure_ascii=False)
+    people = {}
+    for p in (n for n in g['data']['nodes'] if n['kind'] == 'person'):
+        d = node(p['id'])['data']
+        people[d['title']] = {'detail': json.dumps(d, ensure_ascii=False), 'qq': node(p['id'], 'qq')['data']}
+    result['people'] = people
+    result['search'] = search('10006')
+
 if CASE == 'paging':
     brain_graph.PART_NODES, brain_graph.PART_EDGES = 4, 5
     whole = graph()

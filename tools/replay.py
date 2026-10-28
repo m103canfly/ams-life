@@ -40,7 +40,10 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
     run, so a lost or moved ledger never starts the count again;
   - a run starts only with what is left, and says so on the screen first (where the ledger
     is, the limit, what the runs before used, what this one may use);
-  - never two runs of one pass at the same time: each writes the ledger as it read it.
+  - never two runs of one pass at the same time: each writes the ledger as it read it;
+  - --new-pass only with the owner's yes, once a pass: on that run, read the limit it prints
+    first, then let it go on. --out is checked before the ledger is started, so a refused
+    --out starts nothing.
   Once the limit is reached, or a kind's --model-cap, the plugin gets an empty answer and
   nothing is sent. After three
   failures in a row the replay stops there and says so (exit code 3). Every call's kind,
@@ -52,8 +55,10 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
   parts (text, @, quote, picture...), and message_str with the first @ of her left out and
   every other @ written " @昵称(号码) ".
 
-- Messages the forget registry rules out are never fed in (by person, by message; a quote of a
-  forgotten message is dropped from the message that quotes it). The registry holds what the old
+- Messages the forget registry rules out are never fed in (by person, by message). A message that
+  quotes one is fed in as AstrBot hands it over, the quoted message's sender, number and words
+  and all (the real AstrBot does not ask the registry): the plugin must keep none of it, and the
+  audit's forgotten check looks for it in the data folder. The registry holds what the old
   companion was asked to forget; the owner decided it stays forgotten (--old-forgets keep-out, the
   default). --old-forgets let-in replays without it. No one can make her forget by a chat command;
   only the owner can delete, from the panel (step 1, part 3-2), and that goes into the registry too.
@@ -557,6 +562,7 @@ def main(argv=None):
         if u.scheme != "http" or u.hostname not in LOCAL_HOSTS:
             ap.error("--embed-url must be a vector service on this computer (http://127.0.0.1:...)")
         allowed = {(h, u.port or 80) for h in (u.hostname, "127.0.0.1" if u.hostname == "localhost" else u.hostname)}
+    _guard.output_dir(args.out, "the replay", make=False)   # before the ledger: a refused --out starts no pass
     post = model_base = model_name = None
     persona = PERSONA
     if args.astrbot:
@@ -649,9 +655,6 @@ def main(argv=None):
                 parts = [Plain(text=text)]
             super().__init__(text, sender=row["user_id"], name=row["name"], group=group, self_id=self_id)
             self.message_obj.message_id = row["message_id"]
-            quoted = row.get("quoted") or ""   # '' when it quoted something forgotten
-            if not quoted:
-                parts = [p for p in parts if type(p).__name__ != "Reply"]
             self._parts = [astrbot_reply(by_id[p.id], self_id, names, comps)
                            if type(p).__name__ == "Reply" and getattr(p, "id", "") in by_id else p for p in parts]
 
@@ -779,11 +782,12 @@ def main(argv=None):
         if why:
             stats["skipped_" + why] += 1
             continue
-        if row.get("quoted") and reg.why_not(source_id=row["quoted"], place=row["place"]):
-            row["quoted"] = ""
-            stats["quote_of_forgotten_dropped"] += 1
         current.update(place=row["place"], ts=row["ts"])
         event = ReplayEvent(row)
+        q = by_id.get(row.get("quoted") or "")
+        if q and reg.why_not(qq=q["user_id"], place=q["place"], at=q["ts"], source_id=q["message_id"]) and any(
+                type(p).__name__ == "Reply" and getattr(p, "message_str", "") for p in event.get_messages()):
+            stats["quote_of_forgotten_fed_in"] += 1   # as AstrBot would: the plugin must keep none of it
         if not event.message_str.strip() and not event.get_messages():
             stats["skipped_empty"] += 1
             continue

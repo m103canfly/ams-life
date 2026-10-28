@@ -10,8 +10,10 @@ never quotes a message.
 Checks (a "piece" is 8 characters in a row, letters and digits only, lower case, taken from one
 line of a message or a prompt, or from one text field of a data file -- never across two. An
 all-digit piece that is part of a known number (someone's, a group's, the registry's) is the
-qq check's; any other all-digit piece -- a phone number, a code -- counts like words. A reply
-prompt is checked with what AstrBot sends the model of the message, "asked", added to it):
+qq check's; any other all-digit piece -- a phone number, a code -- counts like words. A private
+message that is only a short number, 5 to 7 digits (a code), is looked for as a whole number
+instead: those digits with no digit right before or after them. A reply prompt is checked with
+what AstrBot sends the model of the message, "asked", added to it):
 
 private      A reply prompt somewhere else holds a piece that only ever occurred in one private
              chat -- said by the other person or by her (her replies there, and what the old account
@@ -50,7 +52,8 @@ import redline  # noqa: E402
 from tools import _guard  # noqa: E402
 
 LIMITS = [
-    "short messages: a message under 6 letters/characters has no piece, so it is not looked for",
+    "short messages: a message under 6 letters/characters has no piece, so it is not looked for "
+    "(but a private message that is only a 5- to 7-digit number is, as a whole number)",
     "paraphrase: only words in the same order are found; the same thing said another way is not",
     "the model: in run 1 a fake one copies or makes up text; in run 2 a real one (replay.json: model) "
     "writes summaries, the notes of the day, impressions and the notebook in its own words, and what it "
@@ -64,6 +67,7 @@ LIMITS = [
 ]
 
 PIECE = 8
+CODE = re.compile(r"(?<![0-9])[0-9]{5,7}(?![0-9])")   # a short number on its own: a code
 EXAMPLES = 10
 _KEEP = re.compile(r"[^0-9a-z㐀-鿿]")
 
@@ -205,6 +209,15 @@ def audit(replay_dir, chat) -> dict:
     for r in hers:
         for p in line_pieces(r["message_content"]):
             piece_places[p].add(r["place"])
+    # short codes: a private message that is only 5-7 digits; where else those digits were said, whole
+    code_places, private_codes = defaultdict(set), {}
+    for r in rows + hers:
+        text = str(r["message_content"] or "")
+        for c in CODE.findall(text):
+            code_places[c].add(r["place"])
+        if r["place"].startswith("private:") and CODE.fullmatch(norm(text)):
+            private_codes[norm(text)] = r["place"]
+            code_places[norm(text)].add(r["place"])
     # the old account itself, every group, the registry's people and messages count too
     known_qq |= {str(r.get("self_id") or "") for r in log} | {str(r.get("group_id") or "") for r in log}
     known_qq |= gone_people | gone_ids
@@ -214,6 +227,8 @@ def audit(replay_dir, chat) -> dict:
     gone_pieces -= kept_pieces | numbers_only  # only what nobody else also said
     private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
                     if len(pl) == 1 and next(iter(pl)).startswith("private:") and p not in numbers_only}
+    private_codes = {c: pl for c, pl in private_codes.items()
+                     if code_places[c] == {pl} and not any(c in q for q in known_qq)}
     # a person's number is off limits only while he still may not be kept (a forget row read as a
     # cutoff lets what he says later back in, number and all)
     still_gone = {q for q in gone_people if reg.why_not(qq=q, at=float("inf"))}
@@ -249,8 +264,7 @@ def audit(replay_dir, chat) -> dict:
             checks["qq"].warnings["asker_own_number"] += 1
         if pr["kind"] != "reply":
             continue
-        for p in ps:
-            src = private_only.get(p)
+        for src in [private_only.get(p) for p in ps] + [private_codes.get(c) for c in CODE.findall(text)]:
             if src and src != place:
                 checks["private"].fail(dict(where, came_from=lab(src)))
                 break

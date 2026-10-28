@@ -55,7 +55,7 @@ class Replay(unittest.TestCase):
         self.assertEqual(s['skipped_forgotten'], 1)       # his message before he asked
         self.assertEqual(s['skipped_optout'], 1)          # and after (his forget row read as "not again")
         self.assertEqual(s['skipped_source'], 1)          # the one forgotten message
-        self.assertEqual(s['quote_of_forgotten_dropped'], 1)
+        self.assertEqual(s['quote_of_forgotten_fed_in'], 1)   # as AstrBot hands it over
         self.assertEqual(s['her_messages_used_as_replies'], 7)
         self.assertNotIn('her_unprompted_skipped', s)
         self.assertEqual(s['requests'], 7 + 5)            # 7 from the log, 5 canary requests
@@ -161,6 +161,68 @@ class Replay(unittest.TestCase):
             self.assertFalse(audit_replay.audit(bad, chat)['checks']['private']['pass'])
         # digits of a known number stay the qq check's
         self.assertEqual(audit_replay.number_pieces(['9876543210']), {'98765432', '87654321', '76543210'})
+
+    def test_a_quote_of_the_forgotten_is_fed_in_and_not_kept(self):
+        # quoting his forgotten message (he asked to be forgotten) and the forgotten message: AstrBot hands
+        # both over, his number and words and all; the plugin's data folder keeps none of it
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            with closing(sqlite3.connect(str(chat))) as db:
+                star_id = db.execute("SELECT message_id FROM messages WHERE message_content = '我家猫今天把杯子打碎了'"
+                                     ).fetchone()[0]
+                db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
+                           "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
+                           "processed, created_at) VALUES (9996, '9996', ?, ?, ?, 'group', 'normal', 'message', "
+                           "?, '@小爱 小爱 你看他说的', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                           (fake.BOT, fake.MANGO, fake.G_BUSY,
+                            '[CQ:reply,id=%s][CQ:at,qq=%s] 小爱 你看他说的' % (star_id, fake.BOT), int(fake.T0 + 5600)))
+                db.commit()
+            out = Path(tmp) / 'replay'
+            run_replay(chat, self.registry, out)
+            stats = json.loads((out / 'replay.json').read_text('utf-8'))['stats']
+            self.assertEqual(stats['quote_of_forgotten_fed_in'], 2)
+            gone = [audit_replay.norm(t) for t in ('我家猫今天把杯子打碎了', '这句后来被要求忘掉了')]
+            his = audit_replay.number_pattern([fake.STAR])
+            for path in (out / 'data').rglob('*'):
+                if not path.is_file() or path.name == 'forget_registry.sqlite3':
+                    continue
+                body = path.read_text('utf-8', errors='replace')
+                self.assertFalse(audit_replay.has(his, body), path.name)
+                self.assertFalse(any(g in audit_replay.norm(body) for g in gone), path.name)
+            self.assertTrue(audit_replay.audit(out, chat)['checks']['forgotten']['pass'])
+
+    def test_a_short_code_inside_a_sentence(self):
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            # a 6-digit code said on its own in a private chat (no piece: under 8), then inside a group's prompt
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            with closing(sqlite3.connect(str(chat))) as db:
+                db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
+                           "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
+                           "processed, created_at) VALUES (9998, '9998', ?, ?, NULL, 'private', 'friend', 'message', "
+                           "'482913', '482913', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                           (fake.BOT, fake.MANGO, int(fake.T0 + 100)))
+                # and one that is part of a known number (a group's): the qq check's, not a code
+                db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
+                           "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
+                           "processed, created_at) VALUES (9997, '9997', ?, ?, NULL, 'private', 'friend', 'message', "
+                           "'90000', '90000', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                           (fake.BOT, fake.MANGO, int(fake.T0 + 101)))
+                db.commit()
+            self.assertTrue(audit_replay.audit(self.out, chat)['pass'])        # nothing planted: all 7 pass
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得验证码是那个数482913，对吧')])
+            checks = audit_replay.audit(bad, chat)['checks']
+            self.assertFalse(checks['private']['pass'])
+            self.assertEqual(checks['private']['examples'][-1]['came_from'], '私聊1')
+            # only as a whole number: inside a longer one it is not that code; nor a piece of a known number
+            ok = self.plant(Path(tmp) / 'ok', [('reply', 'group:' + fake.G_BUSY, '订单号 94829130 已发货'),
+                                               ('reply', 'group:' + fake.G_BUSY, '那个数是90000')])
+            self.assertTrue(audit_replay.audit(ok, chat)['checks']['private']['pass'])
 
     def test_what_astrbot_sends_the_model_is_checked(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -610,6 +672,25 @@ class RealModel(unittest.TestCase):
                 self.assertFalse(out.exists(), said)
             self.assertFalse((ROOT / 'model-calls.json').exists())
             self.assertEqual(json.loads(ledger.read_text('utf-8'))['runs'], {'r1': 600, 'r2': 200})
+
+    def test_a_refused_out_starts_no_pass(self):
+        # --out is checked before the ledger: a folder with something in it, and no ledger is started
+        with tempfile.TemporaryDirectory() as tmp:
+            made_up_astrbot(Path(tmp) / 'astrbot')
+            chat = fake.build_chat(Path(tmp) / 'chat.db')
+            out = Path(tmp) / 'r'
+            out.mkdir()
+            (out / 'left-over.txt').write_text('编造', encoding='utf-8')
+            ledger = Path(tmp) / 'model-calls.json'
+            proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
+                                   '--old-forgets', 'let-in', '--out', str(out),
+                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash',
+                                   '--model-limit', '800', '--model-ledger', str(ledger), '--new-pass'],
+                                  capture_output=True, text=True, encoding='utf-8', timeout=60)
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn('not an empty folder', proc.stderr)
+            self.assertFalse(ledger.exists())
+            self.assertEqual([p.name for p in out.iterdir()], ['left-over.txt'])
 
     def test_a_real_model_needs_a_limit(self):
         with tempfile.TemporaryDirectory() as tmp:

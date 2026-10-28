@@ -100,6 +100,15 @@ class WhatSheKeeps(unittest.TestCase):
         self.assertEqual(r['page']['by_store'], {'material': {'health': 1}})
         self.assertTrue(r['page']['filter'])
 
+    def test_changed_words_are_gone_over_like_new_ones(self):
+        # a memory already kept whose words change: numbers out; over a red line (switch on), not kept
+        off = run_case('changed')
+        self.assertEqual(off['library'], ['小爱 我周末想和 @桃子 去海边看日落 我号 [号码]',
+                                          '小爱 我最近失眠好严重 每天都睡不着'])
+        on = run_case('changed_on')
+        self.assertEqual(on['library'], ['小爱 我周末想和 @桃子 去海边看日落 我号 [号码]'])
+        self.assertFalse(LONG.search(json.dumps(off['library'] + on['library'])))
+
     def test_turning_the_switch_on_archives_first(self):
         r = run_case('sweep')
         self.assertEqual(r['library'], ['小爱 我周末想去海边看日落'])

@@ -281,10 +281,13 @@ class MemoryMixin:
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         lib["schema_version"] = MEMORY_SCHEMA_VERSION
         try:
-            # new memories only (the library is not gone over again on every write): numbers
-            # out, and not kept over a red line while the switch is on
+            # new memories only (the library is not gone over again on every write), and ones whose
+            # words changed (merged, tidied up): numbers out, and not kept over a red line while
+            # the switch is on
             old_ids = self._library_ids() if MEMORY_LIBRARY_PATH.exists() else set()
-            new = [e for e in lib.get("entries") or [] if isinstance(e, dict) and str(e.get("id") or "") not in old_ids]
+            old_text = getattr(self, "_known_memory_texts", None) or {}
+            new = [e for e in lib.get("entries") or [] if isinstance(e, dict)
+                   and (str(e.get("id") or "") not in old_ids or old_text.get(str(e.get("id") or "")) != e.get("text"))]
             red = {id(e) for e in new if self._red_line(e.get("text"), "memory")}
             kept = [e for e in lib.get("entries") or [] if self._origin_kept(e) and id(e) not in red]
             if new:
@@ -303,15 +306,18 @@ class MemoryMixin:
         tmp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
         atomic_file.replace(tmp, MEMORY_LIBRARY_PATH)
         store.keep_only(str(e["id"]) for e in lib["entries"] if isinstance(e, dict) and e.get("id"))
-        self._known_memory_ids = {str(e.get("id") or "") for e in lib["entries"] if isinstance(e, dict)}
+        self._known_memory_texts = {str(e.get("id") or ""): e.get("text") for e in lib["entries"] if isinstance(e, dict)}
+        self._known_memory_ids = set(self._known_memory_texts)
         return True
 
     def _library_ids(self) -> set:
-        """The ids in the library: read once, then kept up to date by _write_library."""
+        """The ids in the library: read once, then kept up to date by _write_library (with
+        each one's words, _known_memory_texts, so that changed words are told apart)."""
         ids = getattr(self, "_known_memory_ids", None)
-        if ids is None:
-            ids = self._known_memory_ids = {str(e.get("id") or "") for e in
-                                            self._read_library(vectors=False)["entries"] if isinstance(e, dict)}
+        if ids is None or getattr(self, "_known_memory_texts", None) is None:
+            self._known_memory_texts = {str(e.get("id") or ""): e.get("text") for e in
+                                        self._read_library(vectors=False)["entries"] if isinstance(e, dict)}
+            ids = self._known_memory_ids = set(self._known_memory_texts)
         return ids
 
     def _new_memory_id(self, *seed, taken=()) -> str:
@@ -356,6 +362,8 @@ class MemoryMixin:
             tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
             atomic_file.replace(tmp, MEMORY_LIBRARY_PATH)
             self._known_memory_ids = set(seen)
+            self._known_memory_texts = {str(e.get("id") or ""): e.get("text") for e in lib["entries"]
+                                        if isinstance(e, dict)}
             logger.info("[ams-life] gave %d memories an id of their own", len(fixes))
         moved = vector_store.migrate_library(MEMORY_LIBRARY_PATH, MEMORY_VECTOR_PATH, MEMORY_ARCHIVE_DIR)
         if moved.get("moved"):
