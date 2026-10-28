@@ -176,10 +176,20 @@ class ImpressionsMixin:
                     if text:
                         add("impressions", text, judge=True)
         for place in self._window_places():
-            if place.startswith("group:"):
-                for x in self._read_window(place)["recent"]:
-                    if isinstance(x, dict) and x.get("role") != "assistant":
-                        add("material", x.get("text"))
+            if not place.startswith("group:"):
+                continue
+            # read the file only (as the brain map does): _read_window would write the window
+            # back pruned, and opening the panel must not write anything; expired lines still
+            # do not count
+            try:
+                win = json.loads(self._window_file(place).read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if not isinstance(win, dict) or str(win.get("place") or "") != place:
+                continue
+            for x in self._window_pruned(win.get("recent") or []):
+                if x.get("role") != "assistant":
+                    add("material", x.get("text"))
         by_line = {}
         for counts in by_store.values():
             for line, n in counts.items():

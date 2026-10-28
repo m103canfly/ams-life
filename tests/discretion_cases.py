@@ -503,7 +503,7 @@ def run():
         out['raw_events'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
                              if x.strip()] if (DATA / 'archives' / 'events.jsonl').exists() else []
         out['self_model'] = json.loads((DATA / 'self_model.json').read_text('utf-8'))
-    elif CASE in ('notebook', 'notebook_full', 'notebook_many', 'notebook_body'):
+    elif CASE in ('notebook', 'notebook_full', 'notebook_many', 'notebook_body', 'notebook_scrub'):
         plugin.llm_functions = {'notebook': {'enabled': True}}
         plugin.notebook_time = '00:00'
         plugin._begin_job()
@@ -599,6 +599,21 @@ def run():
         elif CASE == 'notebook_many':
             loop.run_until_complete(plugin._maybe_write_notebook())
             out['calls'] = len(calls)
+        elif CASE == 'notebook_scrub':
+            # what she writes in her notebook is kept like the rest: a number she knows goes, and
+            # someone deleted is 某人 (not only at the next start)
+            t(0, '小爱 早上好', '10002', '柠檬', A)
+            t(10, '小爱 我也在', '10003', '阿星', A)
+            plugin._owner_forget_person('10003')   # the owner deletes him (panel)
+            plugin._begin_job()   # tonight's job starts after the delete
+            event('hike', A_PLACE, ['10002'], '周末去爬山', '柠檬说群里周末一起去爬山')
+            answers['group'] = changes({'op': 'add', 'text': '阿星说柠檬 10002 也想去爬山', 'private': False,
+                                        'uses': ['m1']})
+            plugin.self_model['notebook'] = [{'id': 'n1', 'text': '旧的一条', 'ts': 0,
+                                              'origin': main.discretion.make_origin('self')}]
+            loop.run_until_complete(plugin._maybe_write_notebook())
+            out['notebook'] = [x['text'] for x in plugin.self_model['notebook']]
+            out['saved'] = [x['text'] for x in json.loads((DATA / 'self_model.json').read_text('utf-8'))['notebook']]
         else:  # notebook_body: nothing happened anywhere today; only her body to look at
             answers['group'] = changes({'op': 'add', 'text': '今天很安静', 'private': False, 'uses': ['m1']})
             loop.run_until_complete(plugin._maybe_write_notebook())

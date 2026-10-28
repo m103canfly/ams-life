@@ -549,6 +549,8 @@ class LLMMixin:
             gone = set()
             for change in changes:
                 mark = {"private_mark": change.get("private")}
+                # what she writes is kept like the rest: no number she knows, someone deleted is 某人
+                text = self._scrub(change.get("text")) if change["op"] != "delete" else ""
                 uses = [refs[x] for x in (change.get("uses") or []) if x in refs]
                 if change["op"] in ("edit", "delete"):
                     i, may = shown[change["no"] - 1]
@@ -558,12 +560,12 @@ class LLMMixin:
                     gone.add(i)
                 elif change["op"] == "edit":
                     old = entries[i]
-                    entries[i] = dict(old, text=change["text"], ts=now, uses=uses, sitting=sitting,
+                    entries[i] = dict(old, text=text, ts=now, uses=uses, sitting=sitting,
                                       origin=self._sitting_origin_with(origin, old),
                                       names=sorted(set(names) | set(old.get("names") or [])), **mark)
                 elif len(entries) - len(gone) < NOTEBOOK_MAX:
                     entries.append({"id": _sha256("%s|%s|%s" % (now, sitting, change["text"]))[:12],
-                                    "text": change["text"], "ts": now, "origin": origin, "names": names,
+                                    "text": text, "ts": now, "origin": origin, "names": names,
                                     "uses": uses, "sitting": sitting, **mark})
                 else:
                     continue
