@@ -511,6 +511,7 @@ def main(argv=None):
     ap.add_argument("--limit", type=int, default=0, help="only the first N messages of the log")
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     if args.old_forgets == "keep-out" and not args.registry:
         ap.error("--registry is needed to keep out what was forgotten (or say --old-forgets let-in)")
     if bool(args.astrbot) != bool(args.model) or (args.astrbot and args.model_limit <= 0):

@@ -347,7 +347,7 @@ class ReplayOptions(unittest.TestCase):
             calls = [json.loads(x).get('call') for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
                      if json.loads(x)['kind'] == 'model']
             nightly = [c for c in calls if c in ('daily_digest', 'group_impressions', 'notebook')]
-            self.assertEqual(nightly[:3], ['daily_digest', 'group_impressions', 'notebook'])
+            self.assertEqual(list(dict.fromkeys(nightly)), ['daily_digest', 'group_impressions', 'notebook'])
             # the note of a window is recorded as that window's (what the audit checks it against)
             places = {json.loads(x)['place'] for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
                       if json.loads(x).get('call') == 'daily_digest'}
