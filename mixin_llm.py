@@ -602,9 +602,13 @@ class LLMMixin:
             if not isinstance(items, list):
                 items = []
             _sid, _name = self._speaker(event)
+            # its sources: those of the milestones it was written from
+            _used = set(parsed["evidence_refs"] or [])
+            _sources = [s for m in marks if str(m.get("key") or m.get("type") or "") in _used
+                        for s in (m.get("source_ids") or [])]
             items.append({"ts": time.time(), "text": parsed["narrative"],
                           "evidence_refs": parsed["evidence_refs"],
-                          "origin": discretion.make_origin(self._here(event), [_sid])})
+                          "origin": discretion.make_origin(self._here(event), [_sid], _sources)})
             self.self_model["relationship_narratives"] = items[-5:]
             self._save_self_model()
             self._llm_v2_mark("relationship_narrative")

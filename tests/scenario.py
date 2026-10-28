@@ -67,10 +67,35 @@ FULL_CONFIG = {'llm_only_reply_summary': False, 'safety_enabled': True, 'we_memo
                'memory_worthiness_enabled': False}
 
 
+def sqlite_snapshot(path):
+    """A SQLite file as rows (its bytes are not stable): the memory vectors (rounded), the forget registry."""
+    import sqlite3
+    from array import array
+    db = sqlite3.connect(str(path))
+    out = {}
+    for (table,) in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"):
+        rows = []
+        for row in db.execute('SELECT * FROM "%s" ORDER BY 1' % table):
+            cells = []
+            for cell in row:
+                if isinstance(cell, bytes):
+                    a = array('d')
+                    a.frombytes(cell)
+                    cell = [round(x, 6) for x in a]
+                cells.append(cell)
+            rows.append(cells)
+        out[table] = rows
+    db.close()
+    return out
+
+
 def files_snapshot(root):
     out = {}
     for path in sorted(p for p in root.rglob('*') if p.is_file()):
         rel = path.relative_to(root).as_posix()
+        if path.suffix == '.sqlite3':
+            out[rel] = sqlite_snapshot(path)
+            continue
         text = path.read_text('utf-8', errors='replace')
         if path.suffix == '.json':
             try:
@@ -125,11 +150,6 @@ def main_run():
                 ticks.append('error: ' + type(exc).__name__)
             harness.drain(loop)
         trace['autonomy_ticks'] = ticks
-    for sub in ('readiness', 'learning'):
-        event = harness.FakeEvent('/biocore ' + sub, sender='10001', name='芒果')
-        loop.run_until_complete(plugin.biocore_command(event))
-        chain = getattr(event.result, 'chain', [])
-        trace['command_' + sub] = [getattr(c, 'text', '') for c in chain]
     clock.advance(3600)
     try:
         trace['page_status'] = loop.run_until_complete(plugin.page_status())

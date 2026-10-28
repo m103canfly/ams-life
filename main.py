@@ -345,6 +345,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:
             logger.warning("[ams-life] one-her migration failed: %s", exc)
         try:
+            self._migrate_memory_ids()  # an id of its own for every memory; vectors out of the library
+        except Exception as exc:
+            logger.warning("[ams-life] memory id / vector migration failed: %s", exc)
+        try:
             self._sweep_windows()  # expired phone lines leave the disk at start-up
             self._ensure_autonomy_task()  # and every tick after (the 5-minute loop)
         except Exception as exc:
@@ -497,44 +501,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self.cores[key] = core
         return self.cores[key]
 
-    @filter.command("biocore")
-    async def biocore_command(self, event: AstrMessageEvent):
-        """Task-15: /biocore readiness read-only output."""
-        try:
-            raw = str(getattr(event, "message_str", "") or "").strip()
-        except Exception:
-            raw = ""
-        parts = raw.split(None, 1)
-        sub = parts[1].strip().lower() if len(parts) > 1 else ""
-        if sub == "readiness":
-            event.set_result(MessageEventResult().message(
-                self._readiness_text(event)).use_t2i(False))
-            return
-        if sub == "learning" or sub.startswith("learning "):
-            core = self._core(event)
-            if sub == "learning reset":
-                try:
-                    core._learning = {"version": 1,
-                                      "params": {"regulation_q": {}, "trust_alpha": 0.30,
-                                                 "learning_rate": LEARNING_Q_ALPHA},
-                                      "last_update": 0.0, "updates_count": 0, "log": []}
-                    event.set_result(MessageEventResult().message(
-                        "[BioCore] learning reset done").use_t2i(False))
-                except Exception:
-                    event.set_result(MessageEventResult().message(
-                        "[BioCore] learning reset failed").use_t2i(False))
-                return
-            try:
-                state = json.dumps(core._learning, ensure_ascii=False)[:1500]
-            except Exception:
-                state = "{}"
-            event.set_result(MessageEventResult().message(
-                "[BioCore] learning enabled=%s retention=%s\n%s" % (
-                    bool(getattr(core, "bio_learning", False)),
-                    str(getattr(core, "retention_model", "power_law")), state)).use_t2i(False))
-            return
-        event.set_result(MessageEventResult().message(
-            "用法：/biocore readiness | /biocore learning | /biocore learning reset").use_t2i(False))
+    # ams-life: BioCore's /biocore command (readiness, learning, learning reset) is gone:
+    # anyone in any chat could reset what she learned or have her inner numbers posted.
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
@@ -546,6 +514,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         try:
             self._begin_job()
+            self._check_registry(event)  # someone (or a message) she may not keep: nothing is stored
             self._window_add_message(event)
             self._listen_body(event)
             self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
@@ -566,6 +535,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # the mark on_message set when the message came in: AstrBot may hold the message
         # for the session lock (the previous one still waiting for the model) before this
         self._continue_job()
+        self._check_registry(event)
         await self._ensure_profile(event)
         core = self._core(event)
         # ams-life: how lively the chats are. That she was called (woken) was counted as
@@ -693,6 +663,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if not self.enabled:
             return
         self._continue_job()
+        self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
         # ams-life: no state tag is asked for any more. If the model writes one anyway

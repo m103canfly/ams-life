@@ -343,7 +343,12 @@ def merge_milestones(existing: Any, additions: Any) -> list[dict[str, Any]]:
         if not mtype or not key or (mtype, key) in seen:
             continue
         seen.add((mtype, key))
-        out.append({"type": mtype, "key": key, "ts": _num(item.get("ts"), 0.0)})
+        mark = {"type": mtype, "key": key, "ts": _num(item.get("ts"), 0.0)}
+        # ams-life: where it came from (forgetting by message finds it by these)
+        sources = [str(x) for x in (item.get("source_ids") or []) if str(x or "")]
+        if sources:
+            mark["source_ids"] = sources
+        out.append(mark)
     return out[-MAX_MILESTONES:]
 
 

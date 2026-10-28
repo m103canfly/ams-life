@@ -1291,7 +1291,7 @@ class EventsMixin:
             return []
 
     def _append_insight(self, record: dict) -> None:
-        if self._job_stale():
+        if self._job_stale() or not self._origin_kept(record):
             return
         try:
             EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
@@ -1507,7 +1507,7 @@ class EventsMixin:
         return [list(seg) for seg in segments[-3:]]
 
     def _append_event_archive(self, record: dict) -> None:
-        if self._job_stale():
+        if self._job_stale() or not self._origin_kept(record):
             return
         try:
             EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)

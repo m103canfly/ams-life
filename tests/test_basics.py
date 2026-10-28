@@ -56,8 +56,10 @@ class Split(unittest.TestCase):
     """main.py was split into modules; AstrBot must still find the plugin and its handlers in main.py."""
 
     def test_handlers_defined_in_main(self):
-        for name in ('__init__', 'biocore_command', 'on_message', 'on_llm_request', 'on_llm_response'):
+        for name in ('__init__', 'on_message', 'on_llm_request', 'on_llm_response'):
             self.assertIn(name, vars(main.BioCorePlugin), name)
+        # step 1-3: the /biocore chat command is gone (anyone could reset what she learned)
+        self.assertNotIn('biocore_command', vars(main.BioCorePlugin))
 
     def test_all_methods_reachable(self):
         methods = set()
@@ -66,7 +68,9 @@ class Split(unittest.TestCase):
         # 210 upstream methods minus __init__, plus 10 for one-her (library, migration, discretion, forgetting)
         # and 18 for her phone (on_message, windows, open loops per window, moving old body texts)
         # and 3 for the forget count (_forget_count, _begin_job, _job_stale)
-        self.assertEqual(len(methods), 266)
+        # step 1-3: -1 for /biocore, +18 for the forget registry, the owner's deletes, what
+        # else holds people's words, unique memory ids and the vector store
+        self.assertEqual(len(methods), 283)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

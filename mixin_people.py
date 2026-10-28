@@ -85,6 +85,10 @@ class PeopleMixin:
                        "who_am_i": self.self_model.get("who_am_i", ""),
                        "notebook": len(self.self_model.get("notebook") or [])})
             self.self_model["_history"] = _h[-20:]
+            # ams-life: nothing the forget registry rules out stays in her notes
+            for _key in ("notebook", "narrative_items", "diary", "relationship_narratives"):
+                if isinstance(self.self_model.get(_key), list):
+                    self.self_model[_key] = [x for x in self.self_model[_key] if self._origin_kept(x)]
             SELF_MODEL_PATH.write_text(json.dumps(self.self_model, ensure_ascii=False, indent=1), encoding="utf-8")
         except Exception:
             pass
@@ -193,6 +197,8 @@ class PeopleMixin:
                             str(_ev.get("title") or "") + " " + str(_ev.get("event") or ""))
                         if _mk:
                             _mk["ts"] = float(_ev.get("ts", 0) or 0)
+                            # the messages it came from: deleting one of them deletes it
+                            _mk["source_ids"] = discretion.origin_of(_ev)["source_ids"]
                             _milestones.append(_mk)
                 except Exception:
                     _milestones = []

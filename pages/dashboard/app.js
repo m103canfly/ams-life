@@ -1051,11 +1051,50 @@
       const raw=await bridge.apiPost(path,{});
       const payload=raw&&raw.data?raw.data:raw;
       if(!payload||payload.status==="error"||payload.status==="fail") throw new Error((payload&&payload.message)||"操作失败");
-      setState(op==="delete"?"已删除（保留墓碑）":"已回滚到上一版本");
+      setState(op==="delete"?forgetSummary(payload.data&&payload.data.counts):"已回滚到上一版本");
       setTimeout(()=>{ try{ load(); }catch(err){} },900);
     }catch(err){
       setState("失败："+String(err&&err.message||err));
     }
+  }
+  // step 1-3: what the owner's delete took, in one line
+  function forgetSummary(c){
+    c=(c&&typeof c==="object")?c:{};
+    const parts=[["memories","记忆"],["events","事件"],["insights","领悟"],["notes","她的笔记"],["relationship","关系记录"],["phone","手机里的话"],["pictures","图片描述"]]
+      .filter(p=>Number(c[p[0]]||0)>0).map(p=>p[1]+" "+Number(c[p[0]])+" 条");
+    let t="已彻底删除："+(parts.length?parts.join("、"):"没有找到要删的");
+    if(Array.isArray(c.places)&&c.places.length) t+="；地方："+c.places.map(shortSession).join("、");
+    const a=c.astrbot||{};
+    if(Number(a.conversations||0)||Number(a.message_history||0)) t+="；AstrBot 对话 "+Number(a.conversations||0)+" 个、消息记录 "+Number(a.message_history||0)+" 条";
+    return t;
+  }
+  let forgetArmed=null;
+  function bindForgetPerson(){
+    const btn=$("forgetPersonBtn"), input=$("forgetPersonInput"), state=$("forgetPersonState");
+    if(!btn||btn.dataset.bound) return;
+    btn.dataset.bound="1";
+    btn.addEventListener("click",async ()=>{
+      const qq=String(input&&input.value||"").trim();
+      if(!/^\d{5,12}$/.test(qq)){ if(state) state.textContent="请填 QQ 号（只要数字）"; return; }
+      if(!forgetArmed||forgetArmed.qq!==qq||Date.now()-forgetArmed.at>5000){
+        forgetArmed={qq:qq,at:Date.now()};
+        if(state) state.textContent="再点一次，确认删掉 "+qq+"（5 秒内有效，删了找不回来）";
+        return;
+      }
+      forgetArmed=null;
+      if(!bridge){ if(state) state.textContent="未连接 AstrBot 页面桥，无法删除"; return; }
+      btn.disabled=true; if(state) state.textContent="正在删除…";
+      try{
+        const raw=await bridge.apiPost("page/forget/person",{person:qq});
+        const payload=raw&&raw.data?raw.data:raw;
+        if(!payload||payload.status==="error"||payload.status==="fail") throw new Error((payload&&payload.message)||"删除失败");
+        if(state) state.textContent=forgetSummary(payload.data&&payload.data.counts);
+        if(input) input.value="";
+        setTimeout(()=>{ try{ load(); }catch(err){} },900);
+      }catch(err){
+        if(state) state.textContent="失败："+String(err&&err.message||err);
+      }finally{ btn.disabled=false; }
+    });
   }
   function relSpark(traj){
     const pts=(Array.isArray(traj)?traj:[]).slice(-24).map(p=>(p&&typeof p==="object")?p:{});
@@ -1200,8 +1239,10 @@
     const commit=Number(rel.commitment||0), invest=Number(rel.investment||0);
     const name=String(cur.sender_name||cur.sender_id||"用户");
     if(hint) hint.textContent="交互 "+Number(cur.interactions||0)+" 次 · 最近 "+memWhen(cur.last_seen||cur.ts);
+    bindForgetPerson();
     body.innerHTML='<div class="rel-card">'+
-      '<div class="rel-card-head"><b>'+esc(name)+'</b><span class="hint">'+esc(String(cur.sender_id||""))+'</span><span class="mem-flag">'+(traj.length?"轨迹 "+traj.length+" 点":"无轨迹")+'</span></div>'+
+      '<div class="rel-card-head"><b>'+esc(name)+'</b><span class="hint">'+esc(String(cur.sender_id||""))+'</span><span class="mem-flag">'+(traj.length?"轨迹 "+traj.length+" 点":"无轨迹")+'</span>'+
+      (cur.sender_id?'<button type="button" class="btn mini danger" data-forget-fill="'+esc(String(cur.sender_id))+'">删掉这个人…</button>':'')+'</div>'+
       '<div class="rel-state-grid">'+stateRows+'</div>'+
       '<div class="rel-trend"><div class="rel-trend-head"><small>最近轨迹</small><span class="rel-legend"><i class="rel-lg-trust"></i>信任<i class="rel-lg-close"></i>亲近<i class="rel-lg-conflict"></i>冲突</span></div>'+relSpark(traj)+trajRows+'</div>'+
       '<div class="rel-maps"><div><small>常谈主题 / TRANSACTIVE</small><div class="chips">'+transHtml+'</div></div><div><small>信息来源 / DESTINATION</small><div class="chips">'+destHtml+'</div></div></div>'+
@@ -1219,6 +1260,14 @@
     Object.keys(memOps).forEach(k=>{ delete memOps[k]; });
     Object.keys(memOpStates).forEach(k=>{ delete memOpStates[k]; });
     renderMemoryMeta();
+  });
+  const _relBody=$("relBody");
+  if(_relBody) _relBody.addEventListener("click",(e)=>{
+    const b=e.target&&e.target.closest?e.target.closest("[data-forget-fill]"):null;
+    if(!b) return;
+    const input=$("forgetPersonInput"), state=$("forgetPersonState");
+    if(input){ input.value=String(b.dataset.forgetFill||""); input.focus(); }
+    if(state) state.textContent="在下面再点“删掉这个人”两次确认";
   });
   const _relSel=$("relUserFilter");
   if(_relSel) _relSel.addEventListener("change",()=>{
