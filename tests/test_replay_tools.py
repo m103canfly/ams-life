@@ -321,10 +321,14 @@ class ReplayOptions(unittest.TestCase):
 
     @unittest.skipUnless((ROOT / 'mixin_digest.py').exists(), 'the daily digest is not in this plugin yet')
     def test_digest_then_impressions_then_notebook(self):
+        stub = EmbedStub()   # its own: the class's stub counts the class's replay
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'nightly'
-            run_replay(self.chat, Path(self.tmp.name) / 'bundle' / 'forget_registry.sqlite3', out, '--no-canaries',
-                       '--embed-url', self.stub.url, '--digest', '--impressions', '--notebook')
+            try:
+                run_replay(self.chat, Path(self.tmp.name) / 'bundle' / 'forget_registry.sqlite3', out, '--no-canaries',
+                           '--embed-url', stub.url, '--digest', '--impressions', '--notebook')
+            finally:
+                stub.close()
             stats = json.loads((out / 'replay.json').read_text('utf-8'))['stats']
             self.assertEqual((stats['digest_calls'], stats['digest_events']), (1, 1))
             self.assertEqual(stats['model_calls_fake_daily_digest'], 1)
