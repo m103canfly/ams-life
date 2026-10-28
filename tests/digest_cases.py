@@ -236,6 +236,49 @@ if CASE == 'gone_names':
     result['phone_after_restart'] = phone('group:' + G1)
     result['registry_has_name'] = '阿星'.encode('utf-8') in (DATA / forget_registry.FILE_NAME).read_bytes()
 
+def ask(text, sender, name, group=None, reply='嗯嗯', msg_id=None):
+    """A turn that wakes her; what the reply model is given."""
+    clock.advance(60)
+    event = harness.FakeEvent(text, sender=sender, name=name, group=group)
+    event.message_obj.message_id = msg_id or ('m-%s-%d' % (sender, int(clock.now)))
+    loop.run_until_complete(plugin.on_message(event))
+    harness.drain(loop)
+    req = ProviderRequest(prompt=text, system_prompt='你是小爱。')
+    loop.run_until_complete(plugin.on_llm_request(event, req))
+    harness.drain(loop)
+    loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(reply)))
+    harness.drain(loop)
+    return '\n'.join([str(req.prompt or '')] + [p.get('text') if isinstance(p, dict) else str(p)
+                                                for p in req.extra_user_content_parts])
+
+
+def files_with(word, archive):
+    out = []
+    for p in sorted(DATA.rglob('*')):
+        if not p.is_file() or p.name == forget_registry.FILE_NAME:
+            continue
+        if ('archive' in p.relative_to(DATA).parts) != archive:
+            continue
+        if word.encode('utf-8') in p.read_bytes():
+            out.append(str(p.relative_to(DATA)).replace('\\', '/'))
+    return out
+
+
+if CASE == 'everywhere':
+    # what the reviewer did (made-up): others speak of him to her; then the owner deletes him
+    turn('大家好', '10003', '阿星', group=G1, msg_id='w0')
+    ask('小爱 阿星周末想去打副本 你也来吗', '10002', '柠檬', group=G1, reply='好呀', msg_id='w1')
+    ask('小爱 记得阿星说的那个副本吗', '10001', '芒果', group=G1, reply='记得', msg_id='w2')
+    result['before'] = files_with('阿星', archive=False)
+    result['deleted'] = loop.run_until_complete(plugin.page_forget_person('10003'))
+    result['at_once'] = files_with('阿星', archive=False)
+    result['prompt'] = ask('小爱 周末的副本谁去', '10001', '芒果', group=G1, reply='还不知道', msg_id='w3')
+    result['after_a_turn'] = files_with('阿星', archive=False)
+    plugin = new_plugin()                                      # a restart
+    result['prompt_after_restart'] = ask('小爱 副本几点开始', '10001', '芒果', group=G1, reply='八点', msg_id='w4')
+    result['after_restart'] = files_with('阿星', archive=False)
+    result['archives'] = files_with('阿星', archive=True)
+
 if CASE == 'everyday':
     # someone whose card is an everyday word
     turn('我也来', '10006', '周末', group=G1, msg_id='e0')

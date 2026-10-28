@@ -264,7 +264,7 @@ class Nightly(unittest.TestCase):
         # what others said of him before: 某人 as soon as the owner deletes him
         self.assertEqual(r['phone_before_delete'][1], '周末打副本 阿星来不来')
         self.assertEqual(r['phone_at_once'][0], '周末打副本 某人来不来')
-        self.assertEqual(r['deleted']['data']['counts']['phone_named'], 1)
+        self.assertEqual(r['deleted']['data']['counts']['named'].get('phone'), 1)
         # what is kept of what others say of him: 某人, after a restart too
         self.assertEqual(r['phone_before_restart'][-1], '某人今天在吗')
         self.assertEqual(r['phone_after_restart'][-1], '某人呢')
@@ -278,6 +278,20 @@ class Nightly(unittest.TestCase):
         self.assertEqual(r['night'], {'group:900001': {'called': 1, 'written': 1}})
         self.assertEqual(r['events'], ['芒果说好呀'])
         self.assertFalse(r['registry_has_name'])                   # only hashes of his names
+
+    def test_a_deleted_persons_name_everywhere_at_once(self):
+        r = run_case('everywhere')
+        self.assertIn('memory/library.json', r['before'])            # what others said of him, remembered
+        # the owner deletes him: nowhere she keeps things has his name any more, at once
+        self.assertEqual(r['at_once'], [])
+        self.assertIn('library', r['deleted']['data']['counts']['named'])
+        # a reply before any restart: not in what she recalls, not written back anywhere
+        self.assertNotIn('阿星', r['prompt'])
+        self.assertIn('某人', r['prompt'])
+        self.assertEqual(r['after_a_turn'], [])
+        # and a restart makes no new copy that has it
+        self.assertNotIn('阿星', r['prompt_after_restart'])
+        self.assertEqual((r['after_restart'], r['archives']), ([], []))
 
     def test_a_name_that_is_an_everyday_word(self):
         r = run_case('everyday')

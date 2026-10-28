@@ -139,6 +139,13 @@ class Names(unittest.TestCase):
             self.assertEqual(reg.names_in('周末说他不来'), {'周末': '10006'})
             self.assertEqual(reg.names_in('@周末 来不来'), {'周末': '10006'})
 
+    def test_english_names_in_any_case(self):
+        with fr.ForgetRegistry(None) as reg:
+            reg.remember_names('10007', ['Tom'])
+            self.assertEqual(reg.names_in('tom来了'), {'tom': '10007'})
+            self.assertEqual(reg.names_in('TOM说他不来，Tom也是'), {'TOM': '10007', 'Tom': '10007'})
+            self.assertEqual(reg.names_in('tomorrow见'), {})
+
     def test_each_registry_its_own_salt(self):
         with fr.ForgetRegistry(None) as one, fr.ForgetRegistry(None) as two:
             one.remember_names('10003', ['阿星'])
