@@ -394,16 +394,6 @@
     "type": "int",
     "default": 0
   },
-  "bc_prompt_mode": {
-    "description": "提示词模式（原型）",
-    "hint": "telemetry=现有 [BC] 数值 telemetry（默认）；semantic=60–150 字自然语言 brief 原型。异常自动回退 telemetry。",
-    "type": "string",
-    "default": "telemetry",
-    "options": [
-      "telemetry",
-      "semantic"
-    ]
-  },
   "event_ranking_llm": {
     "description": "事件排序 LLM 重排（默认关）",
     "hint": "默认走确定性打分（importance/recency/salience）；仅开启且全局配置了 rerank provider 时才调用 LLM 重排。",
@@ -461,5 +451,11 @@
     "hint": "默认 1500ms；超时返回 None（等同无 embedding），不阻塞回复。范围 100–15000；仅在实测调用侧 p95<200ms 时才建议降到 300ms。",
     "type": "int",
     "default": 1500
+  },
+  "notebook_time": {
+    "description": "她写本子的时间",
+    "hint": "每天本地时间到点以后写一次（HH:MM，默认 23:30）。开关在面板的模型功能里（“她的本子”），默认关闭；每天最多调 1 次模型，失败也算。",
+    "type": "string",
+    "default": "23:30"
   }
 }

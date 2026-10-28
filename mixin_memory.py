@@ -613,15 +613,17 @@ class MemoryMixin:
             return max(3, min(6, int(getattr(self, "cowan_capacity", 4) or 4)))
         return max(4, self._memory_top_k(core) * 2)
 
-    def _memory_top_k(self, core) -> int:
+    def _memory_top_k(self, core, partner_trust=None) -> int:
+        """ams-life: `partner_trust` is the trust in the person she is answering (passed in;
+        there is no global trust); she recalls a little more for someone she trusts."""
         k = 4
+        if partner_trust is not None and float(partner_trust) > 0.65:
+            k += 1
         if core is not None:
             if float(getattr(core, "stress", 0.0)) > 0.65:
                 k -= 1
             if float(getattr(core, "energy", 1.0)) < 0.35:
                 k -= 1
-            if float(getattr(core, "trust", 0.0)) > 0.65:
-                k += 1
             if float(getattr(core, "attention", 0.5)) > 0.7:
                 k += 1
             elif float(getattr(core, "attention", 0.5)) < 0.3:
@@ -706,9 +708,6 @@ class MemoryMixin:
             _summary_use_llm = self._llm_allowed("memory_summary")
             provider = await self._provider_for("memory_summary", event) if _summary_use_llm else None
             now = time.time()
-            _segments = self._segment_event_texts(entries)
-            if not _segments:
-                _segments = [[str(e.get("text", "")).strip() for e in entries if str(e.get("text", "")).strip()]]
             _attachments = []
             for _e in entries:
                 try:
@@ -938,6 +937,11 @@ class MemoryMixin:
                     item = str(item or "").strip()
                     if item:
                         texts.append(item)
+            # ams-life: her notebook (a score only; nothing of it is shown here)
+            for item in (model.get("notebook") or []):
+                item = str((item or {}).get("text") if isinstance(item, dict) else "").strip()
+                if item:
+                    texts.append(item)
         except Exception:
             pass
         return texts[:24]
@@ -1177,6 +1181,10 @@ class MemoryMixin:
             "gate": "none", "conflicts": 0}
         turn.setdefault("cause_trace", [])
         turn.setdefault("memory_entries", [])
+        try:
+            _partner_trust = float((self._relationship_of(user_data).get("state") or {}).get("trust", 0.5) or 0.5)
+        except Exception:
+            _partner_trust = None
         if not self.memory_dedup_embedding or not self._usable_memory_text(text):
             return ""
         doc = self._load_memory(event)
@@ -1402,7 +1410,7 @@ class MemoryMixin:
         self._schedule_consolidation(event, core)
         scored.sort(key=lambda x: x[0], reverse=True)
         top = memory_meta.select_top(
-            scored, self._memory_top_k(core),
+            scored, self._memory_top_k(core, _partner_trust),
             lambda_=(0.72 if getattr(self, "hybrid_retrieval", True) else 1.0))
         try:
             turn["memory_trace"] = self._apply_memory_trace(core, [e for _s, e in top])
@@ -1579,12 +1587,11 @@ class MemoryMixin:
                 _foreign.append((_escore, _verdict, _entry))
             _foreign.sort(key=lambda item: item[0], reverse=True)
             for _escore, _verdict, _entry in _foreign[:2]:
-                _erole = str(_entry.get("role") or "user")
-                _who = "你" if _erole in ("assistant", "summary") else (
-                    str(_entry.get("sender_name") or _entry.get("sender_id") or "").strip() or "有人")
+                # said elsewhere: never "对方" (that would tell who), and without names when anon
+                _who = self._recall_who(_entry, "", anon=_verdict == discretion.ANON)
                 _line = "%s：%s" % (_who, str(_entry.get("text") or "").strip().replace("\n", " ")[:200])
                 if _verdict == discretion.ANON:
-                    _line = discretion.anonymize(_line, discretion.names_in(_entry))
+                    _line = self._anonymized(_line, discretion.names_in(_entry))
                 _foreign_lines.append("- （别处）" + _line)
                 _known_texts.add(str(_entry.get("text") or "").strip())
         except Exception:
@@ -1641,13 +1648,9 @@ class MemoryMixin:
                 pass
         _gate = str(_meta.get("gate") or "none")
         lines = []
+        _speaker_id = str(self._speaker(event)[0] or "")
         for score, e in top:
-            _entry_role = str(e.get("role") or "user")
-            role = "你(已总结)" if _entry_role == "summary" else ("你" if _entry_role == "assistant" else "用户")
-            if _entry_role not in ("assistant", "summary"):
-                who = str(e.get("sender_name") or e.get("sender_id") or "").strip()
-                if who:
-                    role = who
+            role = self._recall_who(e, _speaker_id)
             snippet = str(e.get("text", "")).strip().replace("\n", " ")
             if getattr(self, "sentence_dedup_enabled", False):
                 snippet = self._dedupe_sentences(snippet)
@@ -1663,6 +1666,24 @@ class MemoryMixin:
             _meta["abstain"] = True
             return ""
         return memory_text
+
+    @staticmethod
+    def _recall_who(entry, speaker_id="", anon=False) -> str:
+        """ams-life: who a recalled memory came from, as the reply model sees it (the owner,
+        step 1-2). Never a QQ number. What was said here (the same group, or his own private
+        chat) keeps the nickname; what was said openly elsewhere is anonymous (有人)."""
+        role = str(entry.get("role") or "user")
+        if role == "summary":
+            return "她总结过"
+        if role == "assistant":
+            return "她自己说过"
+        if anon:
+            return "有人说过"
+        name = str(entry.get("sender_name") or "").strip()
+        if name and not name.isdigit():
+            return name + "说过"
+        sid = str(entry.get("sender_id") or "")
+        return "对方说过" if speaker_id and sid == str(speaker_id) else "有人说过"
 
     async def _remember(self, event, text: str, role: str = "user", core=None):
         if not self.memory_dedup_embedding or not self._usable_memory_text(text):

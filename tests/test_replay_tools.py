@@ -20,15 +20,6 @@ import fake_old_data as fake  # noqa: E402
 from tools import _guard, audit_replay, import_old  # noqa: E402
 
 
-def passes_but_asker_number(result):
-    """On main every reply prompt still carries the asker's own QQ number (spk=name（number）);
-    PR #4 takes it out. Until this branch sits on PR #4: everything else must pass, and the qq
-    check may only fail on the asker's own number."""
-    others = {k: v for k, v in result['checks'].items() if k != 'qq'}
-    qq = result['checks']['qq']
-    return all(v['pass'] for v in others.values()) and         all(e.get('asker_own') for e in qq['examples']) and qq['fails'] == qq.get('warnings', {}).get('asker_own_number', 0)
-
-
 def run_replay(chat, registry, out, *extra):
     env = dict(os.environ, PYTHONHASHSEED='0')
     env.pop('AMS_LIFE_DATA_DIR', None)
@@ -81,7 +72,7 @@ class Replay(unittest.TestCase):
 
     def test_audit_passes(self):
         result = audit_replay.audit(self.out, self.chat)
-        self.assertTrue(passes_but_asker_number(result), json.dumps(result['checks'], ensure_ascii=False, indent=1))
+        self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
         self.assertGreater(result['prompts']['reply'], 0)
 
     def test_audit_catches_a_leak(self):
@@ -124,8 +115,8 @@ class Replay(unittest.TestCase):
                                    ('model', 'group:' + fake.G_BUSY, '整理：' + fake.PEACH + ' 说了什么')])
             checks = audit_replay.audit(bad, self.chat)['checks']
             self.assertTrue(any(e['place'] == '私聊1' for e in checks['names']['examples']))
-            qq = checks['qq']   # on main every reply prompt also has the asker's own number
-            self.assertEqual(qq['fails'], qq['warnings']['asker_own_number'] + 1)
+            self.assertEqual(checks['qq']['fails'], 1)
+            self.assertEqual(checks['qq']['examples'][0]['kind'], 'model')
 
     def test_refuses_a_live_folder_and_says_what_it_cannot_see(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -144,7 +135,7 @@ class Replay(unittest.TestCase):
             stats = json.loads((Path(tmp) / 'r' / 'replay.json').read_text('utf-8'))['stats']
             self.assertFalse([k for k in stats if k.startswith('skipped_') and k != 'skipped_empty'])
             result = audit_replay.audit(Path(tmp) / 'r', self.chat)
-            self.assertTrue(passes_but_asker_number(result))
+            self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
             self.assertIn('skipped', result['checks']['forgotten'])
 
     def test_cutoff_reading(self):
@@ -153,7 +144,8 @@ class Replay(unittest.TestCase):
             stats = json.loads((Path(tmp) / 'r' / 'replay.json').read_text('utf-8'))['stats']
             self.assertNotIn('skipped_optout', stats)      # what he said after asking is kept
             self.assertEqual(stats['skipped_forgotten'], 1)
-            self.assertTrue(passes_but_asker_number(audit_replay.audit(Path(tmp) / 'r', self.chat)))
+            result = audit_replay.audit(Path(tmp) / 'r', self.chat)
+            self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
 
 
 if __name__ == '__main__':

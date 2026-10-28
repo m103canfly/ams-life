@@ -153,6 +153,7 @@ EVENT_SUMMARY_SMALL_MAX = 80
 EVENT_SUMMARY_HISTORY_MAX = 20
 USER_DIR = DATA_DIR / "users"
 SELF_MODEL_PATH = DATA_DIR / "self_model.json"
+OWNER_RULES_PATH = DATA_DIR / "owner_rules.json"
 INSIGHT_ARCHIVE_PATH = EVENT_ARCHIVE_DIR / "insights.jsonl"
 # M3/M4 embedding infrastructure (registered in
 # docs/BIOCORE-ENGINEERING-APPROX-v1.md, "C-S1/C-S2" table): the cache key and
@@ -183,16 +184,27 @@ DEFAULT_PROFILE = {
     "autonomy_gain": 1.0, "contagion_gain": 0.10, "baseline_v": 0.05, "baseline_a": 0.40,
 }
 
-# G3: one-shot bounded seed of core.trust from the persisted user record
-# (cold start / context rebuild only; never every turn, to avoid oscillation).
-TRUST_SEED_WEIGHT = 0.2
-TRUST_SEED_MAX_DELTA = 0.05
+# ams-life: her own urges (numbers only; see BioCore.record_talk / be_seen).
+TALKED_HALF_LIFE_MIN = 240.0   # having talked a lot fades by half in 4 hours
+SEEN_HALF_LIFE_MIN = 360.0     # wanting to be seen grows halfway back to 1 in 6 hours
+SEEN_RELIEF = 0.4              # someone answering her keeps 40% of it
+AMBIENT_WINDOW_SECONDS = 1800  # how lively the chats are: others' messages in the last 30 minutes
+AMBIENT_BUSY_COUNT = 30        # ... this many or more is as lively as it gets
+# Her heart (step 1-2): only what she writes herself, in her notebook.
+NOTEBOOK_MAX = 20              # entries
+NOTEBOOK_CHARS = 40            # characters per entry
+NOTEBOOK_EDITS = 3             # changes per night in all sittings (add / edit / delete)
+NOTEBOOK_PRIVATE_MAX = 3       # private chats she writes about a night (the busiest)
+OWNER_RULES_MAX = 10           # the owner's rules (written in the panel, shown everywhere)
+OWNER_RULES_CHARS = 100
+# The sentences BioCore wrote for her; cleared, her heart is not written for her.
+PRESET_SELF = {"who_am_i": "一个会持续受聊天影响、但不会被单条消息完全定义的角色。",
+               "boundaries": ["不接受被当作没有感受的工具", "不会被一次互动改写全部立场"],
+               "consistency": ["情绪会变，但核心立场不因单次互动翻转"]}
 
 # D5: stable default shape for the page-status memory-trace projection.
 DEFAULT_MEMORY_TRACE = {"count": 0, "valence": 0.0, "stress_delta": 0.0, "entry_ids": []}
 
-# G15: reflection-tree nodes older than this are hidden on read (soft forget).
-REFLECTION_TREE_TTL_DAYS = 90.0
 
 # Task-15: noise -> autonomy (L1 computes; default OFF, private chat only).
 NOISE_CLAMP = 0.30
@@ -282,7 +294,7 @@ LLM_FUNCTIONS = (
     "empathy_hint",
     "pragmatics_hint",
     "tom_probe",
-    "diary",
+    "notebook",
     "relationship_narrative",
     "humor_hint",
 )
@@ -298,7 +310,7 @@ LLM_FUNCTION_DEFAULTS = {
     "empathy_hint": False,
     "pragmatics_hint": False,
     "tom_probe": False,
-    "diary": False,
+    "notebook": False,
     "relationship_narrative": False,
     "humor_hint": False,
 }
@@ -316,6 +328,7 @@ LLM_FUNCTION_ALIASES = {
     "empathy": "empathy_hint",
     "pragmatics": "pragmatics_hint",
     "tom": "tom_probe",
+    "diary": "notebook",
     "narrative": "relationship_narrative",
     "humor": "humor_hint",
 }
@@ -327,7 +340,6 @@ LLM_V2_COOLDOWNS = {
     "empathy_hint": 900,
     "pragmatics_hint": 900,
     "tom_probe": 600,
-    "diary": 72000,
     "relationship_narrative": 86400,
     "humor_hint": 900,
 }
@@ -688,24 +700,6 @@ EMOTION_SPECTRUM = [
     ("nostalgia", "怀念", 0.30, 0.30, 0.40, 0.60),
     ("pride", "自豪", 0.60, 0.50, 0.90, 0.60),
 ]
-
-def circadian_alertness(hour: Any) -> float:
-    """Deterministic local-hour alertness (0..1); no LLM/network."""
-    try:
-        h = float(hour) % 24.0
-    except Exception:
-        h = 12.0
-    anchors = ((0.0, 0.25), (3.0, 0.20), (6.0, 0.35), (8.0, 0.85),
-               (10.0, 0.95), (13.0, 0.78), (15.0, 0.72), (17.0, 0.88),
-               (20.0, 0.70), (23.0, 0.45), (24.0, 0.25))
-    for i in range(1, len(anchors)):
-        if h <= anchors[i][0]:
-            x0, y0 = anchors[i - 1]
-            x1, y1 = anchors[i]
-            if x1 <= x0:
-                return round(y1, 3)
-            return round(y0 + (y1 - y0) * (h - x0) / (x1 - x0), 3)
-    return 0.25
 
 
 class _AutonomySendTarget:

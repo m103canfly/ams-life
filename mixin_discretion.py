@@ -49,6 +49,76 @@ class DiscretionMixin:
         return True
 
     # ------------------------------------------------------------------
+    # Every name a person is known by, for making things anonymous.
+    # ------------------------------------------------------------------
+    def register_name_source(self, source) -> None:
+        """Add a source of names: source(person_id) -> names. For what she calls people
+        (step 1-3's impressions) to join the names below."""
+        sources = getattr(self, "_name_sources", None)
+        if not isinstance(sources, list):
+            sources = self._name_sources = []
+        if source not in sources:
+            sources.append(source)
+
+    def _names_index(self) -> dict:
+        """person id -> the nicknames and group cards seen with it: from every chat window
+        and the memory library once, then kept up as messages come (_note_name)."""
+        idx = getattr(self, "_name_index", None)
+        if isinstance(idx, dict):
+            return idx
+        idx = self._name_index = {}
+        for place in self._window_places():
+            for x in self._read_window(place)["recent"]:
+                self._note_name(x.get("sender_id"), x.get("sender_name"))
+        for e in self._read_library()["entries"]:
+            if not isinstance(e, dict):
+                continue
+            self._note_name(e.get("sender_id"), e.get("sender_name"))
+            prov = e.get("provenance") if isinstance(e.get("provenance"), dict) else {}
+            for src in [prov] + [s for s in (prov.get("sources") or []) if isinstance(s, dict)]:
+                self._note_name(src.get("sender_id"), src.get("sender_name"))
+        return idx
+
+    def _note_name(self, person, name) -> None:
+        person, name = str(person or "").strip(), str(name or "").strip()
+        idx = getattr(self, "_name_index", None)
+        if not person or not name or not isinstance(idx, dict):
+            return
+        idx.setdefault(person, set()).add(name)
+
+    def _known_names(self, people) -> list:
+        """Every name these people are known by: the ids themselves, the nicknames and
+        group cards they used in any window or memory, the names kept in their
+        relationship records, and whatever the registered name sources add."""
+        idx = self._names_index()
+        out = set()
+        for person in people or []:
+            person = str(person or "").strip()
+            if not person:
+                continue
+            out.add(person)
+            out |= idx.get(person, set())
+            try:
+                safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in person)[:60]
+                path = USER_DIR / (safe + ".json")
+                if path.exists():
+                    rec = json.loads(path.read_text(encoding="utf-8"))
+                    out |= {str(x) for x in [rec.get("sender_name")] + list(rec.get("names") or []) if x}
+            except Exception:
+                pass
+            for source in getattr(self, "_name_sources", None) or []:
+                try:
+                    out |= {str(x) for x in (source(person) or []) if x}
+                except Exception as exc:
+                    logger.warning("[ams-life] name source failed: %s", exc)
+        return sorted(out)
+
+    def _anonymized(self, text, names) -> str:
+        """`text` without any name of the people in `names` (ids or names): each id brings
+        every name that person is known by."""
+        return discretion.anonymize(text, self._known_names(names))
+
+    # ------------------------------------------------------------------
     # Events (the one global archive; each record carries its origin).
     # ------------------------------------------------------------------
     def _visible_events(self, event, events) -> list:
@@ -62,7 +132,7 @@ class DiscretionMixin:
             if v == discretion.DROP:
                 continue
             if v == discretion.ANON:
-                names = discretion.names_in(ev)
+                names = self._known_names(discretion.names_in(ev))
                 ev = dict(ev)
                 for key in _EVENT_TEXT_FIELDS:
                     if ev.get(key):
@@ -73,15 +143,12 @@ class DiscretionMixin:
     # ------------------------------------------------------------------
     # Her self-description and the speaker's relationship record.
     # ------------------------------------------------------------------
-    def _self_model_for(self, event) -> dict:
-        """Self model as seen from here: the "recently" narrative only keeps lines allowed here.
-
-        Narrative text written before ams-life has no origin and is left out.
-        """
-        model = dict(self.self_model or {})
+    def _notebook_for(self, event) -> list:
+        """Her notebook as she may bring it up here: each entry by its origin (private ones
+        only in that private chat, others' public ones without names, her own anywhere)."""
         here = self._here(event)
         lines = []
-        for item in model.get("narrative_items") or []:
+        for item in (self.self_model or {}).get("notebook") or []:
             if not isinstance(item, dict):
                 continue
             v = discretion.verdict(discretion.origin_of(item), here)
@@ -89,11 +156,28 @@ class DiscretionMixin:
                 continue
             text = str(item.get("text") or "")
             if v == discretion.ANON:
-                text = discretion.anonymize(text, discretion.origin_of(item)["people"] + list(item.get("names") or []))
+                text = self._anonymized(text, discretion.origin_of(item)["people"] + list(item.get("names") or []))
             if text:
                 lines.append(text)
-        model["narrative"] = "；".join(lines)[:600]
+        return lines
+
+    def _self_model_for(self, event) -> dict:
+        """Self model as seen from here: "narrative" is her notebook, only the entries
+        allowed here (used for goal relevance)."""
+        model = dict(self.self_model or {})
+        model["narrative"] = "；".join(self._notebook_for(event))[:600]
         return model
+
+    def _owner_rules(self) -> list:
+        """The owner's rules, written in the panel; every chat's reply sees them."""
+        try:
+            if OWNER_RULES_PATH.exists():
+                data = json.loads(OWNER_RULES_PATH.read_text(encoding="utf-8"))
+                rules = data.get("rules") if isinstance(data, dict) else []
+                return [str(x)[:OWNER_RULES_CHARS] for x in (rules or []) if str(x or "").strip()][:OWNER_RULES_MAX]
+        except Exception as exc:
+            logger.warning("[ams-life] owner rules read failed: %s", exc)
+        return []
 
     def _user_view(self, event, user_data) -> dict:
         """The speaker's record as shown here: shared memories only in his own private chat.
@@ -118,7 +202,8 @@ class DiscretionMixin:
         """Delete every memory, event, note and phone line that came from `person`
         (or from one of `source_ids`), and his relationship record.
 
-        Returns counts per store. Files moved aside by the one-her migration
+        Returns counts per store (memories, events, insights, relationship, notes incl. her
+        notebook, phone). Files moved aside by the one-her migration
         (per-session legacy/archive folders) are not touched here. Every call
         is logged; the log length is the forget count (see _job_stale).
         """
@@ -128,8 +213,10 @@ class DiscretionMixin:
             return {}
         if not isinstance(getattr(self, "_forget_log", None), list):
             self._forget_log = []
+        if person and isinstance(getattr(self, "_name_index", None), dict):
+            self._name_index.pop(person, None)
         self._forget_log.append((person, list(ids)))
-        counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0}
+        counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0, "insights": 0}
 
         def about(item):
             return discretion.is_about(discretion.origin_of(item), person, ids)
@@ -151,8 +238,8 @@ class DiscretionMixin:
         if counts["memories"] or person:
             self._write_library(lib)
 
-        # 2) the event archive and its per-place copies
-        paths = [EVENT_ARCHIVE_PATH]
+        # 2) the event archive and its per-place copies, and the insights drawn from events
+        paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
         if EVENT_SESSION_DIR.exists():
             paths.extend(sorted(EVENT_SESSION_DIR.glob("*/events.jsonl")))
         for path in paths:
@@ -175,6 +262,8 @@ class DiscretionMixin:
                 os.replace(str(tmp), str(path))
                 if path == EVENT_ARCHIVE_PATH:
                     counts["events"] += dropped
+                elif path == INSIGHT_ARCHIVE_PATH:
+                    counts["insights"] = dropped
 
         # 3) his relationship record
         if person:
@@ -186,7 +275,7 @@ class DiscretionMixin:
 
         # 4) her notes about him (narrative lines, diary, relationship narratives)
         changed = False
-        for key in ("narrative_items", "diary", "relationship_narratives"):
+        for key in ("narrative_items", "diary", "relationship_narratives", "notebook"):
             items = self.self_model.get(key)
             if not isinstance(items, list):
                 continue
