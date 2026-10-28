@@ -209,6 +209,11 @@ class AutonomyMixin:
                     pass
                 try:
                     self._begin_job()
+                    await self._maybe_daily_digest()
+                except Exception as exc:
+                    logger.warning("[ams-life] daily digest failed: %s", exc)
+                try:
+                    self._begin_job()
                     await self._maybe_write_notebook()
                 except Exception as exc:
                     logger.warning("[ams-life] notebook failed: %s", exc)

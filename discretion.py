@@ -24,6 +24,11 @@ from __future__ import annotations
 
 import re
 
+try:
+    from . import everyday_words
+except ImportError:
+    import everyday_words
+
 PUBLIC, PRIVATE, SELF = "public", "private", "self"
 FULL, ANON, DROP = "full", "anon", "drop"
 SOMEONE = "有人"
@@ -129,8 +134,15 @@ def verdict(origin, here) -> str:
 
 
 # a one-character name ("鹿") is only a name where it plainly means someone: after an @, or
-# as the one who says something ("鹿说", "鹿：") -- never inside other words ("小鹿乱撞")
+# as the one who says something ("鹿说", "鹿：") -- never inside other words ("小鹿乱撞");
+# so is a name that is an everyday word ("周末": "周末说" is him, "周末一起玩" is not)
 _HAN = "一-鿿"
+
+
+def plain_word(name) -> bool:
+    """A name only taken for one where it plainly means someone (see _one_char_name)."""
+    name = str(name or "")
+    return (len(name) < 2 and not name.isdigit()) or name in everyday_words.WORDS
 _SAYS = "说|讲|问|答|觉得|认为|提到|：|:"
 
 
@@ -155,7 +167,7 @@ def anonymize(text, names, to=SOMEONE) -> str:
     for name in sorted({str(n).strip() for n in (names or []) if str(n or "").strip()}, key=len, reverse=True):
         if name in _NOT_PEOPLE:
             continue
-        if len(name) < 2 and not name.isdigit():
+        if plain_word(name):
             out = _one_char_name(name).sub(lambda m: ("@" if m.group(0).startswith("@") else "") + to, out)
             continue
         if _is_english(name):

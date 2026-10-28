@@ -25,6 +25,7 @@ class PeopleMixin:
             "narrative_items": [],
             "notebook": [],
             "notebook_night": {},       # tonight's sittings tried (a failed try counts) and changes made
+            "digest_night": {},         # tonight's windows gone over (by a hash of each; a failed try counts)
             "heart": 1,
             "version": 0,
             "_history": [],
@@ -76,6 +77,23 @@ class PeopleMixin:
         out["_history"] = []
         return out
 
+    def _save_night_marks(self) -> None:
+        """Only tonight's marks (windows gone over, notebook sittings tried), into the file as it
+        is: written even when the registry cannot be read, so a restart does not call again."""
+        try:
+            raw = json.loads(SELF_MODEL_PATH.read_text(encoding="utf-8")) if SELF_MODEL_PATH.exists() else {}
+            if not isinstance(raw, dict):
+                return
+            for key in ("digest_night", "notebook_night"):
+                if key in (self.self_model or {}):
+                    raw[key] = self.self_model[key]
+            SELF_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = SELF_MODEL_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(raw, ensure_ascii=False, indent=1), encoding="utf-8")
+            atomic_file.replace(tmp, SELF_MODEL_PATH)
+        except Exception as exc:
+            logger.warning("[ams-life] night marks not written: %s", exc)
+
     def _save_self_model(self) -> None:
         try:
             # ams-life: nothing the forget registry rules out stays in her notes; when the
@@ -87,6 +105,7 @@ class PeopleMixin:
                          if isinstance(self.self_model.get(_key), list)}
             except forget_registry.Unreadable as exc:
                 logger.warning("[ams-life] forget registry unreadable, self model not written: %s", exc)
+                self._save_night_marks()
                 return
             SELF_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
             self.self_model["version"] = int(self.self_model.get("version", 0) or 0) + 1

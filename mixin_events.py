@@ -11,6 +11,10 @@ try:
     from .body import *  # noqa: F401,F403
 except ImportError:
     from body import *  # noqa: F401,F403
+try:
+    from . import digest
+except ImportError:
+    import digest
 
 
 def _merged_origin(item, other) -> dict:
@@ -1244,11 +1248,17 @@ class EventsMixin:
             pass
 
     def _event_context(self, event) -> str:
-        events = self._visible_events(event, self._event_archive(9))
-        if not events:
-            return ""
+        """[最近的事]: the weightiest 3 of the last 9 events as before (the nightly notes of
+        each window left out of those), then at most digest.PER_REPLY of the nightly notes:
+        of this window, to do with this message (digest.for_reply)."""
+        archive = self._event_archive(60)
+        events = self._visible_events(event, [e for e in archive if not digest.is_digest(e)][:9])
         events = sorted(events, key=lambda e: float(e.get("importance", 0.0) or 0.0) *
                         (0.5 + 0.5 * float(e.get("centrality", 0.5) or 0.5)), reverse=True)[:3]
+        events += self._visible_events(event, digest.for_reply(
+            str(getattr(event, "message_str", "") or ""), archive, self._here(event)))
+        if not events:
+            return ""
         lines = []
         for ev in events:
             title = str(ev.get("title") or "").strip()
@@ -1291,7 +1301,7 @@ class EventsMixin:
             return []
 
     _KEPT_TEXT_KEYS = ("text", "event", "title", "small_summary", "big_summary", "meaning_to_her", "reflection",
-                       "summary", "insight", "lesson")
+                       "summary", "insight", "lesson", "event_key")
 
     def _keep_record_text(self, record, what) -> bool:
         """Before an event or an insight is written: numbers out of its text; False when it

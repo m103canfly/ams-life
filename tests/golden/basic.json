@@ -2,6 +2,10 @@
  "files": {
   "api_config.json": {
    "functions": {
+    "daily_digest": {
+     "enabled": false,
+     "provider": "follow_llm"
+    },
     "empathy_hint": {
      "enabled": false,
      "provider": "follow_llm"
@@ -396,7 +400,9 @@
    ]
   },
   "forget_registry.sqlite3": {
-   "forget": []
+   "forget": [],
+   "meta": [],
+   "names": []
   },
   "memory/library.json": {
    "entries": [
@@ -5809,6 +5815,7 @@
    ],
    "boundaries": [],
    "consistency": [],
+   "digest_night": {},
    "heart": 1,
    "narrative": "",
    "narrative_items": [],
@@ -7250,6 +7257,11 @@
      "voice": ""
     },
     "functions": {
+     "daily_digest": {
+      "default_enabled": false,
+      "enabled": false,
+      "provider": "follow_llm"
+     },
      "empathy_hint": {
       "default_enabled": false,
       "enabled": false,
@@ -8096,6 +8108,11 @@
    },
    "last_strategy_hint": "",
    "llm_functions": {
+    "daily_digest": {
+     "default_enabled": false,
+     "enabled": false,
+     "provider": "follow_llm"
+    },
     "empathy_hint": {
      "default_enabled": false,
      "enabled": false,
@@ -10802,6 +10819,7 @@
     "boundaries": [],
     "consistency": [],
     "diary": [],
+    "digest_night": {},
     "heart": 1,
     "narrative": "",
     "narrative_items": [],

@@ -192,7 +192,15 @@ class ImpressionsMixin:
         owner named, every name they are known by -- the owner's and those seen elsewhere."""
         who = {str(x.get("sender_id") or "") for x in lines if isinstance(x, dict) and x.get("role") != "assistant"}
         who |= set(self._impression_store().load(place)["people"]) | set(self._owner_aliases())
-        return {qq: [n for n in self._known_names([qq]) if n != qq] for qq in sorted(who) if qq}
+        out = {qq: [n for n in self._known_names([qq]) if n != qq] for qq in sorted(who) if qq}
+        # and the names of people the owner deleted, as others say them here
+        for x in lines:
+            if isinstance(x, dict):
+                for name, qq in self._gone_names_in(x.get("text")).items():
+                    out.setdefault(qq, [])
+                    if name not in out[qq]:
+                        out[qq].append(name)
+        return out
 
     async def _maybe_update_impressions(self, now=None) -> dict:
         """Each group window once a day after impressions_time; impressions.nightly marks the

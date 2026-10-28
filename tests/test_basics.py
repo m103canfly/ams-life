@@ -82,7 +82,10 @@ class Split(unittest.TestCase):
         # brain map stage 2: +14 (mixin_brain: three read-only pages, noting each turn's recall)
         # review of PR #11: +3 (_brain_build in a worker thread, _registry_keeps, _origin_args);
         # main merged into PR #11: -1 for _brain_person_kept, no one called it
-        self.assertEqual(len(methods), 326)
+        # what happened today in each window: +6 (mixin_digest); review of PR #15: +2
+        # (_gone_names_in: names of people the owner deleted; _save_night_marks), then +1
+        # (_scrub_stores: what others said of him, 某人 everywhere as soon as he is deleted)
+        self.assertEqual(len(methods), 335)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

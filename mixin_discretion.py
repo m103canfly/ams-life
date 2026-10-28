@@ -220,6 +220,16 @@ class DiscretionMixin:
                 self._her_ids = set()
             self._her_ids.add(sid)
 
+    def _gone_names_in(self, text) -> dict:
+        """{name: qq}: names of people the owner deleted that `text` holds (forget_registry.names_in)."""
+        if not str(text or ""):
+            return {}
+        try:
+            return self._registry().names_in(text)
+        except Exception as exc:
+            logger.warning("[ams-life] deleted names could not be looked up: %s", exc)
+            return {}
+
     def _gone_people(self) -> set:
         """People the forget registry rules out now (reread when it grows)."""
         try:
@@ -274,8 +284,13 @@ class DiscretionMixin:
                 if qq in gone and name:
                     seen.setdefault(qq, set()).add(name)
             out = discretion.strip_numbers(text, numbers, her, HER_NAME, gone, ats)
+            hits = self._gone_names_in(text)   # names of people the owner deleted
+            for name, qq in hits.items():
+                seen.setdefault(qq, set()).add(name)
+            names = set(hits)
             if gone:
-                names = {n for p in gone for n in gone_names[p] | seen.get(p, set()) if not str(n).isdigit()}
+                names |= {n for p in gone for n in gone_names[p] | seen.get(p, set()) if not str(n).isdigit()}
+            if names:
                 out = discretion.anonymize(out, names, to=discretion.SOMEBODY)
             return out
         return scrub
@@ -290,7 +305,7 @@ class DiscretionMixin:
     # relationship records): numbers are taken out of these, never out of ids
     _SCRUB_KEYS = {"text", "latest_text", "title", "key", "event", "small_summary", "big_summary",
                    "meaning_to_her", "reflection", "summary", "insight", "lesson", "image_caption",
-                   "voice_text", "source_texts", "evidence", "narrative"}
+                   "voice_text", "source_texts", "evidence", "narrative", "event_key", "merged_event_keys"}
 
     def _scrub_tree(self, obj, scrub, key=None):
         """`obj` with the text fields scrubbed (a new object; ids and numbers fields untouched)."""
@@ -303,16 +318,26 @@ class DiscretionMixin:
         return obj
 
     def _migrate_numbers(self) -> dict:
-        """Numbers kept before step 1-3-5 (an @ with a number, anyone's number in a text, a
-        deleted person's name) are taken out of the library, her phone, events and insights,
-        the relationship records and her notes. Each file that changes is copied into
-        MEMORY_ARCHIVE_DIR first (never deleted); nothing to change: nothing is written."""
+        """At start: numbers kept before step 1-3-5 (an @ with a number, anyone's number in a
+        text, a deleted person's name) are taken out of everything she keeps (_scrub_stores);
+        each file that changes is copied into MEMORY_ARCHIVE_DIR first (never deleted)."""
+        return self._scrub_stores(keep_copies=True)
+
+    def _scrub_stores(self, keep_copies=False) -> dict:
+        """Everything she keeps scrubbed again (_scrub: no number she knows of, someone deleted
+        is 某人): the library, her phone, events (and each place's copy) and insights, the
+        relationship records and her notes; nothing to change: nothing is written. With
+        keep_copies each file that changes is copied into MEMORY_ARCHIVE_DIR first (at start);
+        without (the owner has just deleted someone) nothing is copied: a copy would keep his
+        name. Returns how many files changed, by store."""
         scrub = self._scrubber()
         stamp = time.strftime("%Y%m%d-%H%M%S")
         folder = MEMORY_ARCHIVE_DIR / ("before-numbers-" + stamp)
         counts = {}
 
         def archive(path):
+            if not keep_copies:
+                return
             if path == MEMORY_LIBRARY_PATH:
                 dest = MEMORY_ARCHIVE_DIR / ("library.before-numbers-%s.json" % stamp)
             else:
@@ -867,8 +892,17 @@ class DiscretionMixin:
         person = str(person or "").strip()
         if not person:
             return {}
-        self._registry().owner_delete(person=person)
-        return self._forget(person=person)
+        # every name she knows him by now, kept as hashes (see forget_registry): someone else
+        # saying it later is 某人, and in the nightly material a code, after a restart too
+        names = set(self._known_names([person])) | set((getattr(self, "_gone_names", None) or {}).get(person) or ())
+        reg = self._registry()
+        reg.owner_delete(person=person)
+        reg.remember_names(person, names)
+        counts = self._forget(person=person)
+        # what others said of him, wherever she keeps it: 某人, now (not at the next restart,
+        # and with no copy made first)
+        counts["named"] = self._scrub_stores(keep_copies=False)
+        return counts
 
     def _owner_forget_memory(self, entry_id) -> dict:
         """Delete one memory: it, and everything else that came from the messages it came

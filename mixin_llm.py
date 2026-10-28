@@ -11,6 +11,10 @@ try:
     from .body import *  # noqa: F401,F403
 except ImportError:
     from body import *  # noqa: F401,F403
+try:
+    from . import digest
+except ImportError:
+    import digest
 
 
 class LLMMixin:
@@ -432,12 +436,14 @@ class LLMMixin:
     def _notebook_materials(self, core, sitting, now=None) -> list:
         """The material of one sitting, each with an id and an origin: her body's day (her
         own), and today's events that belong to it: the groups' open ones for "group"
-        (nothing private, nothing of unknown origin), or that private chat's own."""
+        (nothing private, nothing of unknown origin), or that private chat's own. At most 13 in
+        all, fairly between windows (digest.pick_fairly): each window's weightiest event first."""
         mats = []
         trend = self._body_trend_text(core)
         if trend:
             mats.append({"id": "m1", "text": "身体：" + trend,
                          "origin": discretion.make_origin(discretion.SELF), "names": [], "ref": "body"})
+        mine = []
         for e in self._today_events(now):
             origin = discretion.origin_of(e)
             if sitting == "group":
@@ -445,13 +451,14 @@ class LLMMixin:
                     continue
             elif origin["where"] != sitting or origin["visibility"] != discretion.PRIVATE:
                 continue
+            mine.append(dict(e, origin=origin))
+        for e in digest.pick_fairly(mine, 13 - len(mats)):
+            origin = e["origin"]
             body = str(e.get("meaning_to_her") or e.get("reflection") or e.get("small_summary")
                        or e.get("event") or "")
             text = ("%s：%s" % (str(e.get("title") or "一件事"), body)).strip("：")
             mats.append({"id": "m%d" % (len(mats) + 1), "text": "事件：" + text[:160],
                          "origin": origin, "names": discretion.names_in(e), "ref": str(e.get("id") or "")})
-            if len(mats) >= 13:
-                break
         return mats
 
     @staticmethod

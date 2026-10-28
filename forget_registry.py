@@ -11,7 +11,7 @@ goes in here:
   remembers *that* it was deleted, so nothing comes back later: a message that
   arrives afterwards, a replay, an import.
 
-One SQLite table, append-only, read in order:
+One SQLite table, append-only, read in order (and two small ones, see below):
 
     kind      place               qq      source_id   stamp
     'qq'      'group:1' or '*'    10001   -           t    a person: all of his up to t is gone
@@ -32,10 +32,21 @@ rows, not part of them:
     FORGET_ME_OPTOUT (default): it also keeps everything after it out, until an 'optin';
     FORGET_ME_CUTOFF:           only what came before is gone (the old companion).
 
+What a person deleted from the panel was called (the discussion window, 10-29): when the
+owner deletes someone, every name she knew him by then goes in as a salted hash with his
+number (``names``; the salt is in ``meta``, next to it), never the name itself. Someone
+else saying one of those names later is found by names_in(): every stretch of a text of a
+stored length is hashed and looked up. So what she keeps and what the nightly jobs show a
+model never has the name of someone deleted, after a restart too -- the same intent as his
+number in the rows above: remembering whom she no longer keeps.
+
 Only the standard library; no AstrBot.
 """
 from __future__ import annotations
 
+import hashlib
+import re
+import secrets
 import sqlite3
 import time
 from contextlib import closing
@@ -71,7 +82,17 @@ CREATE TABLE IF NOT EXISTS forget (
 );
 CREATE INDEX IF NOT EXISTS forget_qq ON forget (qq);
 CREATE INDEX IF NOT EXISTS forget_source ON forget (source_id);
+CREATE TABLE IF NOT EXISTS names (
+    qq     TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    size   INTEGER NOT NULL,
+    stamp  REAL NOT NULL,
+    PRIMARY KEY (qq, digest)
+);
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
+NAME_MIN, NAME_MAX = 2, 24
+_ASCII_WORD = re.compile(r"[0-9A-Za-z]")
 
 
 def norm_place(place) -> str:
@@ -242,6 +263,72 @@ class ForgetRegistry:
         if any(self.why_not(source_id=s, place=place, at=at, forget_me=forget_me) for s in (source_ids or ())):
             return False
         return not any(self.why_not(qq=p, place=place, at=at, forget_me=forget_me) for p in (people or ()))
+
+    # ------------------------------------------------------------------
+    # What a person deleted from the panel was called (hashes only)
+    # ------------------------------------------------------------------
+    def _salt(self) -> str:
+        row = self._db.execute("SELECT value FROM meta WHERE key='name_salt'").fetchone()
+        if row:
+            return str(row[0])
+        salt = secrets.token_hex(16)
+        self._db.execute("INSERT INTO meta (key, value) VALUES ('name_salt', ?)", (salt,))
+        self._db.commit()
+        return salt
+
+    @staticmethod
+    def _digest(salt, name) -> str:
+        return hashlib.sha256(("%s|%s" % (salt, name)).encode("utf-8")).hexdigest()[:32]
+
+    def remember_names(self, qq, names, stamp=None) -> int:
+        """The names `qq` went by, as salted hashes (2 to 24 characters, not all digits, not his
+        number; lower case, so "Tom" is "tom" too). Returns how many were new."""
+        qq = str(qq or "").strip()
+        names = {str(n).strip().lower() for n in names or () if str(n or "").strip()}
+        names = {n for n in names if NAME_MIN <= len(n) <= NAME_MAX and not n.isdigit() and n != qq}
+        if not qq or not names:
+            return 0
+        salt, stamp = self._salt(), float(time.time() if stamp is None else stamp)
+        before = self._db.total_changes
+        self._db.executemany("INSERT OR IGNORE INTO names (qq, digest, size, stamp) VALUES (?,?,?,?)",
+                             [(qq, self._digest(salt, n), len(n), stamp) for n in sorted(names)])
+        self._db.commit()
+        self._names_cache = None
+        return self._db.total_changes - before
+
+    def _name_table(self) -> tuple:
+        """(salt, {size: {digest: qq}}), reread when the table grows."""
+        count = int(self._db.execute("SELECT COUNT(*) FROM names").fetchone()[0])
+        cache = getattr(self, "_names_cache", None)
+        if cache and cache[0] == count:
+            return cache[1], cache[2]
+        table = {}
+        for qq, digest, size in self._db.execute("SELECT qq, digest, size FROM names"):
+            table.setdefault(int(size), {})[str(digest)] = str(qq)
+        salt = self._salt() if table else ""
+        self._names_cache = (count, salt, table)
+        return salt, table
+
+    def names_in(self, text) -> dict:
+        """{name: qq} for every stretch of `text` that is a stored name (a name of letters and
+        digits only where it stands as a word of its own; one that is an everyday word only
+        where it plainly means someone, see discretion.plain_word)."""
+        text = str(text or "")
+        salt, table = self._name_table()
+        out = {}
+        for size, digests in table.items():
+            for i in range(len(text) - size + 1):
+                part = text[i:i + size]
+                qq = digests.get(self._digest(salt, part.lower()))
+                if not qq:
+                    continue
+                if part.isascii() and ((i and _ASCII_WORD.match(text[i - 1]))
+                                       or (i + size < len(text) and _ASCII_WORD.match(text[i + size]))):
+                    continue
+                if discretion.plain_word(part) and not discretion._one_char_name(part).search(text):
+                    continue   # an everyday word: only where it plainly means someone
+                out[part] = qq
+        return out
 
     def stats(self) -> dict:
         out = {k: 0 for k in KINDS}

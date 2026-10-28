@@ -45,8 +45,10 @@ except ImportError:
     from mixin_people import PeopleMixin
 try:
     from .mixin_impressions import ImpressionsMixin
+    from .mixin_digest import DigestMixin
 except ImportError:
     from mixin_impressions import ImpressionsMixin
+    from mixin_digest import DigestMixin
 try:
     from .mixin_events import EventsMixin
 except ImportError:
@@ -80,7 +82,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -98,6 +100,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # "group_impressions" LLM function, off by default); what they are called joins
         # the names made anonymous elsewhere
         self.impressions_time = str(self.config.get("impressions_time", "23:15") or "23:15").strip()
+        # ams-life: when she goes over what happened today in each window (switch: the
+        # "daily_digest" LLM function, off by default); before the impressions and the notebook
+        self.digest_time = str(self.config.get("digest_time", "23:05") or "23:05").strip()
         # the red lines: one switch, off by default (the owner, 10-28: nothing is held back in
         # the first version; the hits are counted by line for the owner to look at)
         self.redline_filter = bool(self.config.get("redline_filter", False))
