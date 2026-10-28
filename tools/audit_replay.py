@@ -12,8 +12,9 @@ Checks (a "piece" is 8 characters in a row, letters and digits only, lower case)
 private      A reply prompt somewhere else holds a piece that only ever occurred in one private chat.
 names        A reply prompt in a group holds the name of someone who never spoke there, and that
              name never occurred in that group's own messages before.
-qq           A reply prompt holds the QQ number of anyone in the log but the person asking
-             (whose own number is counted as a warning).
+qq           A reply prompt holds the QQ number of anyone in the log -- the person asking too
+             (the owner: no QQ number in a prompt at all). The asker's own number is also counted
+             as a warning, so the report tells the two apart.
 forgotten    Anything of a person or message in the forget registry (what the old companion was
              asked to forget) -- QQ number, message id, a piece only they wrote -- in any prompt
              (reply or model) or any file of the data folder. Their names are listed as warnings
@@ -161,10 +162,10 @@ def audit(replay_dir, chat) -> dict:
                 checks["private"].fail(dict(where, came_from=lab(src)))
                 break
         who = str(pr.get("who") or "")
-        others = number_pattern(known_qq - {who})
-        if has(others, text):
+        if has(number_pattern(known_qq - {who}), text):
             checks["qq"].fail(where)
         elif who and has(number_pattern([who]), text):
+            checks["qq"].fail(dict(where, asker_own=True))
             checks["qq"].warnings["asker_own_number"] += 1
         if place.startswith("group:"):
             for name, owners in name_owner.items():
