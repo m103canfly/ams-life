@@ -344,6 +344,8 @@ class PagesMixin:
                          "the owner deletes one memory and everything from its messages")
                 register("/astrbot_plugin_ams_life/page/forget/person", self.page_forget_person, ["POST"],
                          "the owner deletes a person everywhere")
+                register("/astrbot_plugin_ams_life/page/impressions/delete", self.page_impression_delete, ["POST"],
+                         "the owner deletes what she thinks of someone")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
 
@@ -434,11 +436,17 @@ class PagesMixin:
         except Exception as exc:
             logger.warning("[biocore] restore safety backup failed: %s", exc)
         count = 0
+        # ams-life: the forget registry in use is never replaced by the backup's (and the
+        # vector store is closed while its file may be overwritten)
+        vectors = getattr(self, "_vectors_db", None)
+        if vectors is not None:
+            vectors.close()
+            self._vectors_db = None
         try:
             for name in names:
                 rel = name[len("data/"):]
                 parts = [x for x in rel.split("/") if x not in ("", ".", "..")]
-                if not parts:
+                if not parts or parts[-1].startswith(forget_registry.FILE_NAME):
                     continue
                 dest = DATA_DIR.joinpath(*parts)
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -455,8 +463,17 @@ class PagesMixin:
             self.cores = {}
         except Exception:
             pass
+        # ams-life: whoever and whatever the registry holds is deleted again
+        self._known_memory_ids = self._name_index = self._people_store = None
+        try:
+            self.self_model = self._load_self_model()
+            again = self._forget_registered()
+        except Exception as exc:
+            logger.warning("[ams-life] restored, but deleting again what is registered failed: %s", exc)
+            return {"status": "error", "message": "restored %d files, but deleting again what the forget "
+                                                  "registry holds failed: %s" % (count, str(exc)[:160])}
         logger.info("[biocore] restored %s data files", count)
-        return {"status": "ok", "data": {"files": count}}
+        return {"status": "ok", "data": {"files": count, "deleted_again": again}}
 
     async def page_memory_delete(self, session: str, entry_id: str):
         """The owner deletes one memory (panel only; the page asks to confirm first): the
@@ -467,7 +484,33 @@ class PagesMixin:
             counts = self._owner_forget_memory(entry_id)
             if counts is None:
                 return {"status": "error", "message": "memory entry not found", "data": {}}
+            counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"id": entry_id, "deleted": True, "counts": counts}}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)[:180], "data": {}}
+
+    @staticmethod
+    def _archived_library_copies() -> int:
+        """The library as it was before a migration, kept in memory/archive/ (the owner decided
+        a delete leaves these alone); the panel says they still hold the old data."""
+        return len(list(MEMORY_ARCHIVE_DIR.glob("*.json"))) if MEMORY_ARCHIVE_DIR.exists() else 0
+
+    async def page_impression_delete(self, person=None):
+        """The owner deletes what she thinks of someone (panel only; the page asks to confirm
+        first): {"person": "<qq>"}. Every group; noted, so she does not write one again. What
+        she remembers of him stays (deleting the person is page/forget/person)."""
+        if person is None:
+            try:
+                from quart import request
+                body = await request.get_json(silent=True) or {}
+            except Exception:
+                body = {}
+            person = body.get("person") if isinstance(body, dict) else ""
+        person = str(person or "").strip()
+        if not person or not person.isdigit():
+            return {"status": "error", "message": "person must be a QQ number", "data": {}}
+        try:
+            return {"status": "ok", "data": {"person": person, "groups": self._owner_forget_impression(person)}}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
 
@@ -489,7 +532,11 @@ class PagesMixin:
             umos = self._place_umos()
             counts = self._owner_forget_person(person)
             counts["astrbot"] = await self._forget_in_astrbot(person, umos)
+            counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"person": person, "counts": counts}}
+        except forget_registry.Unreadable:
+            return {"status": "error", "data": {"person": person},
+                    "message": "遗忘登记读不出来，记忆库没删成（别的已经删了）；AstrBot 那边也还没删。请再点一次删除。"}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
 
@@ -624,6 +671,9 @@ class PagesMixin:
             # audit rows, and per-user relationship state/trajectory/maps.
             "memory_index": _memory_index_rows(MEMORY_DIR),
             "relationships": _relationship_rows(USER_DIR),
+            # ams-life step 1-3: the group members she knows, per group (read-only; the
+            # owner can delete what she thinks of someone, never rewrite it)
+            "impressions": self._impressions_for_page(),
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,
                 **dict(getattr(self, "_last_memory_meta", {}) or {})},

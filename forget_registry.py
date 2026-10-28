@@ -22,7 +22,9 @@ One SQLite table, append-only, read in order:
 ``place`` is a place as discretion.place_of() writes it; '*' means everywhere.
 A 'qq' row with qq '*' forgets everyone in that place up to t. The old companion
 also let people opt out and back in themselves; those kinds are kept so its
-registries convert as they are, but nothing new writes them.
+registries convert as they are, but nothing new writes them. An 'impression' row
+(the owner deleted what she thinks of someone, not the person) only stops her
+writing an impression of him again; it does not touch anything else.
 
 What a 'qq' row means for what the person says *later* is a way of reading the
 rows, not part of them:
@@ -51,7 +53,8 @@ class Unreadable(Exception):
     """The registry could not be read (locked, damaged, ...). Whatever was about to be written
     is not written; nothing already kept is dropped because of it."""
 
-KINDS = ("qq", "source", "optout", "optin")
+
+KINDS = ("qq", "source", "optout", "optin", "impression")
 EVERYWHERE = "*"
 FORGET_ME_OPTOUT, FORGET_ME_CUTOFF = "optout", "cutoff"
 FORGET_ME = FORGET_ME_OPTOUT
@@ -141,6 +144,15 @@ class ForgetRegistry:
                 seqs.append(self.forget_message(sid, place, stamp=stamp, note="owner:panel"))
         return seqs
 
+    def stop_impression(self, qq, place=EVERYWHERE, stamp=None, note="owner:panel") -> int:
+        """No impression of `qq` (in `place`) from now on: the owner deleted it in the panel."""
+        return self.add("impression", place, qq=qq, stamp=stamp, note=note)
+
+    def impression_allowed(self, qq, place="") -> bool:
+        place = "" if not place else norm_place(place)
+        return not any(_covers(row_place, place) for (row_place,) in self._db.execute(
+            "SELECT place FROM forget WHERE kind='impression' AND qq=?", (str(qq or "").strip(),)))
+
     def forget_person(self, qq, place=EVERYWHERE, stamp=None, note="") -> int:
         return self.add("qq", place, qq=qq, stamp=stamp, note=note)
 
@@ -207,6 +219,11 @@ class ForgetRegistry:
     def may_keep(self, qq="", place="", at=None, source_id="", forget_me=None) -> bool:
         """May she keep something by this person / from this message, said here at this time?"""
         return not self.why_not(qq, place, at, source_id, forget_me)
+
+    def may_keep_untimed(self, qq, place="") -> bool:
+        """For something of his with no time (an old name): only when no reading of the rows
+        and no time rules him out here -- anyone with a row is left out."""
+        return self.may_keep(qq, place, forget_me=FORGET_ME_OPTOUT) and self.may_keep(qq, place, at=0)
 
     def may_keep_all(self, people=(), place="", at=None, source_ids=(), forget_me=None) -> bool:
         """For something made from several messages: every person and every message must be allowed."""

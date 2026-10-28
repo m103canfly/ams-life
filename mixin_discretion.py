@@ -74,7 +74,7 @@ class DiscretionMixin:
         snap = getattr(self, "_forget_snap", None)
         if not snap or snap[0] != seq:
             rows = reg.rows()
-            snap = self._forget_snap = (seq, {r["qq"] for r in rows if r["kind"] != "source"},
+            snap = self._forget_snap = (seq, {r["qq"] for r in rows if r["kind"] in ("qq", "optout", "optin")},
                                         {r["source_id"] for r in rows if r["kind"] == "source"})
         return snap[1], snap[2]
 
@@ -339,8 +339,7 @@ class DiscretionMixin:
             if isinstance(room, dict) and isinstance(room.get("last_recall_trace"), list):
                 room["last_recall_trace"] = [x for x in room["last_recall_trace"]
                                              if not (isinstance(x, dict) and str(x.get("entry_id") or "") in gone)]
-        if counts["memories"] or person:
-            self._write_library(lib)
+        library_written = self._write_library(lib) if counts["memories"] or person else True
 
         # 2) the event archive and its per-place copies, and the insights drawn from events
         paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
@@ -439,7 +438,19 @@ class DiscretionMixin:
             counts["relationship_text"] = self._forget_relationship_text(
                 others - {person}, set(ids) | gone | gone_events)
 
-        # 7) what else may hold their words: picture descriptions, the dedupe log, the
+        # 7) what she thinks of the people in each group: a person, in every group; by
+        #    message, what the model wrote about its authors there (it may come from it)
+        if hasattr(self, "_impression_store"):
+            store = self._impression_store()
+            if person:
+                counts["impressions"] = store.forget_person(person)
+            for place in places:
+                if place.startswith("group:"):
+                    for who in involved - {person, "self", ""}:
+                        if (ids or entry_ids) and store.forget_message_by(place, who):
+                            counts["impressions"] = counts.get("impressions", 0) + 1
+
+        # 8) what else may hold their words: picture descriptions, the dedupe log, the
         #    in-process vector cache (texts as keys)
         counts["pictures"] = self._forget_pictures(pictures)
         self._forget_dedupe_rows(gone_events)
@@ -449,7 +460,33 @@ class DiscretionMixin:
         counts["places"] = sorted(p for p in places if p)
         logger.info("[ams-life] forgot person=%s sources=%d entries=%d: %s", "yes" if person else "no",
                     len(ids), len(entry_ids), {k: v for k, v in counts.items() if k != "places"})
+        if not library_written:
+            # registered all the same: it goes the next time the library is written
+            raise forget_registry.Unreadable("the forget registry could not be read: the memory library was not "
+                                             "changed (everything else was deleted); try again")
         return counts
+
+    def _forget_registered(self) -> dict:
+        """After the data folder was restored from a backup (the registry itself never is:
+        the one in use stays), delete again what the owner deleted in the panel -- the people
+        (everywhere) and the messages -- so nobody deleted comes back with an older backup.
+        Other rows (a person forgotten in one group, an optout someone ended, a cutoff) are
+        narrower than a whole delete: they are left to the registry, as every write is."""
+        reg = self._registry()
+        rows = [r for r in reg.rows() if str(r["note"] or "").startswith("owner:")]
+        people = sorted({r["qq"] for r in rows if r["kind"] == "qq" and r["place"] == forget_registry.EVERYWHERE
+                         and r["qq"] != "*"})
+        sources = sorted({r["source_id"] for r in rows if r["kind"] == "source" and r["source_id"]})
+        for person in people:
+            self._forget(person=person)
+        if sources:
+            self._forget(source_ids=sources)
+        if hasattr(self, "_impression_store"):
+            for qq in sorted({r["qq"] for r in rows if r["kind"] == "impression"}):
+                self._impression_store().forget_impression(qq)
+        if not self._write_library(self._read_library()):   # rows for everyone in a place
+            raise forget_registry.Unreadable("the forget registry could not be read")
+        return {"people": len(people), "messages": len(sources)}
 
     _REL_TEXT_LISTS = ("we_memory", "annotations", "milestones")
     _REL_TEXT_MAPS = ("transactive_map", "destination_map", "social_world")
@@ -467,7 +504,8 @@ class DiscretionMixin:
 
         def take(x):
             if isinstance(x, dict):
-                texts.extend(str(x.get(k) or "") for k in ("text", "key", "title"))
+                texts.extend(str(x.get(k) or "") for k in ("text", "key", "title", "latest_text"))
+                texts.extend(str(ev.get("text") or "") for ev in x.get("evidence") or [] if isinstance(ev, dict))
                 name_fields.append(str(x.get("sender_name") or x.get("name") or ""))
                 ids.append(str(x.get("sender_id") or x.get("qq") or ""))
             elif isinstance(x, str):

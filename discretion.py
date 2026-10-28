@@ -126,11 +126,38 @@ def verdict(origin, here) -> str:
     return DROP
 
 
+# a one-character name ("鹿") is only a name where it plainly means someone: after an @, or
+# as the one who says something ("鹿说", "鹿：") -- never inside other words ("小鹿乱撞")
+_HAN = "一-鿿"
+_SAYS = "说|讲|问|答|觉得|认为|提到|：|:"
+
+
+def _one_char_name(name):
+    n = re.escape(name)
+    word = _HAN + ("A-Za-z0-9_" if name.isascii() else "")   # "A" is not a name inside "@Alice"
+    return re.compile(r"@%s(?![%s])|(?<![%s@])%s(?=%s)" % (n, word, word, n, _SAYS))
+
+
+def _is_english(name) -> bool:
+    return name.isascii() and not name.isdigit()
+
+
+def _english_name(name):
+    """An English name is a whole word: "Al" is not a name inside "Alice"."""
+    return re.compile(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name))
+
+
 def anonymize(text, names) -> str:
     """Replace the names and QQ numbers of the people involved with "有人"."""
     out = str(text or "")
     for name in sorted({str(n).strip() for n in (names or []) if str(n or "").strip()}, key=len, reverse=True):
-        if name in _NOT_PEOPLE or (len(name) < 2 and not name.isdigit()):
+        if name in _NOT_PEOPLE:
+            continue
+        if len(name) < 2 and not name.isdigit():
+            out = _one_char_name(name).sub(lambda m: ("@" if m.group(0).startswith("@") else "") + SOMEONE, out)
+            continue
+        if _is_english(name):
+            out = _english_name(name).sub(SOMEONE, out)
             continue
         out = out.replace(name, SOMEONE)
     return out
