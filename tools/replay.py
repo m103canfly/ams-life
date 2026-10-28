@@ -4,6 +4,7 @@
         [--aliases <aliases.jsonl>] [--embed-url http://127.0.0.1:11434/v1/embeddings [--embed-model bge-m3]]
         [--impressions] [--old-forgets keep-out|let-in] [--forget-me optout|cutoff] [--remember-replies]
         [--no-canaries] [--limit N]
+        [--notebook] [--astrbot <AstrBot data dir> --model <provider id> --model-limit N [--model-cap kind=N]]
 
 Run 1 of the step-1 gate: no model, no network. The plugin is driven through its real hooks
 (on_message for every message, on_llm_request / on_llm_response when someone woke the old
@@ -18,6 +19,16 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
 - --aliases loads what people were called (tools/import_old.py: aliases.jsonl) before the log.
 - --impressions turns the nightly group impressions on (the fake model answers with a fixed
   made-up line), so their prompts are recorded and checked too.
+- --notebook turns her nightly notebook on (each 5-minute sweep, as her autonomy loop does).
+- Run 2 (--astrbot, --model): a real model answers instead of the fake one: the chat provider
+  of that id in the AstrBot at --astrbot (cmd_config.json, read only), with that AstrBot's
+  default persona (data_v4.db, read only) as hers. Its key is read into memory when the replay
+  starts and only goes into the request header; it is never printed, logged or written, and
+  is not taken on the command line. The provider's address is the one other address the
+  replay may reach (no proxy). --model-limit is a hard limit on calls (failed ones count, none
+  is retried); once reached, or once a kind's --model-cap is, the plugin gets an empty answer
+  and nothing is sent. Every call's kind, tokens and answer go to answers.jsonl; replay.json
+  has the totals and the connections made, by address.
 - Each message is handed over as AstrBot makes it from a QQ message (astrbot_message): its
   parts (text, @, quote, picture...), and message_str with the first @ of her left out and
   every other @ written " @昵称(号码) ".
@@ -159,11 +170,13 @@ CANARY_SECRETS = {"private": "蓝鲸三号", "group": "青柠七号"}
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
-def guard_network(allowed):
-    """Refuse every connection but to `allowed` ({(host, port)} on this computer): no model is
-    reached and nothing goes online. Returns the list the refused hosts are added to."""
+def guard_network(allowed, used=None):
+    """Refuse every connection but to `allowed` ({(host, port)}: the vector service on this
+    computer, and in run 2 the model's address): nothing else is reached. An allowed host name
+    allows the addresses it resolves to. `used` (a Counter) counts the connections let through,
+    by "host:port". Returns the list the refused hosts are added to."""
     import socket
-    refused = []
+    refused, names = [], {}
 
     def ok(host, port):
         return (str(host), int(port or 0)) in allowed
@@ -172,13 +185,19 @@ def guard_network(allowed):
 
     def connect(self, address):
         if isinstance(address, tuple) and ok(address[0], address[1]):
+            if used is not None:
+                used["%s:%s" % (names.get(str(address[0]), address[0]), address[1])] += 1
             return real_connect(self, address)
         refused.append(str(address[0]) if isinstance(address, tuple) else "?")
         raise OSError("network disabled in the replay")
 
     def getaddrinfo(host, port, *a, **k):
         if ok(host, port):
-            return real_getaddrinfo(host, port, *a, **k)
+            infos = real_getaddrinfo(host, port, *a, **k)
+            for info in infos:
+                allowed.add((str(info[4][0]), int(port or 0)))
+                names.setdefault(str(info[4][0]), str(host))
+            return infos
         refused.append(str(host))
         raise OSError("network disabled in the replay")
 
@@ -211,6 +230,112 @@ def local_embedder(url, model, counts):
         counts["embed_ms"] += int((time.perf_counter() - start) * 1000)
         return data
     return call
+
+
+def astrbot_model(data_dir, provider_id):
+    """The chat provider `provider_id` of the AstrBot whose data folder is `data_dir` (read
+    only): (address, model name, post). post(messages) sends one OpenAI-style chat request and
+    returns the answer's JSON. The key is read into memory here and lives only inside post();
+    it is never returned, printed or written."""
+    cfg = json.loads((Path(data_dir) / "cmd_config.json").read_text("utf-8-sig"))
+    prov = next((p for p in cfg.get("provider") or [] if p.get("id") == provider_id), None)
+    if not prov or not prov.get("enable", True):
+        raise SystemExit("AstrBot has no enabled provider %r" % provider_id)
+    src = next((s for s in cfg.get("provider_sources") or [] if s.get("id") == prov.get("provider_source_id")), {})
+    conf = dict(src, **prov)
+    base, model = str(conf.get("api_base") or "").rstrip("/"), str(prov.get("model") or "")
+    keys = conf.get("key") or []
+    key = next((str(k) for k in (keys if isinstance(keys, list) else [keys]) if str(k or "").strip()), "")
+    timeout = int(conf.get("timeout") or 120)
+    if not (base.startswith("https://") and model and key):
+        raise SystemExit("provider %r: no https address, model or key in AstrBot's config" % provider_id)
+    url = base + "/chat/completions"
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # straight there, no proxy
+
+    def post(messages):
+        body = json.dumps({"model": model, "messages": messages, "stream": False}).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json",
+                                                              "Authorization": "Bearer " + key})
+        with opener.open(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    return base, model, post
+
+
+def astrbot_persona(data_dir) -> str:
+    """The default persona's system prompt of the AstrBot at `data_dir` (read only)."""
+    cfg = json.loads((Path(data_dir) / "cmd_config.json").read_text("utf-8-sig"))
+    pid = (((cfg.get("agent_runner") or {}).get("config") or {}).get("persona") or {}).get("persona_id") or ""
+    db = sqlite3.connect("file:" + (Path(data_dir) / "data_v4.db").resolve().as_posix() + "?mode=ro&immutable=1",
+                         uri=True)
+    try:
+        row = db.execute("SELECT system_prompt FROM personas WHERE persona_id = ?", (pid,)).fetchone()
+    finally:
+        db.close()
+    return str(row[0] or "") if row else ""
+
+
+def failure(exc) -> str:
+    """A model call's failure in a word or two (never the answer's body: it may echo the key)."""
+    import socket
+    import urllib.error
+    if isinstance(exc, urllib.error.HTTPError):
+        return "HTTP %s" % exc.code
+    if isinstance(exc, (socket.timeout, TimeoutError)):
+        return "timeout"
+    return type(exc).__name__
+
+
+class ModelGate:
+    """Every model call of run 2 goes through here: the hard limit on calls (failed ones count,
+    none is retried), the per-kind caps, the token count, and answers.jsonl. After STOP_AFTER
+    failures in a row no call is made any more (a wrong key or no way through: stop, don't
+    keep trying)."""
+
+    STOP_AFTER = 3
+
+    def __init__(self, post, limit, caps, stats, answers, clock, current):
+        self.post, self.limit, self.caps, self.stats = post, int(limit), dict(caps), stats
+        self.answers, self.clock, self.current = answers, clock, current
+        self.calls = self.failed_in_a_row = 0
+
+    def chat(self, kind, prompt, system_prompt=None) -> str:
+        s = self.stats
+        if self.calls >= self.limit:
+            s["model_refused_limit"] += 1
+            return ""
+        if self.failed_in_a_row >= self.STOP_AFTER:
+            s["model_refused_after_failures"] += 1
+            return ""
+        if kind in self.caps and s["model_calls_" + kind] >= self.caps[kind]:
+            s["model_refused_cap_" + kind] += 1
+            return ""
+        self.calls += 1
+        s["model_calls"] += 1
+        s["model_calls_" + kind] += 1
+        messages = ([{"role": "system", "content": str(system_prompt)}] if system_prompt else []) + [
+            {"role": "user", "content": str(prompt)}]
+        rec = {"call": self.calls, "kind": kind, "ts": self.clock.now, "place": self.current["place"]}
+        start = time.perf_counter()
+        try:
+            data = self.post(messages)
+            text = str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
+            for k, v in (data.get("usage") or {}).items():
+                if isinstance(v, int):
+                    s["tokens_" + k] += v
+            rec.update(ok=True, usage={k: v for k, v in (data.get("usage") or {}).items() if isinstance(v, int)},
+                       text=text)
+            s["model_ok"] += 1
+            self.failed_in_a_row = 0
+        except Exception as exc:  # noqa: BLE001  (no retry: the plugin gets an empty answer)
+            text = ""
+            rec.update(ok=False, failure=failure(exc))
+            s["model_failed"] += 1
+            s["model_failed_" + rec["failure"]] += 1
+            self.failed_in_a_row += 1
+        s["model_ms"] += int((time.perf_counter() - start) * 1000)
+        self.answers.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        self.answers.flush()
+        return text
 
 
 def place_of(row) -> str:
@@ -331,21 +456,44 @@ def main(argv=None):
     ap.add_argument("--embed-model", default="bge-m3")
     ap.add_argument("--impressions", action="store_true",
                     help="run the nightly group impressions (the fake model answers)")
+    ap.add_argument("--notebook", action="store_true", help="let her write her notebook each night")
+    ap.add_argument("--astrbot", help="run 2: the data folder of the AstrBot whose chat provider answers (read only)")
+    ap.add_argument("--model", help="run 2: that provider's id, e.g. deepseek/deepseek-flash")
+    ap.add_argument("--model-limit", type=int, default=0, help="run 2: at most this many model calls in all")
+    ap.add_argument("--model-cap", action="append", default=[], metavar="KIND=N",
+                    help="run 2: at most N calls of one kind (event_summary, memory_summary, group_impressions, "
+                         "notebook...)")
     ap.add_argument("--limit", type=int, default=0, help="only the first N messages of the log")
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     if args.old_forgets == "keep-out" and not args.registry:
         ap.error("--registry is needed to keep out what was forgotten (or say --old-forgets let-in)")
+    if bool(args.astrbot) != bool(args.model) or (args.astrbot and args.model_limit <= 0):
+        ap.error("a real model needs --astrbot, --model and --model-limit (above 0)")
+    caps = {}
+    for cap in args.model_cap:
+        kind, _, n = cap.partition("=")
+        if not n.isdigit():
+            ap.error("--model-cap is KIND=N")
+        caps[kind.strip()] = int(n)
     allowed = set()
     if args.embed_url:
         u = urllib.parse.urlsplit(args.embed_url)
         if u.scheme != "http" or u.hostname not in LOCAL_HOSTS:
             ap.error("--embed-url must be a vector service on this computer (http://127.0.0.1:...)")
         allowed = {(h, u.port or 80) for h in (u.hostname, "127.0.0.1" if u.hostname == "localhost" else u.hostname)}
+    post = model_base = model_name = None
+    persona = PERSONA
+    if args.astrbot:
+        model_base, model_name, post = astrbot_model(args.astrbot, args.model)
+        u = urllib.parse.urlsplit(model_base)
+        allowed.add((u.hostname, u.port or 443))
+        persona = astrbot_persona(args.astrbot) or PERSONA
     started = time.perf_counter()
     loop = asyncio.new_event_loop()   # before the guard: on Windows it connects to itself
     asyncio.set_event_loop(loop)
-    refused = guard_network(allowed)
+    connections = Counter()
+    refused = guard_network(allowed, connections)
 
     out = _guard.output_dir(args.out, "the replay")
     data = out / "data"
@@ -381,9 +529,14 @@ def main(argv=None):
     stats = Counter()
 
     class RecordingProvider(harness.FakeProvider):
+        def __init__(self, kind=""):
+            super().__init__()
+            self.kind = kind
+
         async def text_chat(self, prompt="", system_prompt=None, **kwargs):
             stats["model_calls_fake"] += 1
-            prompts.write(json.dumps({"kind": "model", "ts": clock.now, "place": current["place"],
+            stats["model_calls_fake_" + (self.kind or "other")] += 1
+            prompts.write(json.dumps({"kind": "model", "ts": clock.now, "place": current["place"], "call": self.kind,
                                       "text": "%s\n%s" % (system_prompt or "", prompt)}, ensure_ascii=False) + "\n")
             if "群里几位群友今天说的话" in str(prompt):   # impressions: one made-up line for everyone
                 codes = re.findall(r"^(P\d+)：", str(prompt), re.M)
@@ -418,14 +571,42 @@ def main(argv=None):
         def get_messages(self):
             return self._parts
 
+    gate = None
+    if post:
+        answers = open(out / "answers.jsonl", "w", encoding="utf-8")
+        gate = ModelGate(post, args.model_limit, caps, stats, answers, clock, current)
+
+    class ModelProvider(harness.FakeProvider):
+        """Run 2: the real model, through the gate, for one kind of call."""
+
+        def __init__(self, kind):
+            super().__init__()
+            self.kind = kind
+            self.provider_config = {"id": args.model, "model": model_name, "provider_type": "chat_completion"}
+
+        async def text_chat(self, prompt="", system_prompt=None, **kwargs):
+            prompts.write(json.dumps({"kind": "model", "ts": clock.now, "place": current["place"], "call": self.kind,
+                                      "text": "%s\n%s" % (system_prompt or "", prompt)}, ensure_ascii=False) + "\n")
+            return harness.FakeResponse(gate.chat(self.kind, prompt, system_prompt))
+
+    class Personas(harness.FakePersonaManager):
+        async def get_default_persona_v3(self, umo=None):
+            return {"name": "default", "prompt": persona}
+
     ctx = harness.FakeContext()
     ctx.provider = RecordingProvider()
+    ctx.persona_manager = Personas()
     plugin = plugin_main.BioCorePlugin(ctx, config={})
     plugin._ipv4_json = (local_embedder(args.embed_url, args.embed_model, stats) if args.embed_url
                          else harness.fake_ipv4_json)
+    async def provider_for(kind, event=None):  # each call knows its kind, for the counts
+        return ModelProvider(str(kind)) if gate else RecordingProvider(str(kind))
+    plugin._provider_for = provider_for
     if args.impressions:
         plugin.llm_functions = dict(plugin.llm_functions or {},
                                     group_impressions={"enabled": True, "provider": "follow_llm"})
+    if args.notebook:
+        plugin.llm_functions = dict(plugin.llm_functions or {}, notebook={"enabled": True, "provider": "follow_llm"})
     if args.aliases:
         import impressions  # noqa: E402
         people = [json.loads(x) for x in Path(args.aliases).read_text("utf-8").splitlines() if x.strip()]
@@ -449,6 +630,12 @@ def main(argv=None):
             done = loop.run_until_complete(plugin._maybe_update_impressions(now=clock.now))
             harness.drain(loop)
             stats["impression_calls"] += sum(1 for r in done.values() if r.get("called"))
+        if args.notebook:
+            current.update(place="nightly", ts=clock.now)
+            plugin._begin_job()
+            if loop.run_until_complete(plugin._maybe_write_notebook(now=clock.now)):
+                stats["notebook_nights_written"] += 1
+            harness.drain(loop)
 
     for row in timeline:
         clock.now = max(clock.now, row["ts"])
@@ -496,7 +683,12 @@ def main(argv=None):
         task.cancel()
     prompts.close()
     reg.close()
+    if gate:
+        gate.answers.close()
     stats["network_refused"] = len(refused)
+    from astrbot.api import logger as plugin_log  # noqa: E402  (the stand-in keeps what the plugin logged)
+    with open(out / "plugin-log.txt", "w", encoding="utf-8") as f:
+        f.writelines("%s %s\n" % rec for rec in getattr(plugin_log, "records", []))
 
     (out / "canaries.json").write_text(json.dumps({
         "enabled": bool(canaries), "people": CANARY_PEOPLE, "secrets": CANARY_SECRETS,
@@ -505,8 +697,11 @@ def main(argv=None):
     summary = {"self_id": self_id, "old_forgets": args.old_forgets, "forget_me": args.forget_me,
                "remember_replies": args.remember_replies, "impressions": args.impressions,
                "vectors": ("%s (%s)" % (args.embed_url, args.embed_model)) if args.embed_url else "fake",
-               "aliases": bool(args.aliases), "seconds": round(time.perf_counter() - started, 1),
-               "refused_hosts": sorted(set(refused)),
+               "aliases": bool(args.aliases), "notebook": args.notebook,
+               "model": ("%s (%s)" % (model_name, model_base)) if post else "fake",
+               "model_limit": args.model_limit if post else 0, "model_caps": caps,
+               "seconds": round(time.perf_counter() - started, 1),
+               "connections": dict(connections), "refused_hosts": sorted(set(refused)),
                "log_rows": len(rows), "canaries": len(canaries), "labels": place_labels, "stats": dict(stats)}
     (out / "replay.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"log_rows": len(rows), "canaries": len(canaries), "stats": dict(stats)}, ensure_ascii=False))

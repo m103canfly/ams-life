@@ -340,5 +340,144 @@ class ReplayOptions(unittest.TestCase):
         proc = subprocess.run([sys.executable, '-I', '-c', code, str(ROOT)], capture_output=True, text=True, timeout=60)
         self.assertGreater(int(proc.stdout.strip()), 0, proc.stderr)
 
+    def test_connections_let_through_are_counted_by_name(self):
+        code = '\n'.join([
+            'import collections, sys, urllib.request; sys.path.insert(0, sys.argv[1]); from tools import replay',
+            'port = int(sys.argv[2]); used = collections.Counter()',
+            'refused = replay.guard_network({("localhost", port)}, used)',
+            'req = urllib.request.Request("http://localhost:%d/v1/embeddings" % port, data=b\'{"input": ["a"]}\')',
+            'urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=5).read()',
+            'print(dict(used), len(refused))'])
+        stub = EmbedStub()   # its own: the replay's stub counts the replay's requests
+        try:
+            port = stub.server.server_port
+            proc = subprocess.run([sys.executable, '-I', '-c', code, str(ROOT), str(port)],
+                                  capture_output=True, text=True, timeout=60)
+        finally:
+            stub.close()
+        used, refused = proc.stdout.strip().rsplit(' ', 1)
+        # under the name asked for (each address it resolves to that was tried counts)
+        self.assertEqual((list(eval(used)), refused, stub.requests), (['localhost:%d' % port], '0', 1), proc.stderr)
+
+
+KEY = 'sk-made-up-key-0000'
+
+
+def made_up_astrbot(folder):
+    """An AstrBot data folder with one made-up chat provider and persona."""
+    import sqlite3
+    folder.mkdir()
+    (folder / 'cmd_config.json').write_text(json.dumps({
+        'provider': [{'id': 'emb', 'type': 'openai_embedding', 'enable': True},
+                     {'id': 'ds/flash', 'enable': True, 'provider_source_id': 'ds', 'model': 'flash'}],
+        'provider_sources': [{'id': 'ds', 'type': 'openai_chat_completion', 'key': ['', KEY],
+                              'api_base': 'https://model.example.com/v1/', 'timeout': 30, 'enable': True}],
+        'agent_runner': {'config': {'persona': {'persona_id': '小爱人设'}}}}), encoding='utf-8')
+    db = sqlite3.connect(str(folder / 'data_v4.db'))
+    db.execute('CREATE TABLE personas (persona_id TEXT, system_prompt TEXT)')
+    db.executemany('INSERT INTO personas VALUES (?, ?)', [('default', '默认'), ('小爱人设', '你是小爱，爱弥斯。')])
+    db.commit()
+    db.close()
+
+
+class RealModel(unittest.TestCase):
+    """Run 2's model: the key stays in memory, the limit is hard, nothing is retried."""
+
+    def test_provider_and_persona_from_astrbot(self):
+        import urllib.request
+        from tools import replay
+        sent = []
+
+        class Opener:
+            def open(self, req, timeout=None):
+                sent.append((req.full_url, dict(req.header_items()), json.loads(req.data), timeout))
+                import io
+                return io.BytesIO(json.dumps({'choices': [{'message': {'content': '好'}}]}).encode())
+        handlers = []
+        real = urllib.request.build_opener
+        urllib.request.build_opener = lambda *h: handlers.extend(h) or Opener()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                made_up_astrbot(Path(tmp) / 'astrbot')
+                base, model, post = replay.astrbot_model(Path(tmp) / 'astrbot', 'ds/flash')
+                persona = replay.astrbot_persona(Path(tmp) / 'astrbot')
+                with self.assertRaises(SystemExit) as no_such:
+                    replay.astrbot_model(Path(tmp) / 'astrbot', 'emb2')
+        finally:
+            urllib.request.build_opener = real
+        self.assertEqual((base, model, persona), ('https://model.example.com/v1', 'flash', '你是小爱，爱弥斯。'))
+        self.assertEqual(post([{'role': 'user', 'content': '嗨'}])['choices'][0]['message']['content'], '好')
+        url, headers, body, timeout = sent[0]
+        self.assertEqual((url, headers['Authorization'], body['model'], timeout),
+                         ('https://model.example.com/v1/chat/completions', 'Bearer ' + KEY, 'flash', 30))
+        self.assertEqual([h.proxies for h in handlers], [{}])          # no proxy: straight to that address
+        self.assertNotIn(KEY, repr((base, model, persona, str(no_such.exception))))
+
+    def test_hard_limit_caps_and_no_retry(self):
+        import io
+        import urllib.error
+        from collections import Counter
+        from tools import replay
+        calls = []
+
+        def post(messages):
+            calls.append(messages)
+            if len(calls) == 2:   # the provider says no, and echoes the key in its answer
+                raise urllib.error.HTTPError('https://model.example.com/v1/chat/completions', 401, 'Unauthorized',
+                                             {}, io.BytesIO(('bad key %s' % KEY).encode()))
+            return {'choices': [{'message': {'content': '答%d' % len(calls)}}],
+                    'usage': {'prompt_tokens': 100, 'completion_tokens': 10, 'prompt_cache_hit_tokens': 60}}
+        stats, answers = Counter(), io.StringIO()
+        clock = type('Clock', (), {'now': 5.0})()
+        gate = replay.ModelGate(post, 4, {'notebook': 1}, stats, answers, clock, {'place': 'nightly'})
+        got = [gate.chat('event_summary', '一'), gate.chat('event_summary', '二', system_prompt='她'),
+               gate.chat('notebook', '三'), gate.chat('notebook', '四'), gate.chat('event_summary', '五'),
+               gate.chat('event_summary', '六')]
+        self.assertEqual(got, ['答1', '', '答3', '', '答4', ''])
+        self.assertEqual(len(calls), 4)                                # the failed one is not tried again
+        self.assertEqual(calls[1][0], {'role': 'system', 'content': '她'})
+        self.assertEqual((stats['model_calls'], stats['model_ok'], stats['model_failed'], stats['model_failed_HTTP 401']),
+                         (4, 3, 1, 1))                                 # the failed one counts
+        self.assertEqual((stats['model_refused_cap_notebook'], stats['model_refused_limit']), (1, 1))
+        self.assertEqual((stats['tokens_prompt_tokens'], stats['tokens_completion_tokens'],
+                          stats['tokens_prompt_cache_hit_tokens']), (300, 30, 180))
+        recs = [json.loads(x) for x in answers.getvalue().splitlines()]
+        self.assertEqual([(r['call'], r['kind'], r['ok']) for r in recs],
+                         [(1, 'event_summary', True), (2, 'event_summary', False), (3, 'notebook', True),
+                          (4, 'event_summary', True)])
+        self.assertEqual(recs[1]['failure'], 'HTTP 401')
+        self.assertNotIn(KEY, answers.getvalue())
+
+    def test_three_failures_in_a_row_stop_it(self):
+        import io
+        from collections import Counter
+        from tools import replay
+        calls = []
+
+        def post(messages):
+            calls.append(messages)
+            if len(calls) in (1, 3, 4, 5):
+                raise TimeoutError()
+            return {'choices': [{'message': {'content': '好'}}]}
+        stats = Counter()
+        gate = replay.ModelGate(post, 800, {}, stats, io.StringIO(), type('C', (), {'now': 0.0})(), {'place': ''})
+        got = [gate.chat('notebook', str(i)) for i in range(7)]
+        self.assertEqual(got, ['', '好', '', '', '', '', ''])
+        self.assertEqual(len(calls), 5)                                # one failure, then three in a row: stop
+        self.assertEqual((stats['model_failed_timeout'], stats['model_refused_after_failures']), (4, 2))
+
+    def test_a_real_model_needs_a_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            made_up_astrbot(Path(tmp) / 'astrbot')
+            chat = fake.build_chat(Path(tmp) / 'chat.db')
+            proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
+                                   '--old-forgets', 'let-in', '--out', str(Path(tmp) / 'r'),
+                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash'],
+                                  capture_output=True, text=True, encoding='utf-8', timeout=60)
+            self.assertEqual(proc.returncode, 2)
+            self.assertFalse((Path(tmp) / 'r').exists())
+            self.assertNotIn(KEY, proc.stdout + proc.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()
