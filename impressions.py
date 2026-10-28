@@ -4,8 +4,11 @@
 
 What she keeps of a person, per group: what he is called there, how he talks (one
 line, at most 60 characters, no numbers, no judgement of who he is), what he often
-talks about (a few words), and some counts. Never his words verbatim, never message
-ids. One file per group, ``people/<group>-<hash>.json``:
+talks about (a few words), and some counts. Never a whole sentence of his: of his
+words only his pet phrases, 2-4 characters each, checked against the red lines
+before they are stored, deleted with his messages, and never put in a prompt
+(``view`` does not return them). Never message ids. One file per group,
+``people/<group>-<hash>.json``:
 
     {"place": "group:1", "tried": "2026-10-28",
      "group":  {"text": "...", "stats": {...}, "origin": {...}},          # what the group is like
@@ -317,15 +320,30 @@ class Store:
         return n
 
     def forget_message_by(self, place, qq) -> bool:
-        """A message of his here was deleted: what the model wrote about him here goes (it may
-        have come from that message); the counts stay. It is written again another night."""
+        """A message of his here was deleted: what the model wrote about him here goes, and so do
+        his pet phrases (either may have come from that message); the counts stay. They are
+        worked out again another night."""
         data = self.load(place)
         rec = data["people"].get(str(qq))
-        if not rec or not (rec.get("style") or rec.get("topics")):
+        stats = (rec or {}).get("stats") or {}
+        if not rec or not (rec.get("style") or rec.get("topics") or stats.get("phrases")):
             return False
         rec["style"], rec["topics"] = "", []
+        if isinstance(rec.get("stats"), dict):
+            rec["stats"]["phrases"] = []
         self.save(place, data)
         return True
+
+
+def clean_phrases(phrases) -> list:
+    """Pet phrases as they may be stored: 2-4 characters, no red line, no judgement, at most 3."""
+    out = []
+    for p in phrases or []:
+        p = str(p or "").strip()
+        if 2 <= len(p) <= 4 and not redline.hit(p) and not JUDGEMENT.search(p) and not DIGITS.search(p) \
+                and p not in out:
+            out.append(p)
+    return out[:MAX_PHRASES]
 
 
 def add_day(rec, name, stats, day) -> None:
@@ -340,7 +358,7 @@ def add_day(rec, name, stats, day) -> None:
         "avg_chars": stats.get("avg_chars", old.get("avg_chars", 0)),
         "image_ratio": stats.get("image_ratio", old.get("image_ratio", 0)),
         "hours": stats.get("hours") or old.get("hours") or [],
-        "phrases": stats.get("phrases") or old.get("phrases") or [],
+        "phrases": clean_phrases(stats.get("phrases") or old.get("phrases") or []),
     }
     rec["since"] = rec.get("since") or day
     rec["updated"] = day
@@ -425,6 +443,17 @@ def describe(v) -> str:
 # ----------------------------------------------------------------------
 _OLD_STATS = {"口头禅": "phrases", "在本群的消息条数": "msgs", "带图比例": "image_ratio", "常在的时段": "hours",
               "平均字数": "avg_chars"}
+# the old group profile's numbers; its group name and "these days" summaries are not carried over
+_OLD_GROUP_STATS = {"消息条数": "msgs", "工作日最热闹的时段": "weekday_hours", "周末最热闹的时段": "weekend_hours",
+                    "平均字数": "avg_chars", "带图比例": "image_ratio", "说话人数": "speakers", "常聊的话题词": "topics"}
+
+
+def _mask(text, names) -> str:
+    """Long numbers -> '#', anyone's name or alias in that group -> '有人'."""
+    out = LONG_NUMBER.sub("#", str(text or ""))
+    for name in sorted({n for n in names if len(n) >= 2}, key=len, reverse=True):
+        out = out.replace(name, discretion.SOMEONE)
+    return out
 
 
 def from_bundle(store, people=(), groups=(), registry=None, day="") -> dict:
@@ -433,19 +462,32 @@ def from_bundle(store, people=(), groups=(), registry=None, day="") -> dict:
     recently' is not carried over (it may be his words)."""
     counts = Counter()
     day = day or time.strftime("%Y-%m-%d")
+    people = list(people or ())
+    names = {}  # place -> every name and alias anyone goes by there (old cards and what is kept)
+    for p in people:
+        names.setdefault(str(p.get("place") or ""), set()).update(
+            str(n) for n in [p.get("name")] + list(p.get("aliases") or []) if n)
     for g in groups or ():
         place = str(g.get("place") or "")
         if not place.startswith("group:"):
             counts["group_no_place"] += 1
             continue
         data = store.load(place)
-        text = str(g.get("text") or "")
+        known = set(names.get(place, ()))
+        for their_names in group_names((), data["people"]).values():
+            known.update(their_names)
+        text = _mask(g.get("text"), known)
+        old = g.get("stats") or {}
+        stats = {new: old[key] for key, new in _OLD_GROUP_STATS.items() if key in old}
+        if isinstance(stats.get("topics"), list):
+            stats["topics"] = [t for t in (check_topic(_mask(x, known)) for x in stats["topics"])
+                               if t and t != discretion.SOMEONE][:8]
         data["group"] = {"text": "" if redline.hit(text) or JUDGEMENT.search(text) else text,
-                         "stats": dict(g.get("stats") or {}), "from": g.get("from"), "to": g.get("to"),
+                         "stats": stats, "from": g.get("from"), "to": g.get("to"),
                          "origin": discretion.make_origin(place, [], []), "updated": day}
         store.save(place, data)
         counts["groups"] += 1
-    for p in people or ():
+    for p in people:
         place, qq = str(p.get("place") or ""), str(p.get("qq") or "")
         if not place.startswith("group:") or not qq:
             counts["person_no_place"] += 1
@@ -461,7 +503,7 @@ def from_bundle(store, people=(), groups=(), registry=None, day="") -> dict:
         old = p.get("stats") or {}
         stats = {new: old[key] for key, new in _OLD_STATS.items() if key in old}
         if "phrases" in stats:
-            stats["phrases"] = [x for x in stats["phrases"] if isinstance(x, str) and not redline.hit(x)][:MAX_PHRASES]
+            stats["phrases"] = clean_phrases(x for x in stats["phrases"] if isinstance(x, str))
         rec["stats"] = dict(rec.get("stats") or {}, **stats)
         rec["since"] = rec.get("since") or str(p.get("from") or day)
         rec["updated"] = day

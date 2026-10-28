@@ -177,6 +177,24 @@ class StoreAndForget(unittest.TestCase):
             self.assertEqual(store.forget_person('10002'), 2)
             self.assertEqual(store.load(G2)['people'], {})
 
+    def test_pet_phrases_go_with_a_deleted_message(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            data = store.load(G1)
+            rec = data['people'].setdefault('10002', im._record(G1, '10002'))
+            rec['stats'] = {'msgs': 12, 'phrases': ['冲鸭']}
+            store.save(G1, data)
+            self.assertTrue(store.forget_message_by(G1, '10002'))
+            self.assertEqual(store.load(G1)['people']['10002']['stats'], {'msgs': 12, 'phrases': []})
+
+    def test_pet_phrases_are_checked_before_they_are_stored(self):
+        rec = im._record(G1, '10002')
+        im.add_day(rec, '柠檬', {'msgs': 3, 'phrases': ['工资', '冲鸭', '说的是一整句话', '好笨', '冲鸭']}, DAY)
+        self.assertEqual(rec['stats']['phrases'], ['冲鸭'])
+        rec['stats']['phrases'] = ['冲鸭']
+        self.assertNotIn('phrases', im.view(rec, G1, G1))           # never in a prompt
+        self.assertNotIn('冲鸭', im.describe(im.view(rec, G1, G1)))
+
     def test_another_groups_file_is_not_read(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = im.Store(Path(tmp) / 'people')
@@ -230,6 +248,22 @@ class OldCards(unittest.TestCase):
             self.assertNotIn('10003', data['people'])
             self.assertEqual(data['group']['text'], '一个爱聊抽卡的游戏群')
             self.assertNotIn('他说的一句话', store.path(G1).read_text('utf-8'))
+
+    def test_old_group_profile_hides_numbers_and_names(self):
+        people = [{'place': G1, 'qq': '10001', 'name': '芒果', 'aliases': [], 'style': '', 'stats': {}},
+                  {'place': G1, 'qq': '10002', 'name': '柠檬', 'aliases': ['柠柠'], 'style': '', 'stats': {}}]
+        groups = [{'place': G1, 'text': '芒果常发 123456789 的那个群，柠柠也在',
+                   'stats': {'群': '某某群 900001', '消息条数': 100, '这几天的摘要': ['芒果说了一件事'],
+                             '常聊的话题词': ['抽卡', '芒果', '工资', '900001'], '说话人数': 12}}]
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            im.from_bundle(store, people, groups, day='2026-10-28')
+            group = store.load(G1)['group']
+            self.assertEqual(group['text'], '有人常发 # 的那个群，有人也在')
+            self.assertEqual(group['stats'], {'msgs': 100, 'topics': ['抽卡'], 'speakers': 12})
+            raw = store.path(G1).read_text('utf-8')
+            for gone in ('123456789', '这几天', '某某群', '一件事'):
+                self.assertNotIn(gone, raw)
 
 
 if __name__ == '__main__':
