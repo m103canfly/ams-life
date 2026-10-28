@@ -335,12 +335,15 @@ class PagesMixin:
                 register("/astrbot_plugin_ams_life/page/memory_point_feedback",
                          self.page_memory_point_feedback, ["POST"],
                          "BioCore memory-point feedback (important/unimportant/edit/restore)")
-                register("/astrbot_plugin_ams_life/page/memory/rollback/<path:session>/<entry_id>",
-                         self.page_memory_rollback, ["POST"], "BioCore memory rollback")
+                # ams-life step 1-3: BioCore's memory rollback / restore endpoints are gone: they
+                # wrote around the forget registry and the vector store, and restore could bring
+                # deleted words back from a tombstone. Deleting is for real. (The whole-folder
+                # backup / restore above stays: it is the owner's tool.)
                 register("/astrbot_plugin_ams_life/page/memory/delete/<path:session>/<entry_id>",
-                         self.page_memory_delete, ["POST"], "BioCore memory soft delete")
-                register("/astrbot_plugin_ams_life/page/memory/restore/<path:session>/<entry_id>",
-                         self.page_memory_restore, ["POST"], "BioCore memory restore")
+                         self.page_memory_delete, ["POST"],
+                         "the owner deletes one memory and everything from its messages")
+                register("/astrbot_plugin_ams_life/page/forget/person", self.page_forget_person, ["POST"],
+                         "the owner deletes a person everywhere")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
 
@@ -455,145 +458,38 @@ class PagesMixin:
         logger.info("[biocore] restored %s data files", count)
         return {"status": "ok", "data": {"files": count}}
 
-    def _memory_doc_for_session(self, session_key: str) -> tuple[Path, dict]:
-        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(session_key or "default"))[:80]
-        path = MEMORY_DIR / (safe + ".json")
-        if path.exists():
-            try:
-                d = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(d, dict):
-                    return path, d
-            except Exception:
-                pass
-        return path, {"entries": []}
-
-    def _memory_save_doc_for_session(self, path: Path, doc: dict) -> None:
-        MEMORY_DIR.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
-
-    @staticmethod
-    def _memory_entry_id(entry: dict) -> str:
-        return _memory_entry_id_of(entry)
-
-    @classmethod
-    def _memory_find_entry(cls, entries, entry_id: str) -> dict | None:
-        if not isinstance(entries, list):
-            return None
-        for entry in entries:
-            if isinstance(entry, dict) and cls._memory_entry_id(entry) == entry_id:
-                return entry
-        return None
-
-    async def page_memory_rollback(self, session: str, entry_id: str):
-        """Rollback one memory entry to its previous version (dashboard API)."""
-        try:
-            path, doc = self._memory_doc_for_session(session)
-            entries = doc.get("entries") if isinstance(doc.get("entries"), list) else []
-            target = self._memory_find_entry(entries, entry_id)
-            if target is None:
-                return {"status": "error", "message": "memory entry not found", "data": {}}
-            if not memory_meta.rollback_entry(target):
-                return {"status": "error", "message": "no previous version", "data": {}}
-            try:
-                _text = str(target.get("text", ""))
-                _sens = bool(target.get("sensitive"))
-                if not _sens and getattr(self, "safety_enabled", False):
-                    _sens = bool(memory_meta.classify_sensitivity(_text).get("sensitive"))
-                _vec = await self._embed_text_guarded(_text, _sens)
-                if _vec:
-                    target["vector"] = _vec
-                    target["needs_reindex"] = False
-                else:
-                    target["needs_reindex"] = True
-            except Exception:
-                target["needs_reindex"] = True
-            target["rollback_ts"] = time.time()
-            self._memory_save_doc_for_session(path, doc)
-            return {"status": "ok", "data": {"session": session, "id": entry_id, "text": target.get("text", "")[:160]}}
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)[:180], "data": {}}
-
     async def page_memory_delete(self, session: str, entry_id: str):
-        """Soft-delete one memory entry; keeps a tombstone for audit."""
+        """The owner deletes one memory (panel only; the page asks to confirm first): the
+        memory and everything else that came from the messages it came from, for real (no
+        tombstone), and registered so it is not kept again. `session` is not used: there
+        is one library."""
         try:
-            path, doc = self._memory_doc_for_session(session)
-            entries = doc.get("entries") if isinstance(doc.get("entries"), list) else []
-            target = self._memory_find_entry(entries, entry_id)
-            if target is None:
+            counts = self._owner_forget_memory(entry_id)
+            if counts is None:
                 return {"status": "error", "message": "memory entry not found", "data": {}}
-            doc["tombstones"] = (doc.get("tombstones") if isinstance(doc.get("tombstones"), list) else [])[-100:]
-            doc["tombstones"].append({"id": entry_id, "ts": time.time(), "text": str(target.get("text", ""))[:200]})
-            doc["entries"] = [e for e in entries if not (isinstance(e, dict) and self._memory_entry_id(e) == entry_id)]
-            memory_meta.append_write_log(doc, op="DELETE", entry_id=entry_id,
-                                         reason="dashboard", ts=time.time())
-            # Propagate the deletion to derived summaries/events/insights.
-            try:
-                _event = types.SimpleNamespace(unified_msg_origin=session)
-                self._propagate_memory_deletion(_event, target, doc, reason="dashboard")
-            except Exception:
-                pass
-            self._memory_save_doc_for_session(path, doc)
-            return {"status": "ok", "data": {"session": session, "id": entry_id, "deleted": True}}
+            return {"status": "ok", "data": {"id": entry_id, "deleted": True, "counts": counts}}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
 
-    async def page_memory_restore(self, session: str, entry_id: str):
-        """Restore a soft-deleted entry, or recreate one from a tombstone.
-
-        Note: archive/insight redactions made at deletion time are not undone
-        (deletion propagation is one-way for derived artifacts).
-        """
-        try:
-            path, doc = self._memory_doc_for_session(session)
-            entries = doc.get("entries") if isinstance(doc.get("entries"), list) else []
-            target = self._memory_find_entry(entries, entry_id)
-            from_tombstone = False
-            if target is not None:
-                if not memory_meta.restore_entry(target):
-                    return {"status": "error", "message": "memory entry is not deleted",
-                            "data": {}}
-            else:
-                tombstones = doc.get("tombstones") if isinstance(doc.get("tombstones"), list) else []
-                tomb = next((item for item in tombstones if isinstance(item, dict)
-                             and str(item.get("id") or "") == entry_id), None)
-                if tomb is None:
-                    return {"status": "error", "message": "memory entry not found", "data": {}}
-                target = {"id": entry_id,
-                          "text": str(tomb.get("text") or "")[:1200],
-                          "role": "user", "ts": time.time(), "hits": 1,
-                          "importance": 0.5, "memory_source": "inferred",
-                          "memory_confidence": 0.35, "memory_tier": "warm",
-                          "last_write_op": "RESTORE",
-                          "restored_from_tombstone": True}
-                doc["tombstones"] = [item for item in tombstones
-                                     if not (isinstance(item, dict)
-                                             and str(item.get("id") or "") == entry_id)]
-                entries.append(target)
-                from_tombstone = True
+    async def page_forget_person(self, person=None):
+        """The owner deletes a person everywhere (panel only; the page asks to confirm
+        first): {"person": "<qq>"}. Registered, so nothing of his is kept again; what
+        AstrBot keeps of him goes too, as far as AstrBot lets a plugin."""
+        if person is None:
             try:
-                _text = str(target.get("text", ""))
-                _sens = bool(target.get("sensitive"))
-                if not _sens and getattr(self, "safety_enabled", False):
-                    _sens = bool(memory_meta.classify_sensitivity(_text).get("sensitive"))
-                _vec = await self._embed_text_guarded(_text, _sens)
-                if _vec:
-                    target["vector"] = _vec
-                    target["needs_reindex"] = False
-                else:
-                    target["needs_reindex"] = True
+                from quart import request
+                body = await request.get_json(silent=True) or {}
             except Exception:
-                target["needs_reindex"] = True
-            target["restored_ts"] = time.time()
-            target["last_write_op"] = "RESTORE"
-            memory_meta.append_write_log(
-                doc, op="RESTORE", entry_id=entry_id,
-                reason=("tombstone" if from_tombstone else "soft_delete"),
-                ts=time.time())
-            self._memory_save_doc_for_session(path, doc)
-            return {"status": "ok", "data": {"session": session, "id": entry_id,
-                                            "text": str(target.get("text") or "")[:160],
-                                            "restored": True,
-                                            "from_tombstone": from_tombstone}}
+                body = {}
+            person = body.get("person") if isinstance(body, dict) else ""
+        person = str(person or "").strip()
+        if not person or not person.isdigit():
+            return {"status": "error", "message": "person must be a QQ number", "data": {}}
+        try:
+            umos = self._place_umos()
+            counts = self._owner_forget_person(person)
+            counts["astrbot"] = await self._forget_in_astrbot(person, umos)
+            return {"status": "ok", "data": {"person": person, "counts": counts}}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
 
