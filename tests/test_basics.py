@@ -55,14 +55,17 @@ class Split(unittest.TestCase):
     """main.py was split into modules; AstrBot must still find the plugin and its handlers in main.py."""
 
     def test_handlers_defined_in_main(self):
-        for name in ('__init__', 'biocore_command', 'on_llm_request', 'on_llm_response'):
+        for name in ('__init__', 'biocore_command', 'on_message', 'on_llm_request', 'on_llm_response'):
             self.assertIn(name, vars(main.BioCorePlugin), name)
 
     def test_all_methods_reachable(self):
         methods = set()
         for klass in main.BioCorePlugin.__mro__[:-2]:  # drop Star, object
             methods |= {k for k in vars(klass) if not k.startswith('__')}
-        self.assertEqual(len(methods), 209)  # 210 upstream methods minus __init__
+        # 210 upstream methods minus __init__, plus 10 for one-her (library, migration, discretion, forgetting)
+        # and 18 for her phone (on_message, windows, open loops per window, moving old body texts)
+        # and 3 for the forget count (_forget_count, _begin_job, _job_stale)
+        self.assertEqual(len(methods), 245)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

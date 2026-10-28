@@ -362,7 +362,8 @@ def _return_contract(memory_meta) -> str:
 def render_compact(core, memory="", events="", self_model=None, user=None,
                    image="", kb="", speaker="", voice="", memory_meta=None,
                    open_loops=None, open_loops_due=0, answer_confidence=None,
-                   strategy_hint="", continuity=None, prompt_mode="telemetry") -> str:
+                   strategy_hint="", continuity=None, prompt_mode="telemetry",
+                   memory_trace=None) -> str:
     """Render biological state into the single compact block the LLM sees.
 
     The interpretation layer owns this string; callers pass raw state/data and
@@ -424,7 +425,9 @@ def render_compact(core, memory="", events="", self_model=None, user=None,
     except Exception:
         pass
     try:
-        _trace = getattr(core, "_last_memory_trace", None)
+        # ams-life: only this turn's own recall; never the body's shared last trace,
+        # which may come from another window. No recall this turn, no mtrace.
+        _trace = memory_trace
         if isinstance(_trace, dict):
             _tv = float(_trace.get("valence", 0.0) or 0.0)
             if _tv >= 0.3:

@@ -177,10 +177,15 @@ class AutonomyMixin:
             pass
 
     def _ensure_autonomy_task(self) -> None:
-        """P0-1: start the generator only when task-15 or task-28 is on."""
-        if not (getattr(self, "proactive_autonomy", False)
-                or getattr(self, "autonomy_loop_enabled", False)):
+        """P0-1: start the plugin's 5-minute loop. ams-life: it runs whenever the plugin is
+        on, because every tick also sweeps her phone; the autonomy tick inside it still
+        runs only when task-15 or task-28 is on."""
+        if not getattr(self, "enabled", True):
             return
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return  # not inside AstrBot's loop yet; the next message starts it
         try:
             task = getattr(self, "_autonomy_task", None)
             if task is None or task.done():
@@ -189,15 +194,23 @@ class AutonomyMixin:
             pass
 
     async def _autonomy_loop(self) -> None:
-        """P0-1: 5-minute deterministic tick; exits immediately when disabled."""
+        """P0-1: 5-minute deterministic tick; exits when the plugin is turned off.
+        ams-life: each tick sweeps expired lines out of her phone; the autonomy tick
+        runs only when task-15 or task-28 is on."""
         try:
-            while (getattr(self, "proactive_autonomy", False)
-                   or getattr(self, "autonomy_loop_enabled", False)):
+            while getattr(self, "enabled", True):
                 await asyncio.sleep(AUTONOMY_TICK_SECONDS)
-                if not (getattr(self, "proactive_autonomy", False)
-                        or getattr(self, "autonomy_loop_enabled", False)):
+                if not getattr(self, "enabled", True):
                     break
                 try:
+                    self._sweep_windows()
+                except Exception:
+                    pass
+                if not (getattr(self, "proactive_autonomy", False)
+                        or getattr(self, "autonomy_loop_enabled", False)):
+                    continue
+                try:
+                    self._begin_job()
                     await self._autonomy_tick()
                 except Exception:
                     pass

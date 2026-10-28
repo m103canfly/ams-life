@@ -40,7 +40,6 @@ class SettingsMixin:
                         setattr(self, key, bool(d[key]))
                 if "safety_enabled" in d and "safety_enabled" not in self.config:
                     self.safety_enabled = bool(d.get("safety_enabled"))
-                    self.cross_session_memory = not self.safety_enabled
                     self.sensitive_memory_protection = self.safety_enabled
                 if "persona_id" in d and "persona_id" not in self.config:
                     self.persona_id = str(d.get("persona_id") or "").strip()

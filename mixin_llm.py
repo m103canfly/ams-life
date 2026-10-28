@@ -192,7 +192,7 @@ class LLMMixin:
 
     def _save_user_record(self, event, data):
         try:
-            if not isinstance(data, dict):
+            if not isinstance(data, dict) or self._job_stale():
                 return
             path = self._user_path(event)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,7 +226,7 @@ class LLMMixin:
         rel = (user_data or {}).get("relationship") if isinstance(user_data, dict) else None
         return rel if isinstance(rel, dict) else {}
 
-    def _deterministic_hint(self, text, user_data, events_raw, memory_meta, core=None):
+    def _deterministic_hint(self, text, user_data, events_raw, memory_meta, core=None, cause_trace=None):
         """One bounded deterministic token; interpretation owns the wording."""
         rel = self._relationship_of(user_data)
         repair_state = rel.get("repair_state") if isinstance(rel.get("repair_state"), dict) else {}
@@ -251,7 +251,7 @@ class LLMMixin:
             except Exception:
                 hint = ""
         if not hint and interpretation.cause_question(text):
-            hint = interpretation.cause_trace_block(getattr(self, "_last_cause_trace", []))
+            hint = interpretation.cause_trace_block(cause_trace or [])
         if not hint:
             hint = interpretation.memory_receipt_block(memory_meta, text)
         if not hint:
@@ -260,9 +260,9 @@ class LLMMixin:
             hint = interpretation.response_strategy_block(events_raw)
         return hint
 
-    async def _maybe_llm_hints(self, event, core, user_data, events_raw, memory_meta, text):
+    async def _maybe_llm_hints(self, event, core, user_data, events_raw, memory_meta, text, cause_trace=None):
         """Optional per-turn strategy refinement; only when a function is ON."""
-        parts = [self._deterministic_hint(text, user_data, events_raw, memory_meta, core)]
+        parts = [self._deterministic_hint(text, user_data, events_raw, memory_meta, core, cause_trace)]
         rel = self._relationship_of(user_data)
         state = rel.get("state") if isinstance(rel.get("state"), dict) else {}
         repair_state = rel.get("repair_state") if isinstance(rel.get("repair_state"), dict) else {}
@@ -308,13 +308,13 @@ class LLMMixin:
         self._last_strategy_hint = hint
         return hint
 
-    async def _maybe_tom_probe(self, event, core, text, user_data, memory_meta):
+    async def _maybe_tom_probe(self, event, core, text, user_data, memory_meta, memory_entries=None):
         """L-T06: optional bounded ToM annotation; never changes core state."""
         if not self._llm_allowed("tom_probe") or not self._llm_v2_cooldown_ok("tom_probe"):
             return
         try:
-            recent = [str(h.get("text") or "") for h in (core.history or [])[-6:]]
-            refs = [str(x) for x in (getattr(self, "_last_memory_entries", []) or []) if str(x)][:6]
+            recent = [str(h.get("text") or "") for h in self._window_lines(event, 6)]
+            refs = [str(x) for x in (memory_entries or []) if str(x)][:6]
             proposal = await self._llm_v2_call(
                 "tom_probe",
                 interpretation.tom_prompt(user_data, recent, memory_lines=refs),
@@ -339,7 +339,7 @@ class LLMMixin:
         if not self._llm_v2_cooldown_ok("relationship_impression"):
             return
         try:
-            events = [e for e in self._event_archive(12) if isinstance(e, dict)]
+            events = [e for e in self._visible_events(event, self._event_archive(12)) if isinstance(e, dict)]
             important = [e for e in events
                          if float(e.get("importance", 0.0) or 0.0) >= 0.6]
             if len(important) < 3:
@@ -388,18 +388,24 @@ class LLMMixin:
             if not allowed:
                 return
             titles = [str(e.get("title") or "")
-                      for e in self._event_archive(10) if isinstance(e, dict)]
+                      for e in self._visible_events(event, self._event_archive(10)) if isinstance(e, dict)]
             parsed = await self._llm_v2_call(
                 "diary", interpretation.diary_prompt(digest, titles),
                 lambda raw: interpretation.parse_diary(raw, allowed_event_ids=allowed),
                 event)
             if not parsed:
                 return
+            if self._job_stale():
+                return
             diary = self.self_model.get("diary")
             if not isinstance(diary, list):
                 diary = []
+            # ams-life: a diary entry is as private as the most private event it draws on.
+            _sources = [e for e in self._event_archive(80)
+                        if isinstance(e, dict) and str(e.get("id") or "") in allowed]
             diary.append({"ts": time.time(), "date": str(digest.get("date") or ""),
                           "text": parsed["diary"], "evidence": parsed["evidence"],
+                          "origin": discretion.merge([discretion.origin_of(e) for e in _sources]),
                           "generated": True})
             self.self_model["diary"] = diary[-30:]
             self._save_self_model()
@@ -428,11 +434,15 @@ class LLMMixin:
                     raw, allowed_refs=allowed), event)
             if not parsed:
                 return
+            if self._job_stale():
+                return
             items = self.self_model.get("relationship_narratives")
             if not isinstance(items, list):
                 items = []
+            _sid, _name = self._speaker(event)
             items.append({"ts": time.time(), "text": parsed["narrative"],
-                          "evidence_refs": parsed["evidence_refs"]})
+                          "evidence_refs": parsed["evidence_refs"],
+                          "origin": discretion.make_origin(self._here(event), [_sid])})
             self.self_model["relationship_narratives"] = items[-5:]
             self._save_self_model()
             self._llm_v2_mark("relationship_narrative")

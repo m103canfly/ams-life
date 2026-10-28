@@ -108,7 +108,9 @@ class BioCore:
         self.daily_digests = []
         self._daily_accum = {"date": "", "n": 0, "v": 0.0, "a": 0.0, "stress": 0.0,
                              "emotions": {}, "ticks": 0}
-        self.open_loops = []
+        # ams-life: open loops live in her phone (one list per chat window);
+        # the body only knows how many are due, as a number.
+        self.loop_pressure = {"due": 0, "delay_min": 0.0}
         self.stimuli = []
         self.goals = [
             {"key": "relationship", "name": "和重要的人保持亲近", "keywords": ("喜欢", "爱", "陪", "关系", "信任", "靠近", "一起"),
@@ -129,11 +131,9 @@ class BioCore:
             "stability": ("平静", "冷静", "休息", "不急", "慢慢", "稳住", "安心", "别怕"),
         }
         self.coping_history = []
-        self.event_anchors = []
         self.opponent = {"v": 0.0, "a": 0.0, "d": 0.0, "social": 0.0}
         self.opponent_gain = 0.10
         self.reconsolidation_seconds = 600.0
-        self.autobiography = []
         self.regulation_stats = {}
         self.attention = 0.5
         self.meta_emotion = ""
@@ -248,18 +248,16 @@ class BioCore:
             self.ripple = _num_map(d["ripple"], self.ripple, 0.0, 1.0)
         if isinstance(d.get("spiking"), dict):
             self.spiking = _num_map(d["spiking"], self.spiking, 0.0, 10.0)
+        # ams-life: the body keeps no text. Older state files may still carry
+        # what was said (stimulus text, reply text); it is left behind here.
         if isinstance(d.get("stimuli"), list):
-            self.stimuli = [x for x in d["stimuli"] if isinstance(x, dict)][-40:]
+            self.stimuli = [{k: v for k, v in x.items() if k != "text"}
+                            for x in d["stimuli"] if isinstance(x, dict)][-40:]
         if isinstance(d.get("history"), list):
-            self.history = [x for x in d["history"] if isinstance(x, dict)][-80:]
-        if isinstance(d.get("open_loops"), list):
-            self.open_loops = [x for x in d["open_loops"] if isinstance(x, dict)][-20:]
+            self.history = [{k: v for k, v in x.items() if k != "text"}
+                            for x in d["history"] if isinstance(x, dict)][-80:]
         if isinstance(d.get("coping_history"), list):
             self.coping_history = [float(x) for x in d["coping_history"] if isinstance(x, (int, float))][-40:]
-        if isinstance(d.get("event_anchors"), list):
-            self.event_anchors = [x for x in d["event_anchors"] if isinstance(x, dict)][-20:]
-        if isinstance(d.get("autobiography"), list):
-            self.autobiography = [x for x in d["autobiography"] if isinstance(x, dict)][-80:]
         if isinstance(d.get("regulation_stats"), dict):
             self.regulation_stats = {str(k): dict(v) for k, v in d["regulation_stats"].items() if isinstance(v, dict)}
         try:
@@ -323,16 +321,12 @@ class BioCore:
                 continue
             _g.setdefault("priority", 0.5)
             _g.setdefault("last_update", 0.0)
-        if isinstance(d.get("self_timeline"), dict):
-            self.self_timeline = d["self_timeline"]
         if isinstance(d.get("reflection_tree"), dict):
             self.reflection_tree = d["reflection_tree"]
         elif isinstance(d.get("reflection_tree"), list):
             self.reflection_tree = {"roots": [x for x in d["reflection_tree"] if isinstance(x, dict)][-10:], "count": len(d["reflection_tree"])}
         if isinstance(d.get("sec"), dict):
             self.sec = dict(d["sec"])
-        self.core_self = str(d.get("core_self") or "")
-        self.narrative_self = str(d.get("narrative_self") or "")
         self.last_tick = __import__("time").time()
         for key in ("echo", "echo_trace"):
             if key in d:
@@ -390,7 +384,7 @@ class BioCore:
         except Exception:
             return str(g.get("name") or "")
 
-    def _goal_evidence(self, g: dict, local_text: str, context_text: str) -> float:
+    def _goal_evidence(self, g: dict, local_text: str, context_text: str, own_lines=()) -> float:
         """Evidence that a goal is active, from this turn plus retrieved context.
 
         Local keyword hits are only one channel; memory / self-narrative text is
@@ -412,8 +406,8 @@ class BioCore:
                 density = min(1.0, len(term_hits) / 5.0)
                 learned = max(self._text_similarity(ctx[:900], sig) * 1.6,
                               min(1.0, 0.5 * density + 0.9 * coverage))
-                for h in (getattr(self, "history", []) or [])[-12:]:
-                    _txt = str((h or {}).get("text") or "")
+                for _txt in list(own_lines or ())[-12:]:
+                    _txt = str(_txt or "")
                     if _txt and _txt in ctx:
                         learned = max(learned, self._text_similarity(_txt, sig) * 0.8)
             return max(0.0, min(1.0, max(local, 0.75 * learned)))
@@ -520,8 +514,13 @@ class BioCore:
         except Exception:
             pass
 
-    def bind_goal_context(self, memory_text: str = "", self_model=None, recent=None, text: str = "") -> None:
-        """Fuse retrieved memory / self narrative / recent turns into goal relevance."""
+    def bind_goal_context(self, memory_text: str = "", self_model=None, recent=None, text: str = "",
+                          own_lines=None) -> None:
+        """Fuse retrieved memory / self narrative / recent turns into goal relevance.
+
+        ams-life: `recent` and `own_lines` (her latest replies) come from the
+        chat window she is in; the body itself keeps no text.
+        """
         try:
             ctx_parts = [str(memory_text or "")]
             if isinstance(self_model, dict):
@@ -537,7 +536,7 @@ class BioCore:
                 if not isinstance(g, dict):
                     continue
                 key = str(g.get("key") or "")
-                rel = self._goal_evidence(g, str(text or ""), ctx)
+                rel = self._goal_evidence(g, str(text or ""), ctx, own_lines or ())
                 base[key] = round(max(float(base.get(key, 0.0) or 0.0), rel), 3)
             self.goal_scores = base
             if base:
@@ -553,34 +552,6 @@ class BioCore:
         self.coping_history = (list(getattr(self, "coping_history", [])) + [success])[-40:]
         if self.coping_history:
             self.appraisal["coping"] = round(sum(self.coping_history) / len(self.coping_history), 3)
-
-    def remember_event(self, key: str, title: str, meaning: str = "", reflection: str = "",
-                       embedding=None) -> None:
-        key = str(key or "").strip()
-        title = str(title or "").strip()
-        if not key or not title:
-            return
-        self.event_anchors = [x for x in getattr(self, "event_anchors", [])
-                              if x.get("key") != key][-19:]
-        _anchor = {"key": key, "title": title, "ts": __import__("time").time()}
-        if embedding:
-            try:
-                _anchor["embedding"] = [float(x) for x in embedding]
-            except Exception:
-                pass
-        self.event_anchors.append(_anchor)
-        self.autobiography = (list(getattr(self, "autobiography", [])) + [{
-            "ts": __import__("time").time(), "key": key, "title": title,
-            "meaning": str(meaning or "")[:400], "reflection": str(reflection or "")[:400],
-        }])[-80:]
-        try:
-            self.self_timeline["past"] = [x.get("title") for x in self.autobiography[-8:]]
-            self.self_timeline["present"] = str(reflection or meaning or title)[:300]
-            self.self_timeline["future"] = [g.get("name") for g in (self.goals or []) if g.get("name")][:5]
-            self.core_self = str(getattr(self, "core_self", "") or title)[:300]
-            self.narrative_self = str(reflection or meaning or title)[:500]
-        except Exception:
-            pass
 
     @staticmethod
     def _cosine_static(a, b) -> float:
@@ -636,29 +607,6 @@ class BioCore:
         else:
             self.meta_emotion = ""
 
-    def update_open_loops(self, text: str, now=None) -> None:
-        """Deterministic prospective-memory (open loops) update from one message."""
-        try:
-            stamp = float(now if now is not None else __import__("time").time())
-            loops = [x for x in (getattr(self, "open_loops", []) or []) if isinstance(x, dict)]
-            memory_meta.resolve_open_loops(loops, text, stamp)
-            for new_loop in memory_meta.detect_open_loops(text, stamp):
-                merged = False
-                for existing in loops:
-                    if str(existing.get("status") or "open") != "open":
-                        continue
-                    if memory_meta.text_similarity(
-                            existing.get("text", ""), new_loop.get("text", "")) >= memory_meta.OPEN_LOOP_MERGE_SIMILARITY:
-                        existing["last_mentioned_ts"] = stamp
-                        existing["mentioned"] = int(existing.get("mentioned", 1) or 1) + 1
-                        merged = True
-                        break
-                if not merged:
-                    loops.append(new_loop)
-            self.open_loops = loops[-int(memory_meta.OPEN_LOOP_MAX):]
-        except Exception:
-            pass
-
     def observe(self, text: str, embedding=None) -> None:
         self._decay_to_now()
         self._query_embedding = embedding
@@ -666,13 +614,6 @@ class BioCore:
         t = str(text or "")
         self._update_goals(t)
         _event_key = ""
-        for _anchor in getattr(self, "event_anchors", []) or []:
-            _sim = self._text_similarity(re.sub(r"\s+", "", t)[:120], str(_anchor.get("title", "")))
-            if self._query_embedding and _anchor.get("embedding"):
-                _sim = max(_sim, self._cosine_static(self._query_embedding, _anchor.get("embedding")))
-            if _sim >= 0.55:
-                _event_key = str(_anchor.get("key", ""))
-                break
         v_delta, a_delta, d_delta, social_delta = 0.0, 0.0, 0.0, 0.0
         _hits = []
         for label, words in LEX.items():
@@ -915,10 +856,6 @@ class BioCore:
         self.spiking = {"rate": round(0.02 + self.energy * 0.08, 3),
                         "variance": round(0.01 + self.stress * 0.05, 4),
                         "ei": round(0.2 + self.trust * 0.3, 3)}
-        try:
-            self.update_open_loops(t)
-        except Exception:
-            pass
         self.ticks += 1
         self.infer_labels(force=True)
         try:
@@ -1523,7 +1460,6 @@ class BioCore:
                 "a": round(float(self.a), 3),
                 "d": round(float(self.d), 3),
                 "social": round(float(self.social), 3),
-                "text": str(text or "")[:80],
             })
             if len(self.history) > 80:
                 self.history = self.history[-80:]
@@ -1890,18 +1826,11 @@ class BioCore:
         due = 0
         delay_min = 0.0
         try:
-            for loop in (getattr(self, "open_loops", []) or []):
-                if not isinstance(loop, dict):
-                    continue
-                if str(loop.get("status") or "open") != "open":
-                    continue
-                hint = str(loop.get("due_hint") or "")
-                if hint == "soon":
-                    due += 1
-                    delay_min = max(delay_min, 60.0)
-                elif hint == "tomorrow":
-                    due += 1
-                    delay_min = max(delay_min, 1440.0)
+            # ams-life: the loops themselves are in her phone; the plugin keeps
+            # this count (over every window) up to date.
+            pressure = getattr(self, "loop_pressure", None) or {}
+            due = int(pressure.get("due", 0) or 0)
+            delay_min = float(pressure.get("delay_min", 0.0) or 0.0)
         except Exception:
             return 0, 0.0
         return due, delay_min
@@ -2295,19 +2224,13 @@ class BioCore:
                 "reflection": dict(self.reflection),
                 "momentum": dict(self.momentum),
                 "appraisal": dict(self.appraisal),
-                "stimuli": list(self.stimuli)[-8:],
+                "stimuli": [{k: v for k, v in x.items() if k != "text"}
+                            for x in list(self.stimuli)[-8:] if isinstance(x, dict)],
                 "history": list(self.history)[-80:],
-                "open_loops": [dict(x) for x in (getattr(self, "open_loops", []) or [])[-20:]
-                               if isinstance(x, dict)],
-                "open_loops_due": sum(1 for _loop in (getattr(self, "open_loops", []) or [])
-                                      if isinstance(_loop, dict)
-                                      and _loop.get("status") == "open"
-                                      and str(_loop.get("due_hint") or "") in ("soon", "tomorrow")),
+                "open_loops_due": int((getattr(self, "loop_pressure", None) or {}).get("due", 0) or 0),
                 "goal_focus": self.goal_focus,
                 "coping": round(float((self.appraisal or {}).get("coping", 0.5)), 3),
-                "event_anchors": list(self.event_anchors)[-5:],
                 "opponent": dict(self.opponent),
-                "autobiography": list(self.autobiography)[-8:],
                 "regulation_stats": dict(self.regulation_stats),
                 "attention": round(float(self.attention), 3),
                 "novelty_need": round(float(getattr(self, "novelty_need", 0.5)), 3),

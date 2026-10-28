@@ -599,15 +599,15 @@ class PagesMixin:
         """Force one memory consolidation pass over all local sessions."""
         results = []
         try:
-            files = sorted(MEMORY_DIR.glob("*.json"))
+            # ams-life: one library; consolidate each place's entries separately.
+            files = self._library_places()
         except Exception:
             files = []
         if getattr(self, "_consolidating", False):
             return {"status": "ok", "data": {"files": 0, "message": "already running"}}
         self._consolidating = True
         try:
-            for f in files:
-                key = f.stem
+            for key in files:
                 ev = types.SimpleNamespace(unified_msg_origin=key)
                 try:
                     core = self._core(ev)
@@ -821,7 +821,6 @@ class PagesMixin:
             return {"status": "ok", "data": {"key": key, "value": self.llm_only_reply_summary}}
         if key == "safety_enabled":
             self.safety_enabled = bool(data.get("value"))
-            self.cross_session_memory = not self.safety_enabled
             self.sensitive_memory_protection = self.safety_enabled
             self._save_settings()
             await self._persist_plugin_config({key: self.safety_enabled})

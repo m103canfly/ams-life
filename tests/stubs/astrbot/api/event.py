@@ -1,8 +1,17 @@
 """astrbot.api.event stand-in."""
 
 
+class EventMessageType:
+    GROUP_MESSAGE = 1
+    PRIVATE_MESSAGE = 2
+    OTHER_MESSAGE = 4
+    ALL = 7
+
+
 class _Filter:
     """Every filter.xxx(...) returns a decorator that leaves the function unchanged."""
+
+    EventMessageType = EventMessageType
 
     def __getattr__(self, name):
         def factory(*args, **kwargs):
