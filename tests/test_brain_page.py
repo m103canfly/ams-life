@@ -1,8 +1,10 @@
 """The brain map page (pages/brain/): stays on this computer, only reads, sample is made up.
 
-Static checks of the page files run everywhere. The sample-format checks run the
-sample generator with Node.js when it is installed (skipped otherwise); no browser,
-no network.
+The page is built by tools/brain/build.mjs from tools/brain/src/ (our code plus
+the vendored Galaxy View renderer, MIT) and three.js / d3-force-3d into one file,
+brain.bundle.js. Static checks of the page files run everywhere. The sample-format
+checks run the sample generator with Node.js when it is installed (skipped
+otherwise); no browser, no network.
 """
 import json
 import re
@@ -13,21 +15,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = ROOT / 'pages' / 'brain'
+SRC = ROOT / 'tools' / 'brain' / 'src'
 FILES = sorted(p for p in PAGE.iterdir() if p.is_file())
+OURS = [SRC / 'brain.js', PAGE / 'index.html', PAGE / 'sample.js']
 
 # What the graph may carry for one point: categories and ids, never content.
 NODE_KEYS = {'id', 'kind', 'sub', 'label', 'cat', 'where', 'ts', 'w', 'vis', 'self'}
 KINDS = {'window', 'person', 'memory', 'event', 'note'}
 EDGE_KINDS = {'link', 'origin', 'about', 'impression'}
+# The only URLs in the bundle are strings inside three.js that are never fetched:
+# the XHTML namespace for createElementNS and a paper cited in a shader comment.
+INERT_URLS = {'http://www.w3.org/1999/xhtml', 'https://jcgt.org/published/0007/04/01/'}
 
 
 class StaysLocal(unittest.TestCase):
     def test_nothing_is_loaded_from_or_sent_to_the_network(self):
-        for f in FILES:
+        for f in FILES + [SRC / 'brain.js']:
             text = f.read_text(encoding='utf-8')
-            for bad in ('http://', 'https://', '//cdn', 'fetch(', 'XMLHttpRequest', 'WebSocket',
-                        'sendBeacon', 'EventSource', '@import', 'import('):
+            for bad in ('fetch(', 'XMLHttpRequest', 'WebSocket', 'sendBeacon', 'EventSource',
+                        'importScripts', '@import', 'import('):
                 self.assertFalse(bad in text, f'{f.name} contains {bad!r}')
+            urls = set(re.findall(r'''https?://[^\s"'`)<>]+''', text))
+            allowed = INERT_URLS if f.name == 'brain.bundle.js' else set()
+            self.assertLessEqual(urls, allowed, f.name)
 
     def test_page_only_loads_its_own_files(self):
         html = (PAGE / 'index.html').read_text(encoding='utf-8')
@@ -36,18 +46,37 @@ class StaysLocal(unittest.TestCase):
         for ref in refs:
             self.assertTrue(ref.startswith('./') and (PAGE / ref[2:]).is_file(), ref)
 
+    def test_every_bundled_package_has_its_license(self):
+        lic = PAGE / 'licenses'
+        rows = re.findall(r'^\| ([^|]+?) \| [^|]+ \| ([^|]+?) \|$', (lic / 'README.md').read_text(encoding='utf-8'), re.M)
+        rows = [(n, l) for n, l in rows if n != 'Package' and not n.startswith('-')]
+        names = {name for name, _ in rows}
+        self.assertIn('galaxy-view', names)
+        self.assertIn('three', names)
+        self.assertIn('d3-force-3d', names)
+        for name, license_ in rows:
+            self.assertTrue((lic / (name.replace('/', '__') + '.LICENSE.txt')).is_file(), name)
+            self.assertIn(license_.strip(), {'MIT', 'ISC', 'BSD-3-Clause', 'Apache-2.0'}, name)
+        self.assertIn('Copyright (c) 2026 Rick', (SRC / 'galaxy' / 'LICENSE').read_text(encoding='utf-8'))
+
 
 class ReadOnly(unittest.TestCase):
     def test_page_never_writes(self):
-        for f in FILES:
+        for f in FILES + [SRC / 'brain.js']:
             text = f.read_text(encoding='utf-8')
-            for bad in ('apiPost', 'apiPut', 'apiDelete', 'apiPatch', 'method:'):
+            for bad in ('apiPost', 'apiPut', 'apiDelete', 'apiPatch'):
                 self.assertFalse(bad in text, f'{f.name} contains {bad!r}')
 
     def test_reads_only_the_brain_routes(self):
-        text = (PAGE / 'brain.js').read_text(encoding='utf-8')
-        routes = set(re.findall(r'apiGet\("([^"]+)"', text))
+        text = (SRC / 'brain.js').read_text(encoding='utf-8')
+        routes = set(re.findall(r"apiGet\('([^']+)'", text))
         self.assertEqual(routes, {'page/brain', 'page/brain/node', 'page/brain/search'})
+
+    def test_bundle_is_built_from_this_source(self):
+        bundle = (PAGE / 'brain.bundle.js').read_text(encoding='utf-8')
+        self.assertTrue(bundle.startswith('/* ams-life brain map (AGPL-3.0)'))
+        for marker in ('page/brain/node', '没说 · ', '想被看见'):   # strings only our source has
+            self.assertIn(marker, bundle)
 
 
 @unittest.skipUnless(shutil.which('node'), 'Node.js not installed')

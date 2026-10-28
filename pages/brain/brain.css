@@ -1,4 +1,4 @@
-/* ams-life (AGPL-3.0); see NOTICE.md. Brain map page; palette follows pages/dashboard/styles.css. */
+/* ams-life (AGPL-3.0); see NOTICE.md. Brain map page; panels follow pages/dashboard/styles.css, the galaxy is Galaxy View (MIT). */
 :root{
   --bg:#f1efe8; --bg2:#e8e5dc; --panel:rgba(251,250,245,.86); --panel2:rgba(245,242,234,.7);
   --line:#c9c4b8; --line2:#ddd8cc; --ink:#161616; --muted:#66635b; --faint:#98938a;
@@ -59,10 +59,30 @@ button,input,select{font:inherit;color:inherit}
 .hits .k{color:var(--faint);font-size:11px;margin-left:auto}
 
 .stage{grid-row:2;position:relative;overflow:hidden}
-#brain{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
-#brain.drag{cursor:grabbing}
+#galaxy{position:absolute;inset:0;background:#000003}
+#galaxy canvas{display:block;width:100%;height:100%;outline:none;touch-action:none}
+[data-theme="light"] #galaxy{background:#f6f4ef}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.lbl3{position:absolute;left:0;top:0;margin-left:-60px;width:120px;text-align:center;font-size:11px;line-height:1.2;color:rgba(233,227,215,.82);text-shadow:0 0 4px #000,0 0 2px #000;white-space:nowrap;will-change:transform}
+.lbl3.win{font-size:12px;color:rgba(255,236,210,.92)}
+.lbl3.faded{opacity:.28}
+.lbl3.core{font-size:11px;color:rgba(255,240,220,.9)}
+.lbl3.sel{color:#fff;font-weight:600}
+.lbl3.lit{color:#ffd58a;font-weight:600;font-size:12px}
+.lbl3.held{color:#b9bcc6}
+.lbl3.hit{color:#ffb14d}
+[data-theme="light"] .lbl3{color:rgba(30,28,24,.85);text-shadow:0 0 3px #f6f4ef,0 0 2px #f6f4ef}
+[data-theme="light"] .lbl3.win{color:#3b2a14}
+[data-theme="light"] .lbl3.lit{color:#a85c00}
+[data-theme="light"] .lbl3.held{color:#666}
+.legend-wins{display:flex;flex-wrap:wrap;gap:4px 10px;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.legend-wins span{display:flex;align-items:center;gap:4px}
+.legend-wins i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.legend-wins i.ring{background:transparent;border:2px solid var(--c)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--c)}
+.dot.ring{background:transparent;border:1.5px solid var(--c)}
 .loading{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);color:var(--faint);letter-spacing:.1em;pointer-events:none}
-.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);padding:3px 8px;font-size:12px;white-space:nowrap;z-index:4}
+.tip{position:absolute;pointer-events:none;z-index:6;background:var(--panel);border:1px solid var(--line);padding:3px 8px;font-size:12px;white-space:nowrap;z-index:4}
 
 .drawer{position:absolute;top:12px;right:12px;bottom:126px;width:330px;overflow:auto;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px);padding:14px 16px;z-index:5}
 .drawer .x{position:absolute;top:6px;right:8px;border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--muted)}
@@ -79,14 +99,13 @@ button,input,select{font:inherit;color:inherit}
 .d-links ul{list-style:none;margin:0;padding:0}
 .d-links li{padding:2px 4px;cursor:pointer;font-size:12px;display:flex;gap:6px;align-items:center}
 .d-links li:hover{background:var(--panel2)}
-.d-links .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .d-links .more{color:var(--faint);cursor:default}
 
 .turns{position:absolute;left:12px;right:12px;bottom:12px;height:102px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px);padding:8px 12px;z-index:4;display:flex;flex-direction:column}
 .turns-head{display:flex;align-items:center;gap:12px}
 .turns-head .muted{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .turns-nav{margin-left:auto;display:flex;gap:6px;flex:none}
-.turn-list{list-style:none;margin:8px 0 0;padding:0;display:flex;gap:6px;overflow-x:auto;flex:1}
+.turn-list{list-style:none;margin:8px 0 0;padding:0;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;flex:1;scrollbar-width:thin}
 .turn-list li{flex:none;border:1px solid var(--line);padding:4px 10px;cursor:pointer;font-size:12px;line-height:1.35;min-width:112px}
 .turn-list li small{display:block;color:var(--faint);font-size:11px}
 .turn-list li.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
