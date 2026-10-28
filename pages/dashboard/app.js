@@ -1160,6 +1160,7 @@
            :'<div class="empty-mini">暂无关联事件</div>')+'</div>';
   }
   function renderRelationships(){
+    bindForgetPerson();  // the delete box works with no relationship record too
     const sel=$("relUserFilter"), body=$("relBody"), empty=$("relEmpty"), hint=$("relStateHint");
     if(!sel||!body) return;
     const users=relationshipsValue();
@@ -1239,7 +1240,6 @@
     const commit=Number(rel.commitment||0), invest=Number(rel.investment||0);
     const name=String(cur.sender_name||cur.sender_id||"用户");
     if(hint) hint.textContent="交互 "+Number(cur.interactions||0)+" 次 · 最近 "+memWhen(cur.last_seen||cur.ts);
-    bindForgetPerson();
     body.innerHTML='<div class="rel-card">'+
       '<div class="rel-card-head"><b>'+esc(name)+'</b><span class="hint">'+esc(String(cur.sender_id||""))+'</span><span class="mem-flag">'+(traj.length?"轨迹 "+traj.length+" 点":"无轨迹")+'</span>'+
       (cur.sender_id?'<button type="button" class="btn mini danger" data-forget-fill="'+esc(String(cur.sender_id))+'">删掉这个人…</button>':'')+'</div>'+
