@@ -1339,9 +1339,9 @@ class BioCore:
             dt_min = max(0.0, (now - float(getattr(self, "last_tick", now))) / 60.0)
         except Exception:
             dt_min = 0.0
-        self.last_tick = now
         if dt_min < 0.5:
-            return
+            return  # ams-life: last_tick stays, so these seconds count at the next decay
+        self.last_tick = now
         def factor(halflife):
             try:
                 hl = max(1.0, float(halflife))

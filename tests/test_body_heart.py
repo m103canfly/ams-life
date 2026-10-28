@@ -99,6 +99,19 @@ class Body(unittest.TestCase):
         self.assertGreater(same, 0.55)
         self.assertLess(other, 0.2)
 
+    def test_decay_counts_time_between_close_calls(self):
+        # calls under 30 seconds apart used to throw that time away
+        often, once = body.BioCore(), body.BioCore()
+        for core in (often, once):
+            core.v, core.a = -0.8, 0.9
+            core._decay_to_now()
+        for _ in range(180):  # every 20 seconds for an hour
+            CLOCK.advance(20)
+            often._decay_to_now()
+        once._decay_to_now()
+        self.assertGreater(often.v, -0.6)
+        self.assertAlmostEqual(often.v, once.v, places=2)
+
     def test_old_homeostasis_is_cut_down(self):
         state = homeostasis.normalize_state({'body': {'hydration': 0.2}, 'need_pyramid': {'dominant': 'esteem'},
                                              'drives': {'energy': 0.9, 'social': 0.4}})
@@ -121,6 +134,29 @@ class TellingTheMouth(unittest.TestCase):
         self.assertNotRegex(text, r'\d')
         for word in INSTRUCTIONS:
             self.assertNotIn(word, text)
+
+    def test_how_she_stands_with_him_in_a_group_and_in_private(self):
+        him = {'interactions': 30, 'absence': {'bucket': 'long'},
+               'relationship': {'state': {'closeness': 0.8, 'conflict': 0.6},
+                                'repair_state': {'phase': 'stable'},
+                                'transactive_map': {'抽卡': 5}}}
+        self.assertEqual(interpretation.relation_brief(him, private_with_him=False), '挺熟')
+        private = interpretation.relation_brief(him, private_with_him=True)
+        for word in ('挺熟', '挺亲近', '最近有点别扭', '很久没聊了', '常聊抽卡'):
+            self.assertIn(word, private)
+        making_up = dict(him, relationship=dict(him['relationship'], repair_state={'phase': 'repairing'}))
+        self.assertEqual(interpretation.relation_brief(making_up), '挺熟')
+        self.assertIn('还在和好的过程中', interpretation.relation_brief(making_up, private_with_him=True))
+
+    def test_every_kind_of_state_tag_is_cut(self):
+        cut = interpretation.strip_state_tags
+        self.assertEqual(cut('好呀<bc v="1">{"e":"joy"}</bc>'), '好呀')
+        self.assertEqual(cut('对<bc>外<bc>{}</bc>层</bc>呀'), '对呀')
+        self.assertEqual(cut('是</bc>呀'), '是呀')
+        self.assertEqual(cut('嗯<BC data=x>{坏'), '嗯')
+        self.assertEqual(cut('好<biocore a="1"/>的'), '好的')
+        self.assertEqual(cut('<bc>1</bc>中<bc>2</bc>'), '中')
+        self.assertEqual(cut('小于号 a<b 不动'), '小于号 a<b 不动')
 
     def test_wanting_to_be_seen_is_never_written(self):
         core = body.BioCore()
@@ -164,13 +200,21 @@ class TellingTheMouth(unittest.TestCase):
 
     def test_a_tag_the_model_writes_is_cut_and_not_used(self):
         r = run_case('reply_tags')
-        self.assertEqual(r['replies'], ['好呀', '好的', '嗯嗯'])
+        self.assertEqual(r['replies'], ['好呀', '好的', '嗯嗯', '行', '对', '是呀'])
         self.assertEqual(r['v0'], r['v1'])
         for text in r['window'] + r['memories']:
             self.assertNotIn('<', text)
 
 
 class Listening(unittest.TestCase):
+    def test_many_messages_do_not_reread_every_window(self):
+        r = run_case('ambient_reads')
+        self.assertEqual(r['other_reads'], 0)
+        self.assertAlmostEqual(r['ambient'], r['expected'], places=3)
+
+    def test_the_message_that_wakes_her_counts_once(self):
+        self.assertEqual(run_case('woken_once')['seen_calls'], 1)
+
     def test_switched_off_listening_does_not_touch_the_body(self):
         r = run_case('listen_off')
         self.assertEqual(r['seen_after_at'], 0.9)

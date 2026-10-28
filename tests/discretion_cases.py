@@ -98,6 +98,7 @@ class Heard(harness.FakeEvent):
     def __init__(self, *a, parts=None, **k):
         super().__init__(*a, **k)
         self._parts = parts
+        self.is_at_or_wake_command = False
 
     def get_messages(self):
         return self._parts if self._parts is not None else super().get_messages()
@@ -125,6 +126,7 @@ def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯', pa
     clock.advance(delay)
     event = (Heard(text, sender=sender, name=name, group=group, parts=parts) if parts is not None
              else harness.FakeEvent(text, sender=sender, name=name, group=group))
+    event.is_at_or_wake_command = True  # a turn is a message that wakes her
     req = ProviderRequest(prompt=text, system_prompt='你是小爱。')
     loop.run_until_complete(plugin.on_message(event))  # AstrBot calls it for every message first
     loop.run_until_complete(plugin.on_llm_request(event, req))
@@ -458,7 +460,8 @@ def run():
         core = plugin._core(None)
         out['v0'] = core.v
         replies = []
-        for raw in ('好呀<bc>{"e":"joy","i":1.0}</bc>', '好的<bc>{坏掉的', '<biocore>{"e":"anger"}</biocore>嗯嗯'):
+        for raw in ('好呀<bc>{"e":"joy","i":1.0}</bc>', '好的<bc>{坏掉的', '<biocore>{"e":"anger"}</biocore>嗯嗯',
+                    '行<bc v="1">{"e":"joy"}</bc>', '对<bc>外<bc>{"e":"joy"}</bc>层</bc>', '是</bc>呀'):
             event = harness.FakeEvent('小爱 好不好', sender='10002', name='柠檬', group=A)
             resp = LLMResponse(raw)
             loop.run_until_complete(plugin.on_llm_response(event, resp))
@@ -605,6 +608,42 @@ def run():
             hear(plugin, loop, 1, '闲聊%d' % i, '10005', '路人', A)
         out['ambient'] = core.ambient
         mixin_phone.LISTEN_MOVES_BODY = True
+    elif CASE == 'ambient_reads':
+        # many messages in one group: she does not reread every window for each of them
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        t(10, '小爱 晚上好', '10004', '桃子', B)
+        t(10, '小爱 在吗', '10001', '芒果')
+        real_read = plugin._read_window
+        reads = []
+
+        def counting_read(place):
+            reads.append(place)
+            return real_read(place)
+        plugin._read_window = counting_read
+        for i in range(20):
+            hear(plugin, loop, 1, '闲聊%d' % i, '10005', '路人', A)
+        plugin._read_window = real_read
+        out['other_reads'] = len([p for p in reads if p != 'group:' + A])
+        out['ambient'] = plugin._core(None).ambient
+        out['expected'] = min(1.0, 23 / 30.0)  # 20 now, 3 earlier, all within 30 minutes
+    elif CASE == 'woken_once':
+        # a message that wakes her: seen once, not once in on_message and again in the request
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        core = plugin._core(None)
+        calls = []
+        real_seen = core.be_seen
+
+        def counting_seen():
+            calls.append(1)
+            return real_seen()
+        core.be_seen = counting_seen
+        event = harness.FakeEvent('小爱 在吗', sender='10002', name='柠檬', group=A)
+        event.is_at_or_wake_command = True
+        req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
+        loop.run_until_complete(plugin.on_message(event))
+        loop.run_until_complete(plugin.on_llm_request(event, req))
+        harness.drain(loop)
+        out['seen_calls'] = len(calls)
     elif CASE == 'names':
         # who said a recalled memory: the nickname in the same place, nobody elsewhere
         t(0, '小爱，我们周末去爬山吧', '10002', '柠檬', A)

@@ -25,12 +25,25 @@ def _one_line(text: str, limit: int = 160) -> str:
 # ams-life: the model is no longer asked for a state tag. If it writes one anyway
 # (<bc>…</bc> or <biocore>…</biocore>, closed or not) it is cut out of the reply and
 # what it says is not used: the body moves from what was said, not a self-report.
-_STATE_TAG = re.compile(r"<\s*(bc|biocore)\s*>.*?(<\s*/\s*\1\s*>|$)", re.S | re.I)
+_TAG_NAME = r"(?:bc|biocore)"
+_TAG_SELF_CLOSING = re.compile(r"<\s*%s\b[^>]*/\s*>" % _TAG_NAME, re.I)
+# an innermost pair: an opening tag (attributes allowed) whose content holds no other opening tag
+_TAG_PAIR = re.compile(r"<\s*(%s)\b[^>]*>(?:(?!<\s*%s\b).)*?<\s*/\s*\1\s*>" % (_TAG_NAME, _TAG_NAME),
+                       re.S | re.I)
+_TAG_OPEN_TO_END = re.compile(r"<\s*%s\b[^>]*>.*\Z" % _TAG_NAME, re.S | re.I)
+_TAG_LONE_CLOSE = re.compile(r"<\s*/\s*%s\s*>" % _TAG_NAME, re.I)
 
 
 def strip_state_tags(raw: str) -> str:
     text = str(raw or "")
-    clean = _STATE_TAG.sub("", text)
+    clean = _TAG_SELF_CLOSING.sub("", text)
+    while True:  # innermost pairs first, so nested tags go with everything inside them
+        nxt = _TAG_PAIR.sub("", clean)
+        if nxt == clean:
+            break
+        clean = nxt
+    clean = _TAG_OPEN_TO_END.sub("", clean)   # one never closed: cut to the end
+    clean = _TAG_LONE_CLOSE.sub("", clean)    # a closing tag left on its own
     return clean.strip() if clean != text else text
 
 
@@ -163,7 +176,9 @@ def body_brief(core) -> str:
 
 
 def relation_brief(user, private_with_him=False) -> str:
-    """How she stands with the person she is answering: no name, no number."""
+    """How she stands with the person she is answering: no name, no number. In a group
+    only how well she knows him; closeness, friction, making up, a long absence and
+    what they talk about only in his own private chat (the owner, step 1-2)."""
     d = user if isinstance(user, dict) else {}
     if not d:
         return ""
@@ -179,14 +194,16 @@ def relation_brief(user, private_with_him=False) -> str:
         conflict = float(state.get("conflict", 0.0) or 0.0)
     except Exception:
         closeness, conflict = 0.5, 0.0
-    if closeness >= 0.65:
-        parts.append("挺亲近")
-    elif n >= 20:
+    if n >= 20:
         parts.append("挺熟")
     elif n >= 3:
         parts.append("认识")
     else:
         parts.append("还不太熟")
+    if not private_with_him:
+        return parts[0]
+    if closeness >= 0.65:
+        parts.append("挺亲近")
     repair = rel.get("repair_state") if isinstance(rel.get("repair_state"), dict) else {}
     if str(repair.get("phase") or "stable") != "stable":
         parts.append("还在和好的过程中")
@@ -196,10 +213,10 @@ def relation_brief(user, private_with_him=False) -> str:
         rel.get("absence") if isinstance(rel.get("absence"), dict) else {})
     if str((absence or {}).get("bucket") or "same_day") in ("long", "medium"):
         parts.append("很久没聊了")
-    # What they talk about is built from what was said where he last spoke, so it is
-    # only shown in his own private chat.
+    # What they talk about is built from what was said where he last spoke (which may
+    # be a private chat).
     trans = rel.get("transactive_map") if isinstance(rel.get("transactive_map"), dict) else {}
-    if private_with_him and trans:
+    if trans:
         topics = sorted(trans.items(), key=lambda item: (-int(item[1]), str(item[0])))[:2]
         parts.append("常聊" + "、".join(str(k)[:12] for k, _ in topics))
     we_items = rel.get("we_memory") if isinstance(rel.get("we_memory"), list) else []

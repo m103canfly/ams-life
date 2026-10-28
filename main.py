@@ -568,9 +568,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         self._continue_job()
         await self._ensure_profile(event)
         core = self._core(event)
-        # ams-life: she was called (woken), so she was seen; and how lively the chats are
+        # ams-life: how lively the chats are. That she was called (woken) was counted as
+        # being seen when the message came in (on_message), once.
         try:
-            core.be_seen()
             core.set_ambient(self._ambient_level())
         except Exception:
             pass

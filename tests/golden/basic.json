@@ -1,6 +1,6 @@
 {
  "command_learning": [
-  "[BioCore] learning enabled=True retention=single\n{\"version\": 1, \"params\": {\"regulation_q\": {\"express\": 0.00495}, \"trust_alpha\": 0.3, \"learning_rate\": 0.2}, \"last_update\": 1793272490.0, \"updates_count\": 1, \"log\": [{\"ts\": 1793272490.0, \"param\": \"regulation_q.express\", \"old\": 0.0, \"new\": 0.00495, \"reason\": \"delta_stress\", \"samples\": 5}], \"evidence\": {\"regulation_q\": {\"express\": {\"n\": 0, \"sum_pe\": 0.0}, \"label_emotion\": {\"n\": 1, \"sum_pe\": 0.10229477372637846}, \"suppress\": {\"n\": 1, \"sum_pe\": 0.04861960482546451}, \"reappraise\": {\"n\": 1, \"sum_pe\": 0.10386169609862858}}}}"
+  "[BioCore] learning enabled=True retention=single\n{\"version\": 1, \"params\": {\"regulation_q\": {\"express\": 0.00495}, \"trust_alpha\": 0.3, \"learning_rate\": 0.2}, \"last_update\": 1793272490.0, \"updates_count\": 1, \"log\": [{\"ts\": 1793272490.0, \"param\": \"regulation_q.express\", \"old\": 0.0, \"new\": 0.00495, \"reason\": \"delta_stress\", \"samples\": 5}], \"evidence\": {\"regulation_q\": {\"express\": {\"n\": 0, \"sum_pe\": 0.0}, \"label_emotion\": {\"n\": 1, \"sum_pe\": 0.10220241467531646}, \"suppress\": {\"n\": 1, \"sum_pe\": 0.048545787938237134}, \"reappraise\": {\"n\": 1, \"sum_pe\": 0.10373328798479338}}}}"
  ],
  "command_readiness": [
   "[BioCore] readiness: disabled (proactive_autonomy=false)\nproactive_send=False"
@@ -75,7 +75,7 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.397,
+     "encoding_arousal": 0.405,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -83,13 +83,13 @@
      "hits": 1,
      "id": "96f2356d0110",
      "image_caption": "",
-     "importance": 0.46727774134908406,
+     "importance": 0.4701075419250374,
      "inhibition": 0.21,
      "inhibition_ts": 1793271330.0,
      "last_used": 1793004390.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793004390.0,
-     "memory_confidence": 0.8174,
+     "memory_confidence": 0.8176,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793090790.0,
@@ -166,13 +166,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.397,
+     "encoding_arousal": 0.405,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.014,
      "hits": 1,
-     "importance": 0.42054996721417565,
+     "importance": 0.4230967877325337,
      "inhibition": 0.0,
      "last_used": 1793004390.0,
      "legacy_backfilled": true,
@@ -250,7 +250,7 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.401,
+     "encoding_arousal": 0.407,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -258,12 +258,12 @@
      "hits": 1,
      "id": "7015b26f2702",
      "image_caption": "",
-     "importance": 0.4861324131472719,
+     "importance": 0.48828401892474116,
      "inhibition": 0.0,
      "last_used": 1793004510.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793004510.0,
-     "memory_confidence": 0.8189,
+     "memory_confidence": 0.8191,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793090910.0,
@@ -340,13 +340,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.401,
+     "encoding_arousal": 0.407,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.083,
      "hits": 1,
-     "importance": 0.43751917183254474,
+     "importance": 0.43945561703226704,
      "inhibition": 0.0,
      "last_used": 1793004510.0,
      "legacy_backfilled": true,
@@ -424,7 +424,7 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.4,
+     "encoding_arousal": 0.404,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -432,12 +432,12 @@
      "hits": 1,
      "id": "0b67eae10905",
      "image_caption": "",
-     "importance": 0.4741504128186156,
+     "importance": 0.4756726234076825,
      "inhibition": 0.0,
      "last_used": 1793271330.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271330.0,
-     "memory_confidence": 0.8179,
+     "memory_confidence": 0.8181,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793357730.0,
@@ -514,13 +514,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.4,
+     "encoding_arousal": 0.404,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.036,
      "hits": 1,
-     "importance": 0.42673537153675406,
+     "importance": 0.42810536106691427,
      "inhibition": 0.0,
      "last_used": 1793271330.0,
      "legacy_backfilled": true,
@@ -598,7 +598,7 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.392,
+     "encoding_arousal": 0.396,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -606,12 +606,12 @@
      "hits": 1,
      "id": "056021c8ff14",
      "image_caption": "",
-     "importance": 0.4624324345297566,
+     "importance": 0.4636273877543944,
      "inhibition": 0.0,
      "last_used": 1793271350.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271350.0,
-     "memory_confidence": 0.817,
+     "memory_confidence": 0.8171,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793357750.0,
@@ -688,13 +688,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.392,
+     "encoding_arousal": 0.396,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": 0.001,
      "hits": 1,
-     "importance": 0.41618919107678093,
+     "importance": 0.41726464897895493,
      "inhibition": 0.0,
      "last_used": 1793271350.0,
      "next_review_ts": 1793357750.0,
@@ -958,7 +958,7 @@
      "hits": 1,
      "id": "99136ad47b58",
      "image_caption": "",
-     "importance": 0.4502669508304393,
+     "importance": 0.4502405606591061,
      "inhibition": 0.0,
      "last_used": 1793000090.0,
      "last_write_op": "ADD",
@@ -1048,7 +1048,7 @@
      "encoding_valence": -0.007,
      "hits": 1,
      "id": "bbc4b59bb507",
-     "importance": 0.42024025574739543,
+     "importance": 0.42021650459319554,
      "inhibition": 0.1411,
      "inhibition_ts": 1793098170.0,
      "last_recall": 1793011740.0,
@@ -1135,7 +1135,7 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.431,
+     "encoding_arousal": 0.435,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -1143,14 +1143,14 @@
      "hits": 1,
      "id": "faa00a605aa5",
      "image_caption": "",
-     "importance": 0.5205939743231388,
+     "importance": 0.5221325172239449,
      "inhibition": 0.0,
      "last_recall": 1793098170.0,
      "last_recall_regulation": "none",
      "last_used": 1793011740.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793011740.0,
-     "memory_confidence": 0.8204,
+     "memory_confidence": 0.8206,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793253690.0,
@@ -1232,13 +1232,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.431,
+     "encoding_arousal": 0.435,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.119,
      "hits": 1,
-     "importance": 0.45511332689082495,
+     "importance": 0.45649801550155045,
      "inhibition": 0.1292,
      "inhibition_ts": 1793271870.0,
      "last_used": 1793011740.0,
@@ -1317,7 +1317,7 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.448,
+     "encoding_arousal": 0.451,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -1325,12 +1325,12 @@
      "hits": 1,
      "id": "f3cf5ee6569a",
      "image_caption": "",
-     "importance": 0.512988731380333,
+     "importance": 0.5142172521531909,
      "inhibition": 0.0,
      "last_used": 1793011770.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793011770.0,
-     "memory_confidence": 0.821,
+     "memory_confidence": 0.8211,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793098170.0,
@@ -1407,13 +1407,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.448,
+     "encoding_arousal": 0.451,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.125,
      "hits": 1,
-     "importance": 0.4616673582422997,
+     "importance": 0.4627730269378718,
      "inhibition": 0.0,
      "last_used": 1793011770.0,
      "legacy_backfilled": true,
@@ -1491,7 +1491,7 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.373,
+     "encoding_arousal": 0.375,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -1499,7 +1499,7 @@
      "hits": 1,
      "id": "32ed0168a98d",
      "image_caption": "",
-     "importance": 0.4644771778093014,
+     "importance": 0.46524782550912175,
      "inhibition": 0.14,
      "inhibition_ts": 1793271800.0,
      "last_used": 1793098170.0,
@@ -1582,13 +1582,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.373,
+     "encoding_arousal": 0.375,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.042,
      "hits": 1,
-     "importance": 0.4193682100283713,
+     "importance": 0.42006179295820956,
      "inhibition": 0.0,
      "last_used": 1793098170.0,
      "legacy_backfilled": true,
@@ -1666,15 +1666,15 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.409,
+     "encoding_arousal": 0.41,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.004,
+     "encoding_valence": 0.003,
      "hits": 1,
      "id": "ce2f0fced43d",
      "image_caption": "",
-     "importance": 0.46906726945591365,
+     "importance": 0.46926957270158265,
      "inhibition": 0.0,
      "last_used": 1793271800.0,
      "last_write_op": "ADD",
@@ -1760,14 +1760,14 @@
      },
      "attachments": [],
      "destabilized_until": 1793272470.0,
-     "encoding_arousal": 0.394,
+     "encoding_arousal": 0.395,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.066,
+     "encoding_valence": -0.067,
      "hits": 1,
      "id": "a0b2d8b7db1c",
-     "importance": 0.46157230826230516,
+     "importance": 0.46185711467325186,
      "inhibition": 0.0,
      "last_recall": 1793271870.0,
      "last_recall_regulation": "express",
@@ -1863,11 +1863,11 @@
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.179,
+     "encoding_valence": -0.18,
      "hits": 1,
      "id": "bd2144a04c59",
      "image_caption": "",
-     "importance": 0.5202287331961936,
+     "importance": 0.5204860833630292,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "last_write_op": "ADD",
@@ -1953,9 +1953,9 @@
      "encoding_emotion": "sadness",
      "encoding_emotion_secondary": "disappointment",
      "encoding_regulation": "express",
-     "encoding_valence": -0.239,
+     "encoding_valence": -0.24,
      "hits": 1,
-     "importance": 0.47698085987657424,
+     "importance": 0.47721247502672626,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "legacy_backfilled": true,
@@ -2041,11 +2041,11 @@
      "encoding_emotion": "sadness",
      "encoding_emotion_secondary": "disappointment",
      "encoding_regulation": "express",
-     "encoding_valence": -0.281,
+     "encoding_valence": -0.28,
      "hits": 1,
      "id": "0e573ca31ece",
      "image_caption": "",
-     "importance": 0.5858020697738263,
+     "importance": 0.5857783562932135,
      "inhibition": 0.0,
      "last_recall": 1793271870.0,
      "last_recall_regulation": "express",
@@ -2147,7 +2147,7 @@
      "encoding_regulation": "express",
      "encoding_valence": -0.334,
      "hits": 1,
-     "importance": 0.5493393627964436,
+     "importance": 0.5493292706638921,
      "inhibition": 0.0,
      "last_used": 1793271840.0,
      "legacy_backfilled": true,
@@ -2226,7 +2226,7 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.605,
+     "encoding_arousal": 0.606,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
@@ -2234,7 +2234,7 @@
      "hits": 1,
      "id": "98bbacc6b4e4",
      "image_caption": "",
-     "importance": 0.6331905752954095,
+     "importance": 0.6331818423233262,
      "inhibition": 0.0,
      "last_recall": 1793272490.0,
      "last_recall_regulation": "express",
@@ -2322,13 +2322,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.605,
+     "encoding_arousal": 0.606,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
      "encoding_valence": -0.334,
      "hits": 1,
-     "importance": 0.5584710673791393,
+     "importance": 0.5584614332112743,
      "inhibition": 0.0,
      "last_used": 1793271870.0,
      "legacy_backfilled": true,
@@ -2406,7 +2406,7 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.633,
+     "encoding_arousal": 0.632,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
@@ -2414,12 +2414,12 @@
      "hits": 1,
      "id": "0d547e081dfd",
      "image_caption": "",
-     "importance": 0.622140550113913,
+     "importance": 0.6218708923484834,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272490.0,
-     "memory_confidence": 0.8298,
+     "memory_confidence": 0.8297,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793358890.0,
@@ -2496,13 +2496,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.698,
+     "encoding_arousal": 0.697,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "label_emotion",
      "encoding_valence": -0.369,
      "hits": 1,
-     "importance": 0.595451169250756,
+     "importance": 0.5952072979488569,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "next_review_ts": 1793358890.0,
@@ -2584,7 +2584,7 @@
      "hits": 1,
      "id": "d7aab5b251fc",
      "image_caption": "",
-     "importance": 0.457984498302959,
+     "importance": 0.4578118078135011,
      "inhibition": 0.0,
      "last_used": 1793000690.0,
      "last_write_op": "ADD",
@@ -2672,7 +2672,7 @@
      "encoding_regulation": "none",
      "encoding_valence": -0.024,
      "hits": 1,
-     "importance": 0.4121860484726631,
+     "importance": 0.412030627032151,
      "inhibition": 0.0,
      "last_used": 1793000690.0,
      "legacy_backfilled": true,
@@ -2751,7 +2751,7 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.373,
+     "encoding_arousal": 0.372,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -2759,7 +2759,7 @@
      "hits": 1,
      "id": "95dca9d8d49b",
      "image_caption": "",
-     "importance": 0.4747442817327585,
+     "importance": 0.4745968941781928,
      "inhibition": 0.0,
      "last_recall": 1793098470.0,
      "last_recall_regulation": "none",
@@ -2848,13 +2848,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.373,
+     "encoding_arousal": 0.372,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.017,
      "hits": 1,
-     "importance": 0.41376985355948265,
+     "importance": 0.4136372047603735,
      "inhibition": 0.0,
      "last_used": 1793000730.0,
      "legacy_backfilled": true,
@@ -2940,7 +2940,7 @@
      "hits": 1,
      "id": "5f2d3fc90ecf",
      "image_caption": "",
-     "importance": 0.4568213198587004,
+     "importance": 0.4566896690138968,
      "inhibition": 0.0,
      "last_used": 1793000790.0,
      "last_write_op": "ADD",
@@ -3028,7 +3028,7 @@
      "encoding_regulation": "none",
      "encoding_valence": -0.007,
      "hits": 1,
-     "importance": 0.4111391878728304,
+     "importance": 0.41102070211250713,
      "inhibition": 0.1585,
      "inhibition_ts": 1793272890.0,
      "last_used": 1793000790.0,
@@ -3108,7 +3108,7 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.366,
+     "encoding_arousal": 0.367,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -3116,7 +3116,7 @@
      "hits": 1,
      "id": "df67f56093b6",
      "image_caption": "",
-     "importance": 0.5054285079233889,
+     "importance": 0.5059199184027406,
      "inhibition": 0.1373,
      "inhibition_ts": 1793272890.0,
      "last_recall": 1793271400.0,
@@ -3124,7 +3124,7 @@
      "last_used": 1793098470.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793098470.0,
-     "memory_confidence": 0.818,
+     "memory_confidence": 0.8181,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793551336.0,
@@ -3206,13 +3206,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.366,
+     "encoding_arousal": 0.367,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.09,
+     "encoding_valence": -0.091,
      "hits": 1,
-     "importance": 0.42807690713105,
+     "importance": 0.4285191765624666,
      "inhibition": 0.0,
      "last_used": 1793098470.0,
      "legacy_backfilled": true,
@@ -3290,7 +3290,7 @@
       "sender_id": "10005",
       "sender_name": "路人"
      },
-     "encoding_arousal": 0.381,
+     "encoding_arousal": 0.382,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -3298,7 +3298,7 @@
      "hits": 1,
      "id": "9c01ab2838a3",
      "image_caption": "",
-     "importance": 0.4727340090645857,
+     "importance": 0.473112183695423,
      "inhibition": 0.0,
      "last_used": 1793098530.0,
      "last_write_op": "ADD",
@@ -3380,13 +3380,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.381,
+     "encoding_arousal": 0.382,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": -0.062,
      "hits": 1,
-     "importance": 0.42647310815812717,
+     "importance": 0.4268134653258807,
      "inhibition": 0.0,
      "last_used": 1793098530.0,
      "legacy_backfilled": true,
@@ -3464,7 +3464,7 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.385,
+     "encoding_arousal": 0.387,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -3472,12 +3472,12 @@
      "hits": 1,
      "id": "d753390d2089",
      "image_caption": "",
-     "importance": 0.4613265831700997,
+     "importance": 0.4621716194856931,
      "inhibition": 0.0,
      "last_used": 1793271380.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271380.0,
-     "memory_confidence": 0.8169,
+     "memory_confidence": 0.817,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793357780.0,
@@ -3554,13 +3554,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.41,
+     "encoding_arousal": 0.412,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": 0.067,
      "hits": 1,
-     "importance": 0.43656892485308973,
+     "importance": 0.43732945753712377,
      "inhibition": 0.0,
      "last_used": 1793271380.0,
      "legacy_backfilled": true,
@@ -3639,7 +3639,7 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.401,
+     "encoding_arousal": 0.403,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
@@ -3647,7 +3647,7 @@
      "hits": 1,
      "id": "632d7be7d6dd",
      "image_caption": "",
-     "importance": 0.4934232663296142,
+     "importance": 0.4940980417525734,
      "inhibition": 0.0,
      "last_recall": 1793272890.0,
      "last_recall_regulation": "suppress",
@@ -3736,13 +3736,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.426,
+     "encoding_arousal": 0.428,
      "encoding_emotion": "neutral",
-     "encoding_emotion_secondary": "interest",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
      "encoding_valence": 0.108,
      "hits": 1,
-     "importance": 0.4509434396966527,
+     "importance": 0.451550737577316,
      "inhibition": 0.0,
      "last_used": 1793271400.0,
      "legacy_backfilled": true,
@@ -3820,7 +3820,7 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.634,
+     "encoding_arousal": 0.633,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "suppress",
@@ -3828,12 +3828,12 @@
      "hits": 1,
      "id": "10e46405a873",
      "image_caption": "",
-     "importance": 0.6206553636927299,
+     "importance": 0.6203212795409333,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272890.0,
-     "memory_confidence": 0.8297,
+     "memory_confidence": 0.8296,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793359290.0,
@@ -3910,13 +3910,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.634,
+     "encoding_arousal": 0.633,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "suppress",
      "encoding_valence": -0.293,
      "hits": 1,
-     "importance": 0.558004827323457,
+     "importance": 0.5577041515868401,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "legacy_backfilled": true,
@@ -3995,7 +3995,7 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.621,
+     "encoding_arousal": 0.62,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "reappraise",
@@ -4003,7 +4003,7 @@
      "hits": 1,
      "id": "a473a739b8d5",
      "image_caption": "",
-     "importance": 0.6212962784962872,
+     "importance": 0.6210313537741629,
      "inhibition": 0.0,
      "last_recall": 1793276520.0,
      "last_recall_regulation": "none",
@@ -4096,20 +4096,20 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.436,
+     "encoding_arousal": 0.455,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.179,
+     "encoding_valence": -0.18,
      "hits": 1,
      "id": "8bbef4ae3aa2",
      "image_caption": "",
-     "importance": 0.5224716340575959,
+     "importance": 0.5292892619675792,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793276520.0,
-     "memory_confidence": 0.8218,
+     "memory_confidence": 0.8223,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793362920.0,
@@ -4186,13 +4186,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.436,
+     "encoding_arousal": 0.455,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.185,
+     "encoding_valence": -0.186,
      "hits": 1,
-     "importance": 0.4715497909829369,
+     "importance": 0.4776841100017127,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "next_review_ts": 1793362920.0,
@@ -4284,9 +4284,9 @@
        "conflict": false,
        "cosine": 0.547723,
        "entry_id": "a473a739b8d5",
-       "importance": 0.6057,
+       "importance": 0.6054,
        "rank": 1,
-       "score": 0.4409,
+       "score": 0.4408,
        "source": "direct",
        "tier": "hot"
       },
@@ -4304,9 +4304,9 @@
        "conflict": false,
        "cosine": 0.434122,
        "entry_id": "632d7be7d6dd",
-       "importance": 0.4929,
+       "importance": 0.4936,
        "rank": 2,
-       "score": 0.3413,
+       "score": 0.3415,
        "source": "direct",
        "tier": "hot"
       }
@@ -4529,7 +4529,7 @@
        "entry_id": "0e573ca31ece",
        "importance": 0.5857,
        "rank": 1,
-       "score": 0.6839,
+       "score": 0.684,
        "source": "direct",
        "tier": "hot"
       },
@@ -4567,9 +4567,9 @@
        "conflict": false,
        "cosine": 0.566947,
        "entry_id": "a0b2d8b7db1c",
-       "importance": 0.4615,
+       "importance": 0.4618,
        "rank": 3,
-       "score": 0.4446,
+       "score": 0.4447,
        "source": "direct",
        "tier": "warm"
       }
@@ -5224,7 +5224,7 @@
    "who_am_i": ""
   },
   "states/her.json": {
-   "a": 0.4361,
+   "a": 0.4554,
    "allostatic_load": 0.0,
    "ambient": 0.0333,
    "appraisal": {
@@ -5234,7 +5234,7 @@
     "goal_relevance": 0.53,
     "norm_compatibility": 0.62,
     "novelty": 0.0,
-    "urgency": 0.38
+    "urgency": 0.405
    },
    "attention": 0.347,
    "boredom": 0.0,
@@ -5242,15 +5242,15 @@
    "compound": "希望",
    "coping": 0.501,
    "core_self": "",
-   "d": 0.6192,
+   "d": 0.6194,
    "daily_digests": [
     {
      "date": "2026-10-26",
      "dominant_emotion": "neutral",
      "event_ids": [],
      "interaction_count": 4,
-     "mean_a": 0.3898,
-     "mean_stress": 0.2663,
+     "mean_a": 0.3928,
+     "mean_stress": 0.2664,
      "mean_v": -0.0387
     },
     {
@@ -5258,14 +5258,14 @@
      "dominant_emotion": "neutral",
      "event_ids": [],
      "interaction_count": 2,
-     "mean_a": 0.3693,
-     "mean_stress": 0.2639,
-     "mean_v": -0.0662
+     "mean_a": 0.371,
+     "mean_stress": 0.264,
+     "mean_v": -0.0663
     }
    ],
    "echo": -0.2621,
-   "echo_trace": -0.2981,
-   "energy": 0.3707,
+   "echo_trace": -0.2982,
+   "energy": 0.3794,
    "goal_conflict": [],
    "goal_focus": "和重要的人保持亲近",
    "goal_scores": {
@@ -5340,7 +5340,7 @@
      "v": -0.024
     },
     {
-     "a": 0.373,
+     "a": 0.372,
      "compound": "",
      "d": 0.539,
      "emotion": "neutral",
@@ -5360,67 +5360,67 @@
      "v": -0.007
     },
     {
-     "a": 0.397,
+     "a": 0.405,
      "compound": "希望",
      "d": 0.552,
      "emotion": "neutral",
-     "intensity": 0.191,
+     "intensity": 0.194,
      "social": 0.536,
      "ts": 1793004390.0,
      "v": -0.014
     },
     {
-     "a": 0.401,
+     "a": 0.407,
      "compound": "",
      "d": 0.526,
      "emotion": "neutral",
-     "intensity": 0.213,
+     "intensity": 0.215,
      "social": 0.538,
      "ts": 1793004510.0,
      "v": -0.083
     },
     {
-     "a": 0.431,
+     "a": 0.435,
      "compound": "失落",
      "d": 0.515,
      "emotion": "neutral",
-     "intensity": 0.233,
+     "intensity": 0.235,
      "social": 0.54,
      "ts": 1793011740.0,
      "v": -0.119
     },
     {
-     "a": 0.448,
+     "a": 0.451,
      "compound": "希望",
      "d": 0.511,
      "emotion": "neutral",
-     "intensity": 0.242,
+     "intensity": 0.243,
      "social": 0.552,
      "ts": 1793011770.0,
      "v": -0.125
     },
     {
-     "a": 0.373,
+     "a": 0.375,
      "compound": "希望",
      "d": 0.534,
      "emotion": "neutral",
-     "intensity": 0.194,
+     "intensity": 0.195,
      "social": 0.556,
      "ts": 1793098170.0,
      "v": -0.042
     },
     {
-     "a": 0.366,
+     "a": 0.367,
      "compound": "希望",
      "d": 0.529,
      "emotion": "neutral",
-     "intensity": 0.208,
+     "intensity": 0.209,
      "social": 0.559,
      "ts": 1793098470.0,
-     "v": -0.09
+     "v": -0.091
     },
     {
-     "a": 0.381,
+     "a": 0.382,
      "compound": "希望",
      "d": 0.526,
      "emotion": "neutral",
@@ -5430,54 +5430,54 @@
      "v": -0.062
     },
     {
-     "a": 0.4,
+     "a": 0.404,
      "compound": "希望",
      "d": 0.544,
      "emotion": "neutral",
-     "intensity": 0.201,
+     "intensity": 0.203,
      "social": 0.55,
      "ts": 1793271330.0,
      "v": -0.036
     },
     {
-     "a": 0.392,
+     "a": 0.396,
      "compound": "",
      "d": 0.545,
      "emotion": "neutral",
-     "intensity": 0.187,
+     "intensity": 0.188,
      "social": 0.553,
      "ts": 1793271350.0,
      "v": 0.001
     },
     {
-     "a": 0.41,
+     "a": 0.412,
      "compound": "",
      "d": 0.559,
      "emotion": "neutral",
-     "intensity": 0.217,
+     "intensity": 0.218,
      "social": 0.572,
      "ts": 1793271380.0,
      "v": 0.067
     },
     {
-     "a": 0.426,
+     "a": 0.428,
      "compound": "希望",
      "d": 0.578,
      "emotion": "neutral",
-     "intensity": 0.238,
+     "intensity": 0.239,
      "social": 0.581,
      "ts": 1793271400.0,
      "v": 0.108
     },
     {
-     "a": 0.394,
+     "a": 0.395,
      "compound": "希望",
      "d": 0.52,
      "emotion": "neutral",
      "intensity": 0.211,
      "social": 0.578,
      "ts": 1793271800.0,
-     "v": -0.066
+     "v": -0.067
     },
     {
      "a": 0.415,
@@ -5487,7 +5487,7 @@
      "intensity": 0.272,
      "social": 0.563,
      "ts": 1793271820.0,
-     "v": -0.239
+     "v": -0.24
     },
     {
      "a": 0.577,
@@ -5500,7 +5500,7 @@
      "v": -0.334
     },
     {
-     "a": 0.605,
+     "a": 0.606,
      "compound": "失落",
      "d": 0.621,
      "emotion": "anger",
@@ -5510,7 +5510,7 @@
      "v": -0.334
     },
     {
-     "a": 0.698,
+     "a": 0.697,
      "compound": "失落",
      "d": 0.683,
      "emotion": "anger",
@@ -5520,7 +5520,7 @@
      "v": -0.369
     },
     {
-     "a": 0.634,
+     "a": 0.633,
      "compound": "希望",
      "d": 0.674,
      "emotion": "anger",
@@ -5530,39 +5530,39 @@
      "v": -0.293
     },
     {
-     "a": 0.621,
+     "a": 0.62,
      "compound": "希望",
      "d": 0.649,
      "emotion": "anger",
-     "intensity": 0.354,
+     "intensity": 0.353,
      "social": 0.492,
      "ts": 1793272920.0,
      "v": -0.256
     },
     {
-     "a": 0.436,
+     "a": 0.455,
      "compound": "希望",
      "d": 0.619,
      "emotion": "neutral",
-     "intensity": 0.265,
+     "intensity": 0.271,
      "social": 0.506,
      "ts": 1793276520.0,
-     "v": -0.185
+     "v": -0.186
     }
    ],
    "homeostasis": {
-    "L_int": 0.0213,
+    "L_int": 0.0214,
     "action": {
      "mode": "engage",
      "reason": "baseline",
-     "strength": 0.5425
+     "strength": 0.5423
     },
     "drives": {
      "curiosity": 0.82,
      "seen": 0.045,
-     "social": 0.5591
+     "social": 0.5589
     },
-    "readiness": 0.4679,
+    "readiness": 0.4674,
     "set_points": {
      "curiosity": 0.811306,
      "seen": 0.082736,
@@ -5594,15 +5594,15 @@
       },
       "label_emotion": {
        "n": 1,
-       "sum_pe": 0.10229477372637846
+       "sum_pe": 0.10220241467531646
       },
       "reappraise": {
        "n": 1,
-       "sum_pe": 0.10386169609862858
+       "sum_pe": 0.10373328798479338
       },
       "suppress": {
        "n": 1,
-       "sum_pe": 0.04861960482546451
+       "sum_pe": 0.048545787938237134
       }
      }
     },
@@ -5639,7 +5639,7 @@
     "attention": 0.04,
     "energy": 0.034,
     "social": -0.036,
-    "stress": 0.073,
+    "stress": 0.074,
     "valence": 0.036
    },
    "novelty_need": 0.5,
@@ -5704,10 +5704,10 @@
     "enabled": false
    },
    "reflection": {
-    "a": 0.06075150753333838,
-    "d": 0.021458117304892894,
+    "a": 0.060751602741297026,
+    "d": 0.021446338065443195,
     "social": 0,
-    "v": -0.07605494578368809
+    "v": -0.07606857105620143
    },
    "refusal_readiness": 0.103,
    "regulation": "none",
@@ -5729,14 +5729,14 @@
     "reappraise": {
      "cost": 0.002,
      "last_update": 1793272920.0,
-     "stress_delta": -0.00419,
+     "stress_delta": -0.00418,
      "success": 1,
      "uses": 1
     },
     "suppress": {
      "cost": 0.01,
      "last_update": 1793272890.0,
-     "stress_delta": 0.00143,
+     "stress_delta": 0.00142,
      "success": 0,
      "uses": 1
     }
@@ -5749,7 +5749,7 @@
    },
    "sec": {
     "coping_potential": 0.501,
-    "implication": 0.267,
+    "implication": 0.269,
     "normative": 0.62,
     "relevance": 0.371
    },
@@ -5759,20 +5759,20 @@
     "past": [],
     "present": ""
    },
-   "social": 0.5063,
+   "social": 0.5061,
    "spectrum": [
     {
-     "distance": 0.135,
+     "distance": 0.127,
      "key": "confusion",
      "name": "困惑"
     },
     {
-     "distance": 0.201,
+     "distance": 0.199,
      "key": "disgust",
      "name": "厌恶"
     },
     {
-     "distance": 0.23,
+     "distance": 0.227,
      "key": "contempt",
      "name": "轻蔑"
     }
@@ -5786,17 +5786,17 @@
     {
      "key": "confusion",
      "name": "困惑",
-     "p": 0.4428
+     "p": 0.455
     },
     {
      "key": "disgust",
      "name": "厌恶",
-     "p": 0.2974
+     "p": 0.2904
     },
     {
      "key": "contempt",
      "name": "轻蔑",
-     "p": 0.2599
+     "p": 0.2546
     }
    ],
    "spiking": {
@@ -5805,10 +5805,10 @@
     "variance": 0.0234
    },
    "stimuli": [],
-   "stress": 0.268,
-   "talked": 0.3221,
+   "stress": 0.2696,
+   "talked": 0.3217,
    "ticks": 24,
-   "v": -0.1852
+   "v": -0.1855
   },
   "users/10001.json": {
    "absence": {
@@ -5865,13 +5865,13 @@
        "ts": 1793000090.0
       },
       {
-       "conflict": 0.2826,
+       "conflict": 0.2827,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793011740.0
       },
       {
-       "conflict": 0.2804,
+       "conflict": 0.2805,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793011770.0
@@ -5889,7 +5889,7 @@
        "ts": 1793271800.0
       },
       {
-       "conflict": 0.2881,
+       "conflict": 0.2882,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271820.0
@@ -5901,7 +5901,7 @@
        "ts": 1793271840.0
       },
       {
-       "conflict": 0.3095,
+       "conflict": 0.3094,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271870.0
@@ -5945,8 +5945,8 @@
       "ts": 1793000090.0
      },
      {
-      "closeness": 0.5444,
-      "conflict": 0.2826,
+      "closeness": 0.5443,
+      "conflict": 0.2827,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -5954,7 +5954,7 @@
      },
      {
       "closeness": 0.5476,
-      "conflict": 0.2804,
+      "conflict": 0.2805,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -5969,7 +5969,7 @@
       "ts": 1793098170.0
      },
      {
-      "closeness": 0.562,
+      "closeness": 0.5619,
       "conflict": 0.2557,
       "predictability": 1.0,
       "repair": 0.0,
@@ -5978,7 +5978,7 @@
      },
      {
       "closeness": 0.5513,
-      "conflict": 0.2881,
+      "conflict": 0.2882,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -5994,7 +5994,7 @@
      },
      {
       "closeness": 0.5339,
-      "conflict": 0.3095,
+      "conflict": 0.3094,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -6293,7 +6293,7 @@
        "ts": 1793272920.0
       },
       {
-       "conflict": 0.2798,
+       "conflict": 0.2805,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793276520.0
@@ -6307,8 +6307,8 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5368,
-     "conflict": 0.2798,
+     "closeness": 0.5365,
+     "conflict": 0.2805,
      "predictability": 1.0,
      "repair": 0.0,
      "trust": 0.5
@@ -6339,8 +6339,8 @@
       "ts": 1793272920.0
      },
      {
-      "closeness": 0.5368,
-      "conflict": 0.2798,
+      "closeness": 0.5365,
+      "conflict": 0.2805,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -6431,7 +6431,7 @@
        "ts": 1793004390.0
       },
       {
-       "conflict": 0.2686,
+       "conflict": 0.2687,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793004510.0
@@ -6474,7 +6474,7 @@
      },
      {
       "closeness": 0.5454,
-      "conflict": 0.2686,
+      "conflict": 0.2687,
       "predictability": 1.0,
       "repair": 0.0,
       "trust": 0.5,
@@ -6782,17 +6782,17 @@
       "social": 0.52,
       "spectrum": [
        {
-        "distance": 0.158,
+        "distance": 0.155,
         "key": "confusion",
         "name": "困惑"
        },
        {
-        "distance": 0.224,
+        "distance": 0.228,
         "key": "calmness",
         "name": "平静"
        },
        {
-        "distance": 0.241,
+        "distance": 0.242,
         "key": "disappointment",
         "name": "失望"
        }
@@ -6801,7 +6801,7 @@
      },
      "key": "her",
      "snapshot": {
-      "a": 0.3792,
+      "a": 0.3836,
       "allostatic_load": 0.0,
       "ambient": 0.0333,
       "appraisal": {
@@ -6811,7 +6811,7 @@
        "goal_relevance": 0.53,
        "norm_compatibility": 0.62,
        "novelty": 0.0,
-       "urgency": 0.38
+       "urgency": 0.405
       },
       "attention": 0.347,
       "boredom": 0.0,
@@ -6819,15 +6819,15 @@
       "compound": "希望",
       "coping": 0.501,
       "core_self": "",
-      "d": 0.5989,
+      "d": 0.5991,
       "daily_digests": [
        {
         "date": "2026-10-26",
         "dominant_emotion": "neutral",
         "event_ids": [],
         "interaction_count": 4,
-        "mean_a": 0.3898,
-        "mean_stress": 0.2663,
+        "mean_a": 0.3928,
+        "mean_stress": 0.2664,
         "mean_v": -0.0387
        },
        {
@@ -6835,14 +6835,14 @@
         "dominant_emotion": "neutral",
         "event_ids": [],
         "interaction_count": 2,
-        "mean_a": 0.3693,
-        "mean_stress": 0.2639,
-        "mean_v": -0.0662
+        "mean_a": 0.371,
+        "mean_stress": 0.264,
+        "mean_v": -0.0663
        }
       ],
       "echo": -0.2621,
-      "echo_trace": -0.2981,
-      "energy": 0.342,
+      "echo_trace": -0.2982,
+      "energy": 0.344,
       "goal_conflict": [],
       "goal_focus": "和重要的人保持亲近",
       "goal_scores": {
@@ -6917,7 +6917,7 @@
         "v": -0.024
        },
        {
-        "a": 0.373,
+        "a": 0.372,
         "compound": "",
         "d": 0.539,
         "emotion": "neutral",
@@ -6937,67 +6937,67 @@
         "v": -0.007
        },
        {
-        "a": 0.397,
+        "a": 0.405,
         "compound": "希望",
         "d": 0.552,
         "emotion": "neutral",
-        "intensity": 0.191,
+        "intensity": 0.194,
         "social": 0.536,
         "ts": 1793004390.0,
         "v": -0.014
        },
        {
-        "a": 0.401,
+        "a": 0.407,
         "compound": "",
         "d": 0.526,
         "emotion": "neutral",
-        "intensity": 0.213,
+        "intensity": 0.215,
         "social": 0.538,
         "ts": 1793004510.0,
         "v": -0.083
        },
        {
-        "a": 0.431,
+        "a": 0.435,
         "compound": "失落",
         "d": 0.515,
         "emotion": "neutral",
-        "intensity": 0.233,
+        "intensity": 0.235,
         "social": 0.54,
         "ts": 1793011740.0,
         "v": -0.119
        },
        {
-        "a": 0.448,
+        "a": 0.451,
         "compound": "希望",
         "d": 0.511,
         "emotion": "neutral",
-        "intensity": 0.242,
+        "intensity": 0.243,
         "social": 0.552,
         "ts": 1793011770.0,
         "v": -0.125
        },
        {
-        "a": 0.373,
+        "a": 0.375,
         "compound": "希望",
         "d": 0.534,
         "emotion": "neutral",
-        "intensity": 0.194,
+        "intensity": 0.195,
         "social": 0.556,
         "ts": 1793098170.0,
         "v": -0.042
        },
        {
-        "a": 0.366,
+        "a": 0.367,
         "compound": "希望",
         "d": 0.529,
         "emotion": "neutral",
-        "intensity": 0.208,
+        "intensity": 0.209,
         "social": 0.559,
         "ts": 1793098470.0,
-        "v": -0.09
+        "v": -0.091
        },
        {
-        "a": 0.381,
+        "a": 0.382,
         "compound": "希望",
         "d": 0.526,
         "emotion": "neutral",
@@ -7007,54 +7007,54 @@
         "v": -0.062
        },
        {
-        "a": 0.4,
+        "a": 0.404,
         "compound": "希望",
         "d": 0.544,
         "emotion": "neutral",
-        "intensity": 0.201,
+        "intensity": 0.203,
         "social": 0.55,
         "ts": 1793271330.0,
         "v": -0.036
        },
        {
-        "a": 0.392,
+        "a": 0.396,
         "compound": "",
         "d": 0.545,
         "emotion": "neutral",
-        "intensity": 0.187,
+        "intensity": 0.188,
         "social": 0.553,
         "ts": 1793271350.0,
         "v": 0.001
        },
        {
-        "a": 0.41,
+        "a": 0.412,
         "compound": "",
         "d": 0.559,
         "emotion": "neutral",
-        "intensity": 0.217,
+        "intensity": 0.218,
         "social": 0.572,
         "ts": 1793271380.0,
         "v": 0.067
        },
        {
-        "a": 0.426,
+        "a": 0.428,
         "compound": "希望",
         "d": 0.578,
         "emotion": "neutral",
-        "intensity": 0.238,
+        "intensity": 0.239,
         "social": 0.581,
         "ts": 1793271400.0,
         "v": 0.108
        },
        {
-        "a": 0.394,
+        "a": 0.395,
         "compound": "希望",
         "d": 0.52,
         "emotion": "neutral",
         "intensity": 0.211,
         "social": 0.578,
         "ts": 1793271800.0,
-        "v": -0.066
+        "v": -0.067
        },
        {
         "a": 0.415,
@@ -7064,7 +7064,7 @@
         "intensity": 0.272,
         "social": 0.563,
         "ts": 1793271820.0,
-        "v": -0.239
+        "v": -0.24
        },
        {
         "a": 0.577,
@@ -7077,7 +7077,7 @@
         "v": -0.334
        },
        {
-        "a": 0.605,
+        "a": 0.606,
         "compound": "失落",
         "d": 0.621,
         "emotion": "anger",
@@ -7087,7 +7087,7 @@
         "v": -0.334
        },
        {
-        "a": 0.698,
+        "a": 0.697,
         "compound": "失落",
         "d": 0.683,
         "emotion": "anger",
@@ -7097,7 +7097,7 @@
         "v": -0.369
        },
        {
-        "a": 0.634,
+        "a": 0.633,
         "compound": "希望",
         "d": 0.674,
         "emotion": "anger",
@@ -7107,39 +7107,39 @@
         "v": -0.293
        },
        {
-        "a": 0.621,
+        "a": 0.62,
         "compound": "希望",
         "d": 0.649,
         "emotion": "anger",
-        "intensity": 0.354,
+        "intensity": 0.353,
         "social": 0.492,
         "ts": 1793272920.0,
         "v": -0.256
        },
        {
-        "a": 0.436,
+        "a": 0.455,
         "compound": "希望",
         "d": 0.619,
         "emotion": "neutral",
-        "intensity": 0.265,
+        "intensity": 0.271,
         "social": 0.506,
         "ts": 1793276520.0,
-        "v": -0.185
+        "v": -0.186
        }
       ],
       "homeostasis": {
-       "L_int": 0.0213,
+       "L_int": 0.0214,
        "action": {
         "mode": "engage",
         "reason": "baseline",
-        "strength": 0.5425
+        "strength": 0.5423
        },
        "drives": {
         "curiosity": 0.82,
         "seen": 0.045,
-        "social": 0.5591
+        "social": 0.5589
        },
-       "readiness": 0.4679,
+       "readiness": 0.4674,
        "set_points": {
         "curiosity": 0.811306,
         "seen": 0.082736,
@@ -7171,15 +7171,15 @@
          },
          "label_emotion": {
           "n": 1,
-          "sum_pe": 0.10229477372637846
+          "sum_pe": 0.10220241467531646
          },
          "reappraise": {
           "n": 1,
-          "sum_pe": 0.10386169609862858
+          "sum_pe": 0.10373328798479338
          },
          "suppress": {
           "n": 1,
-          "sum_pe": 0.04861960482546451
+          "sum_pe": 0.048545787938237134
          }
         }
        },
@@ -7216,7 +7216,7 @@
        "attention": 0.04,
        "energy": 0.034,
        "social": -0.036,
-       "stress": 0.073,
+       "stress": 0.074,
        "valence": 0.036
       },
       "novelty_need": 0.5,
@@ -7281,10 +7281,10 @@
        "enabled": false
       },
       "reflection": {
-       "a": 0.06075150753333838,
-       "d": 0.021458117304892894,
+       "a": 0.060751602741297026,
+       "d": 0.021446338065443195,
        "social": 0,
-       "v": -0.07605494578368809
+       "v": -0.07606857105620143
       },
       "refusal_readiness": 0.103,
       "regulation": "none",
@@ -7306,14 +7306,14 @@
        "reappraise": {
         "cost": 0.002,
         "last_update": 1793272920.0,
-        "stress_delta": -0.00419,
+        "stress_delta": -0.00418,
         "success": 1,
         "uses": 1
        },
        "suppress": {
         "cost": 0.01,
         "last_update": 1793272890.0,
-        "stress_delta": 0.00143,
+        "stress_delta": 0.00142,
         "success": 0,
         "uses": 1
        }
@@ -7326,7 +7326,7 @@
       },
       "sec": {
        "coping_potential": 0.501,
-       "implication": 0.267,
+       "implication": 0.269,
        "normative": 0.62,
        "relevance": 0.371
       },
@@ -7336,20 +7336,20 @@
        "past": [],
        "present": ""
       },
-      "social": 0.5159,
+      "social": 0.5157,
       "spectrum": [
        {
-        "distance": 0.158,
+        "distance": 0.155,
         "key": "confusion",
         "name": "困惑"
        },
        {
-        "distance": 0.224,
+        "distance": 0.228,
         "key": "calmness",
         "name": "平静"
        },
        {
-        "distance": 0.241,
+        "distance": 0.242,
         "key": "disappointment",
         "name": "失望"
        }
@@ -7363,17 +7363,17 @@
        {
         "key": "confusion",
         "name": "困惑",
-        "p": 0.4236
+        "p": 0.431
        },
        {
         "key": "calmness",
         "name": "平静",
-        "p": 0.2988
+        "p": 0.293
        },
        {
         "key": "disappointment",
         "name": "失望",
-        "p": 0.2777
+        "p": 0.276
        }
       ],
       "spiking": {
@@ -7382,10 +7382,10 @@
        "variance": 0.0234
       },
       "stimuli": [],
-      "stress": 0.259,
-      "talked": 0.2709,
+      "stress": 0.2593,
+      "talked": 0.2705,
       "ticks": 24,
-      "v": -0.1277
+      "v": -0.1279
      },
      "working_set": {
       "capacity": 8,
@@ -7423,9 +7423,9 @@
      "conflict": false,
      "cosine": 0.547723,
      "entry_id": "a473a739b8d5",
-     "importance": 0.6057,
+     "importance": 0.6054,
      "rank": 1,
-     "score": 0.4409,
+     "score": 0.4408,
      "source": "direct",
      "tier": "hot"
     },
@@ -7443,9 +7443,9 @@
      "conflict": false,
      "cosine": 0.434122,
      "entry_id": "632d7be7d6dd",
-     "importance": 0.4929,
+     "importance": 0.4936,
      "rank": 2,
-     "score": 0.3413,
+     "score": 0.3415,
      "source": "direct",
      "tier": "hot"
     }
@@ -7576,18 +7576,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4341,
+       "effective_importance": 0.4367,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "96f2356d0110",
-       "importance": 0.467,
+       "importance": 0.47,
        "last_recall": 0.0,
        "last_used": 1793004390.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8174,
+       "memory_confidence": 0.8176,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7613,12 +7613,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.3907,
+       "effective_importance": 0.393,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "c33e2b31d4bb",
-       "importance": 0.421,
+       "importance": 0.423,
        "last_recall": 0.0,
        "last_used": 1793004390.0,
        "last_write_op": "",
@@ -7651,18 +7651,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4516,
+       "effective_importance": 0.4536,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "7015b26f2702",
-       "importance": 0.486,
+       "importance": 0.488,
        "last_recall": 0.0,
        "last_used": 1793004510.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8189,
+       "memory_confidence": 0.8191,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7688,12 +7688,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4064,
+       "effective_importance": 0.4082,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "5eba53d35e3a",
-       "importance": 0.438,
+       "importance": 0.439,
        "last_recall": 0.0,
        "last_used": 1793004510.0,
        "last_write_op": "",
@@ -7726,18 +7726,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.473,
+       "effective_importance": 0.4746,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "0b67eae10905",
-       "importance": 0.474,
+       "importance": 0.476,
        "last_recall": 0.0,
        "last_used": 1793271330.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8179,
+       "memory_confidence": 0.8181,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7763,12 +7763,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4257,
+       "effective_importance": 0.4271,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "629ea9185c27",
-       "importance": 0.427,
+       "importance": 0.428,
        "last_recall": 0.0,
        "last_used": 1793271330.0,
        "last_write_op": "",
@@ -7801,18 +7801,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4613,
+       "effective_importance": 0.4625,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "056021c8ff14",
-       "importance": 0.462,
+       "importance": 0.464,
        "last_recall": 0.0,
        "last_used": 1793271350.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.817,
+       "memory_confidence": 0.8171,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7838,12 +7838,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4152,
+       "effective_importance": 0.4163,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "2deba7ca30c9",
-       "importance": 0.416,
+       "importance": 0.417,
        "last_recall": 0.0,
        "last_used": 1793271350.0,
        "last_write_op": "",
@@ -8026,18 +8026,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4959,
+       "effective_importance": 0.4973,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "faa00a605aa5",
-       "importance": 0.521,
+       "importance": 0.522,
        "last_recall": 1793098170.0,
        "last_used": 1793011740.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8204,
+       "memory_confidence": 0.8206,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8063,12 +8063,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4236,
+       "effective_importance": 0.4249,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "1a9000d96cb1",
-       "importance": 0.455,
+       "importance": 0.456,
        "last_recall": 0.0,
        "last_used": 1793011740.0,
        "last_write_op": "",
@@ -8101,18 +8101,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4775,
+       "effective_importance": 0.4786,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "f3cf5ee6569a",
-       "importance": 0.513,
+       "importance": 0.514,
        "last_recall": 0.0,
        "last_used": 1793011770.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.821,
+       "memory_confidence": 0.8211,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8138,12 +8138,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4297,
+       "effective_importance": 0.4307,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "e042cc33c872",
-       "importance": 0.462,
+       "importance": 0.463,
        "last_recall": 0.0,
        "last_used": 1793011770.0,
        "last_write_op": "",
@@ -8176,12 +8176,12 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4424,
+       "effective_importance": 0.4432,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "32ed0168a98d",
-       "importance": 0.464,
+       "importance": 0.465,
        "last_recall": 0.0,
        "last_used": 1793098170.0,
        "last_write_op": "ADD",
@@ -8213,12 +8213,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.3995,
+       "effective_importance": 0.4001,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "5921a74eb614",
-       "importance": 0.419,
+       "importance": 0.42,
        "last_recall": 0.0,
        "last_used": 1793098170.0,
        "last_write_op": "",
@@ -8251,7 +8251,7 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.468,
+       "effective_importance": 0.4682,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8288,7 +8288,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 1,
-       "effective_importance": 0.4606,
+       "effective_importance": 0.4608,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8326,7 +8326,7 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5191,
+       "effective_importance": 0.5193,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8363,7 +8363,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4759,
+       "effective_importance": 0.4762,
        "encoding_emotion": "sadness",
        "encoding_emotion_secondary": "disappointment",
        "hits": 1,
@@ -8551,7 +8551,7 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6209,
+       "effective_importance": 0.6206,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
@@ -8562,7 +8562,7 @@
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8298,
+       "memory_confidence": 0.8297,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8588,7 +8588,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5942,
+       "effective_importance": 0.594,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
@@ -8626,7 +8626,7 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.425,
+       "effective_importance": 0.4248,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8663,7 +8663,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.3825,
+       "effective_importance": 0.3824,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8701,7 +8701,7 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4522,
+       "effective_importance": 0.4521,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8738,7 +8738,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.384,
+       "effective_importance": 0.3839,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8776,7 +8776,7 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4239,
+       "effective_importance": 0.4238,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8813,7 +8813,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.3815,
+       "effective_importance": 0.3814,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8851,18 +8851,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5043,
+       "effective_importance": 0.5047,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "df67f56093b6",
-       "importance": 0.505,
+       "importance": 0.506,
        "last_recall": 1793271400.0,
        "last_used": 1793098470.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.818,
+       "memory_confidence": 0.8181,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8888,12 +8888,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4078,
+       "effective_importance": 0.4082,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "00e870cdd88e",
-       "importance": 0.428,
+       "importance": 0.429,
        "last_recall": 0.0,
        "last_used": 1793098470.0,
        "last_write_op": "",
@@ -8926,7 +8926,7 @@
         "sender_name": "路人"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4503,
+       "effective_importance": 0.4507,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -8963,12 +8963,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4063,
+       "effective_importance": 0.4066,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "a9a485266c1e",
-       "importance": 0.426,
+       "importance": 0.427,
        "last_recall": 0.0,
        "last_used": 1793098530.0,
        "last_write_op": "",
@@ -9001,18 +9001,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4602,
+       "effective_importance": 0.4611,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "d753390d2089",
-       "importance": 0.461,
+       "importance": 0.462,
        "last_recall": 0.0,
        "last_used": 1793271380.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8169,
+       "memory_confidence": 0.817,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9038,7 +9038,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4355,
+       "effective_importance": 0.4363,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
@@ -9076,12 +9076,12 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4925,
+       "effective_importance": 0.4931,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "632d7be7d6dd",
-       "importance": 0.493,
+       "importance": 0.494,
        "last_recall": 1793272890.0,
        "last_used": 1793271400.0,
        "last_write_op": "ADD",
@@ -9113,12 +9113,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4499,
+       "effective_importance": 0.4505,
        "encoding_emotion": "neutral",
-       "encoding_emotion_secondary": "interest",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "edd1982fd56b",
-       "importance": 0.451,
+       "importance": 0.452,
        "last_recall": 0.0,
        "last_used": 1793271400.0,
        "last_write_op": "",
@@ -9151,18 +9151,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6195,
+       "effective_importance": 0.6191,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "10e46405a873",
-       "importance": 0.621,
+       "importance": 0.62,
        "last_recall": 0.0,
        "last_used": 1793272890.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8297,
+       "memory_confidence": 0.8296,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9188,7 +9188,7 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5569,
+       "effective_importance": 0.5566,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
@@ -9226,7 +9226,7 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6207,
+       "effective_importance": 0.6204,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
@@ -9266,18 +9266,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.522,
+       "effective_importance": 0.5288,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "8bbef4ae3aa2",
-       "importance": 0.522,
+       "importance": 0.529,
        "last_recall": 0.0,
        "last_used": 1793276520.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8218,
+       "memory_confidence": 0.8223,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9303,12 +9303,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4711,
+       "effective_importance": 0.4772,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "9e860730071f",
-       "importance": 0.472,
+       "importance": 0.478,
        "last_recall": 0.0,
        "last_used": 1793276520.0,
        "last_write_op": "",
@@ -9438,7 +9438,7 @@
          "ts": 1793272920.0
         },
         {
-         "conflict": 0.2798,
+         "conflict": 0.2805,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793276520.0
@@ -9451,8 +9451,8 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5368,
-       "conflict": 0.2798,
+       "closeness": 0.5365,
+       "conflict": 0.2805,
        "predictability": 1.0,
        "repair": 0.0,
        "trust": 0.5
@@ -9483,8 +9483,8 @@
         "ts": 1793272920.0
        },
        {
-        "closeness": 0.5368,
-        "conflict": 0.2798,
+        "closeness": 0.5365,
+        "conflict": 0.2805,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -9579,13 +9579,13 @@
          "ts": 1793000090.0
         },
         {
-         "conflict": 0.2826,
+         "conflict": 0.2827,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793011740.0
         },
         {
-         "conflict": 0.2804,
+         "conflict": 0.2805,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793011770.0
@@ -9603,7 +9603,7 @@
          "ts": 1793271800.0
         },
         {
-         "conflict": 0.2881,
+         "conflict": 0.2882,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271820.0
@@ -9615,7 +9615,7 @@
          "ts": 1793271840.0
         },
         {
-         "conflict": 0.3095,
+         "conflict": 0.3094,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271870.0
@@ -9658,8 +9658,8 @@
         "ts": 1793000090.0
        },
        {
-        "closeness": 0.5444,
-        "conflict": 0.2826,
+        "closeness": 0.5443,
+        "conflict": 0.2827,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -9667,7 +9667,7 @@
        },
        {
         "closeness": 0.5476,
-        "conflict": 0.2804,
+        "conflict": 0.2805,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -9682,7 +9682,7 @@
         "ts": 1793098170.0
        },
        {
-        "closeness": 0.562,
+        "closeness": 0.5619,
         "conflict": 0.2557,
         "predictability": 1.0,
         "repair": 0.0,
@@ -9691,7 +9691,7 @@
        },
        {
         "closeness": 0.5513,
-        "conflict": 0.2881,
+        "conflict": 0.2882,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -9707,7 +9707,7 @@
        },
        {
         "closeness": 0.5339,
-        "conflict": 0.3095,
+        "conflict": 0.3094,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -9975,7 +9975,7 @@
          "ts": 1793004390.0
         },
         {
-         "conflict": 0.2686,
+         "conflict": 0.2687,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793004510.0
@@ -10017,7 +10017,7 @@
        },
        {
         "closeness": 0.5454,
-        "conflict": 0.2686,
+        "conflict": 0.2687,
         "predictability": 1.0,
         "repair": 0.0,
         "trust": 0.5,
@@ -10307,7 +10307,7 @@
   {
    "clean": "好久不见！",
    "inject": [
-    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识，很久没聊了"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识"
    ],
    "session": "default:GroupMessage:900002",
    "system": "你是小爱。"
@@ -10379,7 +10379,7 @@
   {
    "clean": "好呀，说定了~",
    "inject": [
-    "[她现在] 心里有点发紧。\n[她跟对方] 还不太熟，很久没聊了\n[她想起来的] 柠檬说过：啊啊啊啊 好激动 小爱快夸我\n[没做完的] 小爱帮我们算算保底还差多少"
+    "[她现在] 心里有点发紧。\n[她跟对方] 还不太熟\n[她想起来的] 柠檬说过：啊啊啊啊 好激动 小爱快夸我\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"

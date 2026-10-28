@@ -97,6 +97,7 @@ def main_run():
     for delay, ev, reply in SCRIPT:
         clock.advance(delay)
         event = harness.FakeEvent(**ev)
+        event.is_at_or_wake_command = reply is not None  # the scripted replies are to messages that wake her
         loop.run_until_complete(plugin.on_message(event))  # AstrBot calls it for every message
         harness.drain(loop)
         if reply is None:

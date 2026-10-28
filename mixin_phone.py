@@ -178,16 +178,25 @@ class PhoneMixin:
     # ------------------------------------------------------------------
     # What the phone tells her body: numbers only, never text
     # ------------------------------------------------------------------
+    def _heard_times(self, now=None) -> list:
+        """When others' messages came in over the last AMBIENT_WINDOW_SECONDS, every window:
+        times only, in memory. Read from the window files once, then kept as they come."""
+        now = time.time() if now is None else now
+        times = getattr(self, "_heard_ts", None)
+        if times is None:
+            times = []
+            for place in self._window_places():
+                times.extend(float(x.get("ts", 0) or 0) for x in self._read_window(place)["recent"]
+                             if x.get("role") != "assistant")
+            times.sort()
+        times = [t for t in times if now - t <= AMBIENT_WINDOW_SECONDS]
+        self._heard_ts = times
+        return times
+
     def _ambient_level(self, now=None) -> float:
         """How lively the chats around her are now (0..1): others' messages in the last
         AMBIENT_WINDOW_SECONDS over every window, counted by their times only."""
-        now = time.time() if now is None else now
-        n = 0
-        for place in self._window_places():
-            for x in self._read_window(place)["recent"]:
-                if x.get("role") != "assistant" and now - float(x.get("ts", 0) or 0) <= AMBIENT_WINDOW_SECONDS:
-                    n += 1
-        return min(1.0, n / float(AMBIENT_BUSY_COUNT))
+        return min(1.0, len(self._heard_times(now)) / float(AMBIENT_BUSY_COUNT))
 
     @staticmethod
     def _addresses_her(event) -> bool:
@@ -246,6 +255,8 @@ class PhoneMixin:
         win = self._read_window(here)
         win["recent"].append(line)
         self._write_window(here, win)
+        if getattr(self, "_heard_ts", None) is not None:  # not yet read: the first read finds it
+            self._heard_ts.append(line["ts"])
 
     def _window_add_reply(self, event, text) -> None:
         text = str(text or "").strip()
