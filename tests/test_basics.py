@@ -65,7 +65,7 @@ class Split(unittest.TestCase):
         # 210 upstream methods minus __init__, plus 10 for one-her (library, migration, discretion, forgetting)
         # and 18 for her phone (on_message, windows, open loops per window, moving old body texts)
         # and 3 for the forget count (_forget_count, _begin_job, _job_stale)
-        self.assertEqual(len(methods), 244)
+        self.assertEqual(len(methods), 245)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

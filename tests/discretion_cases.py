@@ -119,7 +119,8 @@ def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯', pa
 def run():
     config = {}
     if CASE in ('forget', 'strong_event', 'consolidate', 'wait_event', 'wait_embed',
-                'wait_archive', 'wait_consolidate', 'turn_event', 'summary_origin'):  # summaries on, as in the golden 'full' run
+                'wait_archive', 'wait_consolidate', 'turn_event', 'summary_origin',
+                'picture_event', 'picture_only'):  # summaries on, as in the golden 'full' run
         config = {'llm_only_reply_summary': False, 'memory_worthiness_enabled': False}
     plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
@@ -346,6 +347,50 @@ def run():
                              if x.strip()]
         out['forgot'] = plugin._forget(person='10003')
         out['after'] = snapshot(plugin)['events']
+    elif CASE in ('picture_event', 'picture_only'):
+        # the per-turn archive makes an event of a stretch with pictures in it (海鸥 sends
+        # them; a picture's caption is added to its text when the stretch is cut)
+        place = 'group:' + A
+        if CASE == 'picture_event':
+            lines = [('10003', '我答应你以后一定去看海', ''),
+                     ('10006', '我答应你一定去看海，你看这张海', '海边的日落，天空是橙色的海'),
+                     ('10003', '别害怕，我答应过你的', '')]
+        else:
+            lines = [('10006', '我答应你以后一定去看海', '海边的日落，天空是橙色的'),
+                     ('10006', '以后我们永远一起去看海，我承诺', '沙滩上的两串脚印'),
+                     ('10006', '别害怕，我答应过你的', '一只海鸥站在礁石上')]
+
+        def entries_now():
+            entries = []
+            for i, (sid, text, caption) in enumerate(lines):
+                ts = clock.now - 9000 + 10 * i
+                entries.append({'id': 'p%d' % i, 'text': text, 'image_caption': caption, 'role': 'user',
+                                'ts': ts, 'importance': 0.9, 'sender_id': sid, 'vector': [],
+                                'provenance': {'sender_id': sid, 'session': 'default:GroupMessage:' + A,
+                                               'ts': ts, 'message_refs': ['m_pic%d' % i]},
+                                'origin': main.discretion.make_origin(place, [sid], ['m_pic%d' % i])})
+            for i in range(27):
+                ts = clock.now - 3000 + 10 * i
+                entries.append({'id': 'l%d' % i, 'text': '嗯嗯好', 'role': 'user', 'ts': ts,
+                                'importance': 0.1, 'sender_id': '10002', 'vector': [],
+                                'provenance': {'sender_id': '10002', 'session': 'default:GroupMessage:' + A,
+                                               'ts': ts, 'message_refs': ['m_lemon%d' % i]},
+                                'origin': main.discretion.make_origin(place, ['10002'], ['m_lemon%d' % i])})
+            return entries
+        lemon = harness.FakeEvent('嗯嗯好', sender='10002', name='柠檬', group=A)
+
+        def archive():
+            plugin._begin_job()
+            loop.run_until_complete(plugin._archive_ranked_events_deterministic(
+                lemon, plugin._core(None), entries_now()))
+            return snapshot(plugin)['events']
+        out['events'] = archive()
+        out['forgot_by_id'] = plugin._forget(source_ids=['m_pic1'])
+        out['after_by_id'] = snapshot(plugin)['events']
+        clock.advance(10)
+        out['events_again'] = archive()
+        out['forgot_person'] = plugin._forget(person='10006')
+        out['after_person'] = snapshot(plugin)['events']
     elif CASE == 'summary_origin':
         # one of the memories a summary is made of had another message merged into it earlier
         for delay, text in ((0, '小爱，我们群周末要去爬山'), (20, '我们群周末要去爬山，小爱'),

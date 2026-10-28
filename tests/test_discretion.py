@@ -359,6 +359,30 @@ class MergedRecordsKeepEveryOrigin(unittest.TestCase):
             self.assertNotIn(item['text'], r['after'])
 
 
+class PicturesInAnEvent(unittest.TestCase):
+    """A picture's caption is added to its text when the stretch is cut; its entry
+    still counts as one of the event's sources."""
+
+    def check(self, case):
+        r = run_case(case)
+        for events in (r['events'], r['events_again']):
+            [ev] = [e for e in events if '海边的日落' in e['text']]  # the event the picture is in
+            self.assertIn('10006', ev['origin']['people'], case)
+            self.assertIn('m_pic1', ev['origin']['source_ids'], case)
+        for after in (r['after_by_id'], r['after_person']):
+            self.assertFalse([e for e in after if '海边的日落' in e['text'] or '10006' in e['origin']['people']], case)
+
+    def test_a_picture_among_words(self):
+        self.check('picture_event')
+
+    def test_only_pictures(self):
+        r = run_case('picture_only')
+        [ev] = r['events']
+        for i in range(3):
+            self.assertIn('m_pic%d' % i, ev['origin']['source_ids'])
+        self.check('picture_only')
+
+
 class QuotedMessages(unittest.TestCase):
     """Each message is known by its own id; the id of a message it quotes is kept apart."""
 

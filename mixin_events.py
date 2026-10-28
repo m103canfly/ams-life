@@ -1481,6 +1481,12 @@ class EventsMixin:
         await self._generate_insight(event, core, events[:6])
 
     def _segment_event_texts(self, entries) -> list:
+        return [[txt for txt, _e in seg] for seg in self._segment_event_rows(entries)]
+
+    def _segment_event_rows(self, entries) -> list:
+        """The last three stretches of conversation, each a list of (text, entry).
+        ams-life: the entries come along, so nothing has to find them again by text
+        (a picture's caption is added to its text here, so that would miss them)."""
         try:
             rows = []
             for e in entries:
@@ -1510,10 +1516,7 @@ class EventsMixin:
             last = ts
         if current:
             segments.append(current)
-        out = []
-        for seg in segments[-3:]:
-            out.append([x[0] for x in seg])
-        return out
+        return [list(seg) for seg in segments[-3:]]
 
     def _append_event_archive(self, record: dict) -> None:
         if self._job_stale():
@@ -2002,19 +2005,20 @@ class EventsMixin:
         archive the top candidates. The LLM is still optional via event_summary.
         """
         try:
-            segments = self._segment_event_texts(entries)
+            segments = self._segment_event_rows(entries)
             if not segments:
                 return
             now = time.time()
             recent_events = self._event_archive(10)
             candidates = []
-            for seg_texts in segments:
+            for seg in segments:
+                seg_texts = [txt for txt, _e in seg]
                 seg_text = "\n".join(str(t) for t in seg_texts if str(t).strip()).strip()
                 if len(seg_text) < 8:
                     continue
-                seg_set = {str(t).strip() for t in seg_texts if str(t).strip()}
-                seg_entries = [e for e in entries
-                               if str(e.get("text", "")).strip() in seg_set]
+                # ams-life: the segment's own entries (BioCore looked them up again by text,
+                # which misses a picture's message: its text carries the caption here)
+                seg_entries = [e for _t, e in seg]
                 imp = 0.5
                 vecs = []
                 for e in seg_entries:
