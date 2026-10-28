@@ -44,9 +44,10 @@ def output_file(path, label="output") -> Path:
     return out
 
 
-def output_dir(path, label="output") -> Path:
+def output_dir(path, label="output", make=True) -> Path:
     """Check an output folder and create it. It must be new or empty, outside the
-    repository and outside any AstrBot data folder; otherwise stop with a message."""
+    repository and outside any AstrBot data folder; otherwise stop with a message.
+    make=False only checks (nothing is created)."""
     out = Path(path).resolve()
     why = live_reason(out)
     if why:
@@ -55,5 +56,6 @@ def output_dir(path, label="output") -> Path:
         raise Refused("refusing to write %s to %s: it is inside the repository" % (label, out))
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise Refused("refusing to write %s to %s: it exists and is not an empty folder" % (label, out))
-    out.mkdir(parents=True, exist_ok=True)
+    if make:
+        out.mkdir(parents=True, exist_ok=True)
     return out

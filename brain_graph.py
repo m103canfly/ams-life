@@ -132,6 +132,8 @@ def build(src, ids, keep_item, keep_person, keep_impression=None) -> Snapshot:
 
     def name(qq, n):
         n = str(n or "").strip()
+        if n.isdigit() and len(n) >= 5:
+            return   # a card that is all digits (often their QQ number): as if no name, "人N"
         if qq and n and n not in names.setdefault(qq, []):
             names[qq].append(n)
 
