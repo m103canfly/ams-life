@@ -19,6 +19,8 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
 - --aliases loads what people were called (tools/import_old.py: aliases.jsonl) before the log.
 - --impressions turns the nightly group impressions on (the fake model answers with a fixed
   made-up line), so their prompts are recorded and checked too.
+- Prompts are recorded with their place: a nightly call's is "nightly", but the note of one
+  window and a private chat's notebook sitting are that window's.
 - --digest turns on her nightly note of what happened today in each window (the fake model
   notes one thing per window, drawn from its first line); --notebook her nightly notebook.
   Both run each 5-minute sweep, in her autonomy loop's order: the note, the impressions,
@@ -617,6 +619,21 @@ def main(argv=None):
     if args.digest:
         plugin.llm_functions = dict(plugin.llm_functions or {},
                                     daily_digest={"enabled": True, "provider": "follow_llm"})
+        window_digest = plugin._digest_window
+
+        async def digest_window(place, *a, **k):   # its prompt belongs to that window
+            current["place"] = place
+            try:
+                return await window_digest(place, *a, **k)
+            finally:
+                current["place"] = "nightly"
+        plugin._digest_window = digest_window
+    sitting_materials = plugin._notebook_materials
+
+    def notebook_materials(core, sitting, now=None):   # a private chat's sitting belongs to that chat
+        current["place"] = sitting if str(sitting).startswith("private:") else "nightly"
+        return sitting_materials(core, sitting, now)
+    plugin._notebook_materials = notebook_materials
     if args.notebook:
         plugin.llm_functions = dict(plugin.llm_functions or {}, notebook={"enabled": True, "provider": "follow_llm"})
     if args.aliases:

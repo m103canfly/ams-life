@@ -336,6 +336,10 @@ class ReplayOptions(unittest.TestCase):
                      if json.loads(x)['kind'] == 'model']
             nightly = [c for c in calls if c in ('daily_digest', 'group_impressions', 'notebook')]
             self.assertEqual(nightly[:3], ['daily_digest', 'group_impressions', 'notebook'])
+            # the note of a window is recorded as that window's (what the audit checks it against)
+            places = {json.loads(x)['place'] for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
+                      if json.loads(x).get('call') == 'daily_digest'}
+            self.assertEqual(places, {'group:' + fake.G_SMALL})
             evs = [json.loads(x) for x in (out / 'data' / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()]
             self.assertEqual([(e['kind'], e['origin']['where'], e['origin']['visibility']) for e in evs],
                              [('daily_digest', 'group:' + fake.G_SMALL, 'public')])
