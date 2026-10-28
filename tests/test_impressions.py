@@ -81,7 +81,10 @@ class Pick(unittest.TestCase):
         self.assertIn('工资', open_)
         self.assertEqual(im.check_topic('工资'), '')
         self.assertEqual(im.check_topic('工资', red=lambda t: ''), '工资')
-        self.assertEqual(im.check_style('性格内向', red=lambda t: ''), '')   # judgements are another list
+        self.assertEqual(im.check_style('性格内向', red=lambda t: ''), '')   # judgements: their own rule
+        self.assertEqual(im.check_style('性格内向', judge=lambda t: ''), '性格内向')
+        self.assertEqual(im.check_topic('靠谱攻略', judge=lambda t: ''), '靠谱攻略')
+        self.assertEqual(im.judged('这人很靠谱'), 'judgement')
 
     def test_english_names_are_whole_words_in_the_material(self):
         picked = im.pick_people([line('10002', '柠檬', 'Alice 和 Al 都来了', i) for i in range(12)], DAY)

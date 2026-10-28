@@ -1160,7 +1160,7 @@
   const impOps={};
   // the red lines: hits by line (numbers only); held back only while the switch is on
   const RED_NAMES={health:"健康",finance:"钱",relation:"感情",family:"家里的事",hardship:"工作学业不顺",
-    harass:"骚扰",looks:"长相",opinion:"评价人",image:"图片内容"};
+    harass:"骚扰",looks:"长相",opinion:"对人的不满",image:"图片内容",judgement:"评价人的话（群友印象）"};
   function renderRedLines(){
     const note=$("redNote"), red=data&&data.red_lines;
     if(!note||!red) return;

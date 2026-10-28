@@ -54,6 +54,9 @@ class Model(harness.FakeProvider):
         if '群里几位群友今天说的话' in str(prompt):
             Model.impressions_calls += 1
             self.last = str(prompt)
+            if CASE in ('red', 'red_on'):   # what a person is: held back only while the switch is on
+                return harness.FakeResponse(json.dumps({
+                    'P1': {'style': '性格开朗，说话很快', 'topics': ['靠谱攻略'], 'aliases': []}}, ensure_ascii=False))
             return harness.FakeResponse(json.dumps({
                 # P1 is 芒果, P2 is 柠檬 (most lines first, then by number); a name is kept only
                 # where others really called someone that: 柠柠 for her, nothing for him
@@ -186,6 +189,8 @@ if CASE in ('red', 'red_on'):
     loop.run_until_complete(plugin._maybe_update_impressions(now=EVENING + 3.5 * 3600))
     result['seen'] = '工资' in getattr(ctx.provider, 'last', '')
     result['counts'] = json.loads((DATA / 'redline_counts.json').read_text('utf-8'))['by_store'].get('impressions')
+    rec = plugin._impression_store().load('group:' + G1)['people']['10002']
+    result['written'] = {'style': rec.get('style'), 'topics': rec.get('topics')}
 
 for task in asyncio.all_tasks(loop):
     task.cancel()

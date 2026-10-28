@@ -129,6 +129,17 @@ class ImpressionsMixin:
             hh, mm = 23, 15
         return (local.tm_hour, local.tm_min) >= (hh, mm)
 
+    def _judgements_for(self, what):
+        """impressions.judged as the red-line switch has it: a judgement of a person is held
+        back only while redline_filter is on; either way it is counted ("judgement")."""
+        def judge(text):
+            line = impressions.judged(text)
+            if not line:
+                return ""
+            self._count_red_line(line, what, text)
+            return line if getattr(self, "redline_filter", False) else ""
+        return judge
+
     def _material_names(self, place, lines) -> dict:
         """{qq: names} the nightly material turns into codes besides this window's cards: for
         everyone in this group (in the window, or with an impression here) and everyone the
@@ -164,7 +175,8 @@ class ImpressionsMixin:
                 done[place] = await impressions.nightly(self._impression_store(), place, lines, ask, day,
                                                         registry=self._registry(),
                                                         extra_names=self._material_names(place, lines),
-                                                        red=self._red_lines_for("impressions"))
+                                                        red=self._red_lines_for("impressions"),
+                                                        judge=self._judgements_for("impressions"))
             except Exception as exc:
                 logger.warning("[ams-life] impressions for %s failed: %s", place, exc)
         if any(r.get("called") for r in done.values()):
