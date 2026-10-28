@@ -136,24 +136,31 @@ class TellingTheMouth(unittest.TestCase):
             self.assertNotRegex(prompt, r'\b[a-z]+=')
             for qq in QQ:
                 self.assertNotIn(qq, prompt)
-            for name in NAMES:
-                self.assertNotIn(name, prompt)
             for word in INSTRUCTIONS:
                 self.assertNotIn(word, prompt)
+            # nobody is named outside what she recalls
+            for line in prompt.splitlines():
+                if not line.startswith('[她想起来的]'):
+                    for name in NAMES:
+                        self.assertNotIn(name, line)
         self.assertIn('[没做完的] 小爱，记得提醒我明天交报告', r['group'])
-        self.assertIn('[她想起来的] 对方说过：', r['group'])
+        self.assertIn('[她想起来的] 阿星说过：', r['group'])
+        for name in NAMES:  # in the private chat the group's lines come without names
+            self.assertNotIn(name, r['private'])
 
-    def test_recalled_speakers_by_setting(self):
-        anon = run_case('names_anon')['prompt']
-        self.assertIn('对方说过', anon)
-        self.assertIn('有人说过', anon)
-        for name in NAMES:
-            self.assertNotIn(name, anon)
-        nick = run_case('names_nickname')['prompt']
-        self.assertIn('柠檬说过', nick)
-        self.assertIn('阿星说过', nick)
-        for qq in QQ:
-            self.assertNotIn(qq, nick)
+    def test_recalled_speakers_named_here_anonymous_elsewhere(self):
+        r = run_case('names')
+        self.assertIn('柠檬说过', r['same_group'])
+        self.assertIn('阿星说过', r['same_group'])
+        self.assertIn('（别处）有人说过', r['other_group'])
+        self.assertIn('芒果说过', r['private'])
+        for name in NAMES:  # another group hears what, never who
+            self.assertNotIn(name, r['other_group'])
+        for prompt in (r['same_group'], r['other_group']):  # the private surprise stays private
+            self.assertNotIn('惊喜', prompt)
+        for prompt in (r['same_group'], r['other_group'], r['private']):
+            for qq in QQ:
+                self.assertNotIn(qq, prompt)
 
     def test_a_tag_the_model_writes_is_cut_and_not_used(self):
         r = run_case('reply_tags')
@@ -164,12 +171,12 @@ class TellingTheMouth(unittest.TestCase):
 
 
 class Listening(unittest.TestCase):
-    def test_off_listening_does_not_touch_the_body(self):
+    def test_switched_off_listening_does_not_touch_the_body(self):
         r = run_case('listen_off')
         self.assertEqual(r['seen_after_at'], 0.9)
         self.assertEqual(r['ambient'], 0.0)
 
-    def test_on_an_at_means_she_was_seen_and_the_chat_is_lively(self):
+    def test_an_at_means_she_was_seen_and_the_chat_is_lively(self):
         r = run_case('listen_on')
         self.assertLess(r['seen_after_at'], 0.5)
         self.assertEqual(r['ambient'], 1)

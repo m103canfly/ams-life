@@ -190,10 +190,6 @@ SEEN_HALF_LIFE_MIN = 360.0     # wanting to be seen grows halfway back to 1 in 6
 SEEN_RELIEF = 0.4              # someone answering her keeps 40% of it
 AMBIENT_WINDOW_SECONDS = 1800  # how lively the chats are: others' messages in the last 30 minutes
 AMBIENT_BUSY_COUNT = 30        # ... this many or more is as lively as it gets
-# How a recalled memory names who said it: "anon" says 对方 (the person she is
-# answering) or 有人; "nickname" uses the nickname. Never a QQ number. The owner
-# decides (step 1-2).
-RECALL_NAMES = "anon"
 # Her heart (step 1-2): only what she writes herself, in her notebook.
 NOTEBOOK_MAX = 20              # entries
 NOTEBOOK_CHARS = 40            # characters per entry

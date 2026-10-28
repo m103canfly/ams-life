@@ -1669,21 +1669,21 @@ class MemoryMixin:
 
     @staticmethod
     def _recall_who(entry, speaker_id="", anon=False) -> str:
-        """ams-life: who a recalled memory came from, as the reply model sees it. Never a
-        QQ number; a nickname only when RECALL_NAMES says so and the line is not anonymous."""
+        """ams-life: who a recalled memory came from, as the reply model sees it (the owner,
+        step 1-2). Never a QQ number. What was said here (the same group, or his own private
+        chat) keeps the nickname; what was said openly elsewhere is anonymous (有人)."""
         role = str(entry.get("role") or "user")
         if role == "summary":
             return "她总结过"
         if role == "assistant":
             return "她自己说过"
-        if not anon and RECALL_NAMES == "nickname":
-            name = str(entry.get("sender_name") or "").strip()
-            if name:
-                return name + "说过"
+        if anon:
+            return "有人说过"
+        name = str(entry.get("sender_name") or "").strip()
+        if name and not name.isdigit():
+            return name + "说过"
         sid = str(entry.get("sender_id") or "")
-        if not anon and speaker_id and sid == str(speaker_id):
-            return "对方说过"
-        return "有人说过"
+        return "对方说过" if speaker_id and sid == str(speaker_id) else "有人说过"
 
     async def _remember(self, event, text: str, role: str = "user", core=None):
         if not self.memory_dedup_embedding or not self._usable_memory_text(text):

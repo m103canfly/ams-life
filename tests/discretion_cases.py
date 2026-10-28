@@ -241,12 +241,14 @@ def run():
             calls['network'] += 1
             return real_net(*a, **k)
         plugin._provider_for, plugin._embed_text, plugin._ipv4_json = count_provider, count_embed, count_net
-        body_before = json.dumps(core.snapshot(), sort_keys=True)
+        _two = ('seen_need', 'ambient')  # the only numbers listening may move (step 1-2)
+        body_before = json.dumps({k: v for k, v in core.snapshot().items() if k not in _two}, sort_keys=True)
         from astrbot.api.message_components import Image, Plain
         hear(plugin, loop, 0, '我家猫今天学会开冰箱了', '10003', '阿星', A)
         hear(plugin, loop, 0, '看', '10003', '阿星', A, parts=[Plain('看'), Image(url='x')])
         hear(plugin, loop, 0, '小爱你看过冰箱猫吗', '20002', '小爱', A)  # her own account: not stored here
-        out['body_same'] = json.dumps(core.snapshot(), sort_keys=True) == body_before
+        out['body_same'] = json.dumps({k: v for k, v in core.snapshot().items() if k not in _two},
+                                      sort_keys=True) == body_before
         out['listen_calls'] = dict(calls)
         out['event_done'] = dict(Heard.done)
         plugin._provider_for, plugin._embed_text, plugin._ipv4_json = real_provider, real_embed, real_net
@@ -602,14 +604,18 @@ def run():
         for i in range(30):
             hear(plugin, loop, 1, '闲聊%d' % i, '10005', '路人', A)
         out['ambient'] = core.ambient
-        mixin_phone.LISTEN_MOVES_BODY = False
-    elif CASE in ('names_anon', 'names_nickname'):
-        import mixin_memory
-        mixin_memory.RECALL_NAMES = 'nickname' if CASE == 'names_nickname' else 'anon'
+        mixin_phone.LISTEN_MOVES_BODY = True
+    elif CASE == 'names':
+        # who said a recalled memory: the nickname in the same place, nobody elsewhere
         t(0, '小爱，我们周末去爬山吧', '10002', '柠檬', A)
         t(10, '小爱，爬山我也去', '10003', '阿星', A)
+        t(10, '小爱，我偷偷准备了爬山的惊喜', '10001', '芒果')
         t(10, '小爱，爬山要带水吗', '10002', '柠檬', A)
-        out['prompt'] = out['turns'][-1]['prompt']
+        t(10, '小爱，爬山好玩吗', '10004', '桃子', B)
+        t(10, '小爱，爬山的惊喜准备好了', '10001', '芒果')
+        out['same_group'] = out['turns'][3]['prompt']
+        out['other_group'] = out['turns'][4]['prompt']
+        out['private'] = out['turns'][5]['prompt']
     elif CASE == 'quote':
         # 芒果 quotes 柠檬's message; forgetting by message id finds each by its own id only
         first = t(0, '周末一起去爬山吧', '10002', '柠檬', A)

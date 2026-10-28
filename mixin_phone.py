@@ -26,10 +26,10 @@ except ImportError:
 
 WINDOW_MAX = 1000                   # lines per window, everyone's (AstrBot's group context keeps 1000 too)
 WINDOW_SECONDS = 24 * 3600          # every line stays 24 hours, hers too; older things live in memory
-# Whether a message that does not wake her may still move two numbers of her body:
-# someone @-ing or quoting her (she was seen) and how lively the chats are. Off keeps
-# "on_message only stores"; the owner decides (step 1-2).
-LISTEN_MOVES_BODY = False
+# A message that does not wake her still moves two numbers of her body, and only these:
+# someone @-ing or quoting her (she was seen) and how lively the chats are. No model, no
+# text, no reply (the owner, step 1-2).
+LISTEN_MOVES_BODY = True
 WINDOW_LINE_CHARS = 80              # her reply lines
 WINDOW_MESSAGE_CHARS = 300          # others' messages
 # What non-text parts of a message become in the window (no files are kept).
@@ -206,8 +206,8 @@ class PhoneMixin:
             return False
 
     def _listen_body(self, event) -> None:
-        """A message she only listened to: when LISTEN_MOVES_BODY is on, she was seen if it
-        addresses her, and the chats' liveliness is updated. No text, no model, no reply."""
+        """A message she only listened to: she was seen if it addresses her, and the chats'
+        liveliness is updated. No text, no model, no reply."""
         if not LISTEN_MOVES_BODY:
             return
         core = self._core(None)
