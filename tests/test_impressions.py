@@ -70,6 +70,23 @@ class Pick(unittest.TestCase):
         self.assertIn('@P2 你抽了吗', text)
         self.assertIn('我的号是 #', text)
 
+    def test_everyone_in_the_group_becomes_a_code(self):
+        lines = window() + [line('10002', '柠檬', t, 30 + i) for i, t in enumerate(
+            ['阿星昨天说他也歪了', '桃桃今天没来', '@小鱼儿 快来', '路人甲也在'])]
+        people = {'10004': {'name': '桃子', 'aliases': ['桃桃']}}
+        names = im.group_names(lines + [line('10006', '小鱼儿', '在的', 99, day_offset=-1)], people)
+        picked = im.pick_people(lines, DAY)
+        text, codes = im.material(picked, names)
+        self.assertEqual(codes, {'P1': '10002', 'P2': '10001'})   # only the picked are asked about
+        for name in ('阿星', '桃桃', '小鱼儿', '路人', '柠檬', '芒果'):
+            self.assertNotIn(name, text)
+        self.assertRegex(text, r'Q\d昨天说他也歪了')
+        self.assertRegex(text, r'Q\d今天没来')
+        self.assertRegex(text, r'@Q\d 快来')
+        self.assertRegex(text, r'Q\d甲也在')
+        prompt, _ = im.prompt_for(picked, names)
+        self.assertIn('Q1、Q2', prompt)
+
 
 class Answer(unittest.TestCase):
     def test_checks(self):

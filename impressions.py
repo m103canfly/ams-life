@@ -19,7 +19,8 @@ Every night, from that group's phone window (the last 24 hours):
 - counts and pet phrases are worked out by the program;
 - one model call for the whole group, at most once a day (marked as tried before
   the call, so a failure or a restart does not call again): only those people's
-  own lines, each person a code (P1, P2...), long numbers masked, red-line lines
+  own lines, each person a code (P1, P2...), and every name anyone in the group goes by
+  (card, nickname, known aliases) replaced by a code too, long numbers masked, red-line lines
   left out. The answer is JSON per code; every style line and topic is checked
   (red lines, judgements, numbers, length) and whatever fails is not kept -- the
   counts are kept either way.
@@ -149,13 +150,35 @@ def day_stats(own_lines, other_lines=()) -> dict:
 # ----------------------------------------------------------------------
 # What the model sees, and what is kept of its answer
 # ----------------------------------------------------------------------
-def material(picked) -> tuple:
-    """(text for the model, {code: qq}). Each person a code; their names and @s become the
-    code, long numbers '#', pictures and the like '[图]'; red-line lines are left out."""
+def group_names(lines=(), people=None) -> dict:
+    """{qq: {every name he goes by here}}: group card / nickname from the window lines, and the
+    name and aliases already kept in this group's impressions."""
+    out = {}
+    for ln in lines or ():
+        if isinstance(ln, dict) and ln.get("sender_id") and ln.get("sender_name"):
+            out.setdefault(str(ln["sender_id"]), set()).add(str(ln["sender_name"]))
+    for qq, rec in (people or {}).items():
+        names = out.setdefault(str(qq), set())
+        names.update(str(n) for n in [rec.get("name")] + list(rec.get("aliases") or []) if n)
+    return out
+
+
+def material(picked, names=None) -> tuple:
+    """(text for the model, {code: qq}). Each picked person a code P1, P2...; everyone else in
+    the group the model only sees mentioned gets Q1, Q2... -- every name anyone in the group
+    goes by (`names`, from group_names) and every @ becomes a code, long numbers '#', pictures
+    and the like '[图]'; red-line lines are left out."""
     codes = {"P%d" % (i + 1): p["qq"] for i, p in enumerate(picked)}
-    names = sorted(((p["name"], "P%d" % (i + 1)) for i, p in enumerate(picked) if len(p["name"]) >= 2),
+    code_of = {qq: c for c, qq in codes.items()}
+    names = {str(q): set(v) for q, v in (names or {}).items()}
+    for p in picked:
+        if p.get("name"):
+            names.setdefault(p["qq"], set()).add(p["name"])
+    for qq in sorted(q for q in names if q not in code_of):
+        code_of[qq] = "Q%d" % (len(code_of) - len(codes) + 1)
+    swaps = sorted(((n, code_of[q]) for q, ns in names.items() for n in ns if len(n) >= 2),
                    key=lambda x: -len(x[0]))
-    qqs = [(p["qq"], "P%d" % (i + 1)) for i, p in enumerate(picked)]
+    qqs = sorted(code_of.items(), key=lambda x: -len(x[0]))
     out = []
     for code, p in zip(codes, picked):
         out.append("%s：今天说了 %d 句" % (code, p["count"]))
@@ -165,15 +188,15 @@ def material(picked) -> tuple:
                 continue
             for qq, c in qqs:
                 text = text.replace(qq, c)
-            for name, c in names:
+            for name, c in swaps:
                 text = text.replace(name, c)
             text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
-            text = re.sub(r"@(?!P\d)\S{1,20}", "@某人", text)
+            text = re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
             out.append("- " + text[:LINE_CHARS])
     return "\n".join(out), codes
 
 
-PROMPT = """下面是一个群里几位群友今天说的话，每个人用代号表示（P1、P2……），代号只是为了区分人。
+PROMPT = """下面是一个群里几位群友今天说的话，每个人用代号表示（P1、P2……；话里提到的其他群友是 Q1、Q2……），代号只是为了区分人。
 请给每个代号写两样东西：
 - style：他说话的样子，一句话，不超过 60 个字。只写语气、用词、节奏、爱用的表达，比如“说话很快，爱用语气词，常接别人的梗”。
 - topics：他今天常聊的话题，最多 3 个，每个 2 到 8 个字。
@@ -183,8 +206,8 @@ PROMPT = """下面是一个群里几位群友今天说的话，每个人用代�
 """
 
 
-def prompt_for(picked) -> tuple:
-    text, codes = material(picked)
+def prompt_for(picked, names=None) -> tuple:
+    text, codes = material(picked, names)
     return PROMPT + text, codes
 
 
@@ -340,7 +363,7 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="") -> d
         add_day(rec, p["name"], day_stats(p["lines"], others), day)
     data["tried"] = day
     store.save(place, data)
-    prompt, codes = prompt_for(picked)
+    prompt, codes = prompt_for(picked, group_names(lines, data["people"]))
     try:
         answer = await ask(prompt)
     except Exception as exc:  # counted as the day's call all the same
