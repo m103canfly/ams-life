@@ -97,6 +97,47 @@ class Store(unittest.TestCase):
         self.assertEqual(self.store.ids(), {"m0", "m2", "m4"})
 
 
+class SharedIds(unittest.TestCase):
+    """Ids are not unique yet: an id is a hash of the text, so the same words in two groups share
+    one, and her replies have none. Such entries keep their vectors in the library."""
+
+    def test_two_entries_one_id_keep_their_own_vectors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            lib_path, store_path = tmp / "library.json", tmp / vs.FILE_NAME
+            entries = [{"id": "same", "text": "早安", "vector": vec(1), "origin": {"where": "group:900001"}},
+                       {"id": "same", "text": "早安", "vector": vec(2), "origin": {"where": "group:900002"}},
+                       {"id": "m9", "text": "别的", "vector": vec(9)}]
+            lib_path.write_text(json.dumps({"entries": entries}, ensure_ascii=False), encoding="utf-8")
+            counts = vs.migrate_library(lib_path, store_path, tmp / "archive")
+            self.assertEqual((counts["moved"], counts["shared_id"]), (1, 2))
+            lib = json.loads(lib_path.read_text("utf-8"))
+            with vs.VectorStore(store_path) as store:
+                self.assertEqual(store.ids(), {"m9"})
+                back = store.attach(lib["entries"])
+                self.assertEqual([e["vector"] for e in back], [vec(1), vec(2), vec(9)])
+                written = store.detach(back)                       # and again on the next save
+                self.assertEqual([e.get("vector") for e in written], [vec(1), vec(2), None])
+
+    def test_deleting_one_of_two_keeps_the_others_vector(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with vs.VectorStore(Path(tmp) / vs.FILE_NAME) as store:
+                first = {"id": "same", "text": "早安", "vector": vec(1)}
+                store.detach([first])                              # stored while it was the only one
+                second = {"id": "same", "text": "早安", "vector": vec(2)}
+                library = store.detach([{"id": "same", "text": "早安"}, second])
+                self.assertEqual(library[1]["vector"], vec(2))     # shared now: stays in the library
+                # the first is deleted: the id is still used by the second, so its vector stays
+                self.assertEqual(store.delete_many(["same"], remaining=[library[1]]), 0)
+                self.assertEqual(store.attach([{"id": "same"}])[0]["vector"], vec(1))
+                # the second is deleted instead: the first still gets its own vector back
+                self.assertEqual(store.delete_many(["same"], remaining=[library[0]]), 0)
+                self.assertEqual(store.attach([dict(library[0])])[0]["vector"], vec(1))
+                self.assertEqual(store.attach([dict(library[1])])[0]["vector"], vec(2))
+                # both gone: now it goes
+                self.assertEqual(store.delete_many(["same"], remaining=[]), 1)
+
+
 class Migrate(unittest.TestCase):
     def test_move_once_archive_first(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -18,6 +18,13 @@ so recall comes out the same.
   copying the file into an archive folder (never deleted). Run again, it finds
   nothing to move and does nothing.
 
+Ids are not unique yet: a new memory's id is a hash of its text, so the same words
+said in two places share one, and her replies get none when they are written.
+So only an entry whose id occurs once in the whole library has its vector here;
+an entry without an id, or sharing its id, keeps its vector in the library as it
+is. Deleting a vector likewise only happens once no entry uses that id any more.
+Step 1, part 3-2 gives every memory its own id.
+
 Wiring into the plugin (_load_memory / _save_memory, the trims, _forget) comes
 with step 1, part 3-2: until then the plugin still reads vectors from the
 library, so do not migrate a live data folder before that.
@@ -32,6 +39,7 @@ import shutil
 import sqlite3
 import time
 from array import array
+from collections import Counter
 from pathlib import Path
 
 FILE_NAME = "vectors.sqlite3"
@@ -53,6 +61,16 @@ def _unpack(blob) -> list:
     a = array("d")
     a.frombytes(blob)
     return a.tolist()
+
+
+def unique_ids(entries) -> set:
+    """The ids that occur exactly once among `entries` (the whole library)."""
+    count = Counter(str(e["id"]) for e in entries or [] if isinstance(e, dict) and e.get("id"))
+    return {i for i, n in count.items() if n == 1}
+
+
+def _used_ids(entries) -> set:
+    return {str(e["id"]) for e in entries or [] if isinstance(e, dict) and e.get("id")}
 
 
 class VectorStore:
@@ -126,12 +144,15 @@ class VectorStore:
         self._wrote()
         return len(rows)
 
-    def delete(self, entry_id) -> bool:
-        return self.delete_many([entry_id]) == 1
+    def delete(self, entry_id, remaining=None) -> bool:
+        return self.delete_many([entry_id], remaining) == 1
 
-    def delete_many(self, ids) -> int:
+    def delete_many(self, ids, remaining=None) -> int:
+        """Delete the vectors of `ids`. With `remaining` (the whole library after the deletion),
+        an id some remaining entry still uses keeps its vector: ids are not unique yet."""
         cache = self._vectors()
-        gone = [str(i) for i in ids if str(i) in cache]
+        still = _used_ids(remaining) if remaining is not None else set()
+        gone = [str(i) for i in ids if str(i) in cache and str(i) not in still]
         if not gone:
             return 0
         self._db.executemany("DELETE FROM vectors WHERE entry_id=?", [(i,) for i in gone])
@@ -158,12 +179,13 @@ class VectorStore:
 
     def detach(self, entries) -> list:
         """Store the vectors and return copies of the entries without them, ready to be written.
-        Only new or changed vectors are written. Entries without an id keep their vector
-        (nothing to file it under)."""
+        `entries` must be the whole library. Only new or changed vectors are written. An entry
+        without an id, or whose id another entry also has, keeps its vector in the library."""
         stored = self._vectors()
+        unique = unique_ids(entries)
         moving, out = {}, []
         for e in entries or []:
-            if isinstance(e, dict) and e.get("id") and isinstance(e.get("vector"), list):
+            if isinstance(e, dict) and str(e.get("id") or "") in unique and isinstance(e.get("vector"), list):
                 eid = str(e["id"])
                 if e["vector"] and stored.get(eid) != [float(x) for x in e["vector"]]:
                     moving[eid] = e["vector"]
@@ -179,15 +201,19 @@ def migrate_library(library_path, store_path, archive_dir) -> dict:
     The library file is first copied into `archive_dir` (never deleted); then the vectors are
     stored, and only then is the library written again without them (a crash in between leaves
     them in both places, and running again finishes the job). Nothing to move: nothing is
-    archived or written. Entries without an id, or with an empty vector, are left as they are."""
+    archived or written. Entries without an id, sharing their id with another entry, or with an
+    empty vector, are left as they are."""
     library_path = Path(library_path)
     lib = json.loads(library_path.read_text(encoding="utf-8"))
     entries = lib.get("entries") if isinstance(lib, dict) else None
     entries = entries if isinstance(entries, list) else []
-    moving = [e for e in entries if isinstance(e, dict) and e.get("id") and isinstance(e.get("vector"), list)
-              and e["vector"]]
+    unique = unique_ids(entries)
+    moving = [e for e in entries if isinstance(e, dict) and str(e.get("id") or "") in unique
+              and isinstance(e.get("vector"), list) and e["vector"]]
     counts = {"entries": len(entries), "moved": len(moving), "archived": "",
               "no_id": sum(1 for e in entries if isinstance(e, dict) and not e.get("id") and e.get("vector")),
+              "shared_id": sum(1 for e in entries if isinstance(e, dict) and e.get("id")
+                               and str(e["id"]) not in unique and e.get("vector")),
               "empty": sum(1 for e in entries if isinstance(e, dict) and e.get("vector") == [])}
     with VectorStore(store_path) as store:
         counts["already"] = sum(1 for e in entries if isinstance(e, dict) and str(e.get("id") or "") in store.ids()
