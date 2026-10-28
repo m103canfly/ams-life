@@ -206,6 +206,18 @@ class TellingTheMouth(unittest.TestCase):
             self.assertNotIn('<', text)
 
 
+class NotInTheHistory(unittest.TestCase):
+    def test_her_lines_are_sent_this_turn_and_not_kept(self):
+        # AstrBot keeps each turn's user message in the conversation history and sends it
+        # again later; her state lines are for this turn only
+        r = run_case('prompt_shape')
+        for turn in r['turns']:
+            [block] = [b for b in turn['sent'] if b.startswith('[她现在]')]
+            self.assertEqual(block, turn['prompt'])
+            self.assertFalse([b for b in turn['history'] if '[她现在]' in b])
+            self.assertEqual(len(turn['history']), 1)  # what was said is kept
+
+
 class Listening(unittest.TestCase):
     def test_many_messages_do_not_reread_every_window(self):
         r = run_case('ambient_reads')

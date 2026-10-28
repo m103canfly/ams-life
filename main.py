@@ -652,9 +652,13 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
             # the transient intent to this user turn instead of persisting it.
+            # ams-life: "_no_save" makes it this turn's only: AstrBot (4.29.3,
+            # agent/message.py) sends it to the model but leaves it out of the
+            # conversation history, so old blocks do not pile up and come back.
+            # (The system prompt below is never saved either.)
             parts = getattr(req, "extra_user_content_parts", None)
             if isinstance(parts, list):
-                parts.append({"type": "text", "text": _compact})
+                parts.append({"type": "text", "text": _compact, "_no_save": True})
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
 

@@ -134,7 +134,9 @@ def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯', pa
     loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(reply)))
     harness.drain(loop)
     prompt = '\n'.join(p.get('text') if isinstance(p, dict) else str(p) for p in req.extra_user_content_parts)
-    return {'session': event.unified_msg_origin, 'prompt': prompt, 'refs': plugin._source_ids(event)}
+    sent, kept = harness.astrbot_user_message(req)
+    return {'session': event.unified_msg_origin, 'prompt': prompt, 'refs': plugin._source_ids(event),
+            'sent': [b.get('text') for b in sent], 'history': [b.get('text') for b in kept]}
 
 
 def run():
