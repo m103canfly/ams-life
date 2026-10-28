@@ -1158,7 +1158,19 @@
   }
   // step 1-3: the group members she knows; the owner can delete one (click twice), not edit
   const impOps={};
+  // the red lines: hits by line (numbers only); held back only while the switch is on
+  const RED_NAMES={health:"健康",finance:"钱",relation:"感情",family:"家里的事",hardship:"工作学业不顺",
+    harass:"骚扰",looks:"长相",opinion:"对人的不满",image:"图片内容",judgement:"评价人的话（群友印象）"};
+  function renderRedLines(){
+    const note=$("redNote"), red=data&&data.red_lines;
+    if(!note||!red) return;
+    const parts=Object.entries(red.by_line||{}).filter(([,n])=>Number(n)>0)
+      .map(([k,n])=>(RED_NAMES[k]||k)+" "+Number(n)+" 条");
+    note.textContent=(red.filter?"红线过滤：开（碰到的不存）。":"红线过滤：关（一律不挡，只记数）。")+
+      (parts.length?"现在存着的里面碰到红线的："+parts.join("，")+"。":"现在存着的里面没有碰到红线的话。");
+  }
   function renderImpressions(){
+    renderRedLines();
     const body=$("impBody"), empty=$("impEmpty");
     if(!body) return;
     const groups=(data&&Array.isArray(data.impressions))?data.impressions.filter(g=>g&&Array.isArray(g.people)&&g.people.length):[];

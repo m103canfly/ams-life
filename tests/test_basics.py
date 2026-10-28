@@ -74,8 +74,12 @@ class Split(unittest.TestCase):
         # +4 (_new_item_kept, _record_mentions, _EVERYDAY_WORDS, _library_ids);
         # +11 for the group members she knows (mixin_impressions, the panel's delete);
         # +1 for counting the backups a delete leaves alone;
-        # review of PR #10: +2 (_material_names, _forget_registered)
-        self.assertEqual(len(methods), 295)
+        # review of PR #10: +2 (_material_names, _forget_registered);
+        # step 1-3-5, no numbers and no red lines in what she keeps: +11 (_note_her, _gone_people,
+        # _known_numbers, _scrubber, _scrub, _SCRUB_KEYS, _scrub_tree, _migrate_numbers, _red_line,
+        # _KEPT_TEXT_KEYS, _keep_record_text); the red-line switch and its counts: +3 (_red_lines_for,
+        # _red_line_counts, _count_red_line), and judgements of people under it too: +1 (_judgements_for)
+        self.assertEqual(len(methods), 310)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

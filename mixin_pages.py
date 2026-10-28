@@ -492,8 +492,11 @@ class PagesMixin:
     @staticmethod
     def _archived_library_copies() -> int:
         """The library as it was before a migration, kept in memory/archive/ (the owner decided
-        a delete leaves these alone); the panel says they still hold the old data."""
-        return len(list(MEMORY_ARCHIVE_DIR.glob("*.json"))) if MEMORY_ARCHIVE_DIR.exists() else 0
+        a delete leaves these alone), and the folders of other files kept before the numbers
+        were taken out; the panel says they still hold the old data."""
+        if not MEMORY_ARCHIVE_DIR.exists():
+            return 0
+        return len(list(MEMORY_ARCHIVE_DIR.glob("*.json"))) + len([p for p in MEMORY_ARCHIVE_DIR.iterdir() if p.is_dir()])
 
     async def page_impression_delete(self, person=None):
         """The owner deletes what she thinks of someone (panel only; the page asks to confirm
@@ -674,6 +677,8 @@ class PagesMixin:
             # ams-life step 1-3: the group members she knows, per group (read-only; the
             # owner can delete what she thinks of someone, never rewrite it)
             "impressions": self._impressions_for_page(),
+            # red-line hits by line (numbers only) and whether they are held back
+            "red_lines": dict(self._red_line_census(), filter=bool(getattr(self, "redline_filter", False))),
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,
                 **dict(getattr(self, "_last_memory_meta", {}) or {})},
