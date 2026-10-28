@@ -143,6 +143,7 @@ class ReviewOfPR10(unittest.TestCase):
     def test_a_delete_that_could_not_write_the_library_says_so(self):
         r = run_case('forget_broken')
         self.assertEqual(r['page']['status'], 'error')
+        self.assertIn('AstrBot 那边也还没删', r['page']['message'])
         self.assertTrue(r['still_there'])
         self.assertEqual(r['retry'], 'ok')
         self.assertTrue(r['gone_after_retry'])
@@ -150,12 +151,18 @@ class ReviewOfPR10(unittest.TestCase):
     def test_restoring_a_backup_does_not_bring_anyone_back(self):
         r = run_case('restore')
         self.assertEqual(r['restore']['status'], 'ok', r['restore'])
-        self.assertEqual(r['restore']['data']['deleted_again'], {'people': 1, 'messages': 0})
+        self.assertEqual(r['restore']['data']['deleted_again'], {'people': 1, 'messages': 1})
         self.assertFalse(r['guitar'])
-        self.assertTrue(r['hike'])
+        self.assertFalse(r['hike'])
         self.assertFalse(r['user_10001'])
         self.assertFalse(r['phone_guitar'])
-        self.assertEqual(r['registry'], [['qq', '10001']])
+        self.assertIn(['qq', '10001'], r['registry'])
+
+    def test_restoring_deletes_again_only_what_the_owner_deleted(self):
+        r = run_case('restore')
+        # 10003 is forgotten in group 1 only, 10004 opted back in: what the registry lets her keep stays
+        self.assertEqual(r['kept'], {'蛋糕': True, '下雨': True, '我回来啦': True})
+        self.assertEqual(r['users'], {'10002': True, '10003': True, '10004': True})
 
 
 class NoChatCommands(unittest.TestCase):

@@ -40,6 +40,14 @@ if CASE == 'registered':
         reg.forget_person('10003', forget_registry.EVERYWHERE, stamp=1.0, note='legacy:test')
         reg.forget_message('m-gone', 'group:' + G1, note='legacy:test')
 
+if CASE == 'restore':
+    # rows narrower than a whole delete: forgotten in one group only; an optout that ended
+    import forget_registry
+    with forget_registry.ForgetRegistry(DATA / forget_registry.FILE_NAME) as reg:
+        reg.forget_person('10003', 'group:' + G1, stamp=1.0, note='legacy:test')
+        reg.opt_out('10004', forget_registry.EVERYWHERE, stamp=1.0, note='legacy:test')
+        reg.opt_in('10004', forget_registry.EVERYWHERE, stamp=2.0, note='legacy:test')
+
 if CASE in ('migrate', 'recall_before', 'recall_after'):
     # a library as written before step 1-3: her replies without ids, the same words in two
     # groups sharing an id (a hash of the text), vectors in the JSON
@@ -330,8 +338,13 @@ if CASE == 'forget_broken':
 if CASE == 'restore':
     turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')
+    turn('小爱 我做了蛋糕', '10002', '柠檬', group=G1, reply='看起来好好吃', msg_id='m-cake')
+    turn('小爱 今天下雨了', '10003', '阿星', group=G2, reply='记得带伞', msg_id='m-rain')
+    turn('小爱 我回来啦', '10004', '桃子', group=G2, reply='欢迎回来', msg_id='m-back')
     backup = loop.run_until_complete(plugin.page_backup())['data']['base64']
-    loop.run_until_complete(plugin.page_forget_person('10001'))
+    loop.run_until_complete(plugin.page_forget_person('10001'))                 # the owner deletes a person
+    hike = next(e for e in library()['entries'] if e.get('text', '').startswith('小爱 周末去爬山'))
+    loop.run_until_complete(plugin.page_memory_delete('library', hike['id']))   # ... and one memory
     import types
 
     async def get_json(silent=True):
@@ -341,6 +354,8 @@ if CASE == 'restore':
     texts = [e['text'] for e in library()['entries']]
     result['guitar'] = any('吉他' in t for t in texts)
     result['hike'] = any('爬山' in t for t in texts)
+    result['kept'] = {w: any(w in t for t in texts) for w in ('蛋糕', '下雨', '我回来啦')}
+    result['users'] = {who: (DATA / 'users' / (who + '.json')).exists() for who in ('10002', '10003', '10004')}
     result['user_10001'] = (DATA / 'users' / '10001.json').exists()
     result['phone_guitar'] = '吉他' in ''.join(all_text().values())
     import forget_registry

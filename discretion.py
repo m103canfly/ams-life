@@ -138,6 +138,15 @@ def _one_char_name(name):
     return re.compile(r"@%s(?![%s])|(?<![%s@])%s(?=%s)" % (n, word, word, n, _SAYS))
 
 
+def _is_english(name) -> bool:
+    return name.isascii() and not name.isdigit()
+
+
+def _english_name(name):
+    """An English name is a whole word: "Al" is not a name inside "Alice"."""
+    return re.compile(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name))
+
+
 def anonymize(text, names) -> str:
     """Replace the names and QQ numbers of the people involved with "有人"."""
     out = str(text or "")
@@ -146,6 +155,9 @@ def anonymize(text, names) -> str:
             continue
         if len(name) < 2 and not name.isdigit():
             out = _one_char_name(name).sub(lambda m: ("@" if m.group(0).startswith("@") else "") + SOMEONE, out)
+            continue
+        if _is_english(name):
+            out = _english_name(name).sub(SOMEONE, out)
             continue
         out = out.replace(name, SOMEONE)
     return out

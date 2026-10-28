@@ -534,6 +534,9 @@ class PagesMixin:
             counts["astrbot"] = await self._forget_in_astrbot(person, umos)
             counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"person": person, "counts": counts}}
+        except forget_registry.Unreadable:
+            return {"status": "error", "data": {"person": person},
+                    "message": "遗忘登记读不出来，记忆库没删成（别的已经删了）；AstrBot 那边也还没删。请再点一次删除。"}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
 

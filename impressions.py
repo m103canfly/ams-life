@@ -231,7 +231,10 @@ def material(picked, names=None, said_to=()) -> tuple:
         for qq, c in qqs:
             text = text.replace(qq, c)
         for name, c in swaps:
-            text = text.replace(name, c)
+            if discretion._is_english(name):
+                text = discretion._english_name(name).sub(c, text)
+            else:
+                text = text.replace(name, c)
         for pattern, c in singles:
             text = pattern.sub(lambda m, c=c: ("@" if m.group(0).startswith("@") else "") + c, text)
         text = PART.sub("[图]", LONG_NUMBER.sub("#", text))

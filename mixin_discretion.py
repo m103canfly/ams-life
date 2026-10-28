@@ -468,11 +468,14 @@ class DiscretionMixin:
 
     def _forget_registered(self) -> dict:
         """After the data folder was restored from a backup (the registry itself never is:
-        the one in use stays), delete again everyone and every message it holds, so nobody
-        deleted comes back with an older backup."""
+        the one in use stays), delete again what the owner deleted in the panel -- the people
+        (everywhere) and the messages -- so nobody deleted comes back with an older backup.
+        Other rows (a person forgotten in one group, an optout someone ended, a cutoff) are
+        narrower than a whole delete: they are left to the registry, as every write is."""
         reg = self._registry()
-        rows = reg.rows()
-        people = sorted(reg.people())
+        rows = [r for r in reg.rows() if str(r["note"] or "").startswith("owner:")]
+        people = sorted({r["qq"] for r in rows if r["kind"] == "qq" and r["place"] == forget_registry.EVERYWHERE
+                         and r["qq"] != "*"})
         sources = sorted({r["source_id"] for r in rows if r["kind"] == "source" and r["source_id"]})
         for person in people:
             self._forget(person=person)

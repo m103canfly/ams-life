@@ -73,6 +73,11 @@ class Pick(unittest.TestCase):
         self.assertIn('@P2 你抽了吗', text)
         self.assertIn('我的号是 #', text)
 
+    def test_english_names_are_whole_words_in_the_material(self):
+        picked = im.pick_people([line('10002', '柠檬', 'Alice 和 Al 都来了', i) for i in range(12)], DAY)
+        text, _codes = im.material(picked, {'10007': {'Al'}})
+        self.assertIn('Alice 和 Q1 都来了', text)
+
     def test_everyone_in_the_group_becomes_a_code(self):
         lines = window() + [line('10002', '柠檬', t, 30 + i) for i, t in enumerate(
             ['阿星昨天说他也歪了', '桃桃今天没来', '@小鱼儿 快来', '路人甲也在'])]

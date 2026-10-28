@@ -102,6 +102,14 @@ class Names(unittest.TestCase):
         for kept in ('@Alice 你好', 'BA说的'):
             self.assertEqual(a(kept, ['A']), kept)
 
+    def test_english_names_are_whole_words(self):
+        a = discretion.anonymize
+        self.assertEqual(a('Al说他也去', ['Al']), '有人说他也去')
+        self.assertEqual(a('@Al 快来', ['Al']), '@有人 快来')
+        for kept in ('Alice 你好', 'Al2 在吗', 'HAL 来了'):
+            self.assertEqual(a(kept, ['Al']), kept)
+        self.assertEqual(a('柠檬汁', ['柠檬']), '有人汁')             # Chinese as before
+
 
 class NamesStay(unittest.TestCase):
     """PR #10 review: the names he went by stay for making things anonymous after his impression
