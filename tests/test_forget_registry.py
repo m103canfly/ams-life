@@ -112,6 +112,34 @@ class Rows(unittest.TestCase):
                 self.assertEqual(reg.last_seq(), 1)
 
 
+class Names(unittest.TestCase):
+    """What a person deleted from the panel was called: salted hashes, found in what others say."""
+
+    def test_found_and_never_stored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / fr.FILE_NAME
+            with fr.ForgetRegistry(path) as reg:
+                self.assertEqual(reg.names_in('阿星来不来'), {})
+                self.assertEqual(reg.remember_names('10003', ['阿星', '星', '10003', '12345', 'Tom', '阿星']), 2)
+                self.assertEqual(reg.remember_names('10003', ['阿星']), 0)
+                self.assertEqual(reg.names_in('周末 阿星来不来'), {'阿星': '10003'})
+                self.assertEqual(reg.names_in('Tom 来了'), {'Tom': '10003'})
+                self.assertEqual(reg.names_in('Tomorrow 见'), {})       # letters only as a word of their own
+                self.assertEqual(reg.names_in('星星'), {})               # one character is not kept
+            with fr.ForgetRegistry(path) as again:                      # reopened: still found
+                self.assertEqual(again.names_in('阿星呢'), {'阿星': '10003'})
+            raw = path.read_bytes()
+            for name in ('阿星', 'Tom'):
+                self.assertNotIn(name.encode('utf-8'), raw)
+
+    def test_each_registry_its_own_salt(self):
+        with fr.ForgetRegistry(None) as one, fr.ForgetRegistry(None) as two:
+            one.remember_names('10003', ['阿星'])
+            two.remember_names('10003', ['阿星'])
+            digests = [r.execute('SELECT digest FROM names').fetchone()[0] for r in (one._db, two._db)]
+            self.assertNotEqual(digests[0], digests[1])
+
+
 class Legacy(unittest.TestCase):
     def test_old_registries(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -220,6 +220,16 @@ class DiscretionMixin:
                 self._her_ids = set()
             self._her_ids.add(sid)
 
+    def _gone_names_in(self, text) -> dict:
+        """{name: qq}: names of people the owner deleted that `text` holds (forget_registry.names_in)."""
+        if not str(text or ""):
+            return {}
+        try:
+            return self._registry().names_in(text)
+        except Exception as exc:
+            logger.warning("[ams-life] deleted names could not be looked up: %s", exc)
+            return {}
+
     def _gone_people(self) -> set:
         """People the forget registry rules out now (reread when it grows)."""
         try:
@@ -274,8 +284,13 @@ class DiscretionMixin:
                 if qq in gone and name:
                     seen.setdefault(qq, set()).add(name)
             out = discretion.strip_numbers(text, numbers, her, HER_NAME, gone, ats)
+            hits = self._gone_names_in(text)   # names of people the owner deleted
+            for name, qq in hits.items():
+                seen.setdefault(qq, set()).add(name)
+            names = set(hits)
             if gone:
-                names = {n for p in gone for n in gone_names[p] | seen.get(p, set()) if not str(n).isdigit()}
+                names |= {n for p in gone for n in gone_names[p] | seen.get(p, set()) if not str(n).isdigit()}
+            if names:
                 out = discretion.anonymize(out, names, to=discretion.SOMEBODY)
             return out
         return scrub
@@ -867,7 +882,12 @@ class DiscretionMixin:
         person = str(person or "").strip()
         if not person:
             return {}
-        self._registry().owner_delete(person=person)
+        # every name she knows him by now, kept as hashes (see forget_registry): someone else
+        # saying it later is 某人, and in the nightly material a code, after a restart too
+        names = set(self._known_names([person])) | set((getattr(self, "_gone_names", None) or {}).get(person) or ())
+        reg = self._registry()
+        reg.owner_delete(person=person)
+        reg.remember_names(person, names)
         return self._forget(person=person)
 
     def _owner_forget_memory(self, entry_id) -> dict:

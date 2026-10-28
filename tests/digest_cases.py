@@ -30,11 +30,14 @@ from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 class Model(harness.FakeProvider):
     """Answers the digest prompt (group and private); keeps every digest prompt."""
     digests = []
+    group_answer = None   # a case's own answer for a group
 
     async def text_chat(self, prompt='', system_prompt=None, **kwargs):
         p = str(prompt)
         if '今天在这里发生的几件事' in p:
             Model.digests.append(p)
+            if Model.group_answer is not None and '一个群' in p:
+                return harness.FakeResponse(json.dumps({'events': Model.group_answer}, ensure_ascii=False))
             if '一个私聊' in p:
                 return harness.FakeResponse(json.dumps({'events': [
                     {'title': 'P1说了蓝莓计划', 'what': 'P1跟她说起蓝莓计划的安排', 'who': ['P1'], 'lines': [1, 2]}]},
@@ -178,6 +181,74 @@ if CASE == 'reply':
     for name, text in (('related', '周末的副本几点开始'), ('unrelated', '你好呀')):
         ev = harness.FakeEvent(text, sender='10002', name='柠檬', group=G1)
         result[name] = plugin._event_context(ev)
+
+
+def digest_on():
+    plugin.llm_functions = dict(plugin.llm_functions or {}, daily_digest={'enabled': True, 'provider': 'follow_llm'})
+
+
+def phone(place):
+    return [x['text'] for x in plugin._read_window(place)['recent']]
+
+
+if CASE == 'merge_gone':
+    # 阿星 is ruled out but his words are still in her phone (an imported registry, a restored
+    # backup); the note of the day is the same as an event she has, and names him
+    turn('大家好', '10003', '阿星', group=G1, msg_id='g0')
+    turn('周末一起打副本吗 阿星来不来', '10002', '柠檬', group=G1, msg_id='g1')
+    with forget_registry.ForgetRegistry(DATA / forget_registry.FILE_NAME) as reg:
+        reg.forget_person('10003', forget_registry.EVERYWHERE, stamp=1.0, note='legacy:test')
+    add_event('柠檬约周末打副本', '柠檬约大家周末打副本', 'default:GroupMessage:' + G1, ['10002'], digest_kind=False)
+    Model.group_answer = [{'title': 'P1约周末打副本', 'what': 'P1约周末打副本，Q1也被叫上了', 'who': ['P1', 'Q1'],
+                           'lines': [1]}]
+    digest_on()
+    result['night'] = loop.run_until_complete(plugin._maybe_daily_digest(now=LATE))
+    result['prompt'] = Model.digests[-1]
+    result['events'] = [{'title': e.get('title'), 'origin': e.get('origin')} for e in plugin._event_archive(100, read_only=True)]
+    files = [p for p in (DATA / 'archives').rglob('*') if p.is_file()]
+    result['files_with_him'] = sorted(str(p.relative_to(DATA)) for p in files if '10003' in p.read_text('utf-8'))
+
+if CASE == 'gone_names':
+    turn('大家好', '10003', '阿星', group=G1, msg_id='g0')
+    turn('周末打副本 阿星来不来', '10002', '柠檬', group=G1, msg_id='g1')
+    turn('好呀', '10001', '芒果', group=G1, msg_id='g2')
+    loop.run_until_complete(plugin.page_forget_person('10003'))   # the owner, from the panel
+    turn('阿星今天在吗', '10002', '柠檬', group=G1, msg_id='g3')
+    result['phone_before_restart'] = phone('group:' + G1)
+    # the night, before a restart: his name, said by others before he was deleted, is a code
+    result['material_names'] = plugin._material_names('group:' + G1, plugin._read_window('group:' + G1)['recent'])
+    digest_on()
+    Model.group_answer = [{'title': 'P1约打副本', 'what': 'P1约大家打副本，Q1也被叫上了', 'who': ['P1', 'Q1'],
+                           'lines': [1]},
+                          {'title': 'P2答应了', 'what': 'P2说好呀', 'who': ['P2'], 'lines': [2]}]
+    result['night'] = loop.run_until_complete(plugin._maybe_daily_digest(now=LATE))
+    result['prompt'] = Model.digests[-1]
+    result['events'] = [e.get('event') for e in events()]
+    plugin = new_plugin()                                          # a restart: nothing in memory
+    clock.now = LATE + 600
+    turn('阿星呢', '10001', '芒果', group=G1, msg_id='g4')
+    result['phone_after_restart'] = phone('group:' + G1)
+    result['registry_has_name'] = '阿星'.encode('utf-8') in (DATA / forget_registry.FILE_NAME).read_bytes()
+
+if CASE == 'marks':
+    chat()
+    # something in her notebook, and the registry unreadable while tonight's mark is saved
+    plugin.self_model['notebook'] = [{'id': 'n1', 'text': '今天下雨了', 'ts': clock.now,
+                                      'origin': {'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'}}]
+
+    def unreadable(item):
+        raise forget_registry.Unreadable('locked')
+    plugin._origin_kept = unreadable
+    digest_on()
+    plugin.llm_functions = dict(plugin.llm_functions or {}, notebook={'enabled': True, 'provider': 'follow_llm'})
+    result['first'] = loop.run_until_complete(plugin._maybe_daily_digest(now=LATE))
+    loop.run_until_complete(plugin._maybe_write_notebook(now=EVENING + 3.5 * 3600))
+    plugin = new_plugin()
+    digest_on()
+    result['after_restart'] = loop.run_until_complete(plugin._maybe_daily_digest(now=LATE + 600))
+    result['calls'] = len(Model.digests)
+    saved = json.loads((DATA / 'self_model.json').read_text('utf-8'))
+    result['notebook_tried'] = saved.get('notebook_night', {}).get('tried')
 
 
 for task in asyncio.all_tasks(loop):

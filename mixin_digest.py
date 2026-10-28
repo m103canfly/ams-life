@@ -105,6 +105,8 @@ class DigestMixin:
             people, ids = digest.sources(item, codes, shown, day_all)
             record = self._digest_event(place, win.get("umo") or place, item, codes, day_all, people, ids,
                                         private, now)
+            if not self._new_item_kept(record):
+                continue   # someone or something the registry rules out: not kept, nor merged in
             dup = self._find_any_duplicate_event(record["session"], record["event_key"], record["event"], now)
             if dup is not None and discretion.origin_of(dup)["where"] == place:
                 self._merge_archive_duplicate(dup, record)

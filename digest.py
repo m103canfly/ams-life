@@ -53,16 +53,25 @@ def _day(ts) -> str:
 
 def day_lines(lines, day, place="", registry=None) -> list:
     """The window's lines of `day` she may use: not from anyone or any message the forget
-    registry rules out (her own lines are hers)."""
+    registry rules out; her own lines by their own origin (whom she answered, and what)."""
     out = []
     for ln in lines or ():
         if not isinstance(ln, dict) or _day(ln.get("ts")) != day or not str(ln.get("text") or "").strip():
             continue
-        if ln.get("role") != "assistant" and registry is not None and not registry.may_keep(
-                str(ln.get("sender_id") or ""), place, ln.get("ts"), str(ln.get("msg_id") or "")):
-            continue
+        if registry is not None:
+            if ln.get("role") == "assistant":
+                o = ln.get("origin") if isinstance(ln.get("origin"), dict) else {}
+                if not registry.may_keep_all(_people(o), place, ln.get("ts"), o.get("source_ids") or ()):
+                    continue
+            elif not registry.may_keep(str(ln.get("sender_id") or ""), place, ln.get("ts"),
+                                       str(ln.get("msg_id") or "")):
+                continue
         out.append(ln)
     return out
+
+
+def _people(origin) -> list:
+    return [str(p) for p in (origin.get("people") or []) if str(p or "") not in ("", "self", HER)]
 
 
 def speakers(lines) -> list:
@@ -157,9 +166,10 @@ def named(text, codes, names) -> str:
 
 
 def sources(item, codes, shown, day_all) -> tuple:
-    """(people, message ids) of one item: from the lines it names, the people it names and
-    the codes in its text; when it names no line or a wrong one, every message of the day
-    and everyone who spoke today; when it names a wrong person, everyone who spoke too."""
+    """(people, message ids) of one item: from the lines it names (her own by their origin:
+    whom she answered, and what), the people it names and the codes in its text; when it
+    names no line or a wrong one, every line of the day; when it names a wrong person,
+    everyone who spoke too."""
     coded = {codes[c] for c in item["who"] + CODE.findall(item["title"] + " " + item["what"]) if c in codes}
     if item["lines_ok"]:
         used = [shown[n - 1] for n in item["lines"]]
@@ -169,6 +179,10 @@ def sources(item, codes, shown, day_all) -> tuple:
     if not item["who_ok"] or not item["lines_ok"]:
         people |= set(speakers(day_all))
     ids = [str(ln.get("msg_id")) for ln in used if ln.get("msg_id")]
+    for ln in used:   # her own lines: whom she answered there, and what
+        if ln.get("role") == "assistant" and isinstance(ln.get("origin"), dict):
+            people |= set(_people(ln["origin"]))
+            ids += [str(s) for s in ln["origin"].get("source_ids") or [] if str(s or "")]
     return sorted(people), list(dict.fromkeys(ids))
 
 

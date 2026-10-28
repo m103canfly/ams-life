@@ -400,7 +400,9 @@
    ]
   },
   "forget_registry.sqlite3": {
-   "forget": []
+   "forget": [],
+   "meta": [],
+   "names": []
   },
   "memory/library.json": {
    "entries": [

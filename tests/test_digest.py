@@ -47,6 +47,9 @@ class Registry:
     def may_keep(self, qq='', place='', at=None, source_id=''):
         return qq not in self.people and source_id not in self.ids
 
+    def may_keep_all(self, people=(), place='', at=None, source_ids=()):
+        return not (set(people) & self.people or set(source_ids) & self.ids)
+
 
 LINES = [line(0, '10002', '柠檬', '周末一起打副本吗'),
          line(1, '10001', '芒果', '我来 @柠檬 柠柠别鸽'),
@@ -57,6 +60,16 @@ LINES = [line(0, '10002', '柠檬', '周末一起打副本吗'),
 
 
 class Material(unittest.TestCase):
+    def test_her_own_lines_by_their_origin(self):
+        hers = dict(line(6, '', '', '好呀柠檬', role='assistant'), msg_id='',
+                    origin={'where': 'group:1', 'people': ['10002'], 'source_ids': ['m0']})
+        kept = digest.day_lines(LINES[:2] + [hers], DAY, 'group:1')
+        self.assertEqual(len(digest.day_lines(LINES[:2] + [hers], DAY, 'group:1', Registry(people={'10002'}))), 1)
+        self.assertEqual(len(digest.day_lines(LINES[1:2] + [hers], DAY, 'group:1', Registry(ids={'m0'}))), 1)
+        _text, codes, shown = digest.material(kept)
+        only_hers = {'title': '她答应了', 'what': '她答应了', 'who': [], 'lines': [3], 'who_ok': True, 'lines_ok': True}
+        self.assertEqual(digest.sources(only_hers, codes, shown, kept), (['10002'], ['m0']))
+
     def test_only_today_and_nothing_ruled_out(self):
         kept = digest.day_lines(LINES, DAY, 'group:1', Registry(people={'10003'}, ids={'m4'}))
         self.assertEqual([x['msg_id'] for x in kept], ['m0', 'm1', 'm2'])
@@ -238,6 +251,34 @@ class Nightly(unittest.TestCase):
         self.assertNotIn('桃子', r['related'])                      # another window's
         self.assertNotIn('抽卡', r['related'])                      # nothing to do with it
         self.assertEqual(r['unrelated'], '- 柠檬的生日聚会：柠檬请大家去她家过生日')
+
+    def test_not_merged_with_someone_ruled_out(self):
+        r = run_case('merge_gone')
+        self.assertIn('Q1来不来', r['prompt'])
+        self.assertEqual(r['night'], {'group:900001': {'called': 1, 'written': 0}})
+        self.assertEqual([e['origin']['people'] for e in r['events']], [['10002']])
+        self.assertEqual(r['files_with_him'], [])
+
+    def test_a_deleted_persons_name(self):
+        r = run_case('gone_names')
+        # what is kept of what others say of him: 某人, after a restart too
+        self.assertEqual(r['phone_before_restart'][-1], '某人今天在吗')
+        self.assertEqual(r['phone_after_restart'][-1], '某人呢')
+        self.assertNotIn('阿星', ''.join(r['phone_after_restart']))  # and at a restart, in what was kept before
+        # in the nightly material (impressions and the note of the day) a code
+        self.assertEqual(r['material_names'].get('10003'), ['阿星'])
+        self.assertNotIn('阿星', r['prompt'])
+        self.assertIn('1 P1：周末打副本 Q1来不来', r['prompt'])
+        # what names him is not kept; the rest is
+        self.assertEqual(r['night'], {'group:900001': {'called': 1, 'written': 1}})
+        self.assertEqual(r['events'], ['芒果说好呀'])
+        self.assertFalse(r['registry_has_name'])                   # only hashes of his names
+
+    def test_tonights_marks_with_the_registry_unreadable(self):
+        r = run_case('marks')
+        self.assertEqual(set(r['first']), {'group:900001', 'private:10004'})
+        self.assertEqual((r['after_restart'], r['calls']), ({}, 2))
+        self.assertTrue(r['notebook_tried'])
 
     def test_and_with_a_restored_backup(self):
         r = run_case('restore')
