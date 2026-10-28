@@ -5821,6 +5821,9 @@
    "first_seen": 1793000000.0,
    "interactions": 10,
    "last_seen": 1793272490.0,
+   "names": [
+    "芒果"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6055,6 +6058,9 @@
    "first_seen": 1793000690.0,
    "interactions": 5,
    "last_seen": 1793271400.0,
+   "names": [
+    "柠檬"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6229,6 +6235,9 @@
    "first_seen": 1793000730.0,
    "interactions": 4,
    "last_seen": 1793276520.0,
+   "names": [
+    "阿星"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6393,6 +6402,9 @@
    "first_seen": 1793004390.0,
    "interactions": 4,
    "last_seen": 1793271350.0,
+   "names": [
+    "桃子"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6526,6 +6538,9 @@
    "first_seen": 1793098530.0,
    "interactions": 1,
    "last_seen": 1793098530.0,
+   "names": [
+    "路人"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",

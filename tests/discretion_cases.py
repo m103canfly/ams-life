@@ -604,6 +604,52 @@ def run():
             t(0, '小爱 早上好', '10002', '柠檬', A)
             t(10, '小爱 在吗', '10001', '芒果')
             out['prompts'] = [x['prompt'] for x in out['turns'][-2:]]
+    elif CASE == 'notebook_readonly':
+        # a private chat's sitting tries to change one of her own thoughts
+        plugin.llm_functions = {'notebook': {'enabled': True}}
+        plugin.notebook_time = '00:00'
+        plugin._begin_job()
+        plugin.self_model['notebook'] = [{'id': 'own', 'text': '我喜欢看海', 'ts': 0,
+                                          'origin': main.discretion.make_origin('self')}]
+        plugin._append_event_archive({
+            'id': 'cake', 'ts': clock.now, 'session': 'default:FriendMessage:10001', 'title': '偷偷准备惊喜蛋糕',
+            'event': '芒果在偷偷准备一个惊喜蛋糕', 'meaning_to_her': '芒果在偷偷准备一个惊喜蛋糕', 'event_key': 'cake',
+            'origin': main.discretion.make_origin('private:10001', ['10001'], ['m_cake'])})
+        prompts = {}
+
+        class NotebookModel:
+            async def text_chat(self, prompt='', system_prompt=None, **k):
+                if '惊喜蛋糕' in prompt:
+                    prompts['private'] = prompt
+                    return harness.FakeResponse(json.dumps({'changes': [
+                        {'op': 'edit', 'no': 1, 'text': '我喜欢看海，也想吃蛋糕', 'private': True},
+                        {'op': 'delete', 'no': 1}]}, ensure_ascii=False))
+                return harness.FakeResponse('{}')
+        real_provider = plugin._provider_for
+
+        async def provider(kind, event=None):
+            return NotebookModel() if kind == 'notebook' else await real_provider(kind, event)
+        plugin._provider_for = provider
+        loop.run_until_complete(plugin._maybe_write_notebook())
+        out['private_prompt'] = prompts.get('private', '')
+        out['notebook'] = [{'text': x['text'], 'origin': x['origin']} for x in plugin.self_model['notebook']]
+        out['changes'] = plugin.self_model['notebook_night']['changes']
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        out['group'] = out['turns'][-1]['prompt']
+    elif CASE == 'names_everywhere':
+        # 阿星 goes by another group card in group B; a thing said openly in both comes up
+        # in a third group: every name he goes by is taken out
+        from astrbot.api.message_components import Plain
+        hear(plugin, loop, 0, '周末去爬山吧', '10003', '阿星', A)
+        hear(plugin, loop, 10, '我也去，带水', '10003', '星仔', B)
+        plugin._begin_job()
+        both = main.discretion.merge([main.discretion.make_origin('group:' + A, ['10003'], ['m_a']),
+                                      main.discretion.make_origin('group:' + B, ['10003'], ['m_b'])])
+        plugin._append_event_archive({
+            'id': 'hike', 'ts': clock.now, 'session': 'default:GroupMessage:' + A, 'title': '周末爬山',
+            'event': '阿星约大家周末爬山，星仔说他带水', 'event_key': 'hike', 'origin': both})
+        t(10, '小爱 晚上好', '10004', '桃子', '900003')
+        out['third_group'] = out['turns'][-1]['prompt']
     elif CASE == 'insight':
         plugin.llm_functions = {'insight': {'enabled': True}}
         plugin._begin_job()

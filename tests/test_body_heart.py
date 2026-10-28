@@ -357,6 +357,33 @@ class Notebook(unittest.TestCase):
         self.assertEqual(r['notebook_after_forget'], ['周末大家要去爬山'])
 
 
+class NotebookOwnThoughts(unittest.TestCase):
+    def test_a_private_chat_cannot_take_in_one_of_her_own_thoughts(self):
+        r = run_case('notebook_readonly')
+        self.assertIn('1. 我喜欢看海（只能看', r['private_prompt'])
+        self.assertEqual(r['notebook'], [{'text': '我喜欢看海', 'origin': {
+            'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'}}])
+        self.assertEqual(r['changes'], 0)  # the dropped changes do not use up the night
+        self.assertIn('[她的本子] 我喜欢看海', r['group'])
+
+
+class EveryName(unittest.TestCase):
+    def test_every_name_he_goes_by_is_taken_out_elsewhere(self):
+        r = run_case('names_everywhere')
+        line = [x for x in r['third_group'].splitlines() if x.startswith('[最近的事]')][0]
+        self.assertIn('爬山', line)
+        for name in ('阿星', '星仔', '10003'):
+            self.assertNotIn(name, line)
+
+    def test_name_sources_join_in(self):
+        import mixin_discretion
+        holder = type('P', (mixin_discretion.DiscretionMixin,), {})()
+        holder._name_index = {'10003': {'阿星'}}
+        holder.register_name_source(lambda person: ['星星'] if person == '10003' else [])
+        self.assertEqual(holder._known_names(['10003']), ['10003', '星星', '阿星'])
+        self.assertEqual(holder._anonymized('星星和阿星都来了', ['10003']), '有人和有人都来了')
+
+
 class Insights(unittest.TestCase):
     def test_an_insight_lives_with_the_events_and_can_be_forgotten(self):
         r = run_case('insight')

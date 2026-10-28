@@ -489,17 +489,19 @@ class LLMMixin:
 
     @staticmethod
     def _notebook_shown(entries, sitting) -> list:
-        """Which entries a sitting may see and change: in "group" her own and the open ones;
-        in a private chat's, her own and that chat's (so nothing private is copied out)."""
+        """Which entries a sitting sees, as (index, may change it): in "group" her own and
+        the open ones, all changeable; in a private chat's, that chat's (changeable) and her
+        own, which it only reads: a private chat never takes one of her own thoughts in."""
         shown = []
         for i, x in enumerate(entries):
             o = discretion.origin_of(x)
-            if o["visibility"] == discretion.SELF or o["where"] == discretion.SELF:
-                shown.append(i)
-            elif sitting == "group" and o["visibility"] == discretion.PUBLIC:
-                shown.append(i)
+            own = o["visibility"] == discretion.SELF or o["where"] == discretion.SELF
+            if sitting == "group" and (own or o["visibility"] == discretion.PUBLIC):
+                shown.append((i, True))
             elif sitting != "group" and o["where"] == sitting:
-                shown.append(i)
+                shown.append((i, True))
+            elif sitting != "group" and own:
+                shown.append((i, False))
         return shown
 
     async def _maybe_write_notebook(self, now=None) -> bool:
@@ -526,7 +528,7 @@ class LLMMixin:
             materials = self._notebook_materials(core, sitting, now)
             changes = await self._llm_v2_call(
                 "notebook",
-                interpretation.notebook_prompt([entries[i].get("text") for i in shown], materials,
+                interpretation.notebook_prompt([(entries[i].get("text"), may) for i, may in shown], materials,
                                                sitting != "group", NOTEBOOK_MAX, NOTEBOOK_CHARS, budget),
                 lambda raw: interpretation.parse_notebook_changes(
                     raw, len(shown), [m["id"] for m in materials], NOTEBOOK_CHARS, budget),
@@ -541,10 +543,13 @@ class LLMMixin:
             for change in changes:
                 mark = {"private_mark": change.get("private")}
                 uses = [refs[x] for x in (change.get("uses") or []) if x in refs]
+                if change["op"] in ("edit", "delete"):
+                    i, may = shown[change["no"] - 1]
+                    if not may:
+                        continue  # one of her own thoughts, seen from a private chat: read only
                 if change["op"] == "delete":
-                    gone.add(shown[change["no"] - 1])
+                    gone.add(i)
                 elif change["op"] == "edit":
-                    i = shown[change["no"] - 1]
                     old = entries[i]
                     entries[i] = dict(old, text=change["text"], ts=now, uses=uses, sitting=sitting,
                                       origin=self._sitting_origin_with(origin, old),

@@ -132,6 +132,11 @@ class PeopleMixin:
                     d = {}
             d["sender_id"] = sid
             d["sender_name"] = name or d.get("sender_name", "")
+            # ams-life: every name he has gone by (group cards differ), for anonymizing
+            _names = [str(x) for x in (d.get("names") or []) if str(x or "").strip()]
+            if name and name not in _names:
+                _names.append(name)
+            d["names"] = _names[-20:]
             try:
                 _prev_last_seen = float(d.get("last_seen", 0) or 0)
             except Exception:

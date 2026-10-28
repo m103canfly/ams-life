@@ -1591,7 +1591,7 @@ class MemoryMixin:
                 _who = self._recall_who(_entry, "", anon=_verdict == discretion.ANON)
                 _line = "%s：%s" % (_who, str(_entry.get("text") or "").strip().replace("\n", " ")[:200])
                 if _verdict == discretion.ANON:
-                    _line = discretion.anonymize(_line, discretion.names_in(_entry))
+                    _line = self._anonymized(_line, discretion.names_in(_entry))
                 _foreign_lines.append("- （别处）" + _line)
                 _known_texts.add(str(_entry.get("text") or "").strip())
         except Exception:

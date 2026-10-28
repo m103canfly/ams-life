@@ -257,6 +257,7 @@ class PhoneMixin:
         self._write_window(here, win)
         if getattr(self, "_heard_ts", None) is not None:  # not yet read: the first read finds it
             self._heard_ts.append(line["ts"])
+        self._note_name(line["sender_id"], line["sender_name"])  # every name he goes by
 
     def _window_add_reply(self, event, text) -> None:
         text = str(text or "").strip()

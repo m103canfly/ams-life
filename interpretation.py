@@ -1229,8 +1229,10 @@ def notebook_prompt(entries, materials, private_sitting=False, max_entries=20, m
     """Her notebook, at night, one sitting: what of it she sees now, the sitting's
     material, and what she may change. It is hers: nothing tells her what to think,
     only how to write the answer down. She marks each entry private or not; the mark is
-    kept, it does not decide where the entry comes up (the sitting does)."""
-    book = "\n".join("%d. %s" % (i + 1, _hint(x, max_chars)) for i, x in enumerate(entries or [])) or "（还是空的）"
+    kept, it does not decide where the entry comes up (the sitting does). `entries` are
+    (text, may change) pairs; the ones she may only read say so."""
+    book = "\n".join("%d. %s%s" % (i + 1, _hint(x, max_chars), "" if may else "（只能看，这一次不改）")
+                     for i, (x, may) in enumerate(entries or [])) or "（还是空的）"
     mats = "\n".join("%s. %s" % (m.get("id"), _hint(m.get("text"), 160)) for m in (materials or [])) or "（今天没有）"
     where = ("这一次看的是你跟一个人私聊里的事；这里写下的，只会在跟这个人私聊时想起。"
              if private_sitting else "这一次看的是各个群里大家当众说的事。")
