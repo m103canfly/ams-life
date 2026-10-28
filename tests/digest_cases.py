@@ -145,6 +145,41 @@ if CASE == 'restore':
     plugin._forget_registered()
     result['after'] = sorted(e['title'] for e in events())
 
+def add_event(title, what, where, people, digest_kind=True, importance=0.5, n=[0]):
+    n[0] += 1
+    clock.advance(60)
+    rec = {'id': 'e%d' % n[0], 'ts': clock.now, 'session': where, 'title': title, 'event': what,
+           'event_key': title, 'importance': importance, 'centrality': 0.5,
+           'origin': {'where': where, 'people': people, 'source_ids': ['s%d' % n[0]],
+                      'visibility': 'private' if where.startswith('private:') else 'public'}}
+    if digest_kind:
+        rec['kind'] = 'daily_digest'
+    plugin._append_event_archive(rec)
+
+
+if CASE == 'fair':
+    # six groups, four things each, in order; one strong event in the last group, about three people
+    for g in range(6):
+        for i in range(4):
+            add_event('第%d群的事%d' % (g + 1, i), '经过%d' % i, 'group:90010%d' % g, ['1000%d' % i])
+    add_event('大事', '三个人的大事', 'group:900105', ['10001', '10002', '10003'], digest_kind=False, importance=0.9)
+    clock.now = EVENING + 3.5 * 3600
+    mats = plugin._notebook_materials(plugin._core(None), 'group', clock.now)
+    result['texts'] = [m['text'] for m in mats]
+    result['windows'] = sorted({m['origin']['where'] for m in mats if m['ref'] != 'body'})
+
+if CASE == 'reply':
+    add_event('柠檬的生日聚会', '柠檬请大家去她家过生日', 'group:' + G1, ['10002'], digest_kind=False, importance=0.9)
+    add_event('柠檬约周末打副本', '柠檬约大家周末一起打副本', 'group:' + G1, ['10002', '10001'])
+    add_event('大家聊抽卡', '几个人在聊今天抽卡的运气', 'group:' + G1, ['10002', '10001'])
+    add_event('芒果的副本攻略', '芒果分享了周末副本的打法', 'group:' + G1, ['10001'])
+    add_event('副本开荒', '大家约好周末副本开荒', 'group:' + G1, ['10001'])
+    add_event('桃子也想打副本', '桃子说周末也想打副本', 'group:' + G2, ['10004'])
+    for name, text in (('related', '周末的副本几点开始'), ('unrelated', '你好呀')):
+        ev = harness.FakeEvent(text, sender='10002', name='柠檬', group=G1)
+        result[name] = plugin._event_context(ev)
+
+
 for task in asyncio.all_tasks(loop):
     task.cancel()
 OUT.write_text(json.dumps(result, ensure_ascii=False, indent=1, default=str), 'utf-8')

@@ -132,6 +132,42 @@ class Answer(unittest.TestCase):
         self.assertEqual(digest.named('P1约了P2和Q1', codes, {'10002': '柠檬', '10001': '芒果'}), '柠檬约了芒果和某人')
 
 
+def ev(title, where, people=(), digest_kind=True, importance=0.5, ts=0.0, what=''):
+    e = {'title': title, 'event': what or title, 'importance': importance, 'ts': ts,
+         'origin': {'where': where, 'people': list(people)}}
+    if digest_kind:
+        e['kind'] = 'daily_digest'
+    return e
+
+
+class WhereTheyAreUsed(unittest.TestCase):
+    def test_fairly_between_windows(self):
+        events = [ev('%s-%d' % (g, i), g, ts=n) for n, (g, i) in enumerate((g, i) for g in 'ABCDEF' for i in range(4))]
+        events.append(ev('F大事', 'F', ['1', '2', '3'], digest_kind=False, ts=99))
+        got = [e['title'] for e in digest.pick_fairly(events, 8)]
+        self.assertEqual(len(got), 8)
+        self.assertEqual({t[0] for t in got}, set('ABCDEF'))      # every window first
+        self.assertIn('F大事', got)                                 # a strong event before the notes
+        self.assertEqual(got, [e['title'] for e in events if e['title'] in got])   # in their order
+        self.assertEqual(len(digest.pick_fairly(events[:3], 8)), 3)
+
+    def test_more_windows_than_room(self):
+        events = [ev('%d' % i, 'w%d' % i, ['p'] * (i % 3), ts=i) for i in range(6)]
+        got = [e['title'] for e in digest.pick_fairly(events, 2)]
+        self.assertEqual(got, ['2', '5'])                           # the windows of the weightiest
+
+    def test_only_here_only_to_do_with_it_at_most_two(self):
+        events = [ev('柠檬约周末打副本', 'g1'), ev('大家聊抽卡', 'g1'), ev('芒果的副本攻略', 'g1', what='周末副本的打法'),
+                  ev('副本开荒', 'g1', what='大家约好周末副本开荒'), ev('桃子也想打副本', 'g2', what='周末也想打副本'),
+                  ev('周末打副本', 'g1', digest_kind=False)]
+        got = [e['title'] for e in digest.for_reply('周末的副本几点开始', events, 'g1')]
+        self.assertEqual(len(got), 2)
+        self.assertNotIn('桃子也想打副本', got)
+        self.assertNotIn('大家聊抽卡', got)
+        self.assertNotIn('周末打副本', got)                         # a strong event is not one of these
+        self.assertEqual(digest.for_reply('你好呀', events, 'g1'), [])
+
+
 class Nightly(unittest.TestCase):
     def test_off_by_default_and_once_a_night(self):
         r = run_case('nightly')
@@ -187,6 +223,21 @@ class Nightly(unittest.TestCase):
         self.assertEqual(r['forget_message']['events'], 3)   # every group event holds that message
         self.assertEqual(r['after_message'], ['桃子说了蓝莓计划'])
         self.assertEqual(r['after_person'], [])
+
+    def test_her_notebook_fairly_between_windows(self):
+        r = run_case('fair')
+        self.assertEqual(len(r['texts']), 13)                       # her body and 12 events, as before
+        self.assertEqual(r['windows'], ['group:90010%d' % g for g in range(6)])
+        self.assertIn('事件：大事：三个人的大事', r['texts'])
+
+    def test_recent_things_in_a_reply(self):
+        r = run_case('reply')
+        lines = r['related'].splitlines()
+        self.assertEqual(lines[0], '- 柠檬的生日聚会：柠檬请大家去她家过生日')   # the strong one first, as before
+        self.assertEqual(len(lines), 3)                            # and at most two of the notes
+        self.assertNotIn('桃子', r['related'])                      # another window's
+        self.assertNotIn('抽卡', r['related'])                      # nothing to do with it
+        self.assertEqual(r['unrelated'], '- 柠檬的生日聚会：柠檬请大家去她家过生日')
 
     def test_and_with_a_restored_backup(self):
         r = run_case('restore')

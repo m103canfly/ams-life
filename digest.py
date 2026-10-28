@@ -170,3 +170,60 @@ def sources(item, codes, shown, day_all) -> tuple:
         people |= set(speakers(day_all))
     ids = [str(ln.get("msg_id")) for ln in used if ln.get("msg_id")]
     return sorted(people), list(dict.fromkeys(ids))
+
+
+# ----------------------------------------------------------------------
+# Where its events are used (the discussion window, 10-28)
+# ----------------------------------------------------------------------
+PER_REPLY = 2           # of these events in "[最近的事]", at most
+RELEVANT_MIN = 2        # pairs of characters a message must share with one of them
+
+
+def is_digest(e) -> bool:
+    return isinstance(e, dict) and e.get("kind") == "daily_digest"
+
+
+def _pairs(text) -> set:
+    t = re.sub(r"[^0-9a-z一-鿿]", "", str(text or "").lower())
+    return {t[i:i + 2] for i in range(len(t) - 1)}
+
+
+def relevance(message, e) -> int:
+    """How much one of these events has to do with a message: the pairs of characters in a
+    row (letters, digits, Chinese) they share."""
+    return len(_pairs(message) & _pairs("%s %s" % (e.get("title") or "", e.get("event") or "")))
+
+
+def for_reply(message, events, here) -> list:
+    """Which of these events a reply here may bring up: only this window's, only those that
+    have to do with the message (RELEVANT_MIN), the most to do with it first, at most PER_REPLY."""
+    scored = [(relevance(message, e), i, e) for i, e in enumerate(events)
+              if is_digest(e) and (e.get("origin") or {}).get("where") == here]
+    return [e for n, _i, e in sorted(scored, key=lambda x: (-x[0], x[1])) if n >= RELEVANT_MIN][:PER_REPLY]
+
+
+def weight(e) -> tuple:
+    """How much an event matters, for picking: a strong event (not one of these) first, then
+    the more people it is about, then its importance, then the newer."""
+    o = e.get("origin") if isinstance(e.get("origin"), dict) else {}
+    return (0 if is_digest(e) else 1, len(o.get("people") or []), float(e.get("importance", 0) or 0),
+            float(e.get("ts", 0) or 0))
+
+
+def pick_fairly(events, n) -> list:
+    """At most `n` of `events`, fairly between windows: each window's weightiest first (the
+    windows by that one), then the weightiest of the rest. In their order in `events`."""
+    order = sorted(range(len(events)), key=lambda i: weight(events[i]), reverse=True)
+    picked, windows = [], set()
+    for i in order:
+        where = (events[i].get("origin") or {}).get("where", "")
+        if where not in windows:
+            windows.add(where)
+            picked.append(i)
+    picked = picked[:n]
+    for i in order:
+        if len(picked) >= n:
+            break
+        if i not in picked:
+            picked.append(i)
+    return [events[i] for i in sorted(picked)]
