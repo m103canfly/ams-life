@@ -80,6 +80,8 @@ class MediaMixin:
         return {}
 
     def _save_image_cache(self, cache: dict) -> None:
+        if self._job_stale():
+            return  # someone (or a message) she may not keep, or something forgotten meanwhile
         try:
             if len(cache) > self.image_cache_max_entries:
                 items = sorted(cache.items(), key=lambda kv: float(kv[1].get("ts", 0) or 0), reverse=True)

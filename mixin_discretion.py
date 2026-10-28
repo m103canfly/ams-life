@@ -16,6 +16,9 @@ import contextvars
 # ams-life: the forget count when the current job (one request, one reply, one
 # background task) started. A task started from a request inherits its mark.
 _FORGET_MARK = contextvars.ContextVar("ams_life_forget_mark", default=None)
+# ams-life: set when the message this job is about comes from someone (or is a message)
+# the forget registry rules out: she may still answer, but nothing of it is kept.
+_KEEP_NOTHING = contextvars.ContextVar("ams_life_keep_nothing", default=False)
 
 _EVENT_TEXT_FIELDS = ("title", "event", "central_details", "meaning_to_her", "reflection",
                       "big_summary", "small_summary", "peripheral_details")
@@ -32,6 +35,7 @@ class DiscretionMixin:
 
     def _begin_job(self) -> None:
         _FORGET_MARK.set(self._forget_count())
+        _KEEP_NOTHING.set(False)
 
     def _continue_job(self) -> None:
         """A later step of the same message (the reply) keeps the mark its request set
@@ -41,12 +45,89 @@ class DiscretionMixin:
             self._begin_job()
 
     def _job_stale(self) -> bool:
-        """True when something was forgotten since this job started: do not write."""
+        """True when something was forgotten since this job started, or the message it is
+        about may not be kept (forget registry): do not write."""
+        if _KEEP_NOTHING.get():
+            return True
         mark = _FORGET_MARK.get()
         if mark is None or self._forget_count() <= mark:
             return False
         logger.info("[ams-life] write dropped: something was forgotten since this work started")
         return True
+
+    # ------------------------------------------------------------------
+    # The forget registry (forget_registry.py): who and what she must not keep.
+    # What the old companion was asked to forget, and what the owner deleted in
+    # the panel. No one can add to it by saying something in a chat.
+    # ------------------------------------------------------------------
+    def _registry(self):
+        reg = getattr(self, "_forget_reg", None)
+        if reg is None:
+            reg = self._forget_reg = forget_registry.ForgetRegistry(FORGET_REGISTRY_PATH)
+            self._forget_snap = None
+        return reg
+
+    def _registry_sets(self) -> tuple:
+        """(people with any row, message ids with a row), reread when the registry grows."""
+        reg = self._registry()
+        seq = reg.last_seq()
+        snap = getattr(self, "_forget_snap", None)
+        if not snap or snap[0] != seq:
+            rows = reg.rows()
+            snap = self._forget_snap = (seq, {r["qq"] for r in rows if r["kind"] != "source"},
+                                        {r["source_id"] for r in rows if r["kind"] == "source"})
+        return snap[1], snap[2]
+
+    def _may_keep(self, people=(), place="", at=None, source_ids=()) -> bool:
+        """May she keep something about these people / from these messages, said here and
+        then? When the registry cannot be read this raises forget_registry.Unreadable: the
+        caller writes nothing this time (it never drops what is already kept)."""
+        try:
+            gone_people, gone_ids = self._registry_sets()
+            people = {str(x) for x in (people or ()) if str(x or "").strip()}
+            ids = {str(x) for x in (source_ids or ()) if str(x or "").strip()}
+            if "*" not in gone_people and not (people & gone_people) and not (ids & gone_ids):
+                return True
+            return self._registry().may_keep_all(sorted(people), place, at, sorted(ids))
+        except Exception as exc:
+            raise forget_registry.Unreadable(str(exc)) from exc
+
+    def _new_item_kept(self, item) -> bool:
+        """One new item (an event, an insight): may it be written? Not when the registry
+        cannot be read (it is just not written)."""
+        try:
+            return self._origin_kept(item)
+        except forget_registry.Unreadable as exc:
+            logger.warning("[ams-life] forget registry unreadable, not written: %s", exc)
+            return False
+
+    def _origin_kept(self, item) -> bool:
+        """May an item (memory, event, note, phone line) with this origin be kept? Raises
+        forget_registry.Unreadable when the registry cannot be read."""
+        if not isinstance(item, dict):
+            return True
+        o = discretion.origin_of(item)
+        try:
+            at = float(item.get("ts")) if item.get("ts") is not None else None
+        except (TypeError, ValueError):
+            at = None
+        return self._may_keep(o["people"], o["where"], at, o["source_ids"])
+
+    def _check_registry(self, event) -> bool:
+        """The message this job is about: may she keep anything of it? If not, nothing this
+        job (and the work it starts) writes is kept."""
+        try:
+            sid, _name = self._speaker(event)
+        except Exception:
+            sid = ""
+        try:
+            if self._may_keep([sid] if sid else [], self._here(event), time.time(), self._source_ids(event)):
+                return True
+            logger.info("[ams-life] a message she may not keep: nothing of it is written")
+        except forget_registry.Unreadable as exc:
+            logger.warning("[ams-life] forget registry unreadable: nothing of this message is written: %s", exc)
+        _KEEP_NOTHING.set(True)
+        return False
 
     # ------------------------------------------------------------------
     # Every name a person is known by, for making things anonymous.
@@ -198,33 +279,56 @@ class DiscretionMixin:
     # ------------------------------------------------------------------
     # Forgetting: delete for real, by person or by source message.
     # ------------------------------------------------------------------
-    def _forget(self, person: str = "", source_ids=None) -> dict:
+    def _forget(self, person: str = "", source_ids=None, entry_ids=None) -> dict:
         """Delete every memory, event, note and phone line that came from `person`
-        (or from one of `source_ids`), and his relationship record.
+        (or from one of `source_ids`; or the memories `entry_ids`), and his relationship
+        record. Deleting by message also takes what is written in the relationship
+        records of the people those messages involve (sub-records from those messages,
+        and any without a source; the numbers stay), the descriptions of pictures in
+        what was deleted, and the dedupe log rows of deleted events.
 
         Returns counts per store (memories, events, insights, relationship, notes incl. her
-        notebook, phone). Files moved aside by the one-her migration
-        (per-session legacy/archive folders) are not touched here. Every call
-        is logged; the log length is the forget count (see _job_stale).
+        notebook, phone) and the places something was deleted from. Files moved aside by
+        the one-her migration (per-session legacy/archive folders) and the archive
+        copies of the library are not touched here. Every call is logged; the log
+        length is the forget count (see _job_stale).
         """
         person = str(person or "").strip()
         ids = [str(x) for x in (source_ids or []) if str(x or "").strip()]
-        if not person and not ids:
+        entry_ids = {str(x) for x in (entry_ids or []) if str(x or "").strip()}
+        if not person and not ids and not entry_ids:
             return {}
         if not isinstance(getattr(self, "_forget_log", None), list):
             self._forget_log = []
+        his_names = [n for n in self._known_names([person]) if len(n) >= 2] if person else []
         if person and isinstance(getattr(self, "_name_index", None), dict):
             self._name_index.pop(person, None)
         self._forget_log.append((person, list(ids)))
         counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0, "insights": 0}
+        places, involved, pictures, gone_events = set(), set(), set(), set()
 
         def about(item):
             return discretion.is_about(discretion.origin_of(item), person, ids)
 
+        def note(item):
+            o = discretion.origin_of(item)
+            if o["where"]:
+                places.add(o["where"])
+            involved.update(str(x) for x in o["people"])
+            for a in item.get("attachments") or []:
+                if isinstance(a, dict) and a.get("ref"):
+                    pictures.add(str(a["ref"]))
+
+        def entry_gone(e):
+            return isinstance(e, dict) and (about(e) or (entry_ids and _memory_entry_id_of(e) in entry_ids))
+
         # 1) the memory library (and the person's private room)
         lib = self._read_library()
-        gone = {str(e.get("id") or "") for e in lib["entries"] if isinstance(e, dict) and about(e)}
-        keep = [e for e in lib["entries"] if not (isinstance(e, dict) and about(e))]
+        gone = {str(e.get("id") or "") for e in lib["entries"] if entry_gone(e)}
+        for e in lib["entries"]:
+            if entry_gone(e):
+                note(e)
+        keep = [e for e in lib["entries"] if not entry_gone(e)]
         counts["memories"] = len(lib["entries"]) - len(keep)
         lib["entries"] = keep
         if person:
@@ -254,6 +358,9 @@ class DiscretionMixin:
                     continue
                 if isinstance(rec, dict) and about(rec):
                     dropped += 1
+                    note(rec)
+                    if rec.get("id"):
+                        gone_events.add(str(rec["id"]))
                     continue
                 kept.append(line)
             if dropped:
@@ -280,6 +387,9 @@ class DiscretionMixin:
             if not isinstance(items, list):
                 continue
             kept_items = [x for x in items if not (isinstance(x, dict) and about(x))]
+            for x in items:
+                if isinstance(x, dict) and about(x):
+                    note(x)
             if len(kept_items) != len(items):
                 counts["notes"] += len(items) - len(kept_items)
                 self.self_model[key] = kept_items
@@ -300,6 +410,9 @@ class DiscretionMixin:
             win = self._read_window(place)
             changed = False
             for key in ("recent", "open_loops"):
+                for x in win[key]:
+                    if isinstance(x, dict) and about(x):
+                        note(x)
                 kept_items = [x for x in win[key] if not (isinstance(x, dict) and about(x))]
                 if len(kept_items) != len(win[key]):
                     counts["phone"] += len(win[key]) - len(kept_items)
@@ -307,6 +420,220 @@ class DiscretionMixin:
                     changed = True
             if changed:
                 self._write_window(place, win)
+        if person and (counts["phone"] or counts["relationship"]):
+            places.add("private:" + person)
+
+        # 6) what the relationship records of the people involved say: by message, those of
+        #    the people in what was deleted; a person, every record that names him (BioCore
+        #    draws the topics and sources in a record from the whole chat)
+        others = set(involved) - {person, "self", ""}
+        if person and USER_DIR.exists():
+            for upath in USER_DIR.glob("*.json"):
+                try:
+                    rec = json.loads(upath.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                if isinstance(rec, dict) and self._record_mentions(rec, person, his_names):
+                    others.add(str(rec.get("sender_id") or upath.stem))
+        if others:
+            counts["relationship_text"] = self._forget_relationship_text(
+                others - {person}, set(ids) | gone | gone_events)
+
+        # 7) what else may hold their words: picture descriptions, the dedupe log, the
+        #    in-process vector cache (texts as keys)
+        counts["pictures"] = self._forget_pictures(pictures)
+        self._forget_dedupe_rows(gone_events)
+        EMBED_CACHE.clear()
+
         self._refresh_loop_pressure(self._core(None))
-        logger.info("[ams-life] forgot person=%s sources=%d: %s", "yes" if person else "no", len(ids), counts)
+        counts["places"] = sorted(p for p in places if p)
+        logger.info("[ams-life] forgot person=%s sources=%d entries=%d: %s", "yes" if person else "no",
+                    len(ids), len(entry_ids), {k: v for k, v in counts.items() if k != "places"})
         return counts
+
+    _REL_TEXT_LISTS = ("we_memory", "annotations", "milestones")
+    _REL_TEXT_MAPS = ("transactive_map", "destination_map", "social_world")
+    # names that are everyday words: a record "mentions" such a person only by his number or
+    # in a name field, never because the word turns up in what was said
+    _EVERYDAY_WORDS = {"哈哈", "哈哈哈", "嘿嘿", "嗯嗯", "好的", "可以", "你好", "什么", "这个", "那个", "大家",
+                       "真的", "没有", "就是", "然后", "知道", "有人", "某人"}
+
+    def _record_mentions(self, rec, person, names) -> bool:
+        """Does someone else's relationship record draw from `person`? Only its name and text
+        fields are looked at (never timestamps or counts): his number as a whole number, his
+        names in name fields, and in text only names that are not everyday words."""
+        rel = rec.get("relationship") if isinstance(rec.get("relationship"), dict) else {}
+        texts, name_fields, ids = [], [], []
+
+        def take(x):
+            if isinstance(x, dict):
+                texts.extend(str(x.get(k) or "") for k in ("text", "key", "title"))
+                name_fields.append(str(x.get("sender_name") or x.get("name") or ""))
+                ids.append(str(x.get("sender_id") or x.get("qq") or ""))
+            elif isinstance(x, str):
+                texts.append(x)
+        for key in self._REL_TEXT_LISTS + self._REL_TEXT_MAPS:
+            value = rel.get(key)
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    texts.append(str(k))
+                    take(v)
+            elif isinstance(value, list):
+                for v in value:
+                    take(v)
+        if person in ids or person in name_fields:
+            return True
+        number = re.compile(r"(?<![0-9])%s(?![0-9])" % re.escape(person))
+        if any(number.search(t) for t in texts):
+            return True
+        names = [n for n in names if len(n) >= 2 and not n.isdigit()]
+        if any(n in name_fields for n in names):
+            return True
+        return any(n in t for n in names if n not in self._EVERYDAY_WORDS for t in texts)
+
+    def _forget_relationship_text(self, people, refs) -> int:
+        """Relationship records of `people`: drop sub-records that came from `refs` (message,
+        memory or event ids) and any that do not say where they came from; the words drawn
+        from memories (topics, sources, people around him) go too and are rebuilt from what
+        is left. The numbers (state, trajectory, counts) stay."""
+        dropped = 0
+        refs = {str(x) for x in refs if str(x or "")}
+        for who in sorted(people):
+            safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(who))[:60]
+            path = USER_DIR / (safe + ".json")
+            if not path.exists():
+                continue
+            try:
+                d = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            rel = d.get("relationship") if isinstance(d, dict) else None
+            if not isinstance(rel, dict):
+                continue
+            changed = False
+            for key in self._REL_TEXT_LISTS:
+                items = rel.get(key)
+                if not isinstance(items, list):
+                    continue
+                kept = []
+                for x in items:
+                    own = set()
+                    if isinstance(x, dict):
+                        own = {str(r) for r in list(x.get("source_ids") or []) + list(x.get("evidence_refs") or [])}
+                    if own and not (own & refs):
+                        kept.append(x)
+                if len(kept) != len(items):
+                    dropped += len(items) - len(kept)
+                    rel[key] = kept
+                    changed = True
+            for key in self._REL_TEXT_MAPS:
+                if rel.get(key):
+                    rel[key] = [] if isinstance(rel.get(key), list) else {}
+                    changed = True
+            if changed:
+                path.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        return dropped
+
+    def _forget_pictures(self, refs) -> int:
+        """Descriptions of the pictures that were in what was deleted."""
+        if not refs or not IMAGE_CACHE_PATH.exists():
+            return 0
+        cache = self._load_image_cache()
+        keys = {_sha256(r) for r in refs} | {k for k, v in cache.items()
+                                             if isinstance(v, dict) and str(v.get("ref") or "") in refs}
+        gone = [k for k in keys if k in cache]
+        for k in gone:
+            cache.pop(k, None)
+        if gone:
+            IMAGE_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        return len(gone)
+
+    def _forget_dedupe_rows(self, event_ids) -> None:
+        """The one-time dedupe log keeps event titles: its rows about deleted events go."""
+        path = EVENT_ARCHIVE_DIR / "dedupe_log.jsonl"
+        if not event_ids or not path.exists():
+            return
+        kept = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                row = json.loads(line)
+            except Exception:
+                kept.append(line)
+                continue
+            if isinstance(row, dict) and {str(row.get("kept_id") or ""), str(row.get("dropped_id") or "")} & set(event_ids):
+                continue
+            kept.append(line)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
+        os.replace(str(tmp), str(path))
+
+    # ------------------------------------------------------------------
+    # The owner's deletes (panel only; never from a chat).
+    # ------------------------------------------------------------------
+    def _owner_forget_person(self, person) -> dict:
+        """Delete a person everywhere and register it, so nothing of his is kept again."""
+        person = str(person or "").strip()
+        if not person:
+            return {}
+        self._registry().owner_delete(person=person)
+        return self._forget(person=person)
+
+    def _owner_forget_memory(self, entry_id) -> dict:
+        """Delete one memory: it, and everything else that came from the messages it came
+        from (registered, so they are not kept again). None when there is no such memory."""
+        entry_id = str(entry_id or "").strip()
+        lib = self._read_library()
+        target = next((e for e in lib["entries"] if isinstance(e, dict) and _memory_entry_id_of(e) == entry_id), None)
+        if not entry_id or target is None:
+            return None
+        o = discretion.origin_of(target)
+        if o["source_ids"]:
+            self._registry().owner_delete(source_ids=o["source_ids"], place=o["where"] or forget_registry.EVERYWHERE)
+        return self._forget(source_ids=o["source_ids"], entry_ids=[entry_id])
+
+    def _place_umos(self) -> dict:
+        """place -> AstrBot's id of that chat, as her phone last saw it."""
+        out = {}
+        for place in self._window_places():
+            umo = str(self._read_window(place).get("umo") or "")
+            if umo:
+                out[place] = umo
+        return out
+
+    async def _forget_in_astrbot(self, person, umos) -> dict:
+        """What AstrBot itself keeps of a deleted person, through its public interfaces:
+        the conversation of his private chat, and his rows in the platform message
+        history (off by default). `umos`: place -> AstrBot's chat id, taken before the
+        phone was cleared. The group context buffer has no public interface and is not
+        touched (it holds at most the last messages of each group, in memory)."""
+        out = {"conversations": 0, "message_history": 0}
+        person = str(person or "").strip()
+        if not person:
+            return out
+        conv = getattr(self.context, "conversation_manager", None)
+        for umo in [u for p, u in sorted(umos.items()) if p == "private:" + person]:
+            try:
+                if conv is not None:
+                    await conv.delete_conversations_by_user_id(umo)
+                    out["conversations"] += 1
+            except Exception as exc:
+                logger.warning("[ams-life] astrbot conversation delete failed: %s", exc)
+        hist = getattr(self.context, "message_history_manager", None)
+        if hist is not None:
+            for _place, umo in sorted(umos.items()):
+                platform_id = str(umo).split(":", 1)[0]
+                try:
+                    page = 1
+                    while page <= 50:
+                        rows = await hist.get(platform_id, umo, page=page, page_size=200)
+                        if not rows:
+                            break
+                        mine = [row for row in rows if str(getattr(row, "sender_id", "") or "") == person]
+                        for row in mine:
+                            await hist.delete_by_id(getattr(row, "id"))
+                            out["message_history"] += 1
+                        if not mine:
+                            page += 1  # what was deleted moved the later rows up a page
+                except Exception as exc:
+                    logger.warning("[ams-life] astrbot message history delete failed: %s", exc)
+        return out

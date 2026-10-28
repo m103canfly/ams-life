@@ -393,6 +393,14 @@
         <p class="api-note" id="relNote">只读关系投影：calibration 只记录（EWMA/Brier），并只用于召回置信度；关系 → 稳态（C6）有一轮延迟。</p>
         <p class="api-note" id="relEmpty">还没有关系记录。</p>
         <div id="relBody"></div>
+        <div class="forget-box" id="forgetBox">
+          <p class="api-note">只有你能在这里删：删掉一个人在她这里的一切（所有群和私聊的记忆、事件、关系、手机里的话），并且登记下来，以后也不再记他。删了找不回来。群友在聊天里说什么都删不了。删完最好重启一次 AstrBot：AstrBot 自己放在内存里的群聊上下文（每个群最近的几条消息）插件清不掉，重启才会清空。</p>
+          <div class="event-toolbar">
+            <label><span>QQ 号</span><input id="forgetPersonInput" class="event-session" inputmode="numeric" autocomplete="off" placeholder="要删的人的 QQ 号"></label>
+            <button type="button" class="btn mini danger" id="forgetPersonBtn">删掉这个人</button>
+            <span class="mem-op-state" id="forgetPersonState"></span>
+          </div>
+        </div>
       </div>
     </section>
 

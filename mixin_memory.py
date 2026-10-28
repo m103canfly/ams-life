@@ -250,7 +250,15 @@ class MemoryMixin:
     def _here(self, event) -> str:
         return discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
 
-    def _read_library(self) -> dict:
+    def _vector_store(self):
+        store = getattr(self, "_vectors_db", None)
+        if store is None:
+            store = self._vectors_db = vector_store.VectorStore(MEMORY_VECTOR_PATH)
+        return store
+
+    def _read_library(self, vectors=True) -> dict:
+        """The whole library; each memory gets its vector back from the vector store
+        (vectors=False: without, for code that only looks at ids or text)."""
         try:
             d = json.loads(MEMORY_LIBRARY_PATH.read_text(encoding="utf-8"))
             if isinstance(d, dict):
@@ -258,17 +266,88 @@ class MemoryMixin:
                     d["entries"] = []
                 if not isinstance(d.get("rooms"), dict):
                     d["rooms"] = {}
+                if vectors:
+                    self._vector_store().attach(d["entries"])
                 return d
         except Exception:
             pass
         return {"entries": [], "rooms": {}}
 
     def _write_library(self, lib) -> None:
+        """Write the whole library: nothing the forget registry rules out is kept; vectors
+        go to the vector store (memories whose id is their own), and the vectors of
+        memories no longer in the library go with them."""
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         lib["schema_version"] = MEMORY_SCHEMA_VERSION
+        try:
+            kept = [e for e in lib.get("entries") or [] if self._origin_kept(e)]
+        except forget_registry.Unreadable as exc:
+            # never filter with a registry that cannot be read: nothing is written this time
+            logger.warning("[ams-life] forget registry unreadable, library not written: %s", exc)
+            return
+        lib["entries"] = kept
+        store = self._vector_store()
+        out = dict(lib, entries=store.detach(lib["entries"]))
         tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
+        tmp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
         os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
+        store.keep_only(str(e["id"]) for e in lib["entries"] if isinstance(e, dict) and e.get("id"))
+        self._known_memory_ids = {str(e.get("id") or "") for e in lib["entries"] if isinstance(e, dict)}
+
+    def _library_ids(self) -> set:
+        """The ids in the library: read once, then kept up to date by _write_library."""
+        ids = getattr(self, "_known_memory_ids", None)
+        if ids is None:
+            ids = self._known_memory_ids = {str(e.get("id") or "") for e in
+                                            self._read_library(vectors=False)["entries"] if isinstance(e, dict)}
+        return ids
+
+    def _new_memory_id(self, *seed, taken=()) -> str:
+        """An id no other memory has: a hash of where, when and what, lengthened on the
+        (unlikely) chance it is taken. `taken`: ids not written to the library yet."""
+        used = self._library_ids() | {str(x) for x in taken}
+        base = _sha256("|".join(str(x) for x in seed))[:12]
+        eid, n = base, 1
+        while eid in used:
+            n += 1
+            eid = "%s-%d" % (base, n)
+        return eid
+
+    def _migrate_memory_ids(self) -> None:
+        """Give every memory an id of its own, then move the vectors out of the library.
+
+        Memories without an id (her replies were written without one) or sharing one (an
+        id used to be a hash of the text, so the same words in two places shared it) get
+        a new one; the first of a shared id keeps it. The library is copied into
+        MEMORY_ARCHIVE_DIR first (never deleted). Nothing to do: nothing is written."""
+        if not MEMORY_LIBRARY_PATH.exists():
+            return
+        lib = self._read_library(vectors=False)
+        seen, fixes = set(), []
+        for e in lib["entries"]:
+            if not isinstance(e, dict):
+                continue
+            eid = str(e.get("id") or "")
+            if not eid or eid in seen:
+                fixes.append(e)
+            else:
+                seen.add(eid)
+        if fixes:
+            MEMORY_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(MEMORY_LIBRARY_PATH), str(
+                MEMORY_ARCHIVE_DIR / ("library.before-ids-%s.json" % time.strftime("%Y%m%d-%H%M%S"))))
+            for e in fixes:
+                e["id"] = self._new_memory_id(discretion.origin_of(e)["where"], e.get("ts"), e.get("role"),
+                                              e.get("text"), taken=seen)
+                seen.add(e["id"])
+            tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
+            os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
+            self._known_memory_ids = set(seen)
+            logger.info("[ams-life] gave %d memories an id of their own", len(fixes))
+        moved = vector_store.migrate_library(MEMORY_LIBRARY_PATH, MEMORY_VECTOR_PATH, MEMORY_ARCHIVE_DIR)
+        if moved.get("moved"):
+            logger.info("[ams-life] moved %d memory vectors out of the library", moved["moved"])
 
     def _library_places(self) -> list:
         lib = self._read_library()
@@ -779,7 +858,9 @@ class MemoryMixin:
                 if not vec:
                     continue
                 importance = max(float(entries[i].get("importance", 0.5) or 0.5) for i in group)
-                _sum_id = "sum_" + str(int(now)) + "_" + str(len(entries))
+                _sum_id = "sum_" + self._new_memory_id(
+                    "summary", self._here(event), now, len(entries),
+                    taken=[str(x.get("id") or "") for x in entries if isinstance(x, dict)])
                 for i in sorted(group, reverse=True):
                     _old = entries[i]
                     _old["summarized"] = True
@@ -1192,27 +1273,9 @@ class MemoryMixin:
         if not isinstance(entries, list):
             entries = []
             doc["entries"] = entries
-        # Explicit memory write commands (DELETE/RESTORE/ROLLBACK) run before
-        # retrieval. A staged delete only executes on an explicit confirmation
-        # turn; the command text is never stored as a new memory.
-        try:
-            _cmd = memory_meta.handle_delete_command(doc, text, time.time())
-        except Exception:
-            _cmd = {"handled": False}
-        if _cmd.get("handled"):
-            if str(_cmd.get("op") or "") == "DELETE":
-                try:
-                    self._propagate_memory_deletion(
-                        event, _cmd.get("entry"), doc, reason="nl_delete")
-                except Exception:
-                    pass
-            self._save_memory(event, doc)
-            self._last_memory_meta = turn["memory_meta"] = {
-                "count": 0, "confidence": 0.0, "source": "unknown",
-                "abstain": False, "tiers": {}, "answer_confidence": 0.0,
-                "gate": "none", "conflicts": 0,
-                "write_op": str(_cmd.get("op") or "NOOP")}
-            return self._memory_command_line(_cmd)
+        # ams-life: no one changes her memory by what they say in a chat (the owner's
+        # decision): BioCore's "删除记忆 / 恢复记忆 / 撤销修改 / 确认" commands are gone. Only
+        # the owner deletes, in the panel.
         if vec is None:
             vec = await self._embed_text(text)
         if not vec:
@@ -1258,7 +1321,9 @@ class MemoryMixin:
         # Only the conservative correction detector can nominate this target.
         _update_target = None
         _explicit_update = False
-        if duplicate is None:
+        # ams-life: "其实是… / 不是这样" no longer picks an older memory to overwrite;
+        # what was said is kept as said, and the older memory stays as it was.
+        if False:
             try:
                 _scored_ids = {id(_entry) for _score, _entry in scored}
                 _best = None
@@ -1305,13 +1370,7 @@ class MemoryMixin:
             _conflict = (memory_meta.detect_conflict(duplicate.get("text", ""), text)
                          or _explicit_update)
             if _conflict:
-                _old_text = str(duplicate.get("text", ""))
-                memory_meta.merge_version(duplicate, _old_text)
-                _new_text = str(text or "").strip()[:1200]
-                if _new_text and _new_text != _old_text:
-                    duplicate["text"] = _new_text
-                    duplicate["vector"] = vec
-                    duplicate["vec_updated_ts"] = now
+                # ams-life: the stored text is not rewritten by what someone says now
                 duplicate["conflict"] = True
                 duplicate["conflict_resolved"] = bool(_explicit_update)
                 try:
@@ -1339,7 +1398,9 @@ class MemoryMixin:
                     except Exception:
                         duplicate["memory_confidence"] = 0.55
             if not duplicate.get("id"):
-                duplicate["id"] = _sha256(str(duplicate.get("text", ""))[:300])[:12]
+                duplicate["id"] = self._new_memory_id(
+                    _here, duplicate.get("ts"), duplicate.get("text"),
+                    taken=[str(x.get("id") or "") for x in entries if isinstance(x, dict)])
             duplicate["memory_tier"] = memory_meta.memory_tier(duplicate, now)
             _write_op = memory_meta.classify_write_op(
                 duplicate, {"text": text[:1200]}, 1.0, conflict=_conflict or bool(duplicate.get("conflict"))
@@ -1361,7 +1422,9 @@ class MemoryMixin:
                                              reason="conflict" if _conflict else "duplicate", ts=now)
         else:
             _importance = self._memory_importance(core, "user")
-            _new_entry = {"id": _sha256(str(text)[:300])[:12], "text": text[:1200],
+            _new_entry = {"id": self._new_memory_id(
+                              _here, now, text, taken=[str(x.get("id") or "") for x in entries if isinstance(x, dict)]),
+                          "text": text[:1200],
                           "role": "user", "vector": vec, "ts": now, "hits": 1,
                           "sender_id": _sid, "sender_name": _sname,
                           "attachments": self._attachments_from_messages(event),
@@ -1477,7 +1540,9 @@ class MemoryMixin:
                 # write_log reference it; only assign one for legacy entries.
                 _eid = str(e.get("id") or "").strip()
                 if not _eid:
-                    _eid = _sha256(str(e.get("text", ""))[:300])[:12]
+                    _eid = self._new_memory_id(
+                        self._here(event), e.get("ts"), e.get("text"),
+                        taken=[str(x.get("id") or "") for x in entries if isinstance(x, dict)])
                     e["id"] = _eid
                 e["last_recall_regulation"] = str(getattr(core, "regulation", "none") or "none")
                 _ids.append(e)
@@ -1738,16 +1803,20 @@ class MemoryMixin:
                      "ts": now, "message_refs": []}
         else:
             _prov = self._memory_provenance(event, now)
-        entries.append({"text": text[:1200], "role": role, "vector": vec,
+        entries.append({"id": self._new_memory_id(
+                            self._here(event), now, role, text,
+                            taken=[str(x.get("id") or "") for x in entries if isinstance(x, dict)]),
+                        "text": text[:1200], "role": role, "vector": vec,
                         "ts": now, "hits": 1,
                         "sender_id": _sid if role == "user" else "",
                         "sender_name": _sname if role == "user" else "",
                         "attachments": self._attachments_from_messages(event) if role == "user" else [],
                         "provenance": _prov,
-                        # her reply belongs to the place and to the person she answered
+                        # her reply belongs to the place, to the person she answered and to
+                        # the message she answered: deleting that message deletes her reply too
                         "origin": discretion.make_origin(
                             self._here(event), [_sid],
-                            _prov.get("message_refs") if role == "user" else []),
+                            _prov.get("message_refs") if role == "user" else self._source_ids(event)),
                         "importance": self._memory_importance(core, role),
                         "last_used": now, "next_review_ts": now + 86400, "review_count": 0})
         self._apply_memory_encoding(entries[-1], core, now, text)

@@ -53,6 +53,14 @@ try:
     from . import homeostasis
 except Exception:
     import homeostasis
+try:
+    from . import forget_registry
+except Exception:
+    import forget_registry
+try:
+    from . import vector_store
+except Exception:
+    import vector_store
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 _LEGACY_DATA_DIR = PLUGIN_DIR / "data"
@@ -89,6 +97,13 @@ HER_STATE_PATH = STATE_DIR / "her.json"
 STATE_ARCHIVE_DIR = STATE_DIR / "per_session_archive"
 MEMORY_LIBRARY_PATH = MEMORY_DIR / "library.json"
 MEMORY_LEGACY_DIR = MEMORY_DIR / "per_session_legacy"
+# ams-life step 1-3: vectors live next to the library, one row per memory id; the
+# library as it was before a migration is copied into MEMORY_ARCHIVE_DIR (never deleted).
+MEMORY_VECTOR_PATH = MEMORY_DIR / vector_store.FILE_NAME
+MEMORY_ARCHIVE_DIR = MEMORY_DIR / "archive"
+# who and what she must not keep: the old companion's forget list, and the owner's
+# deletions from the panel (no one can make her forget by a chat command)
+FORGET_REGISTRY_PATH = DATA_DIR / forget_registry.FILE_NAME
 # ams-life: her phone. Every group and private chat is one window; what was
 # said there (her recent replies, open loops) is kept only in that window.
 # The body keeps no text at all.
