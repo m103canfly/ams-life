@@ -305,7 +305,7 @@ class DiscretionMixin:
     # relationship records): numbers are taken out of these, never out of ids
     _SCRUB_KEYS = {"text", "latest_text", "title", "key", "event", "small_summary", "big_summary",
                    "meaning_to_her", "reflection", "summary", "insight", "lesson", "image_caption",
-                   "voice_text", "source_texts", "evidence", "narrative"}
+                   "voice_text", "source_texts", "evidence", "narrative", "event_key", "merged_event_keys"}
 
     def _scrub_tree(self, obj, scrub, key=None):
         """`obj` with the text fields scrubbed (a new object; ids and numbers fields untouched)."""

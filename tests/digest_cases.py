@@ -148,13 +148,13 @@ if CASE == 'restore':
     plugin._forget_registered()
     result['after'] = sorted(e['title'] for e in events())
 
-def add_event(title, what, where, people, digest_kind=True, importance=0.5, n=[0]):
+def add_event(title, what, where, people, digest_kind=True, importance=0.5, n=[0], **more):
     n[0] += 1
     clock.advance(60)
-    rec = {'id': 'e%d' % n[0], 'ts': clock.now, 'session': where, 'title': title, 'event': what,
-           'event_key': title, 'importance': importance, 'centrality': 0.5,
-           'origin': {'where': where, 'people': people, 'source_ids': ['s%d' % n[0]],
-                      'visibility': 'private' if where.startswith('private:') else 'public'}}
+    rec = dict({'id': 'e%d' % n[0], 'ts': clock.now, 'session': where, 'title': title, 'event': what,
+                'event_key': title, 'importance': importance, 'centrality': 0.5,
+                'origin': {'where': where, 'people': people, 'source_ids': ['s%d' % n[0]],
+                           'visibility': 'private' if where.startswith('private:') else 'public'}}, **more)
     if digest_kind:
         rec['kind'] = 'daily_digest'
     plugin._append_event_archive(rec)
@@ -269,9 +269,16 @@ if CASE == 'everywhere':
     turn('大家好', '10003', '阿星', group=G1, msg_id='w0')
     ask('小爱 阿星周末想去打副本 你也来吗', '10002', '柠檬', group=G1, reply='好呀', msg_id='w1')
     ask('小爱 记得阿星说的那个副本吗', '10001', '芒果', group=G1, reply='记得', msg_id='w2')
+    # an event about it, of 柠檬's alone: its key names him, and a key merged into it too
+    add_event('柠檬约阿星打副本', '柠檬约阿星周末一起打副本', 'default:GroupMessage:' + G1, ['10002'],
+              digest_kind=False, merged_event_keys=['阿星的副本局'])
     result['before'] = files_with('阿星', archive=False)
+    result['keys_before'] = [(e.get('event_key'), e.get('merged_event_keys'))
+                             for e in plugin._event_archive(100, read_only=True)]
     result['deleted'] = loop.run_until_complete(plugin.page_forget_person('10003'))
     result['at_once'] = files_with('阿星', archive=False)
+    result['keys_at_once'] = [(e.get('event_key'), e.get('merged_event_keys'))
+                              for e in plugin._event_archive(100, read_only=True)]
     result['prompt'] = ask('小爱 周末的副本谁去', '10001', '芒果', group=G1, reply='还不知道', msg_id='w3')
     result['after_a_turn'] = files_with('阿星', archive=False)
     plugin = new_plugin()                                      # a restart

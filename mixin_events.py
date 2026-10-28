@@ -1301,7 +1301,7 @@ class EventsMixin:
             return []
 
     _KEPT_TEXT_KEYS = ("text", "event", "title", "small_summary", "big_summary", "meaning_to_her", "reflection",
-                       "summary", "insight", "lesson")
+                       "summary", "insight", "lesson", "event_key")
 
     def _keep_record_text(self, record, what) -> bool:
         """Before an event or an insight is written: numbers out of its text; False when it

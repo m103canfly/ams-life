@@ -282,9 +282,12 @@ class Nightly(unittest.TestCase):
     def test_a_deleted_persons_name_everywhere_at_once(self):
         r = run_case('everywhere')
         self.assertIn('memory/library.json', r['before'])            # what others said of him, remembered
+        self.assertIn('archives/events.jsonl', r['before'])          # and an event whose key names him
+        self.assertIn(['柠檬约阿星打副本', ['阿星的副本局']], r['keys_before'])
         # the owner deletes him: nowhere she keeps things has his name any more, at once
         self.assertEqual(r['at_once'], [])
         self.assertIn('library', r['deleted']['data']['counts']['named'])
+        self.assertIn(['柠檬约某人打副本', ['某人的副本局']], r['keys_at_once'])   # the event's keys too
         # a reply before any restart: not in what she recalls, not written back anywhere
         self.assertNotIn('阿星', r['prompt'])
         self.assertIn('某人', r['prompt'])
