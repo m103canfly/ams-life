@@ -34,7 +34,9 @@
     </section>
     <section>
       <div class="lbl">线</div>
-      <div id="edgeBoxes" class="boxes"></div>
+      <label class="toggle"><input type="checkbox" id="allLines" /> 显示全部连线 <span class="muted">（只给检查用）</span></label>
+      <p class="hint">平常星之间不连线。她想起来的时候、或者你点开一颗星的时候，才连那几条。</p>
+      <p class="hint" id="lineCount"></p>
     </section>
     <section>
       <label class="lbl" for="winSel">窗口</label>
@@ -52,7 +54,7 @@
     <section class="legend">
       <div class="lbl">怎么看</div>
       <div class="legend-wins" id="legendWins"></div>
-      <p>每个群是一团同色的星；私聊里听到的是淡紫的空心星。</p>
+      <p>每个群是一团同色的星；私聊里听到的是淡紫的空心星。相关的星排在一起，但平常不连线。</p>
       <p>星系中心那一圈会呼吸的光是她的身体，越大越亮，数值越高。</p>
       <p>拖动转镜头，滚轮缩放，右键或按住 Shift 拖动平移。点一颗星飞过去。</p>
       <p>这一页只能看，不能改她。删东西请回原来的面板。</p>

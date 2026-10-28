@@ -19,6 +19,7 @@ import { TIERS } from './galaxy/quality/tiers';
 import { DAYLIGHT, DEEP_SPACE } from './galaxy/render/presets';
 import { CURVE_BOW } from './galaxy/render/linkCurves';
 import { elapsedFrameSeconds, frameDeltaSeconds } from './galaxy/timing/frameClock';
+import { SHOW_ALL_DEFAULT, TURN, baseLinesVisible, lineMap, openedLines, turnFrame, turnSteps } from './lines.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -59,9 +60,10 @@ let G = { nodes: [], links: [] }, idx = new Map(), adj = null, src = [];
 const posCache = new Map();
 let renderer = null, director = null, layout = null, graphRadius = 80, viewRadius = 300, tier = TIERS.high;
 let body = {}, liveBody = null;
-const filter = { kinds: new Set(Object.keys(KIND)), edges: new Set(Object.keys(EDGE)), win: '', vis: 'all', from: 24, to: 0 };
+const filter = { kinds: new Set(Object.keys(KIND)), win: '', vis: 'all', from: 24, to: 0 };
 let sel = -1, turn = -1, turnStart = 0, hits = null, hover = -1, coreSel = -1;
 let motion = true, dark = true, framed = false, settledOnce = false;
+let showAll = SHOW_ALL_DEFAULT, lines = new Map();
 const winColor = new Map();
 let overrides = new Map();
 
@@ -169,7 +171,6 @@ function rebuild(initial) {
 		fileSize: 0, tags: [], unresolved: n.vis === 'private' && n.kind !== 'window', tag: false }));
 	const links = [];
 	for (const e of raw.edges) {
-		if (!filter.edges.has(e.kind)) continue;
 		const s = idx.get(e.s), t = idx.get(e.t);
 		if (s === undefined || t === undefined) continue;
 		links.push({ source: s, target: t, kind: e.kind });
@@ -177,6 +178,7 @@ function rebuild(initial) {
 	}
 	G = { nodes, links };
 	adj = buildAdjacency(G);
+	lines = lineMap(links);
 	const R = seedRadius(nodes.length);
 	const positions = new Float32Array(nodes.length * 3);
 	keep.forEach((n, i) => {
@@ -257,24 +259,29 @@ function applyFocus() {
 	if (!renderer) return;
 	if (turn >= 0) { stepTurn(performance.now(), true); return; }
 	let weight = null, t1 = [];
-	if (sel >= 0) {
-		const nb = neighborhood(adj, sel, 1);
-		weight = (i) => (nb.depthOf.has(i) ? DIM.lit : DIM.rest);
-		t1 = nb.linkTier1;
+	if (sel >= 0) {   // an opened star calls up its lines while the drawer is open
+		t1 = openedLines(G.links, sel);
+		const near = new Set([sel]);
+		for (const li of t1) { near.add(G.links[li].source); near.add(G.links[li].target); }
+		weight = (i) => (near.has(i) ? DIM.lit : DIM.rest);
 	} else if (hits) {
 		weight = (i) => (hits.has(i) ? DIM.lit : DIM.rest);
 	} else if (filter.win) {
 		const set = windowFocusSet(filter.win);
 		weight = (i) => (set.has(i) ? DIM.lit : DIM.rest);
-		const w = idx.get(filter.win);
-		G.links.forEach((l, li) => { if (l.source === w || l.target === w) t1.push(li); });
 	}
 	renderer.setFocus(weight);
 	renderer.setSelectedLinks(t1, []);
+	lineAlpha(1);
+}
+// Galaxy View's highlight layer (its selMaterial, TypeScript-private) carries the
+// lines that are called up; its opacity is how a turn's lines fade out.
+function lineAlpha(a) {
+	if (renderer.selMaterial) renderer.selMaterial.opacity = 0.85 * a;
 }
 
 function updateStat() {
-	$('statLine').textContent = '显示 ' + G.nodes.length + ' / ' + rawById.size + ' 颗星 · ' + G.links.length + ' 条线';
+	$('statLine').textContent = '显示 ' + G.nodes.length + ' / ' + rawById.size + ' 颗星 · ' + G.links.length + ' 条关系';
 }
 
 // ------------------------------------------------------------------ renderer
@@ -421,10 +428,9 @@ const marks = {
 		const list = [];
 		if (turn >= 0) {
 			const { rec, held } = turnInfo();
-			const cycle = (rec.length + 3) * STEP + 2200;
-			const local = motion ? (t - turnStart) % cycle : cycle;
+			const local = t - turnStart;
 			rec.forEach((i, k) => {
-				if (local < k * STEP) return;
+				if (motion && local < k * STEP) return;
 				const fresh = motion ? Math.max(0, 1 - (local - k * STEP) / 900) : 0;
 				list.push([i, LIT, 0.05 * (1 + fresh * 1.6), 0.9]);
 			});
@@ -446,16 +452,16 @@ const marks = {
 	},
 };
 
-// Sparks: little lights running along the lines. Idle: random associations.
-// In a turn: along the path she took, in order (Galaxy View has no particles;
+// Sparks: little lights running along the lines that are called up: in a turn,
+// along the path she took, in order; when a star is opened, out along its lines (Galaxy View has no particles;
 // these follow its curved links).
 const sparks = {
 	pts: null, list: [], max: 64,
 	build() { this.pts = glowPoints(this.max); },
 	setPixelScale(v) { if (this.pts) this.pts.material.uniforms.uPixelScale.value = v; },
 	emit(a, b, color, dur, big) { if (this.list.length < this.max) this.list.push({ a, b, color, t0: performance.now(), dur, big }); },
-	ambient(t) {
-		if (!motion || turn >= 0 || !G.links.length || this.list.length > 24 || Math.random() > 0.3) return;
+	ambient(t) {   // only when every line is shown; otherwise lights run only along called-up lines
+		if (!showAll || !motion || turn >= 0 || !G.links.length || this.list.length > 24 || Math.random() > 0.3) return;
 		for (let tries = 0; tries < 6; tries++) {
 			const l = G.links[Math.floor(Math.random() * G.links.length)];
 			if (l.kind !== 'link' && Math.random() < 0.75) continue;
@@ -494,8 +500,8 @@ function curvePoint(s, t, u, P, k) {
 }
 
 // ------------------------------------------------------------------ turns
-const STEP = 600;   // ms between two recalled memories lighting up
-let turnLit = -1;
+const STEP = TURN.step;   // ms between two recalled memories lighting up
+let turnLit = -1, turnLines = -1;
 function turnInfo() {
 	const tr = raw.turns[turn];
 	const rec = (tr.recalled || []).map((id) => idx.get(id)).filter((i) => i !== undefined);
@@ -503,28 +509,29 @@ function turnInfo() {
 	const path = (tr.path || []).map((p) => [idx.get(p[0]), idx.get(p[1])]).filter((p) => p[0] !== undefined && p[1] !== undefined);
 	return { tr, rec, held, path, where: idx.get(tr.where) };
 }
+// A turn plays once: the recalled stars light up in order, a line appears with a
+// light running along it as she goes from one to the next, then the lines fade
+// and only the stars are left. With motion on, the next turn follows.
 function stepTurn(t, force) {
 	if (turn < 0) return;
 	const { rec, held, path, where } = turnInfo();
-	const cycle = (rec.length + 3) * STEP + 2200;
-	const local = motion ? (t - turnStart) % cycle : cycle;
-	const lit = Math.min(rec.length, Math.floor(local / STEP) + 1);
-	if (lit !== turnLit || force) {
-		turnLit = lit;
-		const on = new Set(rec.slice(0, lit));
+	const steps = turnSteps(lines, path, held);
+	const local = t - turnStart;
+	const f = turnFrame(steps, rec.length, local, motion);
+	if (f.done && !force && raw.turns.length > 1) { setTurn((turn + 1) % raw.turns.length); return; }
+	if (f.lit !== turnLit || f.lines.length !== turnLines || force) {
+		turnLit = f.lit; turnLines = f.lines.length;
+		const on = new Set(rec.slice(0, f.lit));
 		const heldSet = new Set(held);
 		renderer.setFocus((i) => (on.has(i) || i === where ? DIM.lit : heldSet.has(i) ? 0.9 : DIM.turnRest));
-		// the lines she went along, plus the held ones (drawn grey through their colour)
-		const want = new Set(path.map(([a, b]) => a + ':' + b).concat(path.map(([a, b]) => b + ':' + a)));
-		const t1 = [];
-		G.links.forEach((l, li) => { if (want.has(l.source + ':' + l.target)) t1.push(li); });
-		renderer.setSelectedLinks(t1, []);
+		renderer.setSelectedLinks(f.lines, []);
 	}
+	lineAlpha(f.alpha);
 	if (!motion) return;
-	path.forEach(([a, b], k) => {   // a spark along each step of the path, in order
+	steps.forEach(({ a, b }, k) => {   // a light along each line as it appears
 		const at = (k + 0.5) * STEP;
-		if (local >= at && local - at < 40 && !sparks.list.some((s) => s.a === a && s.b === b && t - s.t0 < STEP)) {
-			sparks.emit(a, b, held.includes(b) ? HELD : LIT, STEP * 1.4, true);
+		if (local >= at && local - at < 60 && !sparks.list.some((s) => s.a === a && s.b === b && t - s.t0 < STEP)) {
+			sparks.emit(a, b, LIT, STEP * 1.4, true);
 		}
 	});
 }
@@ -542,16 +549,16 @@ function setTurn(k) {
 		for (const i of rec) overrides.set(G.nodes[i].id, LIT);
 		for (const i of held) overrides.set(G.nodes[i].id, HELD);
 		if (tr.body) body = Object.assign({}, liveBody, tr.body);
-		turnStart = performance.now(); turnLit = -1;
+		turnStart = performance.now(); turnLit = -1; turnLines = -1;
 		sparks.list = [];
 		const missing = (tr.recalled || []).length + (tr.held || []).length - rec.length - held.length;
 		$('turnHint').textContent = fmtTime(tr.ts) + ' 在' + whereLabel(tr.where) + '：想起 ' + (tr.recalled || []).length +
-			' 条（金色，按顺序亮），' + ((tr.held || []).length ? (tr.held || []).length + ' 条她知道但在这里没说（灰的）。' : '没有被挡下的。') +
+			' 条（金色，按顺序亮，顺着线想过去），' + ((tr.held || []).length ? (tr.held || []).length + ' 条她知道但在这里没说（灰的）。' : '没有被挡下的。') +
 			(tr.body ? ' 中间的核是那一刻的身体。' : '') + (missing ? '（有 ' + missing + ' 条被筛掉了）' : '');
 		recolor();
 		frameIndices(rec.concat(held, where === undefined ? [] : [where]));
 	} else {
-		$('turnHint').textContent = '点一轮看她这次想起了谁。金色的是想起的，灰的是她知道、但在这里没说的。';
+		$('turnHint').textContent = '点一轮看她这次想起了谁。平常星之间不连线，她想起来时才连。';
 		recolor();
 	}
 	renderTurns();
@@ -706,8 +713,17 @@ function select(i, fly) {
 	if (turn >= 0) setTurn(-1);
 	sel = i;
 	applyFocus();
+	if (motion) for (const li of openedLines(G.links, i)) {   // its lines are called up: a light runs out along each
+		const l = G.links[li], other = l.source === i ? l.target : l.source;
+		sparks.emit(i, other, colorOf(G.nodes[other]).clone().lerp(new Color(1, 1, 1), 0.4), 1200, false);
+	}
 	openDrawer(src[i]);
-	if (fly) director.flyTo(nodePos(i), renderer.nodeRadius(i), () => director.beginFocusOrbit(null));
+	if (fly) {   // frame the star together with the stars its lines reach
+		const near = [i];
+		for (const li of openedLines(G.links, i)) { const l = G.links[li]; near.push(l.source === i ? l.target : l.source); }
+		if (near.length > 1) frameIndices(near);
+		else director.flyTo(nodePos(i), renderer.nodeRadius(i), () => director.beginFocusOrbit(null));
+	}
 }
 function selectId(id, fly) {
 	const i = idx.get(id);
@@ -767,8 +783,8 @@ function buildControls() {
 	const chip = { window: '#ff8a1f', person: hex(PERSON), memory: '#8cacc4', event: '#f2c14e', note: '#a78bfa' };
 	$('kindBoxes').innerHTML = Object.keys(KIND).map((k) => '<label><input type="checkbox" data-kind="' + k + '"' + (filter.kinds.has(k) ? ' checked' : '') + ' />' +
 		'<span class="chip" style="background:' + chip[k] + '"></span>' + KIND[k] + ' <span class="n">' + (count[k] || 0) + '</span></label>').join('');
-	$('edgeBoxes').innerHTML = Object.keys(EDGE).map((k) => '<label><input type="checkbox" data-edge="' + k + '"' + (filter.edges.has(k) ? ' checked' : '') + ' />' +
-		EDGE[k] + ' <span class="n">' + (ecount[k] || 0) + '</span></label>').join('');
+	$('lineCount').textContent = Object.keys(EDGE).map((k) => EDGE[k] + ' ' + (ecount[k] || 0)).join(' · ');
+	$('allLines').checked = showAll;
 	const wins = [...rawById.values()].filter((n) => n.kind === 'window');
 	const per = {};
 	for (const n of rawById.values()) if (n.where) per[n.where] = (per[n.where] || 0) + 1;
@@ -802,10 +818,7 @@ function wire() {
 		const k = ev.target.dataset.kind; if (!k) return;
 		ev.target.checked ? filter.kinds.add(k) : filter.kinds.delete(k); rebuildSoon();
 	});
-	$('edgeBoxes').addEventListener('change', (ev) => {
-		const k = ev.target.dataset.edge; if (!k) return;
-		ev.target.checked ? filter.edges.add(k) : filter.edges.delete(k); rebuildSoon();
-	});
+	$('allLines').addEventListener('change', () => { showAll = $('allLines').checked; sparks.list = []; });
 	$('winSel').addEventListener('change', () => {
 		filter.win = $('winSel').value;
 		select(-1);
@@ -911,6 +924,7 @@ function frame(now) {
 	sparks.update(now);
 	cores.update(now);
 	marks.update(now);
+	if (renderer.linkSegments) renderer.linkSegments.visible = baseLinesVisible(showAll);   // Galaxy View's layer of every line
 	renderer.render(d, ad);
 	updateLabels();
 	if (debug && (frames++ % 30 === 0)) $('statLine').dataset.debug = (layout instanceof WorkerForceLayout ? 'worker' : 'main') + ' ticks=' + layout.ticks + ' settled=' + layout.isSettled() + ' frames=' + frames;
@@ -921,6 +935,7 @@ async function boot() {
 	initTheme();
 	motion = storeGet('brain_motion') !== '0' && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 	if (params.get('motion') === '0') motion = false;
+	if (params.get('lines') === 'all') showAll = true;
 	$('motionBtn').classList.toggle('on', motion);
 	const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 	tier = TIERS[params.get('tier')] || (coarse || window.innerWidth < 820 ? TIERS.mobile : TIERS.high);

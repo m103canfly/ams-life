@@ -79,6 +79,77 @@ class ReadOnly(unittest.TestCase):
             self.assertIn(marker, bundle)
 
 
+class LinesOnlyWhenRecalled(unittest.TestCase):
+    """Stars stand alone; lines are drawn only when something is called up."""
+
+    def test_show_all_switch_is_off_by_default(self):
+        html = (PAGE / 'index.html').read_text(encoding='utf-8')
+        box = re.search(r'<input[^>]*id="allLines"[^>]*>', html).group(0)
+        self.assertNotIn('checked', box)
+        self.assertNotIn('edgeBoxes', html)
+        self.assertIn('export const SHOW_ALL_DEFAULT = false;', (SRC / 'lines.js').read_text(encoding='utf-8'))
+
+    def test_page_hides_the_base_layer_and_idle_sparks(self):
+        text = (SRC / 'brain.js').read_text(encoding='utf-8')
+        self.assertIn('renderer.linkSegments.visible = baseLinesVisible(showAll)', text)
+        self.assertIn('if (!showAll || !motion', text)   # no lights running along hidden lines
+
+
+@unittest.skipUnless(shutil.which('node'), 'Node.js not installed')
+class LineRules(unittest.TestCase):
+    """tools/brain/src/lines.js, run with Node."""
+
+    @classmethod
+    def setUpClass(cls):
+        script = r"""
+const L = await import(process.argv[1]);
+// stars 0..5; 5 is held back. links: 0-1 link, 1-2 link, 2-3 link, 3-5 link, 0-4 about
+const links = [{source:0,target:1,kind:'link'},{source:1,target:2,kind:'link'},{source:2,target:3,kind:'link'},
+  {source:3,target:5,kind:'link'},{source:0,target:4,kind:'about'}];
+const map = L.lineMap(links);
+const steps = L.turnSteps(map, [[0,1],[1,2],[2,3],[3,5]], [5]);
+const end = 4 * L.TURN.step + L.TURN.hold;
+const out = {
+  idle: L.baseLinesVisible(L.SHOW_ALL_DEFAULT), on: L.baseLinesVisible(true),
+  steps: steps.map((s) => s.line),
+  still: L.turnFrame(steps, 4, 0, false),
+  early: L.turnFrame(steps, 4, 0.6 * L.TURN.step, true),
+  mid: L.turnFrame(steps, 4, end, true),
+  fading: L.turnFrame(steps, 4, end + L.TURN.fade / 2, true),
+  gone: L.turnFrame(steps, 4, end + L.TURN.fade + 1, true),
+  over: L.turnFrame(steps, 4, L.turnLength(4), true),
+  openMemory: L.openedLines(links, 0), openPerson: L.openedLines(links, 4),
+};
+process.stdout.write(JSON.stringify(out));
+"""
+        out = subprocess.run(['node', '--input-type=module', '-e', script, (SRC / 'lines.js').as_uri()],
+                             capture_output=True, text=True, encoding='utf-8', timeout=60, check=True).stdout
+        cls.r = json.loads(out)
+
+    def test_no_lines_unless_switched_on(self):
+        self.assertFalse(self.r['idle'])
+        self.assertTrue(self.r['on'])
+
+    def test_a_turn_draws_only_its_own_path_and_never_to_the_held_star(self):
+        self.assertEqual(self.r['steps'], [0, 1, 2])          # 3-5 leads to the held star: no line
+        self.assertEqual(self.r['still']['lines'], [0, 1, 2])  # without motion: all of them, steady
+        self.assertEqual(self.r['still']['alpha'], 1)
+
+    def test_lines_appear_as_she_goes_then_fade(self):
+        self.assertEqual(self.r['early']['lines'], [0])
+        self.assertEqual(self.r['early']['lit'], 1)
+        self.assertEqual(self.r['mid']['lines'], [0, 1, 2])
+        self.assertEqual(self.r['mid']['alpha'], 1)
+        self.assertTrue(0 < self.r['fading']['alpha'] < 1)
+        self.assertEqual(self.r['gone']['lines'], [])
+        self.assertEqual(self.r['gone']['lit'], 4)            # the stars stay lit, only the lines go
+        self.assertTrue(self.r['over']['done'])
+
+    def test_an_opened_star_calls_up_its_associations(self):
+        self.assertEqual(self.r['openMemory'], [0])            # its association, not the about-line
+        self.assertEqual(self.r['openPerson'], [4])            # no associations: its own line
+
+
 @unittest.skipUnless(shutil.which('node'), 'Node.js not installed')
 class SampleFormat(unittest.TestCase):
     @classmethod
