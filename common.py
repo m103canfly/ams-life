@@ -312,6 +312,8 @@ LLM_FUNCTIONS = (
     "notebook",
     "relationship_narrative",
     "humor_hint",
+    # ams-life step 1-3: the group members she knows, once a night per group
+    "group_impressions",
 )
 LLM_FUNCTION_DEFAULTS = {
     "persona_compile": False,
@@ -328,6 +330,7 @@ LLM_FUNCTION_DEFAULTS = {
     "notebook": False,
     "relationship_narrative": False,
     "humor_hint": False,
+    "group_impressions": False,
 }
 INSIGHT_MIN_NEW_EVENTS = 3
 INSIGHT_COOLDOWN_SECONDS = 60 * 60

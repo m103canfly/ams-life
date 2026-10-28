@@ -84,6 +84,16 @@ class Rows(unittest.TestCase):
         self.assertEqual({r['note'] for r in self.reg.rows()}, {'owner:panel'})
         self.assertEqual(self.reg.owner_delete(source_ids=['m1'], place=G1), [0])
 
+    def test_no_impression_only_stops_impressions(self):
+        self.reg.stop_impression('10002')
+        self.assertFalse(self.reg.impression_allowed('10002', G1))
+        self.assertTrue(self.reg.impression_allowed('10001', G1))
+        self.assertTrue(self.reg.may_keep('10002', G1, at=50))       # what she remembers of him: untouched
+        self.assertEqual(self.reg.people(), set())
+        self.reg.stop_impression('10001', G2)
+        self.assertTrue(self.reg.impression_allowed('10001', G1))
+        self.assertFalse(self.reg.impression_allowed('10001', G2))
+
     def test_bad_rows(self):
         with self.assertRaises(ValueError):
             self.reg.add('nope', qq='1')
@@ -112,7 +122,7 @@ class Legacy(unittest.TestCase):
                 self.assertEqual(a, {'rows': 3, 'added': 3, 'already': 0, 'skipped': 0})
                 # marker row skipped, -5001 already there, 5003 new, entry-only row, cutoff for the same moment already there
                 self.assertEqual(b, {'rows': 5, 'added': 1, 'already': 2, 'skipped': 1, 'entry_rows': 1})
-                self.assertEqual(reg.stats(), {'qq': 1, 'source': 3, 'optout': 0, 'optin': 0, 'people': 1})
+                self.assertEqual(reg.stats(), {'qq': 1, 'source': 3, 'optout': 0, 'optin': 0, 'impression': 0, 'people': 1})
                 self.assertEqual(reg.why_not(fake.STAR, 'group:' + fake.G_BUSY, at=fake.T0 + 10), 'forgotten')
                 self.assertEqual(reg.why_not(source_id='5003', place='group:' + fake.G_BUSY), 'source')
                 self.assertTrue(reg.may_keep(fake.LEMON, 'group:' + fake.G_TEST, at=fake.T0 + 200))

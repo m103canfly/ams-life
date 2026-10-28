@@ -663,7 +663,7 @@
   }
 
   const LLM_FUNCTIONS=["persona_compile","event_summary","event_ranking","insight","memory_summary","image_caption",
-  "relationship_impression","repair_hint","empathy_hint","pragmatics_hint","tom_probe","notebook","relationship_narrative","humor_hint"];
+  "relationship_impression","repair_hint","empathy_hint","pragmatics_hint","tom_probe","notebook","relationship_narrative","humor_hint","group_impressions"];
   const MEM_SOURCE_LABELS={direct:"用户直述",media:"图片/语音",told:"转述",retrieved:"检索",inferred:"推断",unknown:"未标注"};
   const MEM_TIER_LABELS={hot:"HOT 热",warm:"WARM 温",cold:"COLD 冷"};
   const MEM_REL_FIELDS=[["trust","信任"],["closeness","亲近"],["conflict","冲突"],["repair","修复"],["predictability","可预测"]];
@@ -1159,8 +1159,52 @@
       (rows?'<div class="rel-events-list">'+rows+'</div>'
            :'<div class="empty-mini">暂无关联事件</div>')+'</div>';
   }
+  // step 1-3: the group members she knows; the owner can delete one (click twice), not edit
+  const impOps={};
+  function renderImpressions(){
+    const body=$("impBody"), empty=$("impEmpty");
+    if(!body) return;
+    const groups=(data&&Array.isArray(data.impressions))?data.impressions.filter(g=>g&&Array.isArray(g.people)&&g.people.length):[];
+    if(empty) empty.style.display=groups.length?"none":"block";
+    body.innerHTML=groups.map(g=>'<div class="imp-group"><small>'+esc(shortSession(String(g.place||"")))+'</small>'+
+      g.people.map(p=>{
+        const key=String(p.qq||""), armed=impOps[key]&&Date.now()-impOps[key]<5000;
+        const names=[p.name].concat(Array.isArray(p.aliases)?p.aliases:[]).filter(Boolean).join(" / ");
+        return '<div class="imp-row"><b>'+esc(names||key)+'</b>'+
+          '<span class="hint">'+esc(key)+' · '+Number(p.msgs||0)+' 句 · '+Number(p.days||0)+' 天</span>'+
+          (p.style?'<div>'+esc(p.style)+'</div>':'')+
+          (Array.isArray(p.topics)&&p.topics.length?'<div class="chips">'+p.topics.map(t=>'<span class="chip">'+esc(t)+'</span>').join("")+'</div>':'')+
+          '<button type="button" class="btn mini danger" data-imp-del="'+esc(key)+'">'+(armed?"再点确认删印象":"删印象")+'</button>'+
+          '<span class="mem-op-state" data-imp-state="'+esc(key)+'"></span></div>';
+      }).join("")+'</div>').join("");
+  }
+  const _impBody=$("impBody");
+  if(_impBody) _impBody.addEventListener("click",async (e)=>{
+    const b=e.target&&e.target.closest?e.target.closest("[data-imp-del]"):null;
+    if(!b) return;
+    const qq=String(b.dataset.impDel||"");
+    const state=_impBody.querySelector('[data-imp-state="'+qq+'"]');
+    if(!impOps[qq]||Date.now()-impOps[qq]>5000){
+      impOps[qq]=Date.now(); b.textContent="再点确认删印象";
+      if(state) state.textContent="5 秒内再点一次；只删她对这个人的印象，记忆不动，以后也不再写";
+      return;
+    }
+    delete impOps[qq];
+    if(!bridge){ if(state) state.textContent="未连接 AstrBot 页面桥，无法删除"; return; }
+    b.disabled=true;
+    try{
+      const raw=await bridge.apiPost("page/impressions/delete",{person:qq});
+      const payload=raw&&raw.data?raw.data:raw;
+      if(!payload||payload.status==="error"||payload.status==="fail") throw new Error((payload&&payload.message)||"删除失败");
+      if(state) state.textContent="已删除 "+Number((payload.data||{}).groups||0)+" 个群里的印象";
+      setTimeout(()=>{ try{ load(); }catch(err){} },900);
+    }catch(err){
+      b.disabled=false; if(state) state.textContent="失败："+String(err&&err.message||err);
+    }
+  });
   function renderRelationships(){
     bindForgetPerson();  // the delete box works with no relationship record too
+    renderImpressions();
     const sel=$("relUserFilter"), body=$("relBody"), empty=$("relEmpty"), hint=$("relStateHint");
     if(!sel||!body) return;
     const users=relationshipsValue();

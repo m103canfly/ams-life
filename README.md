@@ -32,7 +32,7 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | `forget_registry.py` | 遗忘登记：谁、哪条消息她不能再记（旧账号被要求忘记的，和维护者在面板里删的），写之前都先查 |
 | `vector_store.py` | 记忆的向量单独存一个 SQLite，按记忆 id，不再塞在记忆库的 JSON 里 |
 | `redline.py` | 红线词表 |
-| `impressions.py` | 群友印象（还没接进插件） |
+| `impressions.py` `mixin_impressions.py` | 群友印象：每晚给每个群当天常说话的人更新称呼、说话的样子、常聊什么（不存原话，每群每晚最多调 1 次模型，默认关闭）；回话时按分寸表放进“认识的人”一行；称呼也进匿名名单；面板里能看、能删 |
 | `mixin_memory.py` | 向量、记忆的存储、打分、召回、巩固 |
 | `mixin_events.py` | 事件档案：总结、值不值得记、去重、洞察 |
 | `mixin_people.py` | 她的本子（只由她自己写，每晚写一次，每条带出处）、每个人的记录和关系 |

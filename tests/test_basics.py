@@ -69,8 +69,9 @@ class Split(unittest.TestCase):
         # and 18 for her phone (on_message, windows, open loops per window, moving old body texts)
         # and 3 for the forget count (_forget_count, _begin_job, _job_stale)
         # step 1-3: -1 for /biocore, +18 for the forget registry, the owner's deletes, what
-        # else holds people's words, unique memory ids and the vector store
-        self.assertEqual(len(methods), 283)
+        # else holds people's words, unique memory ids and the vector store;
+        # +11 for the group members she knows (mixin_impressions, the panel's delete)
+        self.assertEqual(len(methods), 294)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

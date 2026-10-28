@@ -27,6 +27,12 @@ Every night, from that group's phone window (the last 24 hours):
   left out. The answer is JSON per code; every style line and topic is checked
   (red lines, judgements, numbers, length) and whatever fails is not kept -- the
   counts are kept either way.
+- what others call them: the same call is shown the lines others addressed to them
+  (an @ or a reply) and may propose names; a name is kept only when the program
+  finds it in the window: 2-6 Chinese characters, not an everyday form of address,
+  not part of someone else's group card, used by others at least twice when talking
+  to him (an @, a reply, or within 20 minutes of something he said); a name proposed
+  for two people goes for both.
 
 Where she may use it (``view``), after the discretion table, decided by the owner:
 in that group, all of it; in another group where he is present, only what he is
@@ -61,6 +67,10 @@ STYLE_CHARS = 60
 TOPIC_CHARS = (2, 8)
 MAX_TOPICS = 3
 MAX_PHRASES = 3
+MAX_ALIASES = 4
+ALIAS_MIN_USES = 2      # others called him that at least this often...
+ALIAS_NEAR = 20 * 60    # ...in an @, a reply, or this close to something he said
+ADDRESSED_LINES = 40    # lines others addressed to the picked people, shown to the model
 
 # what a person is, rather than how he talks: not hers to write down about anyone
 JUDGEMENT = re.compile(r"性格|人品|脾气|情商|智商|善良|自私|小气|大方|靠谱|不靠谱|好人|坏人|内向|外向|自卑|自信"
@@ -70,6 +80,12 @@ DIGITS = re.compile(r"[0-9０-９]")
 LONG_NUMBER = re.compile(r"\d{5,}")
 PART = re.compile(r"\[(图片|表情|语音|视频|文件|聊天记录|戳一戳|卡片|分享|位置|音乐|骰子|猜拳|名片|消息)\]")
 HAN = re.compile(r"[一-鿿]+")
+# how anyone is addressed: never kept as what someone in particular is called
+GENERIC_ALIASES = {"大佬", "群主", "管理", "老师", "兄弟", "姐妹", "宝贝", "宝宝", "大家", "各位", "朋友", "群友",
+                   "哥哥", "姐姐", "弟弟", "妹妹", "老哥", "老弟", "老妹", "大哥", "大姐", "同学", "亲爱的",
+                   "小爱", "爱弥斯", "机器人", "主人"}
+# what was masked: a topic like "有人的猫" says nothing about him
+MASKED = re.compile(r"有人|某人|[PQ]\d")
 GENERIC = {"哈哈", "哈哈哈", "哈哈哈哈", "什么", "这个", "那个", "我们", "你们", "他们", "就是", "还是", "可以", "没有",
            "不是", "感觉", "然后", "一个", "小爱", "知道", "现在", "今天", "怎么", "为什么", "真的", "好像", "已经",
            "是不是", "有没有", "不知道", "我也", "我是", "你是", "他是", "这么", "那么", "因为", "所以"}
@@ -103,6 +119,8 @@ def pick_people(lines, day, known=(), place="", registry=None, self_id=""):
             continue
         if registry is not None and not all(registry.may_keep(qq, place, ln.get("ts")) for ln in own):
             continue
+        if registry is not None and hasattr(registry, "impression_allowed") and not registry.impression_allowed(qq, place):
+            continue  # the owner deleted what she thinks of him
         picked.append({"qq": qq, "name": names.get(qq, ""), "count": len(own), "lines": own})
     picked.sort(key=lambda p: (-p["count"], p["qq"]))
     return picked[:MAX_PEOPLE]
@@ -166,7 +184,26 @@ def group_names(lines=(), people=None) -> dict:
     return out
 
 
-def material(picked, names=None) -> tuple:
+def addressed(lines, picked, day, self_id=""):
+    """Lines others said to the picked people today: an @ of their name, or a reply to one
+    of their messages. (What the model looks at for what they are called.)"""
+    names = {p["qq"]: [n for n in [p.get("name")] if n and len(n) >= 2] for p in picked}
+    mine = {str(ln.get("msg_id") or ""): p["qq"] for p in picked for ln in p["lines"] if ln.get("msg_id")}
+    out = []
+    for ln in lines or []:
+        who = str(ln.get("sender_id") or "")
+        if not isinstance(ln, dict) or ln.get("role") == "assistant" or who == str(self_id) or _day(ln.get("ts")) != day:
+            continue
+        text = str(ln.get("text") or "")
+        to = mine.get(str(ln.get("reply_to") or ""))
+        if not to:
+            to = next((q for q, ns in names.items() if any("@" + n in text for n in ns)), None)
+        if to and to != who:
+            out.append(ln)
+    return out[-ADDRESSED_LINES:]
+
+
+def material(picked, names=None, said_to=()) -> tuple:
     """(text for the model, {code: qq}). Each picked person a code P1, P2...; everyone else in
     the group the model only sees mentioned gets Q1, Q2... -- every name anyone in the group
     goes by (`names`, from group_names) and every @ becomes a code, long numbers '#', pictures
@@ -196,6 +233,21 @@ def material(picked, names=None) -> tuple:
             text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
             text = re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
             out.append("- " + text[:LINE_CHARS])
+    shown = []
+    for ln in said_to or ():
+        text = str(ln.get("text") or "")
+        if redline.hit(text):
+            continue
+        for qq, c in qqs:
+            text = text.replace(qq, c)
+        for name, c in swaps:
+            text = text.replace(name, c)
+        text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
+        text = re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
+        shown.append("- " + text[:LINE_CHARS])
+    if shown:
+        out.append("别人对他们说的话：")
+        out.extend(shown)
     return "\n".join(out), codes
 
 
@@ -203,14 +255,15 @@ PROMPT = """下面是一个群里几位群友今天说的话，每个人用代�
 请给每个代号写两样东西：
 - style：他说话的样子，一句话，不超过 60 个字。只写语气、用词、节奏、爱用的表达，比如“说话很快，爱用语气词，常接别人的梗”。
 - topics：他今天常聊的话题，最多 3 个，每个 2 到 8 个字。
+- aliases：别人在聊天里怎么叫他（外号、昵称，2 到 6 个字），只写真的有人这样叫他的；没有就留空。
 不要写数字；不要评价这个人是什么样的人（性格、人品、聪明不聪明）；不要写健康、钱、感情、家里的事、长相、工作学业；看不出来就留空。
-只输出一个 JSON，不要别的文字，格式：{"P1": {"style": "...", "topics": ["...", "..."]}}
+只输出一个 JSON，不要别的文字，格式：{"P1": {"style": "...", "topics": ["...", "..."], "aliases": ["..."]}}
 
 """
 
 
-def prompt_for(picked, names=None) -> tuple:
-    text, codes = material(picked, names)
+def prompt_for(picked, names=None, said_to=()) -> tuple:
+    text, codes = material(picked, names, said_to)
     return PROMPT + text, codes
 
 
@@ -225,16 +278,56 @@ def check_style(text) -> str:
 def check_topic(text) -> str:
     t = str(text or "").strip()
     lo, hi = TOPIC_CHARS
-    if not (lo <= len(t) <= hi) or DIGITS.search(t) or JUDGEMENT.search(t) or redline.hit(t):
+    if not (lo <= len(t) <= hi) or DIGITS.search(t) or JUDGEMENT.search(t) or redline.hit(t) or MASKED.search(t):
         return ""
     return t
 
 
 def check_alias(text) -> str:
-    """2-6 Chinese characters or 2-10 plain letters/digits, not over a red line."""
+    """2-6 Chinese characters or 2-10 plain letters/digits, not over a red line, not how
+    anyone is addressed."""
     t = str(text or "").strip()
     ok = re.fullmatch(r"[一-鿿]{2,6}", t) or re.fullmatch(r"[A-Za-z0-9_]{2,10}", t)
-    return t if ok and not redline.hit(t) and not JUDGEMENT.search(t) else ""
+    return t if ok and t not in GENERIC_ALIASES and not redline.hit(t) and not JUDGEMENT.search(t) else ""
+
+
+def verify_aliases(proposed, lines, cards, day) -> dict:
+    """{qq: [names]} kept from what the model proposed: each found in the window as said by
+    others to him -- an @, a reply to him, or within ALIAS_NEAR of a line of his -- at
+    least ALIAS_MIN_USES times; not part of anyone else's group card (`cards`: {qq: names});
+    a name proposed for two people goes for both."""
+    today = [ln for ln in lines or [] if isinstance(ln, dict) and ln.get("role") != "assistant"
+             and _day(ln.get("ts")) == day]
+    owner_of = {}
+    for qq, names in proposed.items():
+        for n in names:
+            owner_of.setdefault(n, set()).add(qq)
+    out = {}
+    for qq, names in proposed.items():
+        his = [ln for ln in today if str(ln.get("sender_id") or "") == qq]
+        his_ids = {str(ln.get("msg_id") or "") for ln in his if ln.get("msg_id")}
+        his_times = [float(ln.get("ts") or 0) for ln in his]
+        his_cards = [c for c in cards.get(qq, ()) if c]
+        kept = []
+        for n in names:
+            if len(owner_of.get(n, ())) > 1:
+                continue
+            if any(n in c or c in n for other, cs in cards.items() if other != qq for c in cs if len(c) >= 2):
+                continue
+            uses = 0
+            for ln in today:
+                if str(ln.get("sender_id") or "") == qq or n not in str(ln.get("text") or ""):
+                    continue
+                t = float(ln.get("ts") or 0)
+                to_him = str(ln.get("reply_to") or "") in his_ids or any("@" + c in str(ln.get("text") or "")
+                                                                        for c in his_cards)
+                if to_him or any(abs(t - h) <= ALIAS_NEAR for h in his_times):
+                    uses += 1
+            if uses >= ALIAS_MIN_USES:
+                kept.append(n)
+        if kept:
+            out[qq] = kept
+    return out
 
 
 def parse_answer(text, codes) -> dict:
@@ -252,8 +345,9 @@ def parse_answer(text, codes) -> dict:
             continue
         style = check_style(item.get("style"))
         topics = [t for t in (check_topic(x) for x in (item.get("topics") or [])[:MAX_TOPICS * 2]) if t][:MAX_TOPICS]
-        if style or topics:
-            out[qq] = {"style": style, "topics": topics}
+        aliases = [a for a in (check_alias(x) for x in (item.get("aliases") or [])[:MAX_ALIASES * 2]) if a][:MAX_ALIASES]
+        if style or topics or aliases:
+            out[qq] = {"style": style, "topics": topics, "aliases": aliases}
     return out
 
 
@@ -381,12 +475,15 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="") -> d
         add_day(rec, p["name"], day_stats(p["lines"], others), day)
     data["tried"] = day
     store.save(place, data)
-    prompt, codes = prompt_for(picked, group_names(lines, data["people"]))
+    cards = group_names(lines, data["people"])
+    prompt, codes = prompt_for(picked, cards, addressed(lines, picked, day, self_id))
     try:
         answer = await ask(prompt)
     except Exception as exc:  # counted as the day's call all the same
         return {"called": 1, "picked": len(picked), "written": 0, "error": type(exc).__name__}
     got = parse_answer(answer, codes)
+    names_seen = verify_aliases({qq: item["aliases"] for qq, item in got.items() if item.get("aliases")},
+                                lines, {q: [n for n in ns if n] for q, ns in group_names(lines).items()}, day)
     data = store.load(place)
     for qq, item in got.items():
         rec = data["people"].get(qq)
@@ -396,6 +493,8 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="") -> d
             continue  # deleted while the model was answering
         rec["style"] = item["style"] or rec.get("style", "")
         rec["topics"] = item["topics"] or rec.get("topics", [])
+        if names_seen.get(qq):
+            rec["aliases"] = list(dict.fromkeys(list(rec.get("aliases") or []) + names_seen[qq]))[-MAX_ALIASES:]
         rec["updated"] = day
     store.save(place, data)
     return {"called": 1, "picked": len(picked), "written": len(got), "rejected": len(codes) - len(got)}
@@ -441,53 +540,14 @@ def describe(v) -> str:
 # ----------------------------------------------------------------------
 # From the old companion (tools/import_old.py bundle: people.jsonl, groups.jsonl)
 # ----------------------------------------------------------------------
-_OLD_STATS = {"口头禅": "phrases", "在本群的消息条数": "msgs", "带图比例": "image_ratio", "常在的时段": "hours",
-              "平均字数": "avg_chars"}
-# the old group profile's numbers; its group name and "these days" summaries are not carried over
-_OLD_GROUP_STATS = {"消息条数": "msgs", "工作日最热闹的时段": "weekday_hours", "周末最热闹的时段": "weekend_hours",
-                    "平均字数": "avg_chars", "带图比例": "image_ratio", "说话人数": "speakers", "常聊的话题词": "topics"}
-
-
-def _mask(text, names) -> str:
-    """Long numbers -> '#', anyone's name or alias in that group -> '有人'."""
-    out = LONG_NUMBER.sub("#", str(text or ""))
-    for name in sorted({n for n in names if len(n) >= 2}, key=len, reverse=True):
-        out = out.replace(name, discretion.SOMEONE)
-    return out
-
-
-def from_bundle(store, people=(), groups=(), registry=None, day="") -> dict:
-    """Old member cards, how people were called and group profiles -> people/ files.
-    Everything is checked again (style line, aliases, red lines); 'something he said
-    recently' is not carried over (it may be his words)."""
+def from_bundle(store, people=(), registry=None, day="") -> dict:
+    """What the old companion found people were called (tools/import_old.py: aliases.jsonl)
+    -> people/ files: name and aliases only, each alias checked again. Nothing else of the
+    old companion is carried over (the owner's decision): what she thinks of each group and
+    each person grows from the replay and from her own nights."""
     counts = Counter()
     day = day or time.strftime("%Y-%m-%d")
-    people = list(people or ())
-    names = {}  # place -> every name and alias anyone goes by there (old cards and what is kept)
-    for p in people:
-        names.setdefault(str(p.get("place") or ""), set()).update(
-            str(n) for n in [p.get("name")] + list(p.get("aliases") or []) if n)
-    for g in groups or ():
-        place = str(g.get("place") or "")
-        if not place.startswith("group:"):
-            counts["group_no_place"] += 1
-            continue
-        data = store.load(place)
-        known = set(names.get(place, ()))
-        for their_names in group_names((), data["people"]).values():
-            known.update(their_names)
-        text = _mask(g.get("text"), known)
-        old = g.get("stats") or {}
-        stats = {new: old[key] for key, new in _OLD_GROUP_STATS.items() if key in old}
-        if isinstance(stats.get("topics"), list):
-            stats["topics"] = [t for t in (check_topic(_mask(x, known)) for x in stats["topics"])
-                               if t and t != discretion.SOMEONE][:8]
-        data["group"] = {"text": "" if redline.hit(text) or JUDGEMENT.search(text) else text,
-                         "stats": stats, "from": g.get("from"), "to": g.get("to"),
-                         "origin": discretion.make_origin(place, [], []), "updated": day}
-        store.save(place, data)
-        counts["groups"] += 1
-    for p in people:
+    for p in people or ():
         place, qq = str(p.get("place") or ""), str(p.get("qq") or "")
         if not place.startswith("group:") or not qq:
             counts["person_no_place"] += 1
@@ -495,19 +555,16 @@ def from_bundle(store, people=(), groups=(), registry=None, day="") -> dict:
         if registry is not None and not registry.may_keep(qq, place):
             counts["person_forgotten"] += 1
             continue
+        aliases = [a for a in (check_alias(x) for x in p.get("aliases") or []) if a]
+        if not aliases:
+            counts["no_alias_left"] += 1
+            continue
         data = store.load(place)
         rec = data["people"].setdefault(qq, _record(place, qq))
-        rec["name"] = str(p.get("name") or rec.get("name") or "")
-        rec["aliases"] = [a for a in (check_alias(x) for x in p.get("aliases") or []) if a]
-        rec["style"] = check_style(p.get("style"))
-        old = p.get("stats") or {}
-        stats = {new: old[key] for key, new in _OLD_STATS.items() if key in old}
-        if "phrases" in stats:
-            stats["phrases"] = clean_phrases(x for x in stats["phrases"] if isinstance(x, str))
-        rec["stats"] = dict(rec.get("stats") or {}, **stats)
-        rec["since"] = rec.get("since") or str(p.get("from") or day)
+        rec["name"] = rec.get("name") or str(p.get("name") or "")
+        rec["aliases"] = list(dict.fromkeys(list(rec.get("aliases") or []) + aliases))[-MAX_ALIASES:]
+        rec["since"] = rec.get("since") or day
         rec["updated"] = day
         store.save(place, data)
         counts["people"] += 1
-        counts["people_style_dropped"] += 0 if rec["style"] or not p.get("style") else 1
     return dict(counts)

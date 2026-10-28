@@ -342,6 +342,8 @@ class PagesMixin:
                          "the owner deletes one memory and everything from its messages")
                 register("/astrbot_plugin_ams_life/page/forget/person", self.page_forget_person, ["POST"],
                          "the owner deletes a person everywhere")
+                register("/astrbot_plugin_ams_life/page/impressions/delete", self.page_impression_delete, ["POST"],
+                         "the owner deletes what she thinks of someone")
                 register("/astrbot_plugin_ams_life/page/memory/restore/<path:session>/<entry_id>",
                          self.page_memory_restore, ["POST"], "BioCore memory restore")
         except Exception as exc:
@@ -526,6 +528,25 @@ class PagesMixin:
             if counts is None:
                 return {"status": "error", "message": "memory entry not found", "data": {}}
             return {"status": "ok", "data": {"id": entry_id, "deleted": True, "counts": counts}}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)[:180], "data": {}}
+
+    async def page_impression_delete(self, person=None):
+        """The owner deletes what she thinks of someone (panel only; the page asks to confirm
+        first): {"person": "<qq>"}. Every group; noted, so she does not write one again. What
+        she remembers of him stays (deleting the person is page/forget/person)."""
+        if person is None:
+            try:
+                from quart import request
+                body = await request.get_json(silent=True) or {}
+            except Exception:
+                body = {}
+            person = body.get("person") if isinstance(body, dict) else ""
+        person = str(person or "").strip()
+        if not person or not person.isdigit():
+            return {"status": "error", "message": "person must be a QQ number", "data": {}}
+        try:
+            return {"status": "ok", "data": {"person": person, "groups": self._owner_forget_impression(person)}}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
 
@@ -742,6 +763,9 @@ class PagesMixin:
             # audit rows, and per-user relationship state/trajectory/maps.
             "memory_index": _memory_index_rows(MEMORY_DIR),
             "relationships": _relationship_rows(USER_DIR),
+            # ams-life step 1-3: the group members she knows, per group (read-only; the
+            # owner can delete what she thinks of someone, never rewrite it)
+            "impressions": self._impressions_for_page(),
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,
                 **dict(getattr(self, "_last_memory_meta", {}) or {})},

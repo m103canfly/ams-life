@@ -74,7 +74,7 @@ class DiscretionMixin:
         snap = getattr(self, "_forget_snap", None)
         if not snap or snap[0] != seq:
             rows = reg.rows()
-            snap = self._forget_snap = (seq, {r["qq"] for r in rows if r["kind"] != "source"},
+            snap = self._forget_snap = (seq, {r["qq"] for r in rows if r["kind"] in ("qq", "optout", "optin")},
                                         {r["source_id"] for r in rows if r["kind"] == "source"})
         return snap[1], snap[2]
 
@@ -427,7 +427,19 @@ class DiscretionMixin:
             counts["relationship_text"] = self._forget_relationship_text(
                 others - {person}, set(ids) | gone | gone_events)
 
-        # 7) what else may hold their words: picture descriptions, the dedupe log, the
+        # 7) what she thinks of the people in each group: a person, in every group; by
+        #    message, what the model wrote about its authors there (it may come from it)
+        if hasattr(self, "_impression_store"):
+            store = self._impression_store()
+            if person:
+                counts["impressions"] = store.forget_person(person)
+            for place in places:
+                if place.startswith("group:"):
+                    for who in involved - {person, "self", ""}:
+                        if (ids or entry_ids) and store.forget_message_by(place, who):
+                            counts["impressions"] = counts.get("impressions", 0) + 1
+
+        # 8) what else may hold their words: picture descriptions, the dedupe log, the
         #    in-process vector cache (texts as keys)
         counts["pictures"] = self._forget_pictures(pictures)
         self._forget_dedupe_rows(gone_events)

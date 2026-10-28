@@ -17,8 +17,11 @@ DAY = '2026-10-04'
 T = time.mktime(time.strptime(DAY + ' 20:00:00', '%Y-%m-%d %H:%M:%S'))
 
 
-def line(qq, name, text, i=0, day_offset=0, role='user'):
-    return {'ts': T + i * 60 + day_offset * 86400, 'role': role, 'sender_id': qq, 'sender_name': name, 'text': text}
+def line(qq, name, text, i=0, day_offset=0, role='user', msg_id=''):
+    out = {'ts': T + i * 60 + day_offset * 86400, 'role': role, 'sender_id': qq, 'sender_name': name, 'text': text}
+    if msg_id:
+        out['msg_id'] = msg_id
+    return out
 
 
 def window():
@@ -92,18 +95,55 @@ class Answer(unittest.TestCase):
     def test_checks(self):
         codes = {'P1': '10002', 'P2': '10001', 'P3': '10005'}
         answer = '好的：' + json.dumps({
-            'P1': {'style': '说话很快，爱用“冲鸭”，常接别人的梗', 'topics': ['抽卡', '副本', '工资', '一起打3个本']},
+            'P1': {'style': '说话很快，爱用“冲鸭”，常接别人的梗', 'topics': ['抽卡', '副本', '工资', '一起打3个本'],
+                   'aliases': ['柠柠', '大佬', 'x']},
             'P2': {'style': '性格内向，说话慢', 'topics': []},          # a judgement: nothing kept
             'P3': {'style': '每天说 30 句', 'topics': ['美食']},        # a number: style dropped, topic kept
         }, ensure_ascii=False) + ' 以上'
         got = im.parse_answer(answer, codes)
-        self.assertEqual(got['10002'], {'style': '说话很快，爱用“冲鸭”，常接别人的梗', 'topics': ['抽卡', '副本']})
+        self.assertEqual(got['10002'], {'style': '说话很快，爱用“冲鸭”，常接别人的梗', 'topics': ['抽卡', '副本'],
+                                        'aliases': ['柠柠']})         # 大佬: how anyone is addressed
         self.assertNotIn('10001', got)
-        self.assertEqual(got['10005'], {'style': '', 'topics': ['美食']})
+        self.assertEqual(got['10005'], {'style': '', 'topics': ['美食'], 'aliases': []})
         self.assertEqual(im.parse_answer('不是 JSON', codes), {})
         self.assertEqual(im.check_style('x' * 61), '')
         self.assertEqual(im.check_alias('柠柠'), '柠柠')
         self.assertEqual(im.check_alias('a'), '')
+
+    def test_masked_topics_say_nothing(self):
+        for masked in ('有人的猫', '某人家', 'P1的号', '和Q2打本'):
+            self.assertEqual(im.check_topic(masked), '', masked)
+        self.assertEqual(im.check_topic('养猫'), '养猫')
+
+
+class Aliases(unittest.TestCase):
+    def lines(self):
+        ls = [line('10002', '柠檬', '我来啦', i * 30, msg_id='m%d' % i) for i in range(3)]
+        ls += [line('10001', '芒果', '@柠檬 柠柠快来打本', 2),                 # an @ to her
+               dict(line('10003', '阿星', '柠柠你抽到了吗', 4), reply_to='m1'),  # a reply to her
+               line('10005', '路人', '柠柠在吗', 300),                          # far from anything she said
+               line('10001', '芒果', '芒芒说的', 5)]
+        return ls
+
+    def test_found_twice_when_talking_to_him(self):
+        cards = {'10002': ['柠檬'], '10001': ['芒果'], '10003': ['阿星'], '10005': ['路人']}
+        got = im.verify_aliases({'10002': ['柠柠', '冲冲']}, self.lines(), cards, DAY)
+        self.assertEqual(got, {'10002': ['柠柠']})                          # 冲冲: nobody called her that
+        once = [ln for ln in self.lines() if ln['sender_id'] != '10003']
+        self.assertEqual(im.verify_aliases({'10002': ['柠柠']}, once, cards, DAY), {})   # only once near her
+
+    def test_two_people_one_name_goes_for_both_and_cards_win(self):
+        cards = {'10002': ['柠檬'], '10001': ['芒果']}
+        self.assertEqual(im.verify_aliases({'10002': ['柠柠'], '10001': ['柠柠']}, self.lines(), cards, DAY), {})
+        self.assertEqual(im.verify_aliases({'10002': ['芒果']}, self.lines(), cards, DAY), {})
+
+    def test_the_model_sees_what_others_said_to_them_as_codes(self):
+        picked = im.pick_people([line('10002', '柠檬', '在的', i, msg_id='m%d' % i) for i in range(12)], DAY)
+        said_to = im.addressed(self.lines(), picked, DAY)
+        text, _codes = im.material(picked, {'10001': {'芒果'}, '10003': {'阿星'}}, said_to)
+        self.assertIn('别人对他们说的话', text)
+        self.assertIn('@P1 柠柠快来打本', text)       # the unknown name stays for the model to find
+        self.assertNotIn('芒果', text)
 
 
 class Nightly(unittest.TestCase):
@@ -223,47 +263,21 @@ class View(unittest.TestCase):
         self.assertEqual(im.describe(None), '')
 
 
-class OldCards(unittest.TestCase):
-    def test_from_bundle(self):
-        people = [
-            {'place': G1, 'qq': '10001', 'name': '芒果', 'aliases': ['芒芒', 'x'], 'style': '说话很快，爱用语气词',
-             'stats': {'口头禅': ['哼哼', '工资'], '在本群的消息条数': 120, '最近说过的一件事': '他说的一句话'},
-             'from': '2026-10-04'},
-            {'place': G1, 'qq': '10002', 'name': '柠檬', 'aliases': [], 'style': '性格开朗', 'stats': {}},
-            {'place': G1, 'qq': '10003', 'name': '阿星', 'aliases': [], 'style': '爱发猫图', 'stats': {}},
-            {'place': 'private:10001', 'qq': '10001', 'name': '芒果', 'aliases': [], 'style': '', 'stats': {}},
-        ]
-        groups = [{'place': G1, 'text': '一个爱聊抽卡的游戏群', 'stats': {}, 'from': '2026-10-04', 'to': '2026-10-26'}]
+class OldNames(unittest.TestCase):
+    def test_from_bundle_only_names(self):
+        bundle = [{'place': G1, 'qq': '10002', 'name': '柠檬', 'aliases': ['柠柠', '大佬', 'x']},
+                  {'place': G1, 'qq': '10003', 'name': '阿星', 'aliases': ['星星']},
+                  {'place': G1, 'qq': '10005', 'name': '路人', 'aliases': ['各位']},
+                  {'place': 'private:10001', 'qq': '10001', 'name': '芒果', 'aliases': ['芒芒']}]
         with tempfile.TemporaryDirectory() as tmp, fr.ForgetRegistry() as reg:
             reg.forget_person('10003', G1, stamp=0)
             store = im.Store(Path(tmp) / 'people')
-            counts = im.from_bundle(store, people, groups, registry=reg, day='2026-10-28')
-            self.assertEqual(counts, {'groups': 1, 'people': 2, 'people_style_dropped': 1, 'person_forgotten': 1,
-                                      'person_no_place': 1})
-            data = store.load(G1)
-            mango = data['people']['10001']
-            self.assertEqual((mango['aliases'], mango['style']), (['芒芒'], '说话很快，爱用语气词'))
-            self.assertEqual(mango['stats'], {'phrases': ['哼哼'], 'msgs': 120})
-            self.assertEqual(data['people']['10002']['style'], '')
-            self.assertNotIn('10003', data['people'])
-            self.assertEqual(data['group']['text'], '一个爱聊抽卡的游戏群')
-            self.assertNotIn('他说的一句话', store.path(G1).read_text('utf-8'))
-
-    def test_old_group_profile_hides_numbers_and_names(self):
-        people = [{'place': G1, 'qq': '10001', 'name': '芒果', 'aliases': [], 'style': '', 'stats': {}},
-                  {'place': G1, 'qq': '10002', 'name': '柠檬', 'aliases': ['柠柠'], 'style': '', 'stats': {}}]
-        groups = [{'place': G1, 'text': '芒果常发 123456789 的那个群，柠柠也在',
-                   'stats': {'群': '某某群 900001', '消息条数': 100, '这几天的摘要': ['芒果说了一件事'],
-                             '常聊的话题词': ['抽卡', '芒果', '工资', '900001'], '说话人数': 12}}]
-        with tempfile.TemporaryDirectory() as tmp:
-            store = im.Store(Path(tmp) / 'people')
-            im.from_bundle(store, people, groups, day='2026-10-28')
-            group = store.load(G1)['group']
-            self.assertEqual(group['text'], '有人常发 # 的那个群，有人也在')
-            self.assertEqual(group['stats'], {'msgs': 100, 'topics': ['抽卡'], 'speakers': 12})
-            raw = store.path(G1).read_text('utf-8')
-            for gone in ('123456789', '这几天', '某某群', '一件事'):
-                self.assertNotIn(gone, raw)
+            counts = im.from_bundle(store, bundle, registry=reg, day='2026-10-28')
+            self.assertEqual(counts, {'people': 1, 'person_forgotten': 1, 'no_alias_left': 1, 'person_no_place': 1})
+            rec = store.load(G1)['people']['10002']
+            self.assertEqual((rec['name'], rec['aliases'], rec['style'], rec['topics'], rec['stats']),
+                             ('柠檬', ['柠柠'], '', [], {}))
+            self.assertNotIn('group', store.load(G1))
 
 
 if __name__ == '__main__':

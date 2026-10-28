@@ -253,7 +253,7 @@ def _memory_lines(memory, memory_meta=None, answer_confidence=None) -> str:
 def render_compact(core, memory="", events="", notebook=None, user=None,
                    image="", kb="", voice="", memory_meta=None,
                    open_loops=None, answer_confidence=None,
-                   continuity=None, owner_rules=None, private_with_him=False) -> str:
+                   continuity=None, owner_rules=None, private_with_him=False, people=None) -> str:
     """The block the reply model sees with each message, one line per kind.
 
     ams-life step 1-2: every line only describes (her state, how she stands with
@@ -268,6 +268,9 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
     rel = relation_brief(user, private_with_him)
     if rel:
         out.append("[她跟对方] " + rel)
+    known = "；".join(t for t in (_line(x, 90) for x in (people or [])) if t)
+    if known:
+        out.append("[认识的人] " + known[:400])
     mem = _memory_lines(memory, memory_meta, answer_confidence)
     if mem:
         out.append("[她想起来的] " + mem)
