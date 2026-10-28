@@ -88,9 +88,26 @@ class DiscretionMixin:
             ids = {str(x) for x in (source_ids or ()) if str(x or "").strip()}
             if "*" not in gone_people and not (people & gone_people) and not (ids & gone_ids):
                 return True
-            return self._registry().may_keep_all(sorted(people), place, at, sorted(ids))
+            return self._registry_keeps(self._registry(), people, place, at, ids)
         except Exception as exc:
             raise forget_registry.Unreadable(str(exc)) from exc
+
+    @staticmethod
+    def _registry_keeps(reg, people=(), place="", at=None, source_ids=()) -> bool:
+        """The registry's own answer (reg: hers, or a copy of it made in another thread)."""
+        people = {str(x) for x in (people or ()) if str(x or "").strip()}
+        ids = {str(x) for x in (source_ids or ()) if str(x or "").strip()}
+        return reg.may_keep_all(sorted(people), place, at, sorted(ids))
+
+    @staticmethod
+    def _origin_args(item) -> tuple:
+        """(people, place, at, source_ids): what the registry is asked about an item."""
+        o = discretion.origin_of(item)
+        try:
+            at = float(item.get("ts")) if item.get("ts") is not None else None
+        except (TypeError, ValueError):
+            at = None
+        return o["people"], o["where"], at, o["source_ids"]
 
     def _new_item_kept(self, item) -> bool:
         """One new item (an event, an insight): may it be written? Not when the registry
@@ -106,12 +123,7 @@ class DiscretionMixin:
         forget_registry.Unreadable when the registry cannot be read."""
         if not isinstance(item, dict):
             return True
-        o = discretion.origin_of(item)
-        try:
-            at = float(item.get("ts")) if item.get("ts") is not None else None
-        except (TypeError, ValueError):
-            at = None
-        return self._may_keep(o["people"], o["where"], at, o["source_ids"])
+        return self._may_keep(*self._origin_args(item))
 
     def _check_registry(self, event) -> bool:
         """The message this job is about: may she keep anything of it? If not, nothing this
@@ -319,7 +331,7 @@ class DiscretionMixin:
                 tmp = path.with_suffix(".tmp")
                 tmp.write_text(json.dumps(new, ensure_ascii=False, indent=None if path == MEMORY_LIBRARY_PATH else 1),
                                encoding="utf-8")
-                os.replace(str(tmp), str(path))
+                atomic_file.replace(tmp, path)
                 counts[what] = counts.get(what, 0) + 1
 
         if MEMORY_LIBRARY_PATH.exists():
@@ -347,7 +359,7 @@ class DiscretionMixin:
                 archive(path)
                 tmp = path.with_suffix(".tmp")
                 tmp.write_text("".join(x + "\n" for x in out), encoding="utf-8")
-                os.replace(str(tmp), str(path))
+                atomic_file.replace(tmp, path)
                 counts["events"] = counts.get("events", 0) + 1
         if isinstance(getattr(self, "self_model", None), dict):
             new = self._scrub_tree(self.self_model, scrub)
@@ -418,7 +430,7 @@ class DiscretionMixin:
                 archive(path, "")
                 tmp = path.with_suffix(".tmp")
                 tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
-                os.replace(str(tmp), str(path))
+                atomic_file.replace(tmp, path)
                 counts[what] = len(lines) - len(kept)
         if isinstance(getattr(self, "self_model", None), dict):
             dropped = sum(1 for key in ("notebook", "narrative_items", "diary", "relationship_narratives")
@@ -578,6 +590,8 @@ class DiscretionMixin:
                 room["last_recall_trace"] = [x for x in room["last_recall_trace"]
                                              if not (isinstance(x, dict) and str(x.get("entry_id") or "") in gone)]
         library_written = self._write_library(lib) if counts["memories"] or person else True
+        if hasattr(self, "_forget_turns"):   # what each reply recalled (the brain map)
+            counts["turns"] = self._forget_turns(gone, person)
 
         # 2) the event archive and its per-place copies, and the insights drawn from events
         paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
@@ -603,7 +617,7 @@ class DiscretionMixin:
             if dropped:
                 tmp = path.with_suffix(".tmp")
                 tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
-                os.replace(str(tmp), str(path))
+                atomic_file.replace(tmp, path)
                 if path == EVENT_ARCHIVE_PATH:
                     counts["events"] += dropped
                 elif path == INSIGHT_ARCHIVE_PATH:
@@ -724,6 +738,8 @@ class DiscretionMixin:
                 self._impression_store().forget_impression(qq)
         if not self._write_library(self._read_library()):   # rows for everyone in a place
             raise forget_registry.Unreadable("the forget registry could not be read")
+        if hasattr(self, "_turns_to_library"):   # no turn names a memory that is gone
+            self._turns_to_library()
         return {"people": len(people), "messages": len(sources)}
 
     _REL_TEXT_LISTS = ("we_memory", "annotations", "milestones")
@@ -841,7 +857,7 @@ class DiscretionMixin:
             kept.append(line)
         tmp = path.with_suffix(".tmp")
         tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
-        os.replace(str(tmp), str(path))
+        atomic_file.replace(tmp, path)
 
     # ------------------------------------------------------------------
     # The owner's deletes (panel only; never from a chat).

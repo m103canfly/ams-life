@@ -64,6 +64,337 @@
     }
    }
   },
+  "brain_turns.json": {
+   "turns": [
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.8,
+      "seen": 0.027,
+      "social": 0.492,
+      "stress": 0.264,
+      "talked": 0.064,
+      "valence": -0.024
+     },
+     "held": [
+      "809808e442c0"
+     ],
+     "path": [],
+     "recalled": [],
+     "ts": 1793000690.0,
+     "where": "group:900001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.813,
+      "seen": 0.046,
+      "social": 0.536,
+      "stress": 0.252,
+      "talked": 0.134,
+      "valence": -0.014
+     },
+     "held": [
+      "97364d2030ce"
+     ],
+     "path": [],
+     "recalled": [
+      "b76d1d416a85"
+     ],
+     "ts": 1793004390.0,
+     "where": "group:900002"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.809,
+      "seen": 0.089,
+      "social": 0.54,
+      "stress": 0.285,
+      "talked": 0.14,
+      "valence": -0.119
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "809808e442c0",
+      "a85850333f10",
+      "6b57f51ea167"
+     ],
+     "ts": 1793011740.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.823,
+      "seen": 0.036,
+      "social": 0.552,
+      "stress": 0.286,
+      "talked": 0.172,
+      "valence": -0.125
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "8d86027eef6d"
+     ],
+     "ts": 1793011770.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.819,
+      "seen": 0.376,
+      "social": 0.556,
+      "stress": 0.26,
+      "talked": 0.003,
+      "valence": -0.042
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "b3c25a81b8ca"
+     ],
+     "ts": 1793098170.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.817,
+      "seen": 0.153,
+      "social": 0.559,
+      "stress": 0.268,
+      "talked": 0.035,
+      "valence": -0.091
+     },
+     "held": [
+      "626f3bd3fea9"
+     ],
+     "path": [],
+     "recalled": [
+      "a85850333f10"
+     ],
+     "ts": 1793098470.0,
+     "where": "group:900001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.829,
+      "seen": 0.062,
+      "social": 0.551,
+      "stress": 0.266,
+      "talked": 0.068,
+      "valence": -0.062
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "5d576fa04885"
+     ],
+     "ts": 1793098530.0,
+     "where": "group:900001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.818,
+      "seen": 0.064,
+      "social": 0.557,
+      "stress": 0.25,
+      "talked": 0.063,
+      "valence": 0.007
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "7c848b754305",
+      "c3d64eee532e"
+     ],
+     "ts": 1793271380.0,
+     "where": "group:900001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.815,
+      "seen": 0.026,
+      "social": 0.566,
+      "stress": 0.242,
+      "talked": 0.097,
+      "valence": 0.048
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "5d576fa04885"
+     ],
+     "ts": 1793271400.0,
+     "where": "group:900001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.813,
+      "seen": 0.016,
+      "social": 0.578,
+      "stress": 0.244,
+      "talked": 0.128,
+      "valence": 0.003
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "812c96d53379"
+     ],
+     "ts": 1793271800.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.811,
+      "seen": 0.006,
+      "social": 0.563,
+      "stress": 0.285,
+      "talked": 0.162,
+      "valence": -0.18
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "2815637aa1cd"
+     ],
+     "ts": 1793271820.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.824,
+      "seen": 0.003,
+      "social": 0.56,
+      "stress": 0.311,
+      "talked": 0.195,
+      "valence": -0.284
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "d5e9100403d4",
+      "7c848b754305",
+      "0d3ef692223c"
+     ],
+     "ts": 1793271840.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.821,
+      "seen": 0.002,
+      "social": 0.522,
+      "stress": 0.318,
+      "talked": 0.228,
+      "valence": -0.334
+     },
+     "held": [],
+     "path": [
+      [
+       "6fcefbf2ab75",
+       "d5e9100403d4"
+      ]
+     ],
+     "recalled": [
+      "6fcefbf2ab75",
+      "d5e9100403d4",
+      "7c848b754305",
+      "0d3ef692223c"
+     ],
+     "ts": 1793271870.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.833,
+      "seen": 0.008,
+      "social": 0.519,
+      "stress": 0.312,
+      "talked": 0.253,
+      "valence": -0.314
+     },
+     "held": [],
+     "path": [
+      [
+       "6fcefbf2ab75",
+       "27c13fc68348"
+      ],
+      [
+       "27c13fc68348",
+       "d5e9100403d4"
+      ]
+     ],
+     "recalled": [
+      "6fcefbf2ab75",
+      "27c13fc68348",
+      "d5e9100403d4",
+      "7c848b754305",
+      "0d3ef692223c"
+     ],
+     "ts": 1793272490.0,
+     "where": "private:10001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.828,
+      "seen": 0.008,
+      "social": 0.489,
+      "stress": 0.301,
+      "talked": 0.281,
+      "valence": -0.293
+     },
+     "held": [],
+     "path": [],
+     "recalled": [
+      "812c96d53379"
+     ],
+     "ts": 1793272890.0,
+     "where": "group:900001"
+    },
+    {
+     "body": {
+      "boredom": 0.0,
+      "curiosity": 0.82,
+      "seen": 0.045,
+      "social": 0.506,
+      "stress": 0.27,
+      "talked": 0.29,
+      "valence": -0.186
+     },
+     "held": [
+      "f99415312532"
+     ],
+     "path": [
+      [
+       "dd2efe219da9",
+       "812c96d53379"
+      ]
+     ],
+     "recalled": [
+      "dd2efe219da9",
+      "812c96d53379",
+      "8673415ab83c"
+     ],
+     "ts": 1793276520.0,
+     "where": "group:900001"
+    }
+   ]
+  },
   "forget_registry.sqlite3": {
    "forget": []
   },
@@ -10505,7 +10836,10 @@
   "/astrbot_plugin_ams_life/page/memory_point_feedback",
   "/astrbot_plugin_ams_life/page/memory/delete/<path:session>/<entry_id>",
   "/astrbot_plugin_ams_life/page/forget/person",
-  "/astrbot_plugin_ams_life/page/impressions/delete"
+  "/astrbot_plugin_ams_life/page/impressions/delete",
+  "/astrbot_plugin_ams_life/page/brain",
+  "/astrbot_plugin_ams_life/page/brain/node",
+  "/astrbot_plugin_ams_life/page/brain/search"
  ],
  "turns": [
   {

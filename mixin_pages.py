@@ -346,6 +346,13 @@ class PagesMixin:
                          "the owner deletes a person everywhere")
                 register("/astrbot_plugin_ams_life/page/impressions/delete", self.page_impression_delete, ["POST"],
                          "the owner deletes what she thinks of someone")
+                # ams-life: the brain map (pages/brain), read only (mixin_brain.py)
+                register("/astrbot_plugin_ams_life/page/brain", self.page_brain, ["GET"],
+                         "her memory as a map: stars and lines, no words (read-only)")
+                register("/astrbot_plugin_ams_life/page/brain/node", self.page_brain_node, ["GET"],
+                         "one star of the map, when the owner opens it (read-only)")
+                register("/astrbot_plugin_ams_life/page/brain/search", self.page_brain_search, ["GET"],
+                         "the stars whose words match (ids only, read-only)")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
 
@@ -728,7 +735,7 @@ class PagesMixin:
             tmp = OWNER_RULES_PATH.with_suffix(".tmp")
             tmp.write_text(json.dumps({"rules": rules[:OWNER_RULES_MAX]}, ensure_ascii=False, indent=1),
                            encoding="utf-8")
-            os.replace(str(tmp), str(OWNER_RULES_PATH))
+            atomic_file.replace(tmp, OWNER_RULES_PATH)
         return {"status": "ok", "data": {"rules": self._owner_rules(),
                                          "max": OWNER_RULES_MAX, "chars": OWNER_RULES_CHARS}}
 

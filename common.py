@@ -62,6 +62,10 @@ try:
 except Exception:
     import vector_store
 try:
+    from . import atomic_file
+except Exception:
+    import atomic_file
+try:
     from . import redline
 except Exception:
     import redline

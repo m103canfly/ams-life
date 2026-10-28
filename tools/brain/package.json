@@ -1,0 +1,17 @@
+{
+  "name": "ams-life-brain-page",
+  "private": true,
+  "description": "Builds pages/brain/brain.bundle.js (the brain map page) from src/ and the vendored Galaxy View renderer.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "d3-force-3d": "3.0.6",
+    "three": "0.184.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5"
+  }
+}

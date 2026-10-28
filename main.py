@@ -52,6 +52,10 @@ try:
 except ImportError:
     from mixin_events import EventsMixin
 try:
+    from .mixin_brain import BrainMixin
+except ImportError:
+    from mixin_brain import BrainMixin
+try:
     from .mixin_pages import PagesMixin
 except ImportError:
     from mixin_pages import PagesMixin
@@ -76,7 +80,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -628,6 +632,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _mem = await self._memory_recall(event, text, core, _img, vec=_query_vec, voice=_voice,
                                          user_data=_user_data, turn=_turn)
         _memory_meta = _turn.get("memory_meta") or {}
+        # ams-life: what this reply recalled, as ids only, for the brain map (pages/brain)
+        self._note_turn(event, _turn, core)
         try:
             asyncio.create_task(self._maybe_archive_events(event, core))
             asyncio.create_task(self._maybe_archive_strong_event(event, core, text))

@@ -30,6 +30,7 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | `mixin_phone.py` | 她的手机：每个群、每个私聊一个窗口，存这个窗口里所有人的消息和她的回复（都只留 24 小时，过期的定期从硬盘上删掉）、待办 |
 | `discretion.py` `mixin_discretion.py` | 出处和分寸表：什么能在哪说；按人、按消息真删（只从面板） |
 | `forget_registry.py` | 遗忘登记：谁、哪条消息她不能再记（旧账号被要求忘记的，和维护者在面板里删的），写之前都先查；面板加载整份备份时不覆盖它，恢复完按它再删一遍 |
+| `atomic_file.py` | 她换文件（先写临时文件，再换过去）时，文件正被别的程序开着就等几毫秒再试，不丢这一次的写 |
 | `vector_store.py` | 记忆的向量单独存一个 SQLite，按记忆 id，不再塞在记忆库的 JSON 里 |
 | `redline.py` | 红线词表 |
 | `impressions.py` `mixin_impressions.py` | 群友印象：每晚给每个群当天常说话的人更新称呼、说话的样子、常聊什么（不存原话，每群每晚最多调 1 次模型，默认关闭）；回话时按分寸表放进“认识的人”一行；称呼也进匿名名单（删印象、旧称呼被挤掉都还留着，删人才删）；面板里能看、能删 |
@@ -38,9 +39,11 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | `mixin_people.py` | 她的本子（只由她自己写，每晚写一次，每条带出处）、每个人的记录和关系 |
 | `mixin_autonomy.py` | 私聊里的主动开口 |
 | `mixin_llm.py` `mixin_settings.py` `mixin_media.py` `mixin_pages.py` | 模型调用、设置、图片语音、面板 |
+| `brain_graph.py` `mixin_brain.py` | “她的脑子”页面的只读接口：把记忆、事件、人、窗口、本子、印象画成星和线（图里不带原话、名字、QQ 号，点开才取），每条都过遗忘登记；每次回话想起了什么（只记 id，最近 200 轮） |
 | `interpretation.py` | 回复时给模型看的几行描述（她现在怎样、她想起来的、她的本子、主人定的规矩……；不带数字、QQ 号和“该怎么回”），各种提示词 |
 | `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
 | `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开） |
+| `pages/brain/` `tools/brain/` | “她的脑子”：她的记忆画成一个能转的星球（只读；见 `docs/brain-viz.md`） |
 | `tests/` | 离线测试，不连 AstrBot、不联网、不调用模型 |
 | `tools/` | 离线工具：导入旧数据、回放旧聊天记录、查漏；只写到仓库外的新文件夹 |
 | `docs/` | 改造计划、上游原文档 |
