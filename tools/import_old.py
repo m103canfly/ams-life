@@ -58,7 +58,7 @@ def import_aliases(out, reg, path) -> tuple:
             if not place.startswith("group:") or not qq:
                 skipped["no_place"] += 1
                 continue
-            if not reg.may_keep(qq, place):
+            if not reg.may_keep_untimed(qq, place):   # the old names carry no time
                 skipped["forgotten"] += 1
                 continue
             try:

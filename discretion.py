@@ -134,7 +134,8 @@ _SAYS = "说|讲|问|答|觉得|认为|提到|：|:"
 
 def _one_char_name(name):
     n = re.escape(name)
-    return re.compile(r"@%s(?![%s])|(?<![%s@])%s(?=%s)" % (n, _HAN, _HAN, n, _SAYS))
+    word = _HAN + ("A-Za-z0-9_" if name.isascii() else "")   # "A" is not a name inside "@Alice"
+    return re.compile(r"@%s(?![%s])|(?<![%s@])%s(?=%s)" % (n, word, word, n, _SAYS))
 
 
 def anonymize(text, names) -> str:

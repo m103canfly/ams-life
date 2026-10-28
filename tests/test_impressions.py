@@ -235,6 +235,34 @@ class StoreAndForget(unittest.TestCase):
         self.assertNotIn('phrases', im.view(rec, G1, G1))           # never in a prompt
         self.assertNotIn('冲鸭', im.describe(im.view(rec, G1, G1)))
 
+    def test_names_stay_until_he_is_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            data = store.load(G1)
+            data['people']['10002'] = dict(im._record(G1, '10002'), name='柠檬', aliases=['柠柠'])
+            store.save(G1, data)
+            store.keep_names('10002', ['阿柠'])
+            self.assertEqual(store.places(), [G1])                   # the names file is not a group
+            self.assertEqual(store.forget_impression('10002'), 1)
+            self.assertEqual(store.load(G1)['people'], {})
+            self.assertEqual(store.names_of('10002'), ['阿柠', '柠檬', '柠柠'])
+            store.forget_person('10002')
+            self.assertEqual(store.names_of('10002'), [])
+
+    def test_files_are_read_again_only_when_changed(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            store.save(G1, {'people': {'10002': {'name': '柠檬'}}})
+            with mock.patch.object(Path, 'read_text', side_effect=AssertionError('read again')):
+                first = store.load(G1)
+                self.assertEqual(store.places(), [G1])
+            first['people'].clear()                                   # a copy: the cache is untouched
+            self.assertEqual(store.load(G1)['people'], {'10002': {'name': '柠檬'}})
+            other = im.Store(Path(tmp) / 'people')                    # written by someone else
+            other.save(G1, {'people': {'10002': {'name': '柠檬'}, '10001': {'name': '芒果'}}})
+            self.assertEqual(sorted(store.load(G1)['people']), ['10001', '10002'])
+
     def test_another_groups_file_is_not_read(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = im.Store(Path(tmp) / 'people')

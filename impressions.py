@@ -8,7 +8,10 @@ talks about (a few words), and some counts. Never a whole sentence of his: of hi
 words only his pet phrases, 2-4 characters each, checked against the red lines
 before they are stored, deleted with his messages, and never put in a prompt
 (``view`` does not return them). Never message ids. One file per group,
-``people/<group>-<hash>.json``:
+``people/<group>-<hash>.json``, and ``people/names.json``: every name and alias each
+person went by, for making things anonymous elsewhere -- only ever added to, and it
+goes only when he is deleted (deleting his impression, or an alias pushed out of the
+last MAX_ALIASES, leaves it there):
 
     {"place": "group:1", "tried": "2026-10-28",
      "group":  {"text": "...", "stats": {...}, "origin": {...}},          # what the group is like
@@ -44,6 +47,7 @@ comes with step 1, part 3-2. Only the standard library; no AstrBot.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -218,7 +222,20 @@ def material(picked, names=None, said_to=()) -> tuple:
         code_of[qq] = "Q%d" % (len(code_of) - len(codes) + 1)
     swaps = sorted(((n, code_of[q]) for q, ns in names.items() for n in ns if len(n) >= 2),
                    key=lambda x: -len(x[0]))
+    # a one-character name only where it plainly names someone (as discretion.anonymize does)
+    singles = [(discretion._one_char_name(n), code_of[q]) for q, ns in sorted(names.items()) for n in sorted(ns)
+               if len(n) == 1 and not n.isdigit()]
     qqs = sorted(code_of.items(), key=lambda x: -len(x[0]))
+
+    def mask(text):
+        for qq, c in qqs:
+            text = text.replace(qq, c)
+        for name, c in swaps:
+            text = text.replace(name, c)
+        for pattern, c in singles:
+            text = pattern.sub(lambda m, c=c: ("@" if m.group(0).startswith("@") else "") + c, text)
+        text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
+        return re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
     out = []
     for code, p in zip(codes, picked):
         out.append("%s：今天说了 %d 句" % (code, p["count"]))
@@ -226,25 +243,13 @@ def material(picked, names=None, said_to=()) -> tuple:
             text = str(ln.get("text") or "")
             if redline.hit(text):
                 continue
-            for qq, c in qqs:
-                text = text.replace(qq, c)
-            for name, c in swaps:
-                text = text.replace(name, c)
-            text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
-            text = re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
-            out.append("- " + text[:LINE_CHARS])
+            out.append("- " + mask(text)[:LINE_CHARS])
     shown = []
     for ln in said_to or ():
         text = str(ln.get("text") or "")
         if redline.hit(text):
             continue
-        for qq, c in qqs:
-            text = text.replace(qq, c)
-        for name, c in swaps:
-            text = text.replace(name, c)
-        text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
-        text = re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
-        shown.append("- " + text[:LINE_CHARS])
+        shown.append("- " + mask(text)[:LINE_CHARS])
     if shown:
         out.append("别人对他们说的话：")
         out.extend(shown)
@@ -359,11 +364,40 @@ def _record(place, qq):
             "since": "", "updated": "", "origin": discretion.make_origin(place, [str(qq)], [])}
 
 
+NAMES_FILE = "names.json"
+
+
 class Store:
-    """The people/ folder: one file per group."""
+    """The people/ folder: one file per group, and NAMES_FILE ({qq: [names]})."""
 
     def __init__(self, root):
         self.root = Path(root)
+        self._cache = {}   # path -> ((mtime, size), content): a file is read again only when it changed
+
+    def _read(self, path) -> dict:
+        """A file's content (a copy: the caller may change it), read again only when it changed."""
+        try:
+            st = path.stat()
+        except OSError:
+            self._cache.pop(path, None)
+            return {}
+        key = (st.st_mtime_ns, st.st_size)
+        hit = self._cache.get(path)
+        if not hit or hit[0] != key:
+            try:
+                content = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                content = {}
+            hit = self._cache[path] = (key, content if isinstance(content, dict) else {})
+        return copy.deepcopy(hit[1])
+
+    def _write(self, path, content) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(content, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(str(tmp), str(path))
+        st = path.stat()
+        self._cache[path] = ((st.st_mtime_ns, st.st_size), copy.deepcopy(content))
 
     def path(self, place) -> Path:
         place = str(place)
@@ -371,13 +405,7 @@ class Store:
         return self.root / ("%s-%s.json" % (safe, hashlib.sha1(place.encode("utf-8")).hexdigest()[:12]))
 
     def load(self, place) -> dict:
-        data = {}
-        try:
-            path = self.path(place)
-            if path.exists():
-                data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = {}
+        data = self._read(self.path(place))
         if not isinstance(data, dict) or str(data.get("place") or "") != str(place):
             data = {}  # not this group's file: start empty rather than read another group
         data["place"] = str(place)
@@ -386,31 +414,51 @@ class Store:
         return data
 
     def save(self, place, data) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
         data["place"] = str(place)
-        path = self.path(place)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(str(tmp), str(path))
+        self._write(self.path(place), data)
 
     def places(self) -> list:
         out = []
         for path in sorted(self.root.glob("*.json")) if self.root.exists() else []:
-            try:
-                out.append(str(json.loads(path.read_text(encoding="utf-8")).get("place") or ""))
-            except (OSError, ValueError):
-                continue
+            if path.name != NAMES_FILE:
+                out.append(str(self._read(path).get("place") or ""))
         return [p for p in out if p]
 
-    def forget_person(self, qq) -> int:
-        """He is deleted (by the owner): his impression and how he is called, in every group."""
+    def names_of(self, qq) -> list:
+        """Every name and alias he went by (NAMES_FILE)."""
+        return [str(n) for n in self._read(self.root / NAMES_FILE).get(str(qq)) or []]
+
+    def keep_names(self, qq, names) -> None:
+        """Add names he goes by to NAMES_FILE (never removes any)."""
+        path = self.root / NAMES_FILE
+        content = self._read(path)
+        old = [str(n) for n in content.get(str(qq)) or []]
+        new = list(dict.fromkeys(old + [str(n).strip() for n in names or () if str(n or "").strip()]))
+        if new != old:
+            content[str(qq)] = new
+            self._write(path, content)
+
+    def forget_impression(self, qq) -> int:
+        """The owner deleted what she thinks of him: his impression in every group goes; the
+        names he went by stay in NAMES_FILE, so what she remembers of him is still made
+        anonymous elsewhere."""
         n = 0
         for place in self.places():
             data = self.load(place)
-            if str(qq) in data["people"]:
-                del data["people"][str(qq)]
+            rec = data["people"].pop(str(qq), None)
+            if rec is not None:
+                self.keep_names(qq, [rec.get("name")] + list(rec.get("aliases") or []))
                 self.save(place, data)
                 n += 1
+        return n
+
+    def forget_person(self, qq) -> int:
+        """He is deleted (by the owner): his impression in every group, and every name he went by."""
+        n = self.forget_impression(qq)
+        path = self.root / NAMES_FILE
+        content = self._read(path)
+        if content.pop(str(qq), None) is not None:
+            self._write(path, content)
         return n
 
     def forget_message_by(self, place, qq) -> bool:
@@ -458,9 +506,11 @@ def add_day(rec, name, stats, day) -> None:
     rec["updated"] = day
 
 
-async def nightly(store, place, lines, ask, day, registry=None, self_id="") -> dict:
+async def nightly(store, place, lines, ask, day, registry=None, self_id="", extra_names=None) -> dict:
     """One group, one night. `ask` is an async callable(prompt) -> answer text (the model).
-    At most one call per group per day; marked as tried before the call."""
+    At most one call per group per day; marked as tried before the call. `extra_names`
+    ({qq: names}): more names that become codes in what the model sees -- the owner's, and
+    those people go by elsewhere."""
     data = store.load(place)
     if data.get("tried") == day:
         return {"skipped": "tried today"}
@@ -473,9 +523,12 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="") -> d
                   and ln.get("role") != "assistant" and _day(ln.get("ts")) == day]
         rec = data["people"].setdefault(p["qq"], _record(place, p["qq"]))
         add_day(rec, p["name"], day_stats(p["lines"], others), day)
+        store.keep_names(p["qq"], [p["name"]])
     data["tried"] = day
     store.save(place, data)
     cards = group_names(lines, data["people"])
+    for qq, ns in (extra_names or {}).items():
+        cards.setdefault(str(qq), set()).update(str(n) for n in ns if n and not str(n).isdigit())
     prompt, codes = prompt_for(picked, cards, addressed(lines, picked, day, self_id))
     try:
         answer = await ask(prompt)
@@ -494,7 +547,9 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="") -> d
         rec["style"] = item["style"] or rec.get("style", "")
         rec["topics"] = item["topics"] or rec.get("topics", [])
         if names_seen.get(qq):
-            rec["aliases"] = list(dict.fromkeys(list(rec.get("aliases") or []) + names_seen[qq]))[-MAX_ALIASES:]
+            merged = list(dict.fromkeys(list(rec.get("aliases") or []) + names_seen[qq]))
+            store.keep_names(qq, merged)
+            rec["aliases"] = merged[-MAX_ALIASES:]
         rec["updated"] = day
     store.save(place, data)
     return {"called": 1, "picked": len(picked), "written": len(got), "rejected": len(codes) - len(got)}
@@ -552,7 +607,7 @@ def from_bundle(store, people=(), registry=None, day="") -> dict:
         if not place.startswith("group:") or not qq:
             counts["person_no_place"] += 1
             continue
-        if registry is not None and not registry.may_keep(qq, place):
+        if registry is not None and not registry.may_keep_untimed(qq, place):
             counts["person_forgotten"] += 1
             continue
         aliases = [a for a in (check_alias(x) for x in p.get("aliases") or []) if a]
@@ -562,7 +617,9 @@ def from_bundle(store, people=(), registry=None, day="") -> dict:
         data = store.load(place)
         rec = data["people"].setdefault(qq, _record(place, qq))
         rec["name"] = rec.get("name") or str(p.get("name") or "")
-        rec["aliases"] = list(dict.fromkeys(list(rec.get("aliases") or []) + aliases))[-MAX_ALIASES:]
+        merged = list(dict.fromkeys(list(rec.get("aliases") or []) + aliases))
+        store.keep_names(qq, [rec["name"]] + merged)
+        rec["aliases"] = merged[-MAX_ALIASES:]
         rec["since"] = rec.get("since") or day
         rec["updated"] = day
         store.save(place, data)

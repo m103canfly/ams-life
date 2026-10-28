@@ -436,11 +436,17 @@ class PagesMixin:
         except Exception as exc:
             logger.warning("[biocore] restore safety backup failed: %s", exc)
         count = 0
+        # ams-life: the forget registry in use is never replaced by the backup's (and the
+        # vector store is closed while its file may be overwritten)
+        vectors = getattr(self, "_vectors_db", None)
+        if vectors is not None:
+            vectors.close()
+            self._vectors_db = None
         try:
             for name in names:
                 rel = name[len("data/"):]
                 parts = [x for x in rel.split("/") if x not in ("", ".", "..")]
-                if not parts:
+                if not parts or parts[-1].startswith(forget_registry.FILE_NAME):
                     continue
                 dest = DATA_DIR.joinpath(*parts)
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -457,8 +463,17 @@ class PagesMixin:
             self.cores = {}
         except Exception:
             pass
+        # ams-life: whoever and whatever the registry holds is deleted again
+        self._known_memory_ids = self._name_index = self._people_store = None
+        try:
+            self.self_model = self._load_self_model()
+            again = self._forget_registered()
+        except Exception as exc:
+            logger.warning("[ams-life] restored, but deleting again what is registered failed: %s", exc)
+            return {"status": "error", "message": "restored %d files, but deleting again what the forget "
+                                                  "registry holds failed: %s" % (count, str(exc)[:160])}
         logger.info("[biocore] restored %s data files", count)
-        return {"status": "ok", "data": {"files": count}}
+        return {"status": "ok", "data": {"files": count, "deleted_again": again}}
 
     async def page_memory_delete(self, session: str, entry_id: str):
         """The owner deletes one memory (panel only; the page asks to confirm first): the

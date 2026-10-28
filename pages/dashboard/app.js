@@ -2127,7 +2127,7 @@
       restoreArmed = true;
       if (restoreTimer) clearTimeout(restoreTimer);
       restoreTimer = setTimeout(resetRestore, 5000);
-      if (st) st.textContent = "警告：会覆盖当前核心数据（人设/记忆/状态/API 配置）。5 秒内再点一次确认。";
+      if (st) st.textContent = "警告：会覆盖当前核心数据（人设/记忆/状态/API 配置）。遗忘登记保留现在的，恢复完会按它再删一遍：删掉的人不会跟着备份回来。5 秒内再点一次确认。";
       return;
     }
     resetRestore();
@@ -2146,7 +2146,8 @@
       const raw = await bridge.apiPost("page/restore", { filename: f.name, base64 });
       const payload = raw && raw.data ? raw.data : raw;
       if (!payload || payload.status === "error") throw new Error((payload && payload.message) || "restore failed");
-      if (st) st.textContent = "已恢复 " + Number(payload.files || 0) + " 个文件，请重启 AstrBot 生效。";
+      const again = payload.deleted_again || {};
+      if (st) st.textContent = "已恢复 " + Number(payload.files || 0) + " 个文件；按遗忘登记重新删了 " + Number(again.people || 0) + " 人、" + Number(again.messages || 0) + " 条消息。请重启 AstrBot 生效。";
     } catch (e) {
       if (st) st.textContent = "恢复失败：" + String(e && e.message || e);
     }

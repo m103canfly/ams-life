@@ -95,6 +95,45 @@ class Names(unittest.TestCase):
         for kept in ('小鹿乱撞', '一只鹿跑过去', '@鹿鹿 你好'):
             self.assertEqual(a(kept, ['鹿']), kept)
 
+    def test_one_letter_names(self):
+        a = discretion.anonymize
+        self.assertEqual(a('@A 快来', ['A']), '@有人 快来')
+        self.assertEqual(a('A说今天下雨', ['A']), '有人说今天下雨')
+        for kept in ('@Alice 你好', 'BA说的'):
+            self.assertEqual(a(kept, ['A']), kept)
+
+
+class NamesStay(unittest.TestCase):
+    """PR #10 review: the names he went by stay for making things anonymous after his impression
+    is deleted or an alias is pushed out of the last four; they go when he is deleted."""
+
+    def test_after_the_impression_is_deleted(self):
+        r = run_case('anon_kept')
+        self.assertEqual(r['before'], '有人说周末去爬山')
+        self.assertFalse(r['impression_left'])
+        self.assertEqual(r['after_delete'], '有人说周末去爬山')
+        self.assertEqual(r['event_after_delete'], '有人约大家周末去爬山')
+
+    def test_after_an_alias_is_pushed_out(self):
+        r = run_case('anon_kept')
+        self.assertEqual(r['aliases_10006'], ['阿二', '阿三', '阿四', '阿五'])
+        self.assertEqual(r['pushed_out'], '有人说今天下雨')
+
+    def test_deleting_the_person_takes_them(self):
+        self.assertEqual(run_case('anon_kept')['names_after_person'], ['10002'])
+
+
+class Review(unittest.TestCase):
+    def test_his_name_here_in_another_group(self):
+        self.assertEqual(run_case('card_here')['other_group'], '[认识的人] 小柠檬（大家叫 柠柠）')
+
+    def test_the_nightly_material_codes_every_name_she_knows(self):
+        r = run_case('material')
+        self.assertEqual(r['prompt_has'], {'大芒': False, '芒芒': False, '鹿说': False, '芒果': False, '柠檬': False})
+        self.assertTrue(any(ln.startswith('- P2今天没来') for ln in r['lines']), r['lines'])   # 大芒: elsewhere
+        self.assertTrue(any(ln.startswith('- P2快来打本') for ln in r['lines']), r['lines'])   # 芒芒: the owner's
+        self.assertTrue(any(ln.startswith('- Q1说他也去') for ln in r['lines']), r['lines'])   # 鹿
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -220,6 +220,11 @@ class ForgetRegistry:
         """May she keep something by this person / from this message, said here at this time?"""
         return not self.why_not(qq, place, at, source_id, forget_me)
 
+    def may_keep_untimed(self, qq, place="") -> bool:
+        """For something of his with no time (an old name): only when no reading of the rows
+        and no time rules him out here -- anyone with a row is left out."""
+        return self.may_keep(qq, place, forget_me=FORGET_ME_OPTOUT) and self.may_keep(qq, place, at=0)
+
     def may_keep_all(self, people=(), place="", at=None, source_ids=(), forget_me=None) -> bool:
         """For something made from several messages: every person and every message must be allowed."""
         if any(self.why_not(source_id=s, place=place, at=at, forget_me=forget_me) for s in (source_ids or ())):

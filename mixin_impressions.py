@@ -72,7 +72,7 @@ class ImpressionsMixin:
     def _impression_names(self, person) -> list:
         """Name source for making things anonymous (register_name_source): every name and
         alias he goes by in any group, and the owner's names for him."""
-        names = []
+        names = self._impression_store().names_of(person)   # kept when his impression goes
         for _place, rec in self._impression_records(person):
             names.append(rec.get("name"))
             names.extend(rec.get("aliases") or [])
@@ -85,7 +85,7 @@ class ImpressionsMixin:
         here = self._here(event)
         if not here:
             return []
-        sid, _name = self._speaker(event)
+        sid, name = self._speaker(event)
         recent = [x for x in self._read_window(here)["recent"] if isinstance(x, dict) and x.get("role") != "assistant"]
         present = []
         for x in [{"sender_id": sid}] + list(reversed(recent)):
@@ -107,6 +107,10 @@ class ImpressionsMixin:
                 continue
             found = [a for _p, r in records for a in (r.get("aliases") or [])] if not own else list(v["aliases"])
             v["aliases"] = self._aliases_of(who, found)
+            if not own:   # the name he goes by here, not another group's card
+                v["name"] = (name if who == sid and name else next(
+                    (str(x.get("sender_name")) for x in reversed(recent)
+                     if str(x.get("sender_id") or "") == who and x.get("sender_name")), "")) or v["name"]
             line = impressions.describe(v)
             if line:
                 out.append(line)
@@ -124,6 +128,14 @@ class ImpressionsMixin:
         except Exception:
             hh, mm = 23, 15
         return (local.tm_hour, local.tm_min) >= (hh, mm)
+
+    def _material_names(self, place, lines) -> dict:
+        """{qq: names} the nightly material turns into codes besides this window's cards: for
+        everyone in this group (in the window, or with an impression here) and everyone the
+        owner named, every name they are known by -- the owner's and those seen elsewhere."""
+        who = {str(x.get("sender_id") or "") for x in lines if isinstance(x, dict) and x.get("role") != "assistant"}
+        who |= set(self._impression_store().load(place)["people"]) | set(self._owner_aliases())
+        return {qq: [n for n in self._known_names([qq]) if n != qq] for qq in sorted(who) if qq}
 
     async def _maybe_update_impressions(self, now=None) -> dict:
         """Each group window once a day after impressions_time; impressions.nightly marks the
@@ -150,7 +162,8 @@ class ImpressionsMixin:
             try:
                 lines = self._read_window(place)["recent"]
                 done[place] = await impressions.nightly(self._impression_store(), place, lines, ask, day,
-                                                        registry=self._registry())
+                                                        registry=self._registry(),
+                                                        extra_names=self._material_names(place, lines))
             except Exception as exc:
                 logger.warning("[ams-life] impressions for %s failed: %s", place, exc)
         if any(r.get("called") for r in done.values()):
@@ -176,9 +189,10 @@ class ImpressionsMixin:
 
     def _owner_forget_impression(self, qq) -> int:
         """Delete what she thinks of `qq` in every group, and note it so she does not write
-        one again (only the impression: what she remembers of him stays)."""
+        one again (only the impression: what she remembers of him stays, and so do the names
+        he went by, so it is still made anonymous elsewhere)."""
         qq = str(qq or "").strip()
         if not qq:
             return 0
         self._registry().stop_impression(qq)
-        return self._impression_store().forget_person(qq)
+        return self._impression_store().forget_impression(qq)

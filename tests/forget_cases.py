@@ -98,6 +98,13 @@ if CASE == 'mention':
                                    'state': {'trust': 0.5}, 'trajectory': [{'ts': 179310001.5, 'trust': 0.5}],
                                    'we_memory': [{'type': 'ritual', 'text': '哈哈哈每天打卡', 'confidence': 0.6}],
                                    'transactive_map': {'哈哈': 2, '打卡': 3}}})
+    # records that draw from him only in a latest line or in evidence
+    write('users/10011.json', {'sender_id': '10011', 'sender_name': '路人乙', 'interactions': 3,
+                               'relationship': {'state': {'trust': 0.5}, 'destination_map': {
+                                   '10002': {'sender_id': '10002', 'count': 1, 'latest_text': '刚才10001说他在学吉他'}}}})
+    write('users/10012.json', {'sender_id': '10012', 'sender_name': '路人丙', 'interactions': 3,
+                               'relationship': {'state': {'trust': 0.5}, 'social_world': [
+                                   {'name': '同学', 'role': 'friend', 'evidence': [{'ts': 1.0, 'text': '我和10001一起上课'}]}]}})
     # someone whose record does draw from him
     write('users/10002.json', {'sender_id': '10002', 'sender_name': '柠檬', 'interactions': 3,
                                'relationship': {
@@ -302,6 +309,43 @@ if CASE == 'mention':
     loop.run_until_complete(plugin.page_forget_person('10001'))
     result['untouched'] = (DATA / 'users' / '10009.json').read_text('utf-8') == before
     result['user_10002'] = json.loads((DATA / 'users' / '10002.json').read_text('utf-8'))['relationship']
+    for who in ('10011', '10012'):
+        result['user_' + who] = json.loads((DATA / 'users' / (who + '.json')).read_text('utf-8'))['relationship']
+
+if CASE == 'forget_broken':
+    turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')   # what is left is checked
+    turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
+    import sqlite3
+    real = plugin._registry_sets
+
+    def broken():
+        raise sqlite3.OperationalError('database is locked')
+    plugin._registry_sets = broken                      # read right after the row is written
+    result['page'] = loop.run_until_complete(plugin.page_forget_person('10001'))
+    result['still_there'] = any('吉他' in e['text'] for e in library()['entries'])
+    plugin._registry_sets = real
+    result['retry'] = loop.run_until_complete(plugin.page_forget_person('10001'))['status']
+    result['gone_after_retry'] = not any('吉他' in e['text'] for e in library()['entries'])
+
+if CASE == 'restore':
+    turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
+    turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')
+    backup = loop.run_until_complete(plugin.page_backup())['data']['base64']
+    loop.run_until_complete(plugin.page_forget_person('10001'))
+    import types
+
+    async def get_json(silent=True):
+        return {'filename': 'b.zip', 'base64': backup}
+    sys.modules['quart'] = types.SimpleNamespace(request=types.SimpleNamespace(get_json=get_json))
+    result['restore'] = loop.run_until_complete(plugin.page_restore())
+    texts = [e['text'] for e in library()['entries']]
+    result['guitar'] = any('吉他' in t for t in texts)
+    result['hike'] = any('爬山' in t for t in texts)
+    result['user_10001'] = (DATA / 'users' / '10001.json').exists()
+    result['phone_guitar'] = '吉他' in ''.join(all_text().values())
+    import forget_registry
+    with forget_registry.ForgetRegistry(DATA / forget_registry.FILE_NAME) as reg:
+        result['registry'] = sorted((r['kind'], r['qq']) for r in reg.rows())
 
 if CASE == 'old_endpoints':
     result['routes'] = [r for r in ctx.web_routes if 'memory/rollback' in r or 'memory/restore' in r]

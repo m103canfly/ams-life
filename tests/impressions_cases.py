@@ -23,13 +23,19 @@ EVENING = time.mktime(time.strptime('2026-10-04 20:00:00', '%Y-%m-%d %H:%M:%S'))
 import forget_registry  # noqa: E402
 import impressions  # noqa: E402
 
-if CASE in ('views', 'anon'):
+if CASE in ('views', 'anon', 'anon_kept', 'card_here'):
     store = impressions.Store(DATA / 'people')
     data = store.load('group:' + G1)
     rec = data['people'].setdefault('10002', impressions._record('group:' + G1, '10002'))
     rec.update(name='柠檬', aliases=['柠柠'], style='说话很快，爱用语气词', topics=['抽卡', '副本'],
                stats={'msgs': 40, 'days': 3}, updated='2026-10-03')
+    if CASE == 'anon_kept':   # someone with four aliases already
+        rec = data['people'].setdefault('10006', impressions._record('group:' + G1, '10006'))
+        rec.update(name='星野', aliases=['阿一', '阿二', '阿三', '阿四'], updated='2026-10-03')
     store.save('group:' + G1, data)
+
+if CASE == 'material':
+    clock.now = EVENING
 
 if CASE == 'nightly':
     clock.now = EVENING
@@ -60,6 +66,8 @@ class Model(harness.FakeProvider):
 ctx = harness.FakeContext()
 ctx.provider = Model()
 config = {'member_aliases': ['10002:小柠']} if CASE in ('views', 'anon') else {}
+if CASE == 'material':
+    config = {'member_aliases': ['10001:芒芒']}
 plugin = main.BioCorePlugin(ctx, config=config)
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
@@ -131,6 +139,42 @@ if CASE == 'anon':
           'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['m1'], 'visibility': 'public'}}
     elsewhere = harness.FakeEvent('x', sender='10004', name='桃子', group=G2)
     result['event_elsewhere'] = plugin._visible_events(elsewhere, [ev])[0]['event']
+
+if CASE == 'anon_kept':
+    # the owner deletes what she thinks of him: what she remembers of him is still made anonymous
+    ev = {'title': '爬山', 'event': '柠柠约大家周末去爬山', 'ts': clock.now,
+          'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['m1'], 'visibility': 'public'}}
+    elsewhere = harness.FakeEvent('x', sender='10004', name='桃子', group=G2)
+    result['before'] = plugin._anonymized('柠柠说周末去爬山', ['10002'])
+    loop.run_until_complete(plugin.page_impression_delete('10002'))
+    result['impression_left'] = '10002' in plugin._impression_store().load('group:' + G1)['people']
+    result['after_delete'] = plugin._anonymized('柠柠说周末去爬山', ['10002'])
+    result['event_after_delete'] = plugin._visible_events(elsewhere, [ev])[0]['event']
+    # a fifth alias pushes the first one out of his impression
+    impressions.from_bundle(plugin._impression_store(),
+                            [{'place': 'group:' + G1, 'qq': '10006', 'name': '星野', 'aliases': ['阿五']}],
+                            registry=plugin._registry())
+    result['aliases_10006'] = plugin._impression_store().load('group:' + G1)['people']['10006']['aliases']
+    result['pushed_out'] = plugin._anonymized('阿一说今天下雨', ['10006'])
+    # deleting the person takes the names too
+    loop.run_until_complete(plugin.page_forget_person('10002'))
+    result['names_after_person'] = plugin._known_names(['10002'])
+
+if CASE == 'card_here':
+    result['other_group'] = turn('小爱 晚上好', '10002', '小柠檬', group=G2, reply='晚上好')
+
+if CASE == 'material':
+    turn('大家好', '10001', '大芒', group=G2, advance=30)                  # what he goes by elsewhere
+    for i in range(12):
+        turn(['大芒今天没来', '芒芒快来打本', '鹿说他也去'][i % 3] + ' %d' % i, '10002', '柠檬', group=G1, advance=30)
+        if i < 6:
+            turn('副本好难 %d' % i, '10001', '芒果', group=G1, advance=30)
+    turn('我也来', '10005', '鹿', group=G1, advance=30)                    # a one-character card
+    plugin.llm_functions = dict(plugin.llm_functions or {}, group_impressions={'enabled': True, 'provider': 'follow_llm'})
+    loop.run_until_complete(plugin._maybe_update_impressions(now=EVENING + 3.5 * 3600))
+    prompt = getattr(ctx.provider, 'last', '')
+    result['prompt_has'] = {w: w in prompt for w in ('大芒', '芒芒', '鹿说', '芒果', '柠檬')}
+    result['lines'] = [ln for ln in prompt.splitlines() if ln.startswith('- ')]
 
 for task in asyncio.all_tasks(loop):
     task.cancel()

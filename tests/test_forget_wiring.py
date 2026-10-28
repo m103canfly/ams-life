@@ -115,6 +115,11 @@ class Review(unittest.TestCase):
         self.assertEqual(r['user_10002'].get('destination_map'), {})   # this one did draw from him
         self.assertEqual(r['user_10002']['state'], {'trust': 0.5})
 
+    def test_latest_lines_and_evidence_count(self):
+        r = run_case('mention')
+        self.assertEqual(r['user_10011'].get('destination_map'), {})
+        self.assertEqual(r['user_10012'].get('social_world'), [])
+
     def test_old_rollback_and_restore_are_gone(self):
         r = run_case('old_endpoints')
         self.assertEqual((r['routes'], r['methods']), ([], []))
@@ -129,6 +134,28 @@ class Review(unittest.TestCase):
         r = run_case('migrate_many')
         self.assertEqual(r['ids'], [30, 30, True])
         self.assertLessEqual(r['reads_at_start'], 5)
+
+
+class ReviewOfPR10(unittest.TestCase):
+    """PR #9 re-review (fixed on PR #10): a delete whose library write failed says so; a whole
+    backup restored never brings back someone deleted."""
+
+    def test_a_delete_that_could_not_write_the_library_says_so(self):
+        r = run_case('forget_broken')
+        self.assertEqual(r['page']['status'], 'error')
+        self.assertTrue(r['still_there'])
+        self.assertEqual(r['retry'], 'ok')
+        self.assertTrue(r['gone_after_retry'])
+
+    def test_restoring_a_backup_does_not_bring_anyone_back(self):
+        r = run_case('restore')
+        self.assertEqual(r['restore']['status'], 'ok', r['restore'])
+        self.assertEqual(r['restore']['data']['deleted_again'], {'people': 1, 'messages': 0})
+        self.assertFalse(r['guitar'])
+        self.assertTrue(r['hike'])
+        self.assertFalse(r['user_10001'])
+        self.assertFalse(r['phone_guitar'])
+        self.assertEqual(r['registry'], [['qq', '10001']])
 
 
 class NoChatCommands(unittest.TestCase):

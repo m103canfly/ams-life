@@ -62,6 +62,20 @@ class Import(unittest.TestCase):
             self.assertEqual(s['registry']['rows']['optout'], 1)
             self.assertEqual(s['registry']['rows']['people'], 2)
 
+    def test_no_one_registered_under_the_cutoff_reading(self):
+        import forget_registry
+        with tempfile.TemporaryDirectory() as tmp:
+            old = Path(tmp) / 'old'
+            fake.build_old(old)
+            reading = forget_registry.FORGET_ME
+            forget_registry.FORGET_ME = forget_registry.FORGET_ME_CUTOFF
+            try:
+                s = import_old.build(old, Path(tmp) / 'b')
+            finally:
+                forget_registry.FORGET_ME = reading
+            self.assertEqual(s['skipped']['forgotten'], 1)
+            self.assertNotIn('星星', (Path(tmp) / 'b' / 'aliases.jsonl').read_text('utf-8'))
+
     def test_old_forgets_let_in(self):
         with tempfile.TemporaryDirectory() as tmp:
             old = Path(tmp) / 'old'
