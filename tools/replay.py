@@ -4,7 +4,7 @@
         [--aliases <aliases.jsonl>] [--embed-url http://127.0.0.1:11434/v1/embeddings [--embed-model bge-m3]]
         [--impressions] [--old-forgets keep-out|let-in] [--forget-me optout|cutoff] [--remember-replies]
         [--no-canaries] [--limit N]
-        [--notebook] [--astrbot <AstrBot data dir> --model <provider id> --model-limit N [--model-cap kind=N]]
+        [--digest] [--notebook] [--astrbot <AstrBot data dir> --model <provider id> --model-limit N [--model-cap kind=N]]
 
 Run 1 of the step-1 gate: no model, no network. The plugin is driven through its real hooks
 (on_message for every message, on_llm_request / on_llm_response when someone woke the old
@@ -19,7 +19,10 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
 - --aliases loads what people were called (tools/import_old.py: aliases.jsonl) before the log.
 - --impressions turns the nightly group impressions on (the fake model answers with a fixed
   made-up line), so their prompts are recorded and checked too.
-- --notebook turns her nightly notebook on (each 5-minute sweep, as her autonomy loop does).
+- --digest turns on her nightly note of what happened today in each window (the fake model
+  notes one thing per window, drawn from its first line); --notebook her nightly notebook.
+  Both run each 5-minute sweep, in her autonomy loop's order: the note, the impressions,
+  the notebook.
 - Run 2 (--astrbot, --model): a real model answers instead of the fake one: the chat provider
   of that id in the AstrBot at --astrbot (cmd_config.json, read only), with that AstrBot's
   default persona (data_v4.db, read only) as hers. Its key is read into memory when the replay
@@ -456,6 +459,8 @@ def main(argv=None):
     ap.add_argument("--embed-model", default="bge-m3")
     ap.add_argument("--impressions", action="store_true",
                     help="run the nightly group impressions (the fake model answers)")
+    ap.add_argument("--digest", action="store_true",
+                    help="let her note what happened today in each window each night (daily_digest)")
     ap.add_argument("--notebook", action="store_true", help="let her write her notebook each night")
     ap.add_argument("--astrbot", help="run 2: the data folder of the AstrBot whose chat provider answers (read only)")
     ap.add_argument("--model", help="run 2: that provider's id, e.g. deepseek/deepseek-flash")
@@ -538,6 +543,10 @@ def main(argv=None):
             stats["model_calls_fake_" + (self.kind or "other")] += 1
             prompts.write(json.dumps({"kind": "model", "ts": clock.now, "place": current["place"], "call": self.kind,
                                       "text": "%s\n%s" % (system_prompt or "", prompt)}, ensure_ascii=False) + "\n")
+            if "今天在这里发生的几件事" in str(prompt):   # the daily note: one thing, from the first line
+                return harness.FakeResponse(json.dumps({"events": [
+                    {"title": "P1说了些话", "what": "P1在这里说了些话", "who": ["P1"], "lines": [1]}]},
+                    ensure_ascii=False))
             if "群里几位群友今天说的话" in str(prompt):   # impressions: one made-up line for everyone
                 codes = re.findall(r"^(P\d+)：", str(prompt), re.M)
                 return harness.FakeResponse(json.dumps({c: {"style": "说话简短，爱接话", "topics": ["聊天"], "aliases": []}
@@ -605,6 +614,9 @@ def main(argv=None):
     if args.impressions:
         plugin.llm_functions = dict(plugin.llm_functions or {},
                                     group_impressions={"enabled": True, "provider": "follow_llm"})
+    if args.digest:
+        plugin.llm_functions = dict(plugin.llm_functions or {},
+                                    daily_digest={"enabled": True, "provider": "follow_llm"})
     if args.notebook:
         plugin.llm_functions = dict(plugin.llm_functions or {}, notebook={"enabled": True, "provider": "follow_llm"})
     if args.aliases:
@@ -625,6 +637,13 @@ def main(argv=None):
 
     def five_minutes():
         plugin._sweep_windows()
+        if args.digest:
+            current.update(place="nightly", ts=clock.now)
+            plugin._begin_job()
+            done = loop.run_until_complete(plugin._maybe_daily_digest(now=clock.now))
+            harness.drain(loop)
+            stats["digest_calls"] += sum(1 for r in done.values() if r.get("called"))
+            stats["digest_events"] += sum(int(r.get("written") or 0) for r in done.values())
         if args.impressions:
             current.update(place="nightly", ts=clock.now)
             done = loop.run_until_complete(plugin._maybe_update_impressions(now=clock.now))
@@ -697,7 +716,7 @@ def main(argv=None):
     summary = {"self_id": self_id, "old_forgets": args.old_forgets, "forget_me": args.forget_me,
                "remember_replies": args.remember_replies, "impressions": args.impressions,
                "vectors": ("%s (%s)" % (args.embed_url, args.embed_model)) if args.embed_url else "fake",
-               "aliases": bool(args.aliases), "notebook": args.notebook,
+               "aliases": bool(args.aliases), "digest": args.digest, "notebook": args.notebook,
                "model": ("%s (%s)" % (model_name, model_base)) if post else "fake",
                "model_limit": args.model_limit if post else 0, "model_caps": caps,
                "seconds": round(time.perf_counter() - started, 1),

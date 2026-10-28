@@ -319,6 +319,25 @@ class ReplayOptions(unittest.TestCase):
         result = audit_replay.audit(self.out, self.chat)
         self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
 
+    @unittest.skipUnless((ROOT / 'mixin_digest.py').exists(), 'the daily digest is not in this plugin yet')
+    def test_digest_then_impressions_then_notebook(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'nightly'
+            run_replay(self.chat, Path(self.tmp.name) / 'bundle' / 'forget_registry.sqlite3', out, '--no-canaries',
+                       '--embed-url', self.stub.url, '--digest', '--impressions', '--notebook')
+            stats = json.loads((out / 'replay.json').read_text('utf-8'))['stats']
+            self.assertEqual((stats['digest_calls'], stats['digest_events']), (1, 1))
+            self.assertEqual(stats['model_calls_fake_daily_digest'], 1)
+            calls = [json.loads(x).get('call') for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
+                     if json.loads(x)['kind'] == 'model']
+            nightly = [c for c in calls if c in ('daily_digest', 'group_impressions', 'notebook')]
+            self.assertEqual(nightly[:3], ['daily_digest', 'group_impressions', 'notebook'])
+            evs = [json.loads(x) for x in (out / 'data' / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()]
+            self.assertEqual([(e['kind'], e['origin']['where'], e['origin']['visibility']) for e in evs],
+                             [('daily_digest', 'group:' + fake.G_SMALL, 'public')])
+            result = audit_replay.audit(out, self.chat)
+            self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
+
     def test_only_a_service_on_this_computer(self):
         with tempfile.TemporaryDirectory() as tmp:
             proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(self.chat),
