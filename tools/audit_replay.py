@@ -304,6 +304,8 @@ def audit(replay_dir, chat) -> dict:
     result = {"pass": all(c.fails == 0 for c in checks.values()),
               "prompts": Counter(p["kind"] for p in prompts), "checks": {k: c.report() for k, c in checks.items()},
               "limits": LIMITS}
+    if meta.get("stopped"):   # the replay broke off: what was not replayed was not checked
+        result = dict({"unfinished": "回放没跑完（%s）：没回放到的部分没有查" % meta["stopped"]}, **result)
     if meta.get("old_forgets") == "let-in":
         result["checks"]["forgotten"]["skipped"] = "the replay let the old forgets in: nothing to look for"
     report.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -339,6 +341,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     result = audit(args.replay, args.chat)
+    if result.get("unfinished"):
+        print("!!! " + result["unfinished"])
     print(json.dumps({"pass": result["pass"], "fails": {k: v["fails"] for k, v in result["checks"].items()}},
                      ensure_ascii=False))
     raise SystemExit(0 if result["pass"] else 1)

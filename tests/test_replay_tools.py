@@ -372,17 +372,23 @@ class ReplayOptions(unittest.TestCase):
             proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(self.chat),
                                    '--old-forgets', 'let-in', '--no-canaries', '--out', str(out),
                                    '--digest', '--impressions', '--notebook',
-                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash', '--model-limit', '800'],
+                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash', '--model-limit', '800',
+                                   '--model-ledger', str(out.parent / 'model-calls.json'), '--new-pass'],
                                   env=dict(os.environ, PYTHONHASHSEED='0'), capture_output=True, text=True,
                                   encoding='utf-8', timeout=300)
             self.assertEqual(proc.returncode, 3, proc.stderr)
             self.assertIn('模型连续失败 3 次', proc.stderr)
+            self.assertIn('this run may use: 800', proc.stdout)
             summary = json.loads((out / 'replay.json').read_text('utf-8'))
             self.assertEqual(summary['stopped'], '3 model failures in a row')
             self.assertEqual((summary['stats']['model_calls'], summary['stats']['model_failed']), (3, 3))
             self.assertNotIn('model_refused_after_failures', summary['stats'])   # nothing asked after it
             ledger = json.loads((out.parent / 'model-calls.json').read_text('utf-8'))
-            self.assertEqual(ledger['total'], 3)
+            self.assertEqual((ledger['limit'], ledger['total']), (800, 3))
+            # the audit says the replay did not finish
+            result = audit_replay.audit(out, self.chat)
+            self.assertIn('回放没跑完', result['unfinished'])
+            self.assertEqual(list(result)[0], 'unfinished')
             self.assertNotIn(KEY, proc.stdout + proc.stderr)
 
     def test_only_a_service_on_this_computer(self):
@@ -543,33 +549,67 @@ class RealModel(unittest.TestCase):
         from tools import replay
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'model-calls.json'
-            path.write_text(json.dumps({'runs': {'r1 earlier': 5}}), encoding='utf-8')
-            ledger = replay.Ledger(path, 'r2 now')
-            self.assertEqual(ledger.before, 5)
+            first = replay.Ledger(path, 'r1 earlier', 7, new=True)       # a new pass: the limit is written
+            first.record(5)
+            ledger = replay.Ledger(path, 'r2 now', 7)
+            self.assertEqual((ledger.limit, ledger.before, ledger.left), (7, 5, 2))
+            self.assertEqual(replay.Ledger(path, 'r3 smaller', 6).left, 1)   # a lower one is fine
             sent = []
 
             def post(messages):
                 sent.append(json.loads(path.read_text('utf-8'))['total'])   # counted before it is sent
                 return {'choices': [{'message': {'content': '好'}}]}
-            gate = replay.ModelGate(post, 7 - ledger.before, {}, Counter(), io.StringIO(),
+            gate = replay.ModelGate(post, ledger.left, {}, Counter(), io.StringIO(),
                                     type('C', (), {'now': 0.0})(), {'place': ''}, ledger)
             got = [gate.chat('notebook', str(i)) for i in range(4)]
             self.assertEqual(got, ['好', '好', '', ''])
             self.assertEqual(sent, [6, 7])
-            self.assertEqual(json.loads(path.read_text('utf-8')), {'runs': {'r1 earlier': 5, 'r2 now': 2}, 'total': 7})
+            self.assertEqual(json.loads(path.read_text('utf-8')),
+                             {'limit': 7, 'runs': {'r1 earlier': 5, 'r2 now': 2}, 'total': 7})
+            # a higher limit, a second new pass, no ledger: none of them runs
+            for args, said in ((('r4', 800), 'above the ledger'), (('r5', 7, True), 'already there')):
+                with self.assertRaises(SystemExit) as stop:
+                    replay.Ledger(path, *args)
+                self.assertIn(said, str(stop.exception))
+            with self.assertRaises(SystemExit) as stop:
+                replay.Ledger(Path(tmp) / 'gone.json', 'r6', 7)
+            self.assertIn('--new-pass', str(stop.exception))
 
-    def test_used_up_by_the_runs_before(self):
+    def test_no_way_around_the_ledger(self):
+        def run(tmp, out, *extra):
+            return subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
+                                   '--old-forgets', 'let-in', '--out', str(out),
+                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash', *extra],
+                                  capture_output=True, text=True, encoding='utf-8', timeout=60)
         with tempfile.TemporaryDirectory() as tmp:
             made_up_astrbot(Path(tmp) / 'astrbot')
             chat = fake.build_chat(Path(tmp) / 'chat.db')
-            (Path(tmp) / 'model-calls.json').write_text(json.dumps({'runs': {'r1': 600, 'r2': 200}}), encoding='utf-8')
-            proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
-                                   '--old-forgets', 'let-in', '--out', str(Path(tmp) / 'r3'),
-                                   '--astrbot', str(Path(tmp) / 'astrbot'), '--model', 'ds/flash', '--model-limit', '800'],
-                                  capture_output=True, text=True, encoding='utf-8', timeout=60)
-            self.assertNotEqual(proc.returncode, 0)
-            self.assertIn('used up', proc.stderr)
-            self.assertFalse((Path(tmp) / 'r3').exists())
+            ledger = Path(tmp) / 'pass' / 'model-calls.json'
+            ledger.parent.mkdir()
+            ledger.write_text(json.dumps({'limit': 800, 'runs': {'r1': 600, 'r2': 200}}), encoding='utf-8')
+            cases = {
+                # used up, with the output in another folder than the runs before
+                'used up': ('--model-limit', '800', '--model-ledger', str(ledger)),
+                # a higher limit than the owner's
+                'above the ledger': ('--model-limit', '1600', '--model-ledger', str(ledger)),
+                # the ledger lost or moved: not a new count unless said so
+                '--new-pass': ('--model-limit', '800', '--model-ledger', str(Path(tmp) / 'elsewhere.json')),
+                # a new pass where there is one
+                'already there': ('--model-limit', '800', '--model-ledger', str(ledger), '--new-pass'),
+                # no ledger named at all
+                '--model-ledger': ('--model-limit', '800'),
+                # a ledger in the repository
+                'inside the repository': ('--model-limit', '800', '--model-ledger', str(ROOT / 'model-calls.json'),
+                                          '--new-pass'),
+            }
+            for said, extra in cases.items():
+                out = Path(tmp) / 'other' / said.strip('-').replace(' ', '_')
+                proc = run(tmp, out, *extra)
+                self.assertNotEqual(proc.returncode, 0, said)
+                self.assertIn(said, proc.stderr, said)
+                self.assertFalse(out.exists(), said)
+            self.assertFalse((ROOT / 'model-calls.json').exists())
+            self.assertEqual(json.loads(ledger.read_text('utf-8'))['runs'], {'r1': 600, 'r2': 200})
 
     def test_a_real_model_needs_a_limit(self):
         with tempfile.TemporaryDirectory() as tmp:

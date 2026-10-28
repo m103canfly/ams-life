@@ -4,7 +4,8 @@
         [--aliases <aliases.jsonl>] [--embed-url http://127.0.0.1:11434/v1/embeddings [--embed-model bge-m3]]
         [--impressions] [--old-forgets keep-out|let-in] [--forget-me optout|cutoff] [--remember-replies]
         [--no-canaries] [--limit N]
-        [--digest] [--notebook] [--astrbot <AstrBot data dir> --model <provider id> --model-limit N [--model-cap kind=N]]
+        [--digest] [--notebook] [--astrbot <AstrBot data dir> --model <provider id> --model-limit N
+         --model-ledger <file> [--new-pass] [--model-cap kind=N]]
 
 Run 1 of the step-1 gate: no model, no network. The plugin is driven through its real hooks
 (on_message for every message, on_llm_request / on_llm_response when someone woke the old
@@ -31,10 +32,17 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
   starts and only goes into the request header; it is never printed, logged or written, and
   is not taken on the command line. The provider's address is the one other address the
   replay may reach (no proxy, no redirect: a 3xx is a failed call). --model-limit is a hard
-  limit on calls of every run of this pass together (failed ones count, none is retried): the
-  calls are counted in a ledger next to --out (<out>/../model-calls.json, or --model-ledger),
-  counted before each call is sent, and a run starts only with what is left. Once that is reached, or
-  a kind's --model-cap, the plugin gets an empty answer and nothing is sent. After three
+  limit on calls of every run of this pass together (failed ones count, none is retried):
+  - the calls are counted in the ledger --model-ledger names (there is no default; outside the
+    repository and any AstrBot data folder), each before it is sent;
+  - the ledger holds the limit it was started with (--new-pass starts one, and only when there
+    is none): a run with a higher --model-limit, or with no ledger and no --new-pass, does not
+    run, so a lost or moved ledger never starts the count again;
+  - a run starts only with what is left, and says so on the screen first (where the ledger
+    is, the limit, what the runs before used, what this one may use);
+  - never two runs of one pass at the same time: each writes the ledger as it read it.
+  Once the limit is reached, or a kind's --model-cap, the plugin gets an empty answer and
+  nothing is sent. After three
   failures in a row the replay stops there and says so (exit code 3). Every call's kind,
   tokens and answer go to answers.jsonl; replay.json has the totals and the connections
   made, by address.
@@ -249,21 +257,40 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Ledger:
-    """Model calls of every run of one pass, in a JSON file next to the runs' folders:
-    {"runs": {run: calls}, "total"}. Written before each call is sent, so a run that breaks
-    off counts too."""
+    """Model calls of every run of one pass, in a JSON file: {"limit", "runs": {run: calls},
+    "total"}. `new` starts one (and there must be none yet); otherwise it must be there. The
+    limit is the one it was started with. Written before each call is sent, so a run that
+    breaks off counts too."""
 
-    def __init__(self, path, run):
+    def __init__(self, path, run, limit, new=False):
         self.path, self.run = Path(path), str(run)
-        data = json.loads(self.path.read_text("utf-8")) if self.path.exists() else {}
-        self.runs = {str(k): int(v) for k, v in (data.get("runs") or {}).items()}
+        if new:
+            if self.path.exists():
+                raise SystemExit("--new-pass, but the ledger %s is already there: not run" % self.path)
+            self.limit, self.runs = int(limit), {}
+            self._write()
+        else:
+            if not self.path.exists():
+                raise SystemExit("no model ledger at %s (a new pass: say --new-pass): not run" % self.path)
+            data = json.loads(self.path.read_text("utf-8"))
+            self.limit = int(data.get("limit") or 0)
+            self.runs = {str(k): int(v) for k, v in (data.get("runs") or {}).items()}
+            if self.limit <= 0:
+                raise SystemExit("the model ledger %s has no limit: not run" % self.path)
+            if int(limit) > self.limit:
+                raise SystemExit("--model-limit %d is above the ledger's limit %d (the owner's): not run"
+                                 % (int(limit), self.limit))
         self.before = sum(n for k, n in self.runs.items() if k != self.run)
+        self.left = min(int(limit), self.limit) - self.before
 
     def record(self, calls) -> None:
         self.runs[self.run] = int(calls)
+        self._write()
+
+    def _write(self) -> None:
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"runs": self.runs, "total": sum(self.runs.values())}, ensure_ascii=False,
-                                  indent=1), encoding="utf-8")
+        tmp.write_text(json.dumps({"limit": self.limit, "runs": self.runs, "total": sum(self.runs.values())},
+                                  ensure_ascii=False, indent=1), encoding="utf-8")
         tmp.replace(self.path)
 
 
@@ -503,8 +530,10 @@ def main(argv=None):
     ap.add_argument("--model", help="run 2: that provider's id, e.g. deepseek/deepseek-flash")
     ap.add_argument("--model-limit", type=int, default=0,
                     help="run 2: at most this many model calls in all, every run of this pass together")
-    ap.add_argument("--model-ledger", help="run 2: where the calls of every run are counted "
-                                           "(default: model-calls.json next to --out)")
+    ap.add_argument("--model-ledger", help="run 2: the file the calls of every run of this pass are counted in "
+                                           "(needed; it holds the limit too)")
+    ap.add_argument("--new-pass", action="store_true",
+                    help="run 2: start the ledger (only when there is none): the first run of a pass")
     ap.add_argument("--model-cap", action="append", default=[], metavar="KIND=N",
                     help="run 2: at most N calls of one kind (event_summary, memory_summary, group_impressions, "
                          "notebook...)")
@@ -514,8 +543,8 @@ def main(argv=None):
     sys.stderr.reconfigure(encoding="utf-8")
     if args.old_forgets == "keep-out" and not args.registry:
         ap.error("--registry is needed to keep out what was forgotten (or say --old-forgets let-in)")
-    if bool(args.astrbot) != bool(args.model) or (args.astrbot and args.model_limit <= 0):
-        ap.error("a real model needs --astrbot, --model and --model-limit (above 0)")
+    if bool(args.astrbot) != bool(args.model) or (args.astrbot and (args.model_limit <= 0 or not args.model_ledger)):
+        ap.error("a real model needs --astrbot, --model, --model-limit (above 0) and --model-ledger")
     caps = {}
     for cap in args.model_cap:
         kind, _, n = cap.partition("=")
@@ -535,11 +564,14 @@ def main(argv=None):
         u = urllib.parse.urlsplit(model_base)
         allowed.add((u.hostname, u.port or 443))
         persona = astrbot_persona(args.astrbot) or PERSONA
-        ledger = Ledger(args.model_ledger or Path(args.out).resolve().parent / "model-calls.json",
-                        "%s %s" % (Path(args.out).name, time.strftime("%Y-%m-%d %H:%M:%S")))
-        if ledger.before >= args.model_limit:
+        ledger = Ledger(_guard.output_file(args.model_ledger, "the model ledger"),
+                        "%s %s" % (Path(args.out).name, time.strftime("%Y-%m-%d %H:%M:%S")),
+                        args.model_limit, new=args.new_pass)
+        print("model ledger: %s; limit %d; used by the runs before: %d; this run may use: %d"
+              % (ledger.path, ledger.limit, ledger.before, max(0, ledger.left)), flush=True)
+        if ledger.left <= 0:
             raise SystemExit("the model limit (%d) is used up by the runs before (%d calls): not run"
-                             % (args.model_limit, ledger.before))
+                             % (ledger.limit, ledger.before))
     started = time.perf_counter()
     loop = asyncio.new_event_loop()   # before the guard: on Windows it connects to itself
     asyncio.set_event_loop(loop)
@@ -629,7 +661,7 @@ def main(argv=None):
     gate = None
     if post:
         answers = open(out / "answers.jsonl", "w", encoding="utf-8")
-        gate = ModelGate(post, args.model_limit - ledger.before, caps, stats, answers, clock, current, ledger)
+        gate = ModelGate(post, ledger.left, caps, stats, answers, clock, current, ledger)
 
     class ModelProvider(harness.FakeProvider):
         """Run 2: the real model, through the gate, for one kind of call."""
@@ -800,6 +832,7 @@ def main(argv=None):
                "model": ("%s (%s)" % (model_name, model_base)) if post else "fake",
                "model_limit": args.model_limit if post else 0, "model_caps": caps,
                "model_calls_before": ledger.before if post else 0,
+               "model_ledger": str(ledger.path) if post else "",
                "stopped": "%d model failures in a row" % ModelGate.STOP_AFTER if stopped() else "",
                "own_loop": own_loop, "places_after_nightly_jobs": sorted(places_after),
                "seconds": round(time.perf_counter() - started, 1),
