@@ -13,6 +13,7 @@
     <div class="side-label">WORKSPACE</div>
     <nav class="nav">
       <button class="nav-item active" data-view="overview"><span class="ni-icon">◉</span><span>情绪概览</span></button>
+      <button class="nav-item" data-view="brain"><span class="ni-icon">✦</span><span>她的脑子</span></button>
       <button class="nav-item" data-view="intent"><span class="ni-icon">↗</span><span>表达意图</span></button>
       <button class="nav-item" data-view="persona"><span class="ni-icon">◐</span><span>人格自我</span></button>
       <button class="nav-item" data-view="sessions"><span class="ni-icon">▤</span><span>活动会话</span></button>
@@ -140,6 +141,11 @@
       </div>
     </section>
 
+    <!-- ams-life: the brain map (./brain/, built by tools/brain/build.mjs), loaded on the first visit; brain_frame.js -->
+    <section class="view" id="view-brain">
+      <div class="brain-bar"><span class="hint">她的记忆画成一个能转的星球。只读：这里改不了她。</span><button type="button" class="btn" id="brainFill">铺满</button></div>
+      <div class="brain-box" id="brainBox"></div>
+    </section>
     <section class="view" id="view-intent">
       <div class="section-title"><div><div class="eyebrow">TRANSLATION</div><h2>表达意图</h2></div><span class="hint">只看倾向，不生成台词</span></div>
       <div class="persona-tabs fold-grid" id="intentTabs">
@@ -585,5 +591,6 @@
     <footer class="statusbar"><span>BioCore is a tendency layer, not a script.</span><span id="footTime"></span></footer>
   </main>
 </div>
+<script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script>
 <script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261027-0215"></script><script src="./orb.js?v=20261027-0215"></script>
 </body></html>

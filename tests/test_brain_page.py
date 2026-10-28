@@ -2,7 +2,9 @@
 
 The page is built by tools/brain/build.mjs from tools/brain/src/ (our code plus
 the vendored Galaxy View renderer, MIT) and three.js / d3-force-3d into one file,
-brain.bundle.js. Static checks of the page files run everywhere. The sample-format
+brain.bundle.js, next to the page itself (src/page/). The same folder is written
+twice, to pages/brain/ and pages/dashboard/brain/ (the panel shows it; AstrBot
+serves a page only from its own folder). Static checks of the page files run everywhere. The sample-format
 checks run the sample generator with Node.js when it is installed (skipped
 otherwise); no browser, no network.
 """
@@ -15,9 +17,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = ROOT / 'pages' / 'brain'
+PANEL_COPY = ROOT / 'pages' / 'dashboard' / 'brain'
 SRC = ROOT / 'tools' / 'brain' / 'src'
 FILES = sorted(p for p in PAGE.iterdir() if p.is_file())
-OURS = [SRC / 'brain.js', SRC / 'data.js', PAGE / 'index.html', PAGE / 'sample.js']
+# our own code: the page's, and the panel's part that shows it (brain_frame.js)
+CODE = [SRC / 'brain.js', SRC / 'data.js', SRC / 'embed.js', ROOT / 'pages' / 'dashboard' / 'brain_frame.js']
+OURS = [SRC / 'brain.js', SRC / 'data.js', SRC / 'page' / 'index.html', SRC / 'page' / 'sample.js']
+GENERATED = '<!-- 由 tools/brain/build.mjs 生成，改 tools/brain/src/（page/index.html），不要手改这一份。 -->'
 
 # What the graph may carry for one point: categories and ids, never content.
 NODE_KEYS = {'id', 'kind', 'sub', 'label', 'cat', 'where', 'ts', 'w', 'vis', 'self'}
@@ -30,7 +36,7 @@ INERT_URLS = {'http://www.w3.org/1999/xhtml', 'https://jcgt.org/published/0007/0
 
 class StaysLocal(unittest.TestCase):
     def test_nothing_is_loaded_from_or_sent_to_the_network(self):
-        for f in FILES + [SRC / 'brain.js', SRC / 'data.js']:
+        for f in FILES + CODE:
             text = f.read_text(encoding='utf-8')
             for bad in ('fetch(', 'XMLHttpRequest', 'WebSocket', 'sendBeacon', 'EventSource',
                         'importScripts', '@import', 'import('):
@@ -62,7 +68,7 @@ class StaysLocal(unittest.TestCase):
 
 class ReadOnly(unittest.TestCase):
     def test_page_never_writes(self):
-        for f in FILES + [SRC / 'brain.js', SRC / 'data.js']:
+        for f in FILES + CODE:
             text = f.read_text(encoding='utf-8')
             for bad in ('apiPost', 'apiPut', 'apiDelete', 'apiPatch'):
                 self.assertFalse(bad in text, f'{f.name} contains {bad!r}')
@@ -79,10 +85,30 @@ class ReadOnly(unittest.TestCase):
         self.assertNotIn('textContent = d.qq', text)   # the number comes from its own call, not the detail
 
     def test_bundle_is_built_from_this_source(self):
-        bundle = (PAGE / 'brain.bundle.js').read_text(encoding='utf-8')
-        self.assertTrue(bundle.startswith('/* ams-life brain map (AGPL-3.0)'))
-        for marker in ('page/brain/node', '没说 · ', '想被看见'):   # strings only our source has
-            self.assertIn(marker, bundle)
+        for page in (PAGE, PANEL_COPY):
+            bundle = (page / 'brain.bundle.js').read_text(encoding='utf-8')
+            self.assertTrue(bundle.startswith('/* ams-life brain map (AGPL-3.0)'), page)
+            for marker in ('page/brain/node', '没说 · ', '想被看见', 'ams-brain-embed'):   # strings only our source has
+                self.assertIn(marker, bundle, page)
+            # the page itself is the one in src/page/, with the line saying it is generated
+            for name in ('brain.css', 'sample.js'):
+                self.assertEqual((page / name).read_bytes(), (SRC / 'page' / name).read_bytes(), name)
+            html = (page / 'index.html').read_text(encoding='utf-8')
+            self.assertEqual(html.splitlines()[1], GENERATED)
+            self.assertEqual(html.replace(GENERATED + '\n', '', 1), (SRC / 'page' / 'index.html').read_text(encoding='utf-8'))
+
+
+class TwoCopies(unittest.TestCase):
+    """pages/brain/ and pages/dashboard/brain/ are the same build, byte for byte."""
+
+    def test_the_same_files_byte_for_byte(self):
+        def files(root):
+            return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob('*')) if p.is_file()}
+        mine, panel = files(PAGE), files(PANEL_COPY)
+        self.assertEqual(sorted(mine), sorted(panel))
+        self.assertIn('licenses/README.md', mine)
+        for name in mine:
+            self.assertEqual(mine[name], panel[name], name)
 
 
 class LinesOnlyWhenRecalled(unittest.TestCase):
@@ -298,7 +324,7 @@ class SampleFormat(unittest.TestCase):
                   'process.stdout.write(JSON.stringify(BrainSample.make({n: Number(process.argv[2])})));')
         cls.made = {}
         for n in (300, 900):
-            out = subprocess.run(['node', '-e', script, str(PAGE / 'sample.js'), str(n)],
+            out = subprocess.run(['node', '-e', script, str(SRC / 'page' / 'sample.js'), str(n)],
                                  capture_output=True, text=True, encoding='utf-8', timeout=60, check=True).stdout
             cls.made[n] = json.loads(out)
 

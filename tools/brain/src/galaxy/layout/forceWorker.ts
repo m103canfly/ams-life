@@ -33,7 +33,8 @@ type InMsg =
 	| InitMsg
 	| { type: 'params'; params: LayoutParams }
 	| { type: 'reheat'; alpha: number }
-	| { type: 'buffer'; buffer: ArrayBuffer };
+	| { type: 'buffer'; buffer: ArrayBuffer }
+	| { type: 'pause'; on: boolean }; // ams-life: stop ticking while the map is not shown
 
 interface WorkerCtx {
 	onmessage: ((e: MessageEvent) => void) | null;
@@ -51,6 +52,7 @@ let settled = true;
 let tickCount = 0;
 let needPost = false;
 let scheduled = false;
+let paused = false; // ams-life
 
 function linkStrengthFn(mult: number): (link: SimLink<WNode>) => number {
 	return (link) => {
@@ -86,7 +88,7 @@ function schedule(): void {
 function run(): void {
 	scheduled = false;
 	const s = sim;
-	if (!s || settled) return;
+	if (!s || settled || paused) return;
 	const t0 = Date.now();
 	// 批量 tick：每批最多 12ms，主线程按消费节奏取最新帧
 	while (Date.now() - t0 < 12) {
@@ -170,6 +172,10 @@ ctx.onmessage = (e: MessageEvent) => {
 				settled = false;
 				schedule();
 			}
+			break;
+		case 'pause': // ams-life: the map is hidden; go on where it was when shown again
+			paused = msg.on;
+			if (!paused && sim && !settled) schedule();
 			break;
 		case 'buffer':
 			freeBuffers.push(msg.buffer);

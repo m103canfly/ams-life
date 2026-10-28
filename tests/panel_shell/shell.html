@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<!-- A stand-in for AstrBot's web panel around the plugin page (serve.py). Invented data only. -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" /><title>外壳：AstrBot 插件页（模拟）</title>
+<style>html,body{margin:0;height:100%;background:#222}iframe{display:block;width:100%;height:100%;border:0}</style>
+</head>
+<body>
+<!-- as AstrBot's PluginViewPage: sandboxed without allow-same-origin, no allowfullscreen -->
+<iframe id="view" sandbox="allow-scripts allow-forms allow-downloads" referrerpolicy="no-referrer"
+        src="/api/v1/plugins/ams_life/views/dashboard/_t/made-up-token/"></iframe>
+<script src="/shell/sample.js"></script>
+<script src="/shell/host.js"></script>
+</body>
+</html>

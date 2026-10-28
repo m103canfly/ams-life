@@ -96,6 +96,11 @@ export class WorkerForceLayout implements LayoutEngine {
 		this.worker?.postMessage({ type: 'reheat', alpha });
 	}
 
+	/** ams-life: stop (and go on with) the ticking while the map is not shown. */
+	pause(on: boolean): void {
+		this.worker?.postMessage({ type: 'pause', on });
+	}
+
 	updateParams(params: LayoutParams): void {
 		this.settled = false;
 		this.worker?.postMessage({ type: 'params', params });
