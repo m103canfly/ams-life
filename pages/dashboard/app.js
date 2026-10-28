@@ -1066,6 +1066,7 @@
     if(Array.isArray(c.places)&&c.places.length) t+="；地方："+c.places.map(shortSession).join("、");
     const a=c.astrbot||{};
     if(Number(a.conversations||0)||Number(a.message_history||0)) t+="；AstrBot 对话 "+Number(a.conversations||0)+" 个、消息记录 "+Number(a.message_history||0)+" 条";
+    if(Number(c.archived_copies||0)>0) t+="。迁移前的备份里还有删之前的旧数据（memory/archive/ 里 "+Number(c.archived_copies)+" 份，没有动）";
     return t;
   }
   let forgetArmed=null;

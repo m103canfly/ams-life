@@ -527,9 +527,16 @@ class PagesMixin:
             counts = self._owner_forget_memory(entry_id)
             if counts is None:
                 return {"status": "error", "message": "memory entry not found", "data": {}}
+            counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"id": entry_id, "deleted": True, "counts": counts}}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}
+
+    @staticmethod
+    def _archived_library_copies() -> int:
+        """The library as it was before a migration, kept in memory/archive/ (the owner decided
+        a delete leaves these alone); the panel says they still hold the old data."""
+        return len(list(MEMORY_ARCHIVE_DIR.glob("*.json"))) if MEMORY_ARCHIVE_DIR.exists() else 0
 
     async def page_impression_delete(self, person=None):
         """The owner deletes what she thinks of someone (panel only; the page asks to confirm
@@ -568,6 +575,7 @@ class PagesMixin:
             umos = self._place_umos()
             counts = self._owner_forget_person(person)
             counts["astrbot"] = await self._forget_in_astrbot(person, umos)
+            counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"person": person, "counts": counts}}
         except Exception as exc:
             return {"status": "error", "message": str(exc)[:180], "data": {}}

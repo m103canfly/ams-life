@@ -56,6 +56,7 @@ class OwnerDeletes(unittest.TestCase):
         self.assertEqual(counts['places'], ['group:900001', 'private:10001'])
         # what AstrBot keeps: his private conversation, his rows of the message history
         self.assertEqual(counts['astrbot'], {'conversations': 1, 'message_history': 2})
+        self.assertEqual(counts['archived_copies'], 0)                  # nothing was migrated here
         self.assertEqual(r['astrbot']['conversations'], ['default:FriendMessage:10001'])
         self.assertEqual(r['astrbot']['history_left'], ['10002', '10004'])
         # registered: what he says afterwards is not kept either
@@ -92,6 +93,8 @@ class OwnerDeletes(unittest.TestCase):
         self.assertEqual(r['user_10002']['interactions'], 7)
         self.assertEqual(r['events'].strip(), '')
         self.assertEqual(r['vector_ids'], [])                      # their vectors went with them
+        # the library copied before the vectors moved out still holds the old data: the panel says so
+        self.assertEqual(r['by_message']['data']['counts']['archived_copies'], 1)
 
 
 class NoChatCommands(unittest.TestCase):
