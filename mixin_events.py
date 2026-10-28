@@ -13,6 +13,15 @@ except ImportError:
     from body import *  # noqa: F401,F403
 
 
+def _merged_origin(item, other) -> dict:
+    """ams-life: the origin of `item` once `other` has been merged into it: every person and
+    every source id of both, the stricter visibility; it stays where `item` was."""
+    mine = discretion.origin_of(item)
+    both = discretion.merge([mine, other])
+    return discretion.make_origin(mine["where"] or both["where"], both["people"],
+                                  both["source_ids"], both["visibility"])
+
+
 class EventsMixin:
     def _summary_cap(self, text) -> str:
         value = str(text or "")
@@ -937,7 +946,7 @@ class EventsMixin:
         (time_span) + text signals (source_texts/title/summary/body); the
         richer/newer row is kept and the poorer row is merged into it
         (source_texts union, importance/centrality/recall maxima, provenance,
-        summary_history). Group sessions -- including the 664198103 test group
+        summary_history). Group sessions -- including the test group
         -- and unrelated rows are never touched. The global archive and every
         affected per-session archive are rewritten atomically; each merge is
         appended to dedupe_log.jsonl and a marker keeps the migration
@@ -1043,6 +1052,10 @@ class EventsMixin:
             except Exception:
                 pass
             try:
+                rich["origin"] = _merged_origin(rich, discretion.origin_of(poor))  # ams-life
+            except Exception:
+                pass
+            try:
                 rich["merge_count"] = int(rich.get("merge_count", 0) or 0) + 1
                 merged_from = [str(x) for x in (rich.get("merged_from") or [])]
                 poor_id = str(poor.get("id") or "")
@@ -1060,7 +1073,7 @@ class EventsMixin:
             if not session or not row_id:
                 kept.append(row)
                 continue
-            # Requirement: group events (the 664198103 test group and other
+            # Requirement: group events (the test group and other
             # group chats) are out of scope for this private-session migration.
             if ":GroupMessage:" in session or ":GuildMessage:" in session:
                 kept.append(row)
@@ -1939,6 +1952,7 @@ class EventsMixin:
             _new_ts = float(record.get("ts", 0) or 0)
             _new_sources = list((record.get("provenance") or {}).get("sources") or [])[:12]
             _new_texts = list(record.get("source_texts") or [])[:12]
+            _new_origin = discretion.origin_of(record)
 
             def _mutate(obj):
                 if str(obj.get("id") or "") != prev_id:
@@ -1968,6 +1982,8 @@ class EventsMixin:
                         sources.append(_item)
                 prov["sources"] = sources[-24:]
                 obj["provenance"] = prov
+                # ams-life: whoever said the merged lines is in the origin too
+                obj["origin"] = _merged_origin(obj, _new_origin)
                 return True
 
             session = str(prev.get("session") or record.get("session") or "default")
@@ -2046,7 +2062,7 @@ class EventsMixin:
                 score = 0.35 * imp + 0.25 * schema + 0.20 * novelty + 0.20 * cue_score
                 if imp < 0.55 or score < 0.40:
                     continue
-                candidates.append((score, seg_text, seg_entries, vec, schema, imp))
+                candidates.append((score, seg_text, seg_entries, vec, schema, imp, list(seg_texts)))
             if len(candidates) > 1 and getattr(self, "event_ranking_llm", False):
                 _docs = [c[1] for c in candidates]
                 _rs = await self._rerank_scores(
@@ -2054,15 +2070,19 @@ class EventsMixin:
                 if _rs:
                     candidates = [
                         (round(0.6 * c[0] + 0.4 * float(_rs.get(i, 0.0)), 4),
-                         c[1], c[2], c[3], c[4], c[5])
+                         c[1], c[2], c[3], c[4], c[5], c[6])
                         for i, c in enumerate(candidates)
                     ]
             candidates.sort(key=lambda x: x[0], reverse=True)
             _digest_event_ids = []
-            for score, body, seg_entries, vec, schema, imp in candidates[:2]:
+            for score, body, seg_entries, vec, schema, imp, seg_texts in candidates[:2]:
+                # ams-life: seg_texts is this candidate's own (BioCore read the variable the
+                # segment loop above left behind: the last segment's texts)
                 title = interpretation.clean_event_title(body) or "对话事件"
                 _ekey = self._normalize_event_key(title, title)
-                prov = self._event_provenance(event, entries, ts=now)
+                # ams-life: the sources are the entries this event was made of (BioCore took
+                # the last 24 of all), and the origin takes in each one's origin
+                prov = self._event_provenance(event, seg_entries, ts=now)
                 check = self._source_check(body, [str(t) for t in seg_entries],
                                            provenance=prov, record_ts=now)
                 # task-56: duplicate detection compares the real message time
@@ -2117,6 +2137,10 @@ class EventsMixin:
                     "ranking_mode": "deterministic_embedding",
                     "milestone": relationship_meta.milestone_from_text(title + " " + body),
                 }
+                _o = discretion.merge([discretion.origin_of(e) for e in seg_entries]
+                                      + [discretion.origin_of({"provenance": prov})])
+                record["origin"] = discretion.make_origin(self._here(event), _o["people"],
+                                                          _o["source_ids"], _o["visibility"])
                 if vec:
                     record["event_embedding"] = [round(float(x), 5) for x in vec]
                 try:

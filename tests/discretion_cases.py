@@ -119,7 +119,7 @@ def turn(plugin, loop, delay, text, sender, name, group=None, reply='嗯嗯', pa
 def run():
     config = {}
     if CASE in ('forget', 'strong_event', 'consolidate', 'wait_event', 'wait_embed',
-                'wait_archive', 'wait_consolidate'):  # summaries on, as in the golden 'full' run
+                'wait_archive', 'wait_consolidate', 'turn_event', 'summary_origin'):  # summaries on, as in the golden 'full' run
         config = {'llm_only_reply_summary': False, 'memory_worthiness_enabled': False}
     plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
@@ -256,6 +256,118 @@ def run():
         loop.run_until_complete(one_message())
         harness.drain(loop)
         out['after'] = snapshot(plugin)
+    elif CASE == 'wait_lock':
+        # his message is in (on_message), then waits for the session lock while she is still
+        # answering the one before; meanwhile he says "forget me"
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        event = harness.FakeEvent('小爱 记得提醒我明天交报告', sender='10001', name='芒果', group=A)
+        req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
+
+        async def one_message():  # AstrBot runs one message, in to reply, in one task
+            await plugin.on_message(event)
+            await asyncio.sleep(0)  # the session lock
+            out['forgot'] = plugin._forget(person='10001')
+            await plugin.on_llm_request(event, req)
+            await plugin.on_llm_response(event, LLMResponse('好的，明天提醒你'))
+        loop.run_until_complete(one_message())
+        harness.drain(loop)
+        out['after'] = snapshot(plugin)
+    elif CASE == 'merge_event':
+        # a strong event in group A, then a duplicate of it made of what 阿星 said there
+        place = 'group:' + A
+        plugin._begin_job()
+        first = {'id': 'evt_a', 'ts': clock.now, 'session': 'default:GroupMessage:' + A,
+                 'title': '周末去看海', 'event': '周末去看海', 'event_key': '周末去看海',
+                 'source_texts': ['我们周末去看海吧'],
+                 'provenance': {'sender_id': '10002', 'session': 'default:GroupMessage:' + A,
+                                'message_refs': ['m_lemon'], 'sources': []},
+                 'origin': main.discretion.make_origin(place, ['10002'], ['m_lemon'])}
+        dup = {'id': 'evt_b', 'ts': clock.now + 60, 'session': 'default:GroupMessage:' + A,
+               'title': '周末去看海', 'event': '周末去看海', 'event_key': '周末去看海2',
+               'source_texts': ['看海我也要去，我带相机'],
+               'provenance': {'sender_id': '10003', 'session': 'default:GroupMessage:' + A,
+                              'message_refs': ['m_star'],
+                              'sources': [{'sender_id': '10003', 'message_refs': ['m_star']}]},
+               'origin': main.discretion.make_origin(place, ['10003'], ['m_star'])}
+        plugin._append_event_archive(dict(first))
+        plugin._merge_archive_duplicate(dict(first), dup)
+        out['merged'] = snapshot(plugin)['events']
+        out['merged_raw'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
+                             if x.strip()]
+        out['forgot_by_id'] = plugin._forget(source_ids=['m_star'])
+        out['after_by_id'] = snapshot(plugin)['events']
+        plugin._begin_job()
+        plugin._append_event_archive(dict(first))
+        plugin._merge_archive_duplicate(dict(first), dup)
+        out['forgot_person'] = plugin._forget(person='10003')
+        out['after_person'] = snapshot(plugin)['events']
+    elif CASE == 'cleanup_merge':
+        # BioCore's one-time cleanup folds a poorer duplicate row into a richer one
+        session = 'default:FriendMessage:10001'
+        place = 'private:10001'
+        rows = [{'id': 'evt_rich', 'ts': clock.now, 'session': session, 'summary_status': 'llm',
+                 'title': '约好周六去看海', 'event': '约好周六去看海', 'event_key': '看海',
+                 'source_texts': ['我们约好周六去看海'],
+                 'origin': main.discretion.make_origin(place, ['10001'], ['m_one'])},
+                {'id': 'evt_poor', 'ts': clock.now + 30, 'session': session,
+                 'title': '约好周六去看海', 'event': '约好周六去看海', 'event_key': '看海2',
+                 'source_texts': ['我们约好周六去看海', '记得带相机'],
+                 'origin': main.discretion.make_origin(place, ['10001'], ['m_two'])}]
+        (DATA / 'archives').mkdir(parents=True, exist_ok=True)
+        (DATA / 'archives' / 'events.jsonl').write_text(
+            ''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), 'utf-8')
+        out['merged_count'] = plugin._cleanup_duplicate_events(force=True)
+        out['merged_raw'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
+                             if x.strip()]
+        out['forgot'] = plugin._forget(source_ids=['m_two'])
+        out['after'] = snapshot(plugin)['events']
+    elif CASE == 'turn_event':
+        # the per-turn archive makes an event of an older stretch (阿星's three lines);
+        # the 27 later lines are 柠檬's small talk, too unimportant for an event
+        place = 'group:' + A
+        entries = []
+        for i, text in enumerate(('我答应你以后一定去看海', '以后我们永远一起去看海，我承诺', '别害怕，我答应过你的')):
+            entries.append({'id': 's%d' % i, 'text': text, 'role': 'user', 'ts': clock.now - 9000 + 10 * i,
+                            'importance': 0.9, 'sender_id': '10003', 'vector': [],
+                            'provenance': {'sender_id': '10003', 'session': 'default:GroupMessage:' + A,
+                                           'ts': clock.now - 9000 + 10 * i, 'message_refs': ['m_star%d' % i]},
+                            'origin': main.discretion.make_origin(place, ['10003'], ['m_star%d' % i])})
+        for i in range(27):
+            entries.append({'id': 'l%d' % i, 'text': '嗯嗯好', 'role': 'user', 'ts': clock.now - 3000 + 10 * i,
+                            'importance': 0.1, 'sender_id': '10002', 'vector': [],
+                            'provenance': {'sender_id': '10002', 'session': 'default:GroupMessage:' + A,
+                                           'ts': clock.now - 3000 + 10 * i, 'message_refs': ['m_lemon%d' % i]},
+                            'origin': main.discretion.make_origin(place, ['10002'], ['m_lemon%d' % i])})
+        lemon = harness.FakeEvent('嗯嗯好', sender='10002', name='柠檬', group=A)
+        plugin._begin_job()
+        loop.run_until_complete(plugin._archive_ranked_events_deterministic(lemon, plugin._core(None), entries))
+        out['events'] = snapshot(plugin)['events']
+        out['events_raw'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
+                             if x.strip()]
+        out['forgot'] = plugin._forget(person='10003')
+        out['after'] = snapshot(plugin)['events']
+    elif CASE == 'summary_origin':
+        # one of the memories a summary is made of had another message merged into it earlier
+        for delay, text in ((0, '小爱，我们群周末要去爬山'), (20, '我们群周末要去爬山，小爱'),
+                            (20, '周末我们群要去爬山')):
+            t(delay, text, '10002', '柠檬', A, reply='好呀')
+        path = DATA / 'memory' / 'library.json'
+        lib = json.loads(path.read_text('utf-8'))
+        for e in lib['entries']:
+            if e.get('text') == '周末我们群要去爬山':
+                e['origin']['people'].append('10003')
+                e['origin']['source_ids'].append('m_star')
+        path.write_text(json.dumps(lib, ensure_ascii=False), 'utf-8')
+        lemon = harness.FakeEvent('x', sender='10002', name='柠檬', group=A)
+        plugin._begin_job()
+        loop.run_until_complete(plugin._consolidate_memory(lemon, plugin._core(None), force=True))
+        harness.drain(loop)
+        lib = json.loads(path.read_text('utf-8'))
+        out['summaries'] = [{'text': e.get('text'), 'origin': e.get('origin')} for e in lib['entries']
+                            if e.get('role') == 'summary' or e.get('candidate_origin') == 'llm']
+        out['forgot'] = plugin._forget(source_ids=['m_star'])
+        lib = json.loads(path.read_text('utf-8'))
+        out['after'] = [e.get('text') for e in lib['entries']]
     elif CASE == 'quote':
         # 芒果 quotes 柠檬's message; forgetting by message id finds each by its own id only
         first = t(0, '周末一起去爬山吧', '10002', '柠檬', A)

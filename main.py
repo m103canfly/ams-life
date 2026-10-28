@@ -552,7 +552,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
         if not self.enabled or not self.inject_intent:
             return
-        self._begin_job()
+        # the mark on_message set when the message came in: AstrBot may hold the message
+        # for the session lock (the previous one still waiting for the model) before this
+        self._continue_job()
         await self._ensure_profile(event)
         core = self._core(event)
         try:

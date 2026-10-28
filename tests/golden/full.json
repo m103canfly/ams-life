@@ -249,16 +249,7 @@
       "10001"
      ],
      "source_ids": [
-      "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
-      "m真的受够了！"
+      "m我还是好生气"
      ],
      "visibility": "private",
      "where": "private:10001"
@@ -266,155 +257,15 @@
     "peripheral_details": "",
     "provenance": {
      "message_refs": [
-      "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
-      "m真的受够了！"
+      "m我还是好生气"
      ],
      "sender_id": "10001",
      "sender_name": "芒果",
      "senders": [
-      "10001",
-      "self"
+      "10001"
      ],
      "session": "default:FriendMessage:10001",
      "sources": [
-      {
-       "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [
-        "m真的受够了！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
       {
        "message_refs": [
         "m我还是好生气"
@@ -434,141 +285,11 @@
     "small_summary": "我还是好生气！",
     "source_check": {
      "coverage": 0.179,
-     "cross_ref": 17,
+     "cross_ref": 1,
      "length_ratio": 0.011,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [
-        "m真的受够了！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
       {
        "message_refs": [
         "m我还是好生气"
@@ -670,16 +391,8 @@
       "10001"
      ],
      "source_ids": [
-      "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
-      "m真的受够了！"
+      "m真的受够了！",
+      "m我还是好生气"
      ],
      "visibility": "private",
      "where": "private:10001"
@@ -688,14 +401,6 @@
     "provenance": {
      "message_refs": [
       "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
       "m真的受够了！"
      ],
      "sender_id": "10001",
@@ -708,120 +413,6 @@
      "sources": [
       {
        "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [
         "m真的受够了！"
        ],
        "sender_id": "10001",
@@ -835,15 +426,6 @@
        "sender_name": "她",
        "session": "default:FriendMessage:10001",
        "ts": 1793271870.0
-      },
-      {
-       "message_refs": [
-        "m我还是好生气"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793272490.0
       }
      ],
      "ts": 1793272490.0
@@ -855,125 +437,11 @@
     "small_summary": "真的受够了！",
     "source_check": {
      "coverage": 0.197,
-     "cross_ref": 17,
+     "cross_ref": 2,
      "length_ratio": 0.007,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
       {
        "message_refs": [
         "m真的受够了！"
@@ -989,15 +457,6 @@
        "sender_name": "她",
        "session": "default:FriendMessage:10001",
        "ts": 1793271870.0
-      },
-      {
-       "message_refs": [
-        "m我还是好生气"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793272490.0
       }
      ],
      "speaker_ok": true,
@@ -1006,7 +465,8 @@
     },
     "source_count": 2,
     "source_texts": [
-     "我还是好生气！！！凭什么啊！！！"
+     "真的受够了！！！气死了！！！",
+     "先别气坏自己"
     ],
     "strength": 0.596,
     "summary_status": "fallback",
@@ -1190,19 +650,10 @@
     "modalities": [],
     "origin": {
      "people": [
-      "10003",
-      "10002",
-      "10005"
+      "10003"
      ],
      "source_ids": [
-      "m小爱 我们约",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好"
+      "m小爱 我们约"
      ],
      "visibility": "public",
      "where": "group:900001"
@@ -1210,137 +661,15 @@
     "peripheral_details": "",
     "provenance": {
      "message_refs": [
-      "m小爱 我们约",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好"
+      "m小爱 我们约"
      ],
      "sender_id": "10003",
      "sender_name": "阿星",
      "senders": [
-      "10002",
-      "10003",
-      "10005",
-      "self"
+      "10003"
      ],
      "session": "default:GroupMessage:900001",
      "sources": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
       {
        "message_refs": [
         "m小爱 我们约"
@@ -1360,123 +689,11 @@
     "small_summary": "小爱 我们约好下周一起打副本吧",
     "source_check": {
      "coverage": 0.23,
-     "cross_ref": 15,
+     "cross_ref": 1,
      "length_ratio": 0.01,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
       {
        "message_refs": [
         "m小爱 我们约"
@@ -1579,21 +796,11 @@
     "modalities": [],
     "origin": {
      "people": [
-      "10003",
-      "10002",
-      "10005"
+      "10003"
      ],
      "source_ids": [
-      "m小爱 报告我",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好",
-      "m小爱 我们约",
-      "m记得提醒我明"
+      "m记得提醒我明",
+      "m小爱 报告我"
      ],
      "visibility": "public",
      "where": "group:900001"
@@ -1602,154 +809,15 @@
     "provenance": {
      "message_refs": [
       "m小爱 报告我",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好",
-      "m小爱 我们约",
       "m记得提醒我明"
      ],
      "sender_id": "10003",
      "sender_name": "阿星",
      "senders": [
-      "10002",
-      "10003",
-      "10005",
-      "self"
+      "10003"
      ],
      "session": "default:GroupMessage:900001",
      "sources": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
       {
        "message_refs": [
         "m记得提醒我明"
@@ -1758,15 +826,6 @@
        "sender_name": "阿星",
        "session": "default:GroupMessage:900001",
        "ts": 1793272920.0
-      },
-      {
-       "message_refs": [
-        "m小爱 报告我"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793276520.0
       }
      ],
      "ts": 1793276520.0
@@ -1778,139 +837,11 @@
     "small_summary": "记得提醒我明天交报告",
     "source_check": {
      "coverage": 0.172,
-     "cross_ref": 18,
+     "cross_ref": 1,
      "length_ratio": 0.006,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
       {
        "message_refs": [
         "m记得提醒我明"
@@ -1919,15 +850,6 @@
        "sender_name": "阿星",
        "session": "default:GroupMessage:900001",
        "ts": 1793272920.0
-      },
-      {
-       "message_refs": [
-        "m小爱 报告我"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793276520.0
       }
      ],
      "speaker_ok": true,
@@ -1936,7 +858,7 @@
     },
     "source_count": 1,
     "source_texts": [
-     "小爱 报告我交了"
+     "记得提醒我明天交报告"
     ],
     "strength": 0.56,
     "summary_status": "fallback",
@@ -2127,16 +1049,7 @@
       "10001"
      ],
      "source_ids": [
-      "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
-      "m真的受够了！"
+      "m我还是好生气"
      ],
      "visibility": "private",
      "where": "private:10001"
@@ -2144,155 +1057,15 @@
     "peripheral_details": "",
     "provenance": {
      "message_refs": [
-      "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
-      "m真的受够了！"
+      "m我还是好生气"
      ],
      "sender_id": "10001",
      "sender_name": "芒果",
      "senders": [
-      "10001",
-      "self"
+      "10001"
      ],
      "session": "default:FriendMessage:10001",
      "sources": [
-      {
-       "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [
-        "m真的受够了！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
       {
        "message_refs": [
         "m我还是好生气"
@@ -2312,141 +1085,11 @@
     "small_summary": "我还是好生气！",
     "source_check": {
      "coverage": 0.179,
-     "cross_ref": 17,
+     "cross_ref": 1,
      "length_ratio": 0.011,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [
-        "m真的受够了！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271870.0
-      },
       {
        "message_refs": [
         "m我还是好生气"
@@ -2548,16 +1191,8 @@
       "10001"
      ],
      "source_ids": [
-      "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
-      "m真的受够了！"
+      "m真的受够了！",
+      "m我还是好生气"
      ],
      "visibility": "private",
      "where": "private:10001"
@@ -2566,14 +1201,6 @@
     "provenance": {
      "message_refs": [
       "m我还是好生气",
-      "m小爱早呀，今",
-      "m就唱上次那首",
-      "m明天要考试了",
-      "m你还记得我早",
-      "m小爱 我考完",
-      "m小爱 我好难",
-      "m今天被骂了 ",
-      "m气死我了！！",
       "m真的受够了！"
      ],
      "sender_id": "10001",
@@ -2586,120 +1213,6 @@
      "sources": [
       {
        "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [
         "m真的受够了！"
        ],
        "sender_id": "10001",
@@ -2713,15 +1226,6 @@
        "sender_name": "她",
        "session": "default:FriendMessage:10001",
        "ts": 1793271870.0
-      },
-      {
-       "message_refs": [
-        "m我还是好生气"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793272490.0
       }
      ],
      "ts": 1793272490.0
@@ -2733,125 +1237,11 @@
     "small_summary": "真的受够了！",
     "source_check": {
      "coverage": 0.197,
-     "cross_ref": 17,
+     "cross_ref": 2,
      "length_ratio": 0.007,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱早呀，今"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000000.0
-      },
-      {
-       "message_refs": [
-        "m就唱上次那首"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793000090.0
-      },
-      {
-       "message_refs": [
-        "m明天要考试了"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011740.0
-      },
-      {
-       "message_refs": [
-        "m你还记得我早"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793011770.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我考完"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793098170.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我好难"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271800.0
-      },
-      {
-       "message_refs": [
-        "m今天被骂了 "
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271820.0
-      },
-      {
-       "message_refs": [
-        "m气死我了！！"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793271840.0
-      },
       {
        "message_refs": [
         "m真的受够了！"
@@ -2867,15 +1257,6 @@
        "sender_name": "她",
        "session": "default:FriendMessage:10001",
        "ts": 1793271870.0
-      },
-      {
-       "message_refs": [
-        "m我还是好生气"
-       ],
-       "sender_id": "10001",
-       "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
-       "ts": 1793272490.0
       }
      ],
      "speaker_ok": true,
@@ -2884,7 +1265,8 @@
     },
     "source_count": 2,
     "source_texts": [
-     "我还是好生气！！！凭什么啊！！！"
+     "真的受够了！！！气死了！！！",
+     "先别气坏自己"
     ],
     "strength": 0.596,
     "summary_status": "fallback",
@@ -3070,19 +1452,10 @@
     "modalities": [],
     "origin": {
      "people": [
-      "10003",
-      "10002",
-      "10005"
+      "10003"
      ],
      "source_ids": [
-      "m小爱 我们约",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好"
+      "m小爱 我们约"
      ],
      "visibility": "public",
      "where": "group:900001"
@@ -3090,137 +1463,15 @@
     "peripheral_details": "",
     "provenance": {
      "message_refs": [
-      "m小爱 我们约",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好"
+      "m小爱 我们约"
      ],
      "sender_id": "10003",
      "sender_name": "阿星",
      "senders": [
-      "10002",
-      "10003",
-      "10005",
-      "self"
+      "10003"
      ],
      "session": "default:GroupMessage:900001",
      "sources": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
       {
        "message_refs": [
         "m小爱 我们约"
@@ -3240,123 +1491,11 @@
     "small_summary": "小爱 我们约好下周一起打副本吧",
     "source_check": {
      "coverage": 0.23,
-     "cross_ref": 15,
+     "cross_ref": 1,
      "length_ratio": 0.01,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
       {
        "message_refs": [
         "m小爱 我们约"
@@ -3459,21 +1598,11 @@
     "modalities": [],
     "origin": {
      "people": [
-      "10003",
-      "10002",
-      "10005"
+      "10003"
      ],
      "source_ids": [
-      "m小爱 报告我",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好",
-      "m小爱 我们约",
-      "m记得提醒我明"
+      "m记得提醒我明",
+      "m小爱 报告我"
      ],
      "visibility": "public",
      "where": "group:900001"
@@ -3482,154 +1611,15 @@
     "provenance": {
      "message_refs": [
       "m小爱 报告我",
-      "m小爱 你说今",
-      "m我已经歪了三",
-      "m小爱帮我们算",
-      "m小爱 今天群",
-      "m小爱 你是A",
-      "m太开心了！！",
-      "m啊啊啊啊 好",
-      "m小爱 我们约",
       "m记得提醒我明"
      ],
      "sender_id": "10003",
      "sender_name": "阿星",
      "senders": [
-      "10002",
-      "10003",
-      "10005",
-      "self"
+      "10003"
      ],
      "session": "default:GroupMessage:900001",
      "sources": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
       {
        "message_refs": [
         "m记得提醒我明"
@@ -3638,15 +1628,6 @@
        "sender_name": "阿星",
        "session": "default:GroupMessage:900001",
        "ts": 1793272920.0
-      },
-      {
-       "message_refs": [
-        "m小爱 报告我"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793276520.0
       }
      ],
      "ts": 1793276520.0
@@ -3658,139 +1639,11 @@
     "small_summary": "记得提醒我明天交报告",
     "source_check": {
      "coverage": 0.172,
-     "cross_ref": 18,
+     "cross_ref": 1,
      "length_ratio": 0.006,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
-      {
-       "message_refs": [
-        "m小爱 你说今"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000690.0
-      },
-      {
-       "message_refs": [
-        "m我已经歪了三"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000730.0
-      },
-      {
-       "message_refs": [
-        "m小爱帮我们算"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793000790.0
-      },
-      {
-       "message_refs": [
-        "m小爱 今天群"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098470.0
-      },
-      {
-       "message_refs": [
-        "m小爱 你是A"
-       ],
-       "sender_id": "10005",
-       "sender_name": "路人",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793098530.0
-      },
-      {
-       "message_refs": [
-        "m太开心了！！"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271380.0
-      },
-      {
-       "message_refs": [
-        "m啊啊啊啊 好"
-       ],
-       "sender_id": "10002",
-       "sender_name": "柠檬",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793271400.0
-      },
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
-      {
-       "message_refs": [],
-       "sender_id": "self",
-       "sender_name": "她",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      },
       {
        "message_refs": [
         "m记得提醒我明"
@@ -3799,15 +1652,6 @@
        "sender_name": "阿星",
        "session": "default:GroupMessage:900001",
        "ts": 1793272920.0
-      },
-      {
-       "message_refs": [
-        "m小爱 报告我"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793276520.0
       }
      ],
      "speaker_ok": true,
@@ -3816,7 +1660,7 @@
     },
     "source_count": 1,
     "source_texts": [
-     "小爱 报告我交了"
+     "记得提醒我明天交报告"
     ],
     "strength": 0.56,
     "summary_status": "fallback",
@@ -11223,21 +9067,11 @@
      "modalities": [],
      "origin": {
       "people": [
-       "10003",
-       "10002",
-       "10005"
+       "10003"
       ],
       "source_ids": [
-       "m小爱 报告我",
-       "m小爱 你说今",
-       "m我已经歪了三",
-       "m小爱帮我们算",
-       "m小爱 今天群",
-       "m小爱 你是A",
-       "m太开心了！！",
-       "m啊啊啊啊 好",
-       "m小爱 我们约",
-       "m记得提醒我明"
+       "m记得提醒我明",
+       "m小爱 报告我"
       ],
       "visibility": "public",
       "where": "group:900001"
@@ -11246,154 +9080,15 @@
      "provenance": {
       "message_refs": [
        "m小爱 报告我",
-       "m小爱 你说今",
-       "m我已经歪了三",
-       "m小爱帮我们算",
-       "m小爱 今天群",
-       "m小爱 你是A",
-       "m太开心了！！",
-       "m啊啊啊啊 好",
-       "m小爱 我们约",
        "m记得提醒我明"
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
       "senders": [
-       "10002",
-       "10003",
-       "10005",
-       "self"
+       "10003"
       ],
       "session": "default:GroupMessage:900001",
       "sources": [
-       {
-        "message_refs": [
-         "m小爱 你说今"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [
-         "m我已经歪了三"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [
-         "m小爱帮我们算"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [
-         "m小爱 今天群"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [
-         "m小爱 你是A"
-        ],
-        "sender_id": "10005",
-        "sender_name": "路人",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [
-         "m太开心了！！"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [
-         "m啊啊啊啊 好"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我们约"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793272890.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793272890.0
-       },
        {
         "message_refs": [
          "m记得提醒我明"
@@ -11402,15 +9097,6 @@
         "sender_name": "阿星",
         "session": "default:GroupMessage:900001",
         "ts": 1793272920.0
-       },
-       {
-        "message_refs": [
-         "m小爱 报告我"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793276520.0
        }
       ],
       "ts": 1793276520.0
@@ -11422,139 +9108,11 @@
      "small_summary": "记得提醒我明天交报告",
      "source_check": {
       "coverage": 0.172,
-      "cross_ref": 18,
+      "cross_ref": 1,
       "length_ratio": 0.006,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
-       {
-        "message_refs": [
-         "m小爱 你说今"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [
-         "m我已经歪了三"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [
-         "m小爱帮我们算"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [
-         "m小爱 今天群"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [
-         "m小爱 你是A"
-        ],
-        "sender_id": "10005",
-        "sender_name": "路人",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [
-         "m太开心了！！"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [
-         "m啊啊啊啊 好"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我们约"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793272890.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793272890.0
-       },
        {
         "message_refs": [
          "m记得提醒我明"
@@ -11563,15 +9121,6 @@
         "sender_name": "阿星",
         "session": "default:GroupMessage:900001",
         "ts": 1793272920.0
-       },
-       {
-        "message_refs": [
-         "m小爱 报告我"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793276520.0
        }
       ],
       "speaker_ok": true,
@@ -11580,7 +9129,7 @@
      },
      "source_count": 1,
      "source_texts": [
-      "小爱 报告我交了"
+      "记得提醒我明天交报告"
      ],
      "strength": 0.56,
      "summary_status": "fallback",
@@ -11663,19 +9212,10 @@
      "modalities": [],
      "origin": {
       "people": [
-       "10003",
-       "10002",
-       "10005"
+       "10003"
       ],
       "source_ids": [
-       "m小爱 我们约",
-       "m小爱 你说今",
-       "m我已经歪了三",
-       "m小爱帮我们算",
-       "m小爱 今天群",
-       "m小爱 你是A",
-       "m太开心了！！",
-       "m啊啊啊啊 好"
+       "m小爱 我们约"
       ],
       "visibility": "public",
       "where": "group:900001"
@@ -11683,137 +9223,15 @@
      "peripheral_details": "",
      "provenance": {
       "message_refs": [
-       "m小爱 我们约",
-       "m小爱 你说今",
-       "m我已经歪了三",
-       "m小爱帮我们算",
-       "m小爱 今天群",
-       "m小爱 你是A",
-       "m太开心了！！",
-       "m啊啊啊啊 好"
+       "m小爱 我们约"
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
       "senders": [
-       "10002",
-       "10003",
-       "10005",
-       "self"
+       "10003"
       ],
       "session": "default:GroupMessage:900001",
       "sources": [
-       {
-        "message_refs": [
-         "m小爱 你说今"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [
-         "m我已经歪了三"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [
-         "m小爱帮我们算"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [
-         "m小爱 今天群"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [
-         "m小爱 你是A"
-        ],
-        "sender_id": "10005",
-        "sender_name": "路人",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [
-         "m太开心了！！"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [
-         "m啊啊啊啊 好"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
        {
         "message_refs": [
          "m小爱 我们约"
@@ -11833,123 +9251,11 @@
      "small_summary": "小爱 我们约好下周一起打副本吧",
      "source_check": {
       "coverage": 0.23,
-      "cross_ref": 15,
+      "cross_ref": 1,
       "length_ratio": 0.01,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
-       {
-        "message_refs": [
-         "m小爱 你说今"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000690.0
-       },
-       {
-        "message_refs": [
-         "m我已经歪了三"
-        ],
-        "sender_id": "10003",
-        "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000730.0
-       },
-       {
-        "message_refs": [
-         "m小爱帮我们算"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793000790.0
-       },
-       {
-        "message_refs": [
-         "m小爱 今天群"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098470.0
-       },
-       {
-        "message_refs": [
-         "m小爱 你是A"
-        ],
-        "sender_id": "10005",
-        "sender_name": "路人",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793098530.0
-       },
-       {
-        "message_refs": [
-         "m太开心了！！"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271380.0
-       },
-       {
-        "message_refs": [
-         "m啊啊啊啊 好"
-        ],
-        "sender_id": "10002",
-        "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:GroupMessage:900001",
-        "ts": 1793271400.0
-       },
        {
         "message_refs": [
          "m小爱 我们约"
@@ -12155,16 +9461,8 @@
        "10001"
       ],
       "source_ids": [
-       "m我还是好生气",
-       "m小爱早呀，今",
-       "m就唱上次那首",
-       "m明天要考试了",
-       "m你还记得我早",
-       "m小爱 我考完",
-       "m小爱 我好难",
-       "m今天被骂了 ",
-       "m气死我了！！",
-       "m真的受够了！"
+       "m真的受够了！",
+       "m我还是好生气"
       ],
       "visibility": "private",
       "where": "private:10001"
@@ -12173,14 +9471,6 @@
      "provenance": {
       "message_refs": [
        "m我还是好生气",
-       "m小爱早呀，今",
-       "m就唱上次那首",
-       "m明天要考试了",
-       "m你还记得我早",
-       "m小爱 我考完",
-       "m小爱 我好难",
-       "m今天被骂了 ",
-       "m气死我了！！",
        "m真的受够了！"
       ],
       "sender_id": "10001",
@@ -12193,120 +9483,6 @@
       "sources": [
        {
         "message_refs": [
-         "m小爱早呀，今"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [
-         "m就唱上次那首"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [
-         "m明天要考试了"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [
-         "m你还记得我早"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我考完"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我好难"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271800.0
-       },
-       {
-        "message_refs": [
-         "m今天被骂了 "
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271820.0
-       },
-       {
-        "message_refs": [
-         "m气死我了！！"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [
          "m真的受够了！"
         ],
         "sender_id": "10001",
@@ -12320,15 +9496,6 @@
         "sender_name": "她",
         "session": "default:FriendMessage:10001",
         "ts": 1793271870.0
-       },
-       {
-        "message_refs": [
-         "m我还是好生气"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793272490.0
        }
       ],
       "ts": 1793272490.0
@@ -12340,125 +9507,11 @@
      "small_summary": "真的受够了！",
      "source_check": {
       "coverage": 0.197,
-      "cross_ref": 17,
+      "cross_ref": 2,
       "length_ratio": 0.007,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
-       {
-        "message_refs": [
-         "m小爱早呀，今"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [
-         "m就唱上次那首"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [
-         "m明天要考试了"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [
-         "m你还记得我早"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我考完"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我好难"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271800.0
-       },
-       {
-        "message_refs": [
-         "m今天被骂了 "
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271820.0
-       },
-       {
-        "message_refs": [
-         "m气死我了！！"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
        {
         "message_refs": [
          "m真的受够了！"
@@ -12474,15 +9527,6 @@
         "sender_name": "她",
         "session": "default:FriendMessage:10001",
         "ts": 1793271870.0
-       },
-       {
-        "message_refs": [
-         "m我还是好生气"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793272490.0
        }
       ],
       "speaker_ok": true,
@@ -12491,7 +9535,8 @@
      },
      "source_count": 2,
      "source_texts": [
-      "我还是好生气！！！凭什么啊！！！"
+      "真的受够了！！！气死了！！！",
+      "先别气坏自己"
      ],
      "strength": 0.596,
      "summary_status": "fallback",
@@ -12577,16 +9622,7 @@
        "10001"
       ],
       "source_ids": [
-       "m我还是好生气",
-       "m小爱早呀，今",
-       "m就唱上次那首",
-       "m明天要考试了",
-       "m你还记得我早",
-       "m小爱 我考完",
-       "m小爱 我好难",
-       "m今天被骂了 ",
-       "m气死我了！！",
-       "m真的受够了！"
+       "m我还是好生气"
       ],
       "visibility": "private",
       "where": "private:10001"
@@ -12594,155 +9630,15 @@
      "peripheral_details": "",
      "provenance": {
       "message_refs": [
-       "m我还是好生气",
-       "m小爱早呀，今",
-       "m就唱上次那首",
-       "m明天要考试了",
-       "m你还记得我早",
-       "m小爱 我考完",
-       "m小爱 我好难",
-       "m今天被骂了 ",
-       "m气死我了！！",
-       "m真的受够了！"
+       "m我还是好生气"
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
       "senders": [
-       "10001",
-       "self"
+       "10001"
       ],
       "session": "default:FriendMessage:10001",
       "sources": [
-       {
-        "message_refs": [
-         "m小爱早呀，今"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [
-         "m就唱上次那首"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [
-         "m明天要考试了"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [
-         "m你还记得我早"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我考完"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我好难"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271800.0
-       },
-       {
-        "message_refs": [
-         "m今天被骂了 "
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271820.0
-       },
-       {
-        "message_refs": [
-         "m气死我了！！"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [
-         "m真的受够了！"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271870.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271870.0
-       },
        {
         "message_refs": [
          "m我还是好生气"
@@ -12762,141 +9658,11 @@
      "small_summary": "我还是好生气！",
      "source_check": {
       "coverage": 0.179,
-      "cross_ref": 17,
+      "cross_ref": 1,
       "length_ratio": 0.011,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
-       {
-        "message_refs": [
-         "m小爱早呀，今"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000000.0
-       },
-       {
-        "message_refs": [
-         "m就唱上次那首"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793000090.0
-       },
-       {
-        "message_refs": [
-         "m明天要考试了"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011740.0
-       },
-       {
-        "message_refs": [
-         "m你还记得我早"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793011770.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我考完"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793098170.0
-       },
-       {
-        "message_refs": [
-         "m小爱 我好难"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271800.0
-       },
-       {
-        "message_refs": [
-         "m今天被骂了 "
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271820.0
-       },
-       {
-        "message_refs": [
-         "m气死我了！！"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271840.0
-       },
-       {
-        "message_refs": [
-         "m真的受够了！"
-        ],
-        "sender_id": "10001",
-        "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271870.0
-       },
-       {
-        "message_refs": [],
-        "sender_id": "self",
-        "sender_name": "她",
-        "session": "default:FriendMessage:10001",
-        "ts": 1793271870.0
-       },
        {
         "message_refs": [
          "m我还是好生气"

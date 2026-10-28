@@ -172,8 +172,8 @@
     const k=String(label||"").trim();
     return INTERO_LABELS[k]||k||"—";
   }
-  // AstrBot session keys look like "default:FriendMessage:2396952936"
-  // (event archive) or "default_FriendMessage_2396952936" (memory file stem).
+  // AstrBot session keys look like "default:FriendMessage:<QQ号>"
+  // (event archive) or "default_FriendMessage_<QQ号>" (memory file stem).
   // Render them as Chinese labels: 私聊 · <名字> / 群聊 · <群号>.
   const SESSION_TYPE_LABELS={FriendMessage:"私聊",GroupMessage:"群聊",GuildMessage:"频道",TempMessage:"临时会话",OtherMessage:"其他"};
   function parseSessionKey(key){

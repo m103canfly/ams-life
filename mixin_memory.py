@@ -803,6 +803,11 @@ class MemoryMixin:
                         "message_refs": list(_p.get("message_refs") or [])[:6],
                     } for _p in _src_prov][-24:],
                 }
+                # ams-life: a summary (and any fact drawn from it) comes from every entry of
+                # its group: all their people and source ids, not just each one's sender
+                _go = discretion.merge([discretion.origin_of(entries[i]) for i in group])
+                _group_origin = discretion.make_origin(self._here(event), _go["people"],
+                                                       _go["source_ids"], _go["visibility"])
                 _summary_source = "inferred"
                 _summary_conf = memory_meta.initial_confidence(_summary_source, importance)
                 entries.append({"id": _sum_id, "text": self._summary_cap(summary), "role": "summary",
@@ -810,6 +815,7 @@ class MemoryMixin:
                                 "vector": vec, "ts": now, "hits": 1,
                                 "importance": importance, "last_used": now,
                                 "summary_id": _sum_id, "provenance": _summary_prov,
+                                "origin": _group_origin,
                                 "memory_source": _summary_source,
                                 "memory_confidence": _summary_conf,
                                 "memory_tier": "warm", "conflict": False,
@@ -849,6 +855,12 @@ class MemoryMixin:
                             vector=_cvec, now=now, provenance=_summary_prov)
                         _entry = _res.get("entry")
                         if _res.get("op") in ("ADD", "UPDATE") and isinstance(_entry, dict):
+                            # ams-life: a new fact comes from the group; an updated one now
+                            # holds words of the group as well as its own
+                            _prev = [discretion.origin_of(_entry)] if _res.get("op") == "UPDATE" else []
+                            _co = discretion.merge(_prev + [_group_origin])
+                            _entry["origin"] = discretion.make_origin(self._here(event), _co["people"],
+                                                                      _co["source_ids"], _co["visibility"])
                             self._apply_memory_encoding(_entry, core, now, _ctext)
                             memory_meta.append_write_log(
                                 doc, op=_res["op"], entry_id=str(_entry.get("id") or ""),

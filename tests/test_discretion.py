@@ -86,6 +86,11 @@ class Table(unittest.TestCase):
                                         'message_refs': ['m1']}})
         self.assertEqual(o, {'where': 'private:7', 'people': ['7'], 'source_ids': ['m1'], 'visibility': d.PRIVATE})
 
+    def test_origin_keeps_every_person_and_source(self):
+        # no cap: whoever is left out of an origin could not be forgotten
+        o = d.make_origin('group:1', [str(i) for i in range(100)], ['m%d' % i for i in range(200)])
+        self.assertEqual((len(o['people']), len(o['source_ids'])), (100, 200))
+
     def test_anonymize(self):
         self.assertEqual(d.anonymize('芒果：明天考试（10001）', ['芒果', '10001']), '有人：明天考试（有人）')
 
@@ -290,6 +295,68 @@ class ForgetWhileReplying(unittest.TestCase):
             self.assertNotIn('爬山记得带水哦', [x['text'] for x in win['recent']])
         # someone else in the same group is untouched
         self.assertIn('小爱 早上好', [x['text'] for x in a['phone']['group:900001']['recent']])
+
+
+class ForgetWhileWaitingForTheLock(unittest.TestCase):
+    def test_forgotten_while_his_message_waits_for_the_session_lock(self):
+        # on_message sets the mark; the request and the reply keep it
+        r = run_case('wait_lock')
+        self.assertEqual(r['forgot']['phone'], 1)  # the line on_message had stored
+        a = r['after']
+        self.assertFalse([m for m in a['memories']
+                          if m['sender_id'] == '10001' or '10001' in (m['origin'] or {}).get('people', [])])
+        self.assertFalse([e for e in a['events'] if '10001' in e['origin']['people']])
+        self.assertNotIn('10001', a['users'])
+        for win in a['phone'].values():
+            self.assertFalse([x for x in win['recent'] + win['open_loops'] if '10001' in x['origin']['people']])
+            self.assertFalse([x for x in win['open_loops'] if '交报告' in str(x.get('text'))])
+        self.assertIn('小爱 早上好', [m['text'] for m in a['memories']])
+
+
+class MergedRecordsKeepEveryOrigin(unittest.TestCase):
+    """Whatever is merged into a record brings its people and source ids into its origin."""
+
+    def test_duplicate_strong_event(self):
+        r = run_case('merge_event')
+        [ev] = r['merged_raw']
+        self.assertIn('看海我也要去，我带相机', ev['source_texts'])
+        self.assertEqual(ev['origin']['people'], ['10002', '10003'])
+        self.assertEqual(ev['origin']['source_ids'], ['m_lemon', 'm_star'])
+        self.assertEqual(ev['origin']['where'], 'group:900001')
+        # forgetting by the merged message or by its speaker removes the whole event
+        self.assertEqual(r['forgot_by_id']['events'], 1)
+        self.assertEqual(r['after_by_id'], [])
+        self.assertEqual(r['forgot_person']['events'], 1)
+        self.assertEqual(r['after_person'], [])
+
+    def test_one_time_duplicate_cleanup(self):
+        r = run_case('cleanup_merge')
+        self.assertEqual(r['merged_count'], 1)
+        [ev] = r['merged_raw']
+        self.assertIn('记得带相机', ev['source_texts'])
+        self.assertEqual(ev['origin']['source_ids'], ['m_one', 'm_two'])
+        self.assertEqual(r['after'], [])
+
+    def test_per_turn_event_is_made_of_its_own_entries(self):
+        r = run_case('turn_event')
+        [ev] = r['events']
+        self.assertIn('10003', ev['origin']['people'])
+        for i in range(3):
+            self.assertIn('m_star%d' % i, ev['origin']['source_ids'])
+        self.assertNotIn('嗯嗯好', ev['text'])
+        [raw] = r['events_raw']
+        self.assertEqual(raw['source_texts'], ['我答应你以后一定去看海', '以后我们永远一起去看海，我承诺', '别害怕，我答应过你的'])
+        self.assertEqual(r['forgot']['events'], 1)
+        self.assertEqual(r['after'], [])
+
+    def test_summary_and_facts_take_the_origin_of_their_whole_group(self):
+        r = run_case('summary_origin')
+        self.assertTrue(r['summaries'])
+        for item in r['summaries']:
+            self.assertIn('m_star', item['origin']['source_ids'])
+            self.assertIn('10003', item['origin']['people'])
+        for item in r['summaries']:
+            self.assertNotIn(item['text'], r['after'])
 
 
 class QuotedMessages(unittest.TestCase):

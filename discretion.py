@@ -63,9 +63,10 @@ def make_origin(where, people=(), source_ids=(), visibility=None) -> dict:
     where = place_of(where)
     seen_people = [str(p) for p in (people or []) if str(p or "") not in _NOT_PEOPLE]
     seen_ids = [str(s) for s in (source_ids or []) if str(s or "")]
+    # no cap: whoever or whatever is left out could not be forgotten
     return {"where": where,
-            "people": list(dict.fromkeys(seen_people))[:24],
-            "source_ids": list(dict.fromkeys(seen_ids))[:48],
+            "people": list(dict.fromkeys(seen_people)),
+            "source_ids": list(dict.fromkeys(seen_ids)),
             "visibility": visibility if visibility in (PUBLIC, PRIVATE, SELF) else visibility_of(where)}
 
 
