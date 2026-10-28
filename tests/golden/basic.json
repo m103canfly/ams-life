@@ -1,6 +1,6 @@
 {
  "command_learning": [
-  "[BioCore] learning enabled=True retention=single\n{\"version\": 1, \"params\": {\"regulation_q\": {\"express\": 0.00296}, \"trust_alpha\": 0.3, \"learning_rate\": 0.2}, \"last_update\": 1793271840.0, \"updates_count\": 1, \"log\": [{\"ts\": 1793271840.0, \"param\": \"regulation_q.express\", \"old\": 0.0, \"new\": 0.00296, \"reason\": \"delta_stress\", \"samples\": 5}], \"evidence\": {\"regulation_q\": {\"express\": {\"n\": 2, \"sum_pe\": 0.17948968591401165}, \"label_emotion\": {\"n\": 2, \"sum_pe\": 0.2240232221522447}, \"distraction\": {\"n\": 4, \"sum_pe\": 0.702179776346959}}}}"
+  "[BioCore] learning enabled=True retention=single\n{\"version\": 1, \"params\": {\"regulation_q\": {\"express\": 0.00495}, \"trust_alpha\": 0.3, \"learning_rate\": 0.2}, \"last_update\": 1793272490.0, \"updates_count\": 1, \"log\": [{\"ts\": 1793272490.0, \"param\": \"regulation_q.express\", \"old\": 0.0, \"new\": 0.00495, \"reason\": \"delta_stress\", \"samples\": 5}], \"evidence\": {\"regulation_q\": {\"express\": {\"n\": 0, \"sum_pe\": 0.0}, \"label_emotion\": {\"n\": 1, \"sum_pe\": 0.10220241467531646}, \"suppress\": {\"n\": 1, \"sum_pe\": 0.048545787938237134}, \"reappraise\": {\"n\": 1, \"sum_pe\": 0.10373328798479338}}}}"
  ],
  "command_readiness": [
   "[BioCore] readiness: disabled (proactive_autonomy=false)\nproactive_send=False"
@@ -8,10 +8,6 @@
  "files": {
   "api_config.json": {
    "functions": {
-    "diary": {
-     "enabled": false,
-     "provider": "follow_llm"
-    },
     "empathy_hint": {
      "enabled": false,
      "provider": "follow_llm"
@@ -38,6 +34,10 @@
     },
     "memory_summary": {
      "enabled": true,
+     "provider": "follow_llm"
+    },
+    "notebook": {
+     "enabled": false,
      "provider": "follow_llm"
     },
     "persona_compile": {
@@ -75,21 +75,21 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.434,
+     "encoding_arousal": 0.405,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.059,
+     "encoding_valence": -0.014,
      "hits": 1,
      "id": "96f2356d0110",
      "image_caption": "",
-     "importance": 0.4812035944656135,
+     "importance": 0.4701075419250374,
      "inhibition": 0.21,
      "inhibition_ts": 1793271330.0,
      "last_used": 1793004390.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793004390.0,
-     "memory_confidence": 0.8185,
+     "memory_confidence": 0.8176,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793090790.0,
@@ -166,13 +166,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.434,
+     "encoding_arousal": 0.405,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.059,
+     "encoding_valence": -0.014,
      "hits": 1,
-     "importance": 0.43308323501905216,
+     "importance": 0.4230967877325337,
      "inhibition": 0.0,
      "last_used": 1793004390.0,
      "legacy_backfilled": true,
@@ -250,20 +250,20 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.431,
+     "encoding_arousal": 0.407,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.032,
+     "encoding_valence": -0.083,
      "hits": 1,
      "id": "7015b26f2702",
      "image_caption": "",
-     "importance": 0.473437212494129,
+     "importance": 0.48828401892474116,
      "inhibition": 0.0,
      "last_used": 1793004510.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793004510.0,
-     "memory_confidence": 0.8179,
+     "memory_confidence": 0.8191,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793090910.0,
@@ -340,13 +340,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.415,
-     "encoding_emotion": "sadness",
-     "encoding_emotion_secondary": "disappointment",
-     "encoding_regulation": "express",
-     "encoding_valence": -0.098,
+     "encoding_arousal": 0.407,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
+     "encoding_regulation": "none",
+     "encoding_valence": -0.083,
      "hits": 1,
-     "importance": 0.43622902225820487,
+     "importance": 0.43945561703226704,
      "inhibition": 0.0,
      "last_used": 1793004510.0,
      "legacy_backfilled": true,
@@ -424,20 +424,20 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.431,
+     "encoding_arousal": 0.404,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.033,
+     "encoding_valence": -0.036,
      "hits": 1,
      "id": "0b67eae10905",
      "image_caption": "",
-     "importance": 0.47055485376579315,
+     "importance": 0.4756726234076825,
      "inhibition": 0.0,
      "last_used": 1793271330.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271330.0,
-     "memory_confidence": 0.8176,
+     "memory_confidence": 0.8181,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793357730.0,
@@ -514,13 +514,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.469,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.404,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.079,
+     "encoding_valence": -0.036,
      "hits": 1,
-     "importance": 0.44400878372190444,
+     "importance": 0.42810536106691427,
      "inhibition": 0.0,
      "last_used": 1793271330.0,
      "legacy_backfilled": true,
@@ -598,20 +598,20 @@
       "sender_id": "10004",
       "sender_name": "桃子"
      },
-     "encoding_arousal": 0.447,
+     "encoding_arousal": 0.396,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.091,
+     "encoding_valence": 0.001,
      "hits": 1,
      "id": "056021c8ff14",
      "image_caption": "",
-     "importance": 0.4889841613636028,
+     "importance": 0.4636273877543944,
      "inhibition": 0.0,
      "last_used": 1793271350.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271350.0,
-     "memory_confidence": 0.8191,
+     "memory_confidence": 0.8171,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793357750.0,
@@ -688,13 +688,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.486,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "amusement",
+     "encoding_arousal": 0.396,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.204,
+     "encoding_valence": 0.001,
      "hits": 1,
-     "importance": 0.47601453138624505,
+     "importance": 0.41726464897895493,
      "inhibition": 0.0,
      "last_used": 1793271350.0,
      "next_review_ts": 1793357750.0,
@@ -777,14 +777,14 @@
      "hits": 1,
      "id": "4d92732580e3",
      "image_caption": "",
-     "importance": 0.4618678856358124,
+     "importance": 0.4693678856358124,
      "inhibition": 0.0,
      "last_recall": 1793011770.0,
      "last_recall_regulation": "none",
      "last_used": 1793000000.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793000000.0,
-     "memory_confidence": 0.8157,
+     "memory_confidence": 0.8163,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793167290.0,
@@ -866,13 +866,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.405,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.368,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.113,
+     "encoding_valence": 0.002,
      "hits": 1,
-     "importance": 0.43727029707223114,
+     "importance": 0.40893109707223113,
      "inhibition": 0.0,
      "last_used": 1793000000.0,
      "legacy_backfilled": true,
@@ -950,20 +950,20 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.382,
+     "encoding_arousal": 0.353,
      "encoding_emotion": "neutral",
-     "encoding_emotion_secondary": "confusion",
+     "encoding_emotion_secondary": "calmness",
      "encoding_regulation": "none",
-     "encoding_valence": 0.073,
+     "encoding_valence": -0.007,
      "hits": 1,
      "id": "99136ad47b58",
      "image_caption": "",
-     "importance": 0.4695251293352011,
+     "importance": 0.4502405606591061,
      "inhibition": 0.0,
      "last_used": 1793000090.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793000090.0,
-     "memory_confidence": 0.8176,
+     "memory_confidence": 0.816,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793086490.0,
@@ -1041,14 +1041,14 @@
     {
      "attachments": [],
      "destabilized_until": 1793012340.0,
-     "encoding_arousal": 0.42,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.353,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "calmness",
      "encoding_regulation": "none",
-     "encoding_valence": 0.186,
+     "encoding_valence": -0.007,
      "hits": 1,
      "id": "bbc4b59bb507",
-     "importance": 0.47326324140168097,
+     "importance": 0.42021650459319554,
      "inhibition": 0.1411,
      "inhibition_ts": 1793098170.0,
      "last_recall": 1793011740.0,
@@ -1135,22 +1135,22 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.461,
+     "encoding_arousal": 0.435,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.132,
+     "encoding_valence": -0.119,
      "hits": 1,
      "id": "faa00a605aa5",
      "image_caption": "",
-     "importance": 0.5244465274966478,
+     "importance": 0.5221325172239449,
      "inhibition": 0.0,
      "last_recall": 1793098170.0,
      "last_recall_regulation": "none",
      "last_used": 1793011740.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793011740.0,
-     "memory_confidence": 0.8208,
+     "memory_confidence": 0.8206,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793253690.0,
@@ -1232,13 +1232,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.501,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.435,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.017,
+     "encoding_valence": -0.119,
      "hits": 1,
-     "importance": 0.44362843594207035,
+     "importance": 0.45649801550155045,
      "inhibition": 0.1292,
      "inhibition_ts": 1793271870.0,
      "last_used": 1793011740.0,
@@ -1317,20 +1317,20 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.504,
+     "encoding_arousal": 0.451,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.051,
+     "encoding_valence": -0.125,
      "hits": 1,
      "id": "f3cf5ee6569a",
      "image_caption": "",
-     "importance": 0.502248210984726,
+     "importance": 0.5142172521531909,
      "inhibition": 0.0,
      "last_used": 1793011770.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793011770.0,
-     "memory_confidence": 0.8202,
+     "memory_confidence": 0.8211,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793098170.0,
@@ -1407,13 +1407,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.504,
+     "encoding_arousal": 0.451,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.051,
+     "encoding_valence": -0.125,
      "hits": 1,
-     "importance": 0.4520008898862534,
+     "importance": 0.4627730269378718,
      "inhibition": 0.0,
      "last_used": 1793011770.0,
      "legacy_backfilled": true,
@@ -1491,21 +1491,21 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.403,
+     "encoding_arousal": 0.375,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.033,
+     "encoding_valence": -0.036,
      "hits": 1,
      "id": "32ed0168a98d",
      "image_caption": "",
-     "importance": 0.4624989839910039,
+     "importance": 0.46524782550912175,
      "inhibition": 0.14,
      "inhibition_ts": 1793271800.0,
      "last_used": 1793098170.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793098170.0,
-     "memory_confidence": 0.817,
+     "memory_confidence": 0.8172,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793184570.0,
@@ -1582,13 +1582,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.442,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.375,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.071,
+     "encoding_valence": -0.042,
      "hits": 1,
-     "importance": 0.4354880978684669,
+     "importance": 0.42006179295820956,
      "inhibition": 0.0,
      "last_used": 1793098170.0,
      "legacy_backfilled": true,
@@ -1666,20 +1666,20 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.495,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "amusement",
+     "encoding_arousal": 0.41,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.229,
+     "encoding_valence": 0.003,
      "hits": 1,
      "id": "ce2f0fced43d",
      "image_caption": "",
-     "importance": 0.5330795439831215,
+     "importance": 0.46926957270158265,
      "inhibition": 0.0,
      "last_used": 1793271800.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271800.0,
-     "memory_confidence": 0.8226,
+     "memory_confidence": 0.8175,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793358200.0,
@@ -1755,26 +1755,124 @@
      }
     },
     {
+     "assoc": {
+      "0e573ca31ece": 1
+     },
+     "attachments": [],
+     "destabilized_until": 1793272470.0,
+     "encoding_arousal": 0.395,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
+     "encoding_regulation": "none",
+     "encoding_valence": -0.067,
+     "hits": 1,
+     "id": "a0b2d8b7db1c",
+     "importance": 0.46185711467325186,
+     "inhibition": 0.0,
+     "last_recall": 1793271870.0,
+     "last_recall_regulation": "express",
+     "last_used": 1793271800.0,
+     "legacy_backfilled": true,
+     "links": [
+      {
+       "id": "0e573ca31ece",
+       "ts": 1793271870.0,
+       "weight": 1.0
+      }
+     ],
+     "memory_confidence": 0.7,
+     "memory_source": "direct",
+     "memory_tier": "warm",
+     "next_review_ts": 1793551806.0,
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "pii_types": [],
+     "poison_risk": false,
+     "poison_score": 0.0,
+     "poison_signals": [],
+     "provenance": {
+      "message_refs": [],
+      "sender_id": "self",
+      "sender_name": "她",
+      "session": "default:FriendMessage:10001",
+      "ts": 1793271800.0
+     },
+     "recall_count": 2,
+     "reconsolidated_ts": 1793271870.0,
+     "reconsolidation_state": "restabilized",
+     "restabilized_ts": 1793272490.0,
+     "review_count": 2,
+     "role": "assistant",
+     "schema_congruence": 0.0,
+     "scope": "session",
+     "self_defining": false,
+     "sender_id": "",
+     "sender_name": "",
+     "sensitive": false,
+     "sensitivity": 0.0,
+     "stability_days": 3.24,
+     "suppression_count": 0,
+     "text": "我在呢，听着也好难过",
+     "ts": 1793271800.0,
+     "vector": [
+      0.0,
+      0.0,
+      -0.534522,
+      0.267261,
+      0.267261,
+      -0.267261,
+      0.0,
+      0.0,
+      0.0,
+      -0.267261,
+      0.0,
+      0.0,
+      -0.534522,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.267261,
+      0.0,
+      0.0,
+      0.267261,
+      0.0
+     ],
+     "verification": {
+      "conflict": false,
+      "sources": 1,
+      "status": "verified"
+     }
+    },
+    {
      "attachments": [],
      "conflict": false,
      "destination": {
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.482,
+     "encoding_arousal": 0.43,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.084,
+     "encoding_valence": -0.18,
      "hits": 1,
      "id": "bd2144a04c59",
      "image_caption": "",
-     "importance": 0.49365365276382517,
+     "importance": 0.5204860833630292,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271820.0,
-     "memory_confidence": 0.8195,
+     "memory_confidence": 0.8216,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793358220.0,
@@ -1851,28 +1949,117 @@
     },
     {
      "attachments": [],
+     "encoding_arousal": 0.415,
+     "encoding_emotion": "sadness",
+     "encoding_emotion_secondary": "disappointment",
+     "encoding_regulation": "express",
+     "encoding_valence": -0.24,
+     "hits": 1,
+     "importance": 0.47721247502672626,
+     "inhibition": 0.0,
+     "last_used": 1793271820.0,
+     "legacy_backfilled": true,
+     "memory_confidence": 0.7,
+     "memory_source": "direct",
+     "memory_tier": "warm",
+     "next_review_ts": 1793358220.0,
+     "origin": {
+      "people": [
+       "10001"
+      ],
+      "source_ids": [],
+      "visibility": "private",
+      "where": "private:10001"
+     },
+     "pii_types": [],
+     "poison_risk": false,
+     "poison_score": 0.0,
+     "poison_signals": [],
+     "provenance": {
+      "message_refs": [],
+      "sender_id": "self",
+      "sender_name": "她",
+      "session": "default:FriendMessage:10001",
+      "ts": 1793271820.0
+     },
+     "review_count": 0,
+     "role": "assistant",
+     "schema_congruence": 0.0,
+     "scope": "session",
+     "self_defining": false,
+     "sender_id": "",
+     "sender_name": "",
+     "sensitive": false,
+     "sensitivity": 0.0,
+     "suppression_count": 0,
+     "text": "抱抱你，好委屈啊",
+     "ts": 1793271820.0,
+     "vector": [
+      0.0,
+      -0.316228,
+      -0.316228,
+      0.0,
+      0.316228,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.632456,
+      0.0,
+      0.0,
+      0.316228,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.316228,
+      0.0,
+      0.316228,
+      0.0
+     ],
+     "verification": {
+      "conflict": false,
+      "sources": 1,
+      "status": "verified"
+     }
+    },
+    {
+     "assoc": {
+      "a0b2d8b7db1c": 1
+     },
+     "attachments": [],
      "conflict": false,
      "destabilized_until": 1793272470.0,
      "destination": {
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.529,
+     "encoding_arousal": 0.502,
      "encoding_emotion": "sadness",
      "encoding_emotion_secondary": "disappointment",
      "encoding_regulation": "express",
-     "encoding_valence": -0.284,
+     "encoding_valence": -0.28,
      "hits": 1,
      "id": "0e573ca31ece",
      "image_caption": "",
-     "importance": 0.5760537616043286,
+     "importance": 0.5857783562932135,
      "inhibition": 0.0,
      "last_recall": 1793271870.0,
      "last_recall_regulation": "express",
      "last_used": 1793271840.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271840.0,
-     "memory_confidence": 0.8249,
+     "links": [
+      {
+       "id": "a0b2d8b7db1c",
+       "ts": 1793271870.0,
+       "weight": 1.0
+      }
+     ],
+     "memory_confidence": 0.8257,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793427390.0,
@@ -1954,13 +2141,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.632,
+     "encoding_arousal": 0.577,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.415,
+     "encoding_valence": -0.334,
      "hits": 1,
-     "importance": 0.5691332558540766,
+     "importance": 0.5493292706638921,
      "inhibition": 0.0,
      "last_used": 1793271840.0,
      "legacy_backfilled": true,
@@ -1997,31 +2184,31 @@
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
-     "text": "太过分了",
+     "text": "太过分了，我也生气",
      "ts": 1793271840.0,
      "vector": [
       0.0,
+      -0.377964,
+      -0.377964,
+      0.377964,
       0.0,
-      0.0,
-      0.5,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      -0.5,
+      -0.377964,
       0.0,
       0.0,
       0.0,
+      -0.377964,
       0.0,
       0.0,
       0.0,
       0.0,
-      0.5,
       0.0,
       0.0,
       0.0,
-      -0.5,
+      0.377964,
+      0.0,
+      0.377964,
+      0.0,
+      0.0,
       0.0,
       0.0
      ],
@@ -2039,22 +2226,22 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.648,
+     "encoding_arousal": 0.606,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
      "encoding_regulation": "express",
-     "encoding_valence": -0.382,
+     "encoding_valence": -0.325,
      "hits": 1,
      "id": "98bbacc6b4e4",
      "image_caption": "",
-     "importance": 0.6447452954077958,
+     "importance": 0.6331818423233262,
      "inhibition": 0.0,
      "last_recall": 1793272490.0,
-     "last_recall_regulation": "label_emotion",
+     "last_recall_regulation": "express",
      "last_used": 1793271870.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271870.0,
-     "memory_confidence": 0.8304,
+     "memory_confidence": 0.8295,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793428010.0,
@@ -2135,13 +2322,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.757,
+     "encoding_arousal": 0.606,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
-     "encoding_regulation": "label_emotion",
-     "encoding_valence": -0.55,
+     "encoding_regulation": "express",
+     "encoding_valence": -0.334,
      "hits": 1,
-     "importance": 0.6411486054727428,
+     "importance": 0.5584614332112743,
      "inhibition": 0.0,
      "last_used": 1793271870.0,
      "legacy_backfilled": true,
@@ -2219,20 +2406,20 @@
       "sender_id": "10001",
       "sender_name": "芒果"
      },
-     "encoding_arousal": 0.707,
+     "encoding_arousal": 0.632,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
-     "encoding_regulation": "label_emotion",
-     "encoding_valence": -0.437,
+     "encoding_regulation": "express",
+     "encoding_valence": -0.302,
      "hits": 1,
      "id": "0d547e081dfd",
      "image_caption": "",
-     "importance": 0.6666201891818624,
+     "importance": 0.6218708923484834,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272490.0,
-     "memory_confidence": 0.8333,
+     "memory_confidence": 0.8297,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793358890.0,
@@ -2309,13 +2496,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.767,
+     "encoding_arousal": 0.697,
      "encoding_emotion": "anger",
      "encoding_emotion_secondary": "contempt",
-     "encoding_regulation": "distraction",
-     "encoding_valence": -0.613,
+     "encoding_regulation": "label_emotion",
+     "encoding_valence": -0.369,
      "hits": 1,
-     "importance": 0.6610591009708705,
+     "importance": 0.5952072979488569,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "next_review_ts": 1793358890.0,
@@ -2348,32 +2535,32 @@
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
-     "text": "我陪着你",
+     "text": "我陪着你，真让人生气",
      "ts": 1793272490.0,
      "vector": [
       0.0,
+      -0.353553,
+      -0.353553,
+      0.0,
+      0.0,
+      -0.353553,
       0.0,
       0.0,
       0.0,
       0.0,
-      -0.5,
+      -0.353553,
       0.0,
-      0.0,
-      0.0,
-      0.0,
-      -0.5,
-      0.0,
-      -0.5,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
+      -0.353553,
       0.0,
       0.0,
       0.0,
       0.0,
       0.0,
-      0.5,
+      0.0,
+      0.0,
+      -0.353553,
+      0.353553,
+      0.353553,
       0.0
      ],
      "verification": {
@@ -2389,20 +2576,20 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.413,
+     "encoding_arousal": 0.363,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.109,
+     "encoding_valence": -0.024,
      "hits": 1,
      "id": "d7aab5b251fc",
      "image_caption": "",
-     "importance": 0.487423623413083,
+     "importance": 0.4578118078135011,
      "inhibition": 0.0,
      "last_used": 1793000690.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793000690.0,
-     "memory_confidence": 0.819,
+     "memory_confidence": 0.8166,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793087090.0,
@@ -2431,7 +2618,7 @@
      },
      "review_count": 0,
      "role": "user",
-     "schema_congruence": 0.0795,
+     "schema_congruence": 0.0,
      "scope": "user",
      "self_defining": false,
      "sender_id": "10002",
@@ -2479,13 +2666,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.413,
+     "encoding_arousal": 0.363,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.109,
+     "encoding_valence": -0.024,
      "hits": 1,
-     "importance": 0.4386812610717747,
+     "importance": 0.412030627032151,
      "inhibition": 0.0,
      "last_used": 1793000690.0,
      "legacy_backfilled": true,
@@ -2564,22 +2751,22 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.414,
+     "encoding_arousal": 0.372,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.079,
+     "encoding_valence": -0.017,
      "hits": 1,
      "id": "95dca9d8d49b",
      "image_caption": "",
-     "importance": 0.4951957284853594,
+     "importance": 0.4745968941781928,
      "inhibition": 0.0,
      "last_recall": 1793098470.0,
      "last_recall_regulation": "none",
      "last_used": 1793000730.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793000730.0,
-     "memory_confidence": 0.8184,
+     "memory_confidence": 0.8168,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793253990.0,
@@ -2661,13 +2848,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.398,
-     "encoding_emotion": "sadness",
-     "encoding_emotion_secondary": "disappointment",
-     "encoding_regulation": "express",
-     "encoding_valence": 0.017,
+     "encoding_arousal": 0.372,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
+     "encoding_regulation": "none",
+     "encoding_valence": -0.017,
      "hits": 1,
-     "importance": 0.41379375055869844,
+     "importance": 0.4136372047603735,
      "inhibition": 0.0,
      "last_used": 1793000730.0,
      "legacy_backfilled": true,
@@ -2745,20 +2932,20 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.392,
+     "encoding_arousal": 0.371,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.017,
+     "encoding_valence": -0.007,
      "hits": 1,
      "id": "5f2d3fc90ecf",
      "image_caption": "",
-     "importance": 0.4575109508985214,
+     "importance": 0.4566896690138968,
      "inhibition": 0.0,
      "last_used": 1793000790.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793000790.0,
-     "memory_confidence": 0.8166,
+     "memory_confidence": 0.8165,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793087190.0,
@@ -2835,13 +3022,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.429,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.371,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.128,
+     "encoding_valence": -0.007,
      "hits": 1,
-     "importance": 0.44688707795222393,
+     "importance": 0.41102070211250713,
      "inhibition": 0.1585,
      "inhibition_ts": 1793272890.0,
      "last_used": 1793000790.0,
@@ -2921,15 +3108,15 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.418,
+     "encoding_arousal": 0.367,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.009,
+     "encoding_valence": -0.09,
      "hits": 1,
      "id": "df67f56093b6",
      "image_caption": "",
-     "importance": 0.49014662654280433,
+     "importance": 0.5059199184027406,
      "inhibition": 0.1373,
      "inhibition_ts": 1793272890.0,
      "last_recall": 1793271400.0,
@@ -2937,7 +3124,7 @@
      "last_used": 1793098470.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793098470.0,
-     "memory_confidence": 0.8168,
+     "memory_confidence": 0.8181,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793551336.0,
@@ -3019,13 +3206,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.418,
+     "encoding_arousal": 0.367,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.005,
+     "encoding_valence": -0.091,
      "hits": 1,
-     "importance": 0.41324321388852386,
+     "importance": 0.4285191765624666,
      "inhibition": 0.0,
      "last_used": 1793098470.0,
      "legacy_backfilled": true,
@@ -3103,20 +3290,20 @@
       "sender_id": "10005",
       "sender_name": "路人"
      },
-     "encoding_arousal": 0.423,
+     "encoding_arousal": 0.382,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.007,
+     "encoding_valence": -0.058,
      "hits": 1,
      "id": "9c01ab2838a3",
      "image_caption": "",
-     "importance": 0.46137053641165154,
+     "importance": 0.473112183695423,
      "inhibition": 0.0,
      "last_used": 1793098530.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793098530.0,
-     "memory_confidence": 0.8169,
+     "memory_confidence": 0.8178,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793184930.0,
@@ -3193,13 +3380,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.423,
+     "encoding_arousal": 0.382,
      "encoding_emotion": "neutral",
      "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.007,
+     "encoding_valence": -0.062,
      "hits": 1,
-     "importance": 0.4151322327704864,
+     "importance": 0.4268134653258807,
      "inhibition": 0.0,
      "last_used": 1793098530.0,
      "legacy_backfilled": true,
@@ -3277,20 +3464,20 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.456,
+     "encoding_arousal": 0.387,
      "encoding_emotion": "neutral",
-     "encoding_emotion_secondary": "interest",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.156,
+     "encoding_valence": 0.007,
      "hits": 1,
      "id": "d753390d2089",
      "image_caption": "",
-     "importance": 0.5066083010343957,
+     "importance": 0.4621716194856931,
      "inhibition": 0.0,
      "last_used": 1793271380.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271380.0,
-     "memory_confidence": 0.8205,
+     "memory_confidence": 0.817,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793357780.0,
@@ -3367,13 +3554,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.518,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "amusement",
+     "encoding_arousal": 0.412,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.338,
+     "encoding_valence": 0.067,
      "hits": 1,
-     "importance": 0.513540938145395,
+     "importance": 0.43732945753712377,
      "inhibition": 0.0,
      "last_used": 1793271380.0,
      "legacy_backfilled": true,
@@ -3410,29 +3597,29 @@
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
-     "text": "恭喜恭喜！",
+     "text": "恭喜恭喜！我也好开心",
      "ts": 1793271380.0,
      "vector": [
       0.0,
       0.0,
       0.0,
       0.0,
+      0.316228,
+      -0.316228,
       0.0,
       0.0,
       0.0,
       0.0,
       0.0,
       0.0,
+      -0.316228,
+      0.316228,
       0.0,
       0.0,
-      -0.333333,
+      0.632456,
+      0.316228,
       0.0,
-      0.0,
-      0.0,
-      0.666667,
-      0.666667,
-      0.0,
-      0.0,
+      0.316228,
       0.0,
       0.0,
       0.0,
@@ -3452,22 +3639,22 @@
       "sender_id": "10002",
       "sender_name": "柠檬"
      },
-     "encoding_arousal": 0.486,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "amusement",
+     "encoding_arousal": 0.403,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.253,
+     "encoding_valence": 0.052,
      "hits": 1,
      "id": "632d7be7d6dd",
      "image_caption": "",
-     "importance": 0.5534360183477215,
+     "importance": 0.4940980417525734,
      "inhibition": 0.0,
      "last_recall": 1793272890.0,
-     "last_recall_regulation": "distraction",
+     "last_recall_regulation": "suppress",
      "last_used": 1793271400.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793271400.0,
-     "memory_confidence": 0.8231,
+     "memory_confidence": 0.8183,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793428410.0,
@@ -3549,13 +3736,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.544,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "amusement",
+     "encoding_arousal": 0.428,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": 0.425,
+     "encoding_valence": 0.108,
      "hits": 1,
-     "importance": 0.5392222293210713,
+     "importance": 0.451550737577316,
      "inhibition": 0.0,
      "last_used": 1793271400.0,
      "legacy_backfilled": true,
@@ -3592,24 +3779,24 @@
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
-     "text": "超厉害的！",
+     "text": "超厉害的！好高兴",
      "ts": 1793271400.0,
      "vector": [
       0.0,
       0.0,
-      -0.447214,
+      -0.353553,
       0.0,
+      0.353553,
       0.0,
+      -0.353553,
       0.0,
+      -0.353553,
+      0.353553,
+      0.353553,
       0.0,
+      -0.353553,
       0.0,
-      -0.447214,
-      0.447214,
-      0.0,
-      0.0,
-      -0.447214,
-      0.0,
-      -0.447214,
+      -0.353553,
       0.0,
       0.0,
       0.0,
@@ -3633,20 +3820,20 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.619,
-     "encoding_emotion": "loneliness",
-     "encoding_emotion_secondary": "disappointment",
-     "encoding_regulation": "distraction",
-     "encoding_valence": -0.443,
+     "encoding_arousal": 0.633,
+     "encoding_emotion": "anger",
+     "encoding_emotion_secondary": "contempt",
+     "encoding_regulation": "suppress",
+     "encoding_valence": -0.295,
      "hits": 1,
      "id": "10e46405a873",
      "image_caption": "",
-     "importance": 0.6403635818422329,
+     "importance": 0.6203212795409333,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272890.0,
-     "memory_confidence": 0.8312,
+     "memory_confidence": 0.8296,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793359290.0,
@@ -3723,13 +3910,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.619,
-     "encoding_emotion": "loneliness",
-     "encoding_emotion_secondary": "disappointment",
-     "encoding_regulation": "distraction",
-     "encoding_valence": -0.431,
+     "encoding_arousal": 0.633,
+     "encoding_emotion": "anger",
+     "encoding_emotion_secondary": "contempt",
+     "encoding_regulation": "suppress",
+     "encoding_valence": -0.293,
      "hits": 1,
-     "importance": 0.5734809736580097,
+     "importance": 0.5577041515868401,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "legacy_backfilled": true,
@@ -3808,22 +3995,22 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.555,
-     "encoding_emotion": "loneliness",
-     "encoding_emotion_secondary": "disappointment",
-     "encoding_regulation": "distraction",
-     "encoding_valence": -0.368,
+     "encoding_arousal": 0.62,
+     "encoding_emotion": "anger",
+     "encoding_emotion_secondary": "contempt",
+     "encoding_regulation": "reappraise",
+     "encoding_valence": -0.256,
      "hits": 1,
      "id": "a473a739b8d5",
      "image_caption": "",
-     "importance": 0.6138931225364064,
+     "importance": 0.6210313537741629,
      "inhibition": 0.0,
      "last_recall": 1793276520.0,
-     "last_recall_regulation": "distraction",
+     "last_recall_regulation": "none",
      "last_used": 1793272920.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793272920.0,
-     "memory_confidence": 0.8279,
+     "memory_confidence": 0.8285,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793432040.0,
@@ -3909,20 +4096,20 @@
       "sender_id": "10003",
       "sender_name": "阿星"
      },
-     "encoding_arousal": 0.447,
-     "encoding_emotion": "loneliness",
-     "encoding_emotion_secondary": "disappointment",
-     "encoding_regulation": "distraction",
-     "encoding_valence": -0.297,
+     "encoding_arousal": 0.455,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
+     "encoding_regulation": "none",
+     "encoding_valence": -0.18,
      "hits": 1,
      "id": "8bbef4ae3aa2",
      "image_caption": "",
-     "importance": 0.5432488703223881,
+     "importance": 0.5292892619675792,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "last_write_op": "ADD",
      "last_write_ts": 1793276520.0,
-     "memory_confidence": 0.8235,
+     "memory_confidence": 0.8223,
      "memory_source": "direct",
      "memory_tier": "hot",
      "next_review_ts": 1793362920.0,
@@ -3999,13 +4186,13 @@
     },
     {
      "attachments": [],
-     "encoding_arousal": 0.488,
-     "encoding_emotion": "joy",
-     "encoding_emotion_secondary": "contentment",
+     "encoding_arousal": 0.455,
+     "encoding_emotion": "neutral",
+     "encoding_emotion_secondary": "confusion",
      "encoding_regulation": "none",
-     "encoding_valence": -0.194,
+     "encoding_valence": -0.186,
      "hits": 1,
-     "importance": 0.4770749759282982,
+     "importance": 0.4776841100017127,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "next_review_ts": 1793362920.0,
@@ -4088,18 +4275,18 @@
         "inhibition": 0.0,
         "lexical": 1.01,
         "recency": 0.9921,
-        "regulation": 0.96,
+        "regulation": 1.0,
         "retention": 0.9857,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0034
+        "source_weight": 1.0035
        },
        "conflict": false,
        "cosine": 0.547723,
        "entry_id": "a473a739b8d5",
-       "importance": 0.5983,
+       "importance": 0.6054,
        "rank": 1,
-       "score": 0.4207,
+       "score": 0.4408,
        "source": "direct",
        "tier": "hot"
       },
@@ -4108,23 +4295,27 @@
         "inhibition": 0.0,
         "lexical": 1.0133,
         "recency": 0.9888,
-        "regulation": 0.96,
+        "regulation": 1.0,
         "retention": 0.9887,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0027
+        "source_weight": 1.0019
        },
        "conflict": false,
        "cosine": 0.434122,
        "entry_id": "632d7be7d6dd",
-       "importance": 0.5529,
+       "importance": 0.4936,
        "rank": 2,
-       "score": 0.3476,
+       "score": 0.3415,
        "source": "direct",
        "tier": "hot"
       }
      ],
      "working_set": [
+      "95dca9d8d49b",
+      "9c01ab2838a3",
+      "d753390d2089",
+      "df67f56093b6",
       "10e46405a873",
       "8bbef4ae3aa2",
       "a473a739b8d5",
@@ -4331,14 +4522,14 @@
         "retention": 0.9985,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0029
+        "source_weight": 1.0031
        },
        "conflict": false,
        "cosine": 0.763675,
        "entry_id": "0e573ca31ece",
-       "importance": 0.576,
+       "importance": 0.5857,
        "rank": 1,
-       "score": 0.6532,
+       "score": 0.684,
        "source": "direct",
        "tier": "hot"
       },
@@ -4351,25 +4542,47 @@
         "retention": 0.9975,
         "schema": 0.0,
         "sensitive": 1.0,
-        "source_weight": 1.0038
+        "source_weight": 1.0037
        },
        "conflict": false,
        "cosine": 0.708949,
        "entry_id": "98bbacc6b4e4",
-       "importance": 0.6296,
+       "importance": 0.6181,
        "rank": 2,
-       "score": 0.5918,
+       "score": 0.5864,
        "source": "direct",
        "tier": "hot"
+      },
+      {
+       "components": {
+        "inhibition": 0.0,
+        "lexical": 1.0,
+        "recency": 0.9985,
+        "regulation": 1.0,
+        "retention": 0.9991,
+        "schema": 0.0,
+        "sensitive": 1.0,
+        "source_weight": 0.955
+       },
+       "conflict": false,
+       "cosine": 0.566947,
+       "entry_id": "a0b2d8b7db1c",
+       "importance": 0.4618,
+       "rank": 3,
+       "score": 0.4447,
+       "source": "direct",
+       "tier": "warm"
       }
      ],
      "working_set": [
+      "faa00a605aa5",
       "32ed0168a98d",
       "ce2f0fced43d",
       "bd2144a04c59",
       "0d547e081dfd",
       "0e573ca31ece",
-      "98bbacc6b4e4"
+      "98bbacc6b4e4",
+      "a0b2d8b7db1c"
      ],
      "write_log": [
       {
@@ -4439,9 +4652,21 @@
        "ts": 1793271800.0
       },
       {
+       "id": "",
+       "op": "ADD",
+       "reason": "assistant",
+       "ts": 1793271800.0
+      },
+      {
        "id": "bd2144a04c59",
        "op": "ADD",
        "reason": "new",
+       "ts": 1793271820.0
+      },
+      {
+       "id": "",
+       "op": "ADD",
+       "reason": "assistant",
        "ts": 1793271820.0
       },
       {
@@ -4560,7 +4785,7 @@
       "where": "group:900001"
      },
      "role": "assistant",
-     "text": "恭喜恭喜！",
+     "text": "恭喜恭喜！我也好开心",
      "ts": 1793271380.0
     },
     {
@@ -4593,7 +4818,7 @@
       "where": "group:900001"
      },
      "role": "assistant",
-     "text": "超厉害的！",
+     "text": "超厉害的！好高兴",
      "ts": 1793271400.0
     },
     {
@@ -4843,7 +5068,7 @@
       "where": "private:10001"
      },
      "role": "assistant",
-     "text": "我在呢",
+     "text": "我在呢，听着也好难过",
      "ts": 1793271800.0
     },
     {
@@ -4876,7 +5101,7 @@
       "where": "private:10001"
      },
      "role": "assistant",
-     "text": "抱抱你",
+     "text": "抱抱你，好委屈啊",
      "ts": 1793271820.0
     },
     {
@@ -4909,7 +5134,7 @@
       "where": "private:10001"
      },
      "role": "assistant",
-     "text": "太过分了",
+     "text": "太过分了，我也生气",
      "ts": 1793271840.0
     },
     {
@@ -4975,7 +5200,7 @@
       "where": "private:10001"
      },
      "role": "assistant",
-     "text": "我陪着你",
+     "text": "我陪着你，真让人生气",
      "ts": 1793272490.0
     }
    ]
@@ -4983,73 +5208,71 @@
   "self_model.json": {
    "_history": [
     {
-     "narrative": "",
+     "notebook": 0,
      "ts": 1793000000.0,
-     "who_am_i": "一个会持续受聊天影响、但不会被单条消息完全定义的角色。"
+     "who_am_i": ""
     }
    ],
-   "boundaries": [
-    "不接受被当作没有感受的工具",
-    "不会被一次互动改写全部立场"
-   ],
-   "consistency": [
-    "情绪会变，但核心立场不因单次互动翻转"
-   ],
+   "boundaries": [],
+   "consistency": [],
+   "heart": 1,
    "narrative": "",
    "narrative_items": [],
+   "notebook": [],
+   "notebook_night": {},
    "version": 1,
-   "who_am_i": "一个会持续受聊天影响、但不会被单条消息完全定义的角色。"
+   "who_am_i": ""
   },
   "states/her.json": {
-   "a": 0.4878,
+   "a": 0.4554,
    "allostatic_load": 0.0,
+   "ambient": 0.0333,
    "appraisal": {
     "agency": 0.5,
-    "coping": 0.503,
+    "coping": 0.501,
     "expectedness": 1.0,
     "goal_relevance": 0.53,
     "norm_compatibility": 0.62,
     "novelty": 0.0,
-    "urgency": 0.466
+    "urgency": 0.405
    },
-   "attention": 0.199,
+   "attention": 0.347,
    "boredom": 0.0,
    "boundary_pressure": 0.0,
-   "circadian_alertness": 0.669,
    "compound": "希望",
-   "coping": 0.503,
+   "coping": 0.501,
    "core_self": "",
-   "d": 0.7178,
+   "d": 0.6194,
    "daily_digests": [
     {
      "date": "2026-10-26",
      "dominant_emotion": "neutral",
      "event_ids": [],
      "interaction_count": 4,
-     "mean_a": 0.4192,
-     "mean_stress": 0.2562,
-     "mean_v": 0.0119
+     "mean_a": 0.3928,
+     "mean_stress": 0.2664,
+     "mean_v": -0.0387
     },
     {
      "date": "2026-10-27",
      "dominant_emotion": "neutral",
      "event_ids": [],
      "interaction_count": 2,
-     "mean_a": 0.4106,
-     "mean_stress": 0.2502,
-     "mean_v": -0.0222
+     "mean_a": 0.371,
+     "mean_stress": 0.264,
+     "mean_v": -0.0663
     }
    ],
-   "echo": -0.367,
-   "echo_trace": -0.4009,
-   "energy": 0.2065,
+   "echo": -0.2621,
+   "echo_trace": -0.2982,
+   "energy": 0.3794,
    "goal_conflict": [],
    "goal_focus": "和重要的人保持亲近",
    "goal_scores": {
     "autonomy": 0.0,
     "competence": 0.24,
     "relationship": 0.53,
-    "stability": 0.011
+    "stability": 0.0
    },
    "goals": [
     {
@@ -5058,7 +5281,7 @@
      "last_update": 1793276520.0,
      "name": "和重要的人保持亲近",
      "priority": 0.777,
-     "progress": 0.007
+     "progress": 0.022
     },
     {
      "horizon": "long",
@@ -5087,288 +5310,263 @@
    ],
    "history": [
     {
+     "a": 0.368,
+     "compound": "希望",
+     "d": 0.557,
+     "emotion": "neutral",
+     "intensity": 0.184,
+     "social": 0.457,
+     "ts": 1793000000.0,
+     "v": 0.002
+    },
+    {
+     "a": 0.353,
+     "compound": "",
+     "d": 0.546,
+     "emotion": "neutral",
+     "intensity": 0.173,
+     "social": 0.484,
+     "ts": 1793000090.0,
+     "v": -0.007
+    },
+    {
+     "a": 0.363,
+     "compound": "希望",
+     "d": 0.546,
+     "emotion": "neutral",
+     "intensity": 0.18,
+     "social": 0.492,
+     "ts": 1793000690.0,
+     "v": -0.024
+    },
+    {
+     "a": 0.372,
+     "compound": "",
+     "d": 0.539,
+     "emotion": "neutral",
+     "intensity": 0.179,
+     "social": 0.509,
+     "ts": 1793000730.0,
+     "v": -0.017
+    },
+    {
+     "a": 0.371,
+     "compound": "希望",
+     "d": 0.537,
+     "emotion": "neutral",
+     "intensity": 0.177,
+     "social": 0.52,
+     "ts": 1793000790.0,
+     "v": -0.007
+    },
+    {
      "a": 0.405,
      "compound": "希望",
-     "d": 0.582,
-     "emotion": "joy",
-     "intensity": 0.224,
-     "social": 0.488,
-     "ts": 1793000000.0,
-     "v": 0.113
-    },
-    {
-     "a": 0.42,
-     "compound": "",
-     "d": 0.591,
-     "emotion": "joy",
-     "intensity": 0.255,
-     "social": 0.542,
-     "ts": 1793000090.0,
-     "v": 0.186
-    },
-    {
-     "a": 0.413,
-     "compound": "希望",
-     "d": 0.582,
+     "d": 0.552,
      "emotion": "neutral",
-     "intensity": 0.228,
+     "intensity": 0.194,
      "social": 0.536,
-     "ts": 1793000690.0,
-     "v": 0.109
-    },
-    {
-     "a": 0.398,
-     "compound": "",
-     "d": 0.556,
-     "emotion": "sadness",
-     "intensity": 0.193,
-     "social": 0.538,
-     "ts": 1793000730.0,
-     "v": 0.017
-    },
-    {
-     "a": 0.429,
-     "compound": "希望",
-     "d": 0.575,
-     "emotion": "joy",
-     "intensity": 0.244,
-     "social": 0.574,
-     "ts": 1793000790.0,
-     "v": 0.128
-    },
-    {
-     "a": 0.434,
-     "compound": "希望",
-     "d": 0.576,
-     "emotion": "neutral",
-     "intensity": 0.224,
-     "social": 0.572,
      "ts": 1793004390.0,
-     "v": 0.059
+     "v": -0.014
+    },
+    {
+     "a": 0.407,
+     "compound": "",
+     "d": 0.526,
+     "emotion": "neutral",
+     "intensity": 0.215,
+     "social": 0.538,
+     "ts": 1793004510.0,
+     "v": -0.083
+    },
+    {
+     "a": 0.435,
+     "compound": "失落",
+     "d": 0.515,
+     "emotion": "neutral",
+     "intensity": 0.235,
+     "social": 0.54,
+     "ts": 1793011740.0,
+     "v": -0.119
+    },
+    {
+     "a": 0.451,
+     "compound": "希望",
+     "d": 0.511,
+     "emotion": "neutral",
+     "intensity": 0.243,
+     "social": 0.552,
+     "ts": 1793011770.0,
+     "v": -0.125
+    },
+    {
+     "a": 0.375,
+     "compound": "希望",
+     "d": 0.534,
+     "emotion": "neutral",
+     "intensity": 0.195,
+     "social": 0.556,
+     "ts": 1793098170.0,
+     "v": -0.042
+    },
+    {
+     "a": 0.367,
+     "compound": "希望",
+     "d": 0.529,
+     "emotion": "neutral",
+     "intensity": 0.209,
+     "social": 0.559,
+     "ts": 1793098470.0,
+     "v": -0.091
+    },
+    {
+     "a": 0.382,
+     "compound": "希望",
+     "d": 0.526,
+     "emotion": "neutral",
+     "intensity": 0.202,
+     "social": 0.551,
+     "ts": 1793098530.0,
+     "v": -0.062
+    },
+    {
+     "a": 0.404,
+     "compound": "希望",
+     "d": 0.544,
+     "emotion": "neutral",
+     "intensity": 0.203,
+     "social": 0.55,
+     "ts": 1793271330.0,
+     "v": -0.036
+    },
+    {
+     "a": 0.396,
+     "compound": "",
+     "d": 0.545,
+     "emotion": "neutral",
+     "intensity": 0.188,
+     "social": 0.553,
+     "ts": 1793271350.0,
+     "v": 0.001
+    },
+    {
+     "a": 0.412,
+     "compound": "",
+     "d": 0.559,
+     "emotion": "neutral",
+     "intensity": 0.218,
+     "social": 0.572,
+     "ts": 1793271380.0,
+     "v": 0.067
+    },
+    {
+     "a": 0.428,
+     "compound": "希望",
+     "d": 0.578,
+     "emotion": "neutral",
+     "intensity": 0.239,
+     "social": 0.581,
+     "ts": 1793271400.0,
+     "v": 0.108
+    },
+    {
+     "a": 0.395,
+     "compound": "希望",
+     "d": 0.52,
+     "emotion": "neutral",
+     "intensity": 0.211,
+     "social": 0.578,
+     "ts": 1793271800.0,
+     "v": -0.067
     },
     {
      "a": 0.415,
      "compound": "失落",
-     "d": 0.533,
+     "d": 0.511,
      "emotion": "sadness",
-     "intensity": 0.226,
-     "social": 0.56,
-     "ts": 1793004510.0,
-     "v": -0.098
-    },
-    {
-     "a": 0.501,
-     "compound": "",
-     "d": 0.537,
-     "emotion": "joy",
-     "intensity": 0.229,
-     "social": 0.583,
-     "ts": 1793011740.0,
-     "v": -0.017
-    },
-    {
-     "a": 0.504,
-     "compound": "希望",
-     "d": 0.531,
-     "emotion": "neutral",
-     "intensity": 0.242,
-     "social": 0.587,
-     "ts": 1793011770.0,
-     "v": -0.051
-    },
-    {
-     "a": 0.442,
-     "compound": "希望",
-     "d": 0.559,
-     "emotion": "joy",
-     "intensity": 0.231,
-     "social": 0.588,
-     "ts": 1793098170.0,
-     "v": 0.071
-    },
-    {
-     "a": 0.418,
-     "compound": "希望",
-     "d": 0.551,
-     "emotion": "neutral",
-     "intensity": 0.203,
-     "social": 0.586,
-     "ts": 1793098470.0,
-     "v": -0.005
-    },
-    {
-     "a": 0.423,
-     "compound": "希望",
-     "d": 0.545,
-     "emotion": "neutral",
-     "intensity": 0.202,
-     "social": 0.574,
-     "ts": 1793098530.0,
-     "v": 0.007
-    },
-    {
-     "a": 0.469,
-     "compound": "希望",
-     "d": 0.57,
-     "emotion": "joy",
-     "intensity": 0.241,
-     "social": 0.582,
-     "ts": 1793271330.0,
-     "v": 0.079
-    },
-    {
-     "a": 0.486,
-     "compound": "亲近",
-     "d": 0.593,
-     "emotion": "joy",
-     "intensity": 0.292,
-     "social": 0.612,
-     "ts": 1793271350.0,
-     "v": 0.204
-    },
-    {
-     "a": 0.518,
-     "compound": "亲近",
-     "d": 0.618,
-     "emotion": "joy",
-     "intensity": 0.352,
-     "social": 0.656,
-     "ts": 1793271380.0,
-     "v": 0.338
-    },
-    {
-     "a": 0.544,
-     "compound": "希望",
-     "d": 0.647,
-     "emotion": "joy",
-     "intensity": 0.394,
-     "social": 0.683,
-     "ts": 1793271400.0,
-     "v": 0.425
-    },
-    {
-     "a": 0.46,
-     "compound": "希望",
-     "d": 0.571,
-     "emotion": "sadness",
-     "intensity": 0.248,
-     "social": 0.644,
-     "ts": 1793271800.0,
-     "v": 0.076
-    },
-    {
-     "a": 0.45,
-     "compound": "失落",
-     "d": 0.551,
-     "emotion": "sadness",
-     "intensity": 0.294,
-     "social": 0.599,
+     "intensity": 0.272,
+     "social": 0.563,
      "ts": 1793271820.0,
-     "v": -0.239
+     "v": -0.24
     },
     {
-     "a": 0.632,
+     "a": 0.577,
      "compound": "失落",
-     "d": 0.646,
+     "d": 0.596,
      "emotion": "anger",
-     "intensity": 0.419,
-     "social": 0.546,
+     "intensity": 0.364,
+     "social": 0.535,
      "ts": 1793271840.0,
-     "v": -0.415
+     "v": -0.334
     },
     {
-     "a": 0.757,
+     "a": 0.606,
      "compound": "失落",
-     "d": 0.74,
+     "d": 0.621,
      "emotion": "anger",
-     "intensity": 0.52,
-     "social": 0.48,
+     "intensity": 0.374,
+     "social": 0.522,
      "ts": 1793271870.0,
-     "v": -0.55
+     "v": -0.334
     },
     {
-     "a": 0.767,
-     "compound": "委屈",
-     "d": 0.798,
+     "a": 0.697,
+     "compound": "失落",
+     "d": 0.683,
      "emotion": "anger",
-     "intensity": 0.565,
-     "social": 0.439,
-     "ts": 1793272490.0,
-     "v": -0.613
-    },
-    {
-     "a": 0.619,
-     "compound": "希望",
-     "d": 0.761,
-     "emotion": "loneliness",
-     "intensity": 0.443,
-     "social": 0.442,
-     "ts": 1793272890.0,
-     "v": -0.431
-    },
-    {
-     "a": 0.555,
-     "compound": "希望",
-     "d": 0.719,
-     "emotion": "loneliness",
-     "intensity": 0.39,
-     "social": 0.452,
-     "ts": 1793272920.0,
-     "v": -0.368
-    },
-    {
-     "a": 0.488,
-     "compound": "希望",
-     "d": 0.718,
-     "emotion": "joy",
-     "intensity": 0.298,
+     "intensity": 0.423,
      "social": 0.494,
+     "ts": 1793272490.0,
+     "v": -0.369
+    },
+    {
+     "a": 0.633,
+     "compound": "希望",
+     "d": 0.674,
+     "emotion": "anger",
+     "intensity": 0.375,
+     "social": 0.489,
+     "ts": 1793272890.0,
+     "v": -0.293
+    },
+    {
+     "a": 0.62,
+     "compound": "希望",
+     "d": 0.649,
+     "emotion": "anger",
+     "intensity": 0.353,
+     "social": 0.492,
+     "ts": 1793272920.0,
+     "v": -0.256
+    },
+    {
+     "a": 0.455,
+     "compound": "希望",
+     "d": 0.619,
+     "emotion": "neutral",
+     "intensity": 0.271,
+     "social": 0.506,
      "ts": 1793276520.0,
-     "v": -0.194
+     "v": -0.186
     }
    ],
    "homeostasis": {
-    "L_int": 0.0776,
+    "L_int": 0.0214,
     "action": {
-     "mode": "rest",
-     "reason": "low_energy_fatigue",
-     "strength": 0.5077
-    },
-    "body": {
-     "energy": 0.153,
-     "fatigue": 0.3929,
-     "hydration": 0.5531,
-     "warmth": 0.6155
+     "mode": "engage",
+     "reason": "baseline",
+     "strength": 0.5423
     },
     "drives": {
      "curiosity": 0.82,
-     "energy": 0.1826,
-     "safety": 0.6516,
-     "social": 0.5164
+     "seen": 0.045,
+     "social": 0.5589
     },
-    "interoception": {
-     "expression_hint": "normal",
-     "label": "steady",
-     "signal": 0.4199
-    },
-    "last_metabolic_cost": 0.0166,
-    "need_pyramid": {
-     "deficits": {
-      "belonging": 0.4836,
-      "esteem": 0.4481,
-      "physiological": 0.8174,
-      "safety": 0.3484,
-      "self_actualization": 0.18
-     },
-     "dominant": "physiological",
-     "score": 0.5724
-    },
-    "readiness": 0.3458,
+    "readiness": 0.4674,
     "set_points": {
      "curiosity": 0.811306,
-     "energy": 0.362195,
-     "safety": 0.690078,
-     "social": 0.599945
+     "seen": 0.082736,
+     "social": 0.576698
     },
     "setpoint_ticks": 24,
     "tick": 24,
@@ -5376,69 +5574,73 @@
    },
    "interpersonal": {
     "coupling": 0.0,
-    "dampening": 1.0,
+    "dampening": 0.55,
     "other_valence_est": 0.0
    },
    "labels": {
-    "emotion": "joy",
-    "energy": "low",
-    "expression": "short",
-    "intent": "withdraw",
+    "emotion": "neutral",
+    "energy": "normal",
+    "expression": "normal",
+    "intent": "hold",
     "need": "talk",
     "stress": "calm"
    },
    "learning": {
     "evidence": {
      "regulation_q": {
-      "distraction": {
-       "n": 4,
-       "sum_pe": 0.702179776346959
-      },
       "express": {
-       "n": 2,
-       "sum_pe": 0.17948968591401165
+       "n": 0,
+       "sum_pe": 0.0
       },
       "label_emotion": {
-       "n": 2,
-       "sum_pe": 0.2240232221522447
+       "n": 1,
+       "sum_pe": 0.10220241467531646
+      },
+      "reappraise": {
+       "n": 1,
+       "sum_pe": 0.10373328798479338
+      },
+      "suppress": {
+       "n": 1,
+       "sum_pe": 0.048545787938237134
       }
      }
     },
-    "last_update": 1793271840.0,
+    "last_update": 1793272490.0,
     "log": [
      {
-      "new": 0.00296,
+      "new": 0.00495,
       "old": 0.0,
       "param": "regulation_q.express",
       "reason": "delta_stress",
       "samples": 5,
-      "ts": 1793271840.0
+      "ts": 1793272490.0
      }
     ],
     "params": {
      "learning_rate": 0.2,
      "regulation_q": {
-      "express": 0.00296
+      "express": 0.00495
      },
      "trust_alpha": 0.3
     },
     "updates_count": 1,
     "version": 1
    },
-   "meta_emotion": "对孤独的承认",
+   "meta_emotion": "",
    "momentum": {
-    "a": 0.042375748397642556,
-    "d": 0.02768606837434591,
-    "social": -0.005095511837962368,
-    "v": -0.012759906675581117
+    "a": 0.04215567130348063,
+    "d": 0.02530203845366487,
+    "social": -0.01393158998514991,
+    "v": -0.04391957405634457
    },
    "narrative_self": "",
    "noise": {
     "attention": 0.04,
     "energy": 0.034,
     "social": -0.036,
-    "stress": 0.061,
-    "valence": 0.055
+    "stress": 0.074,
+    "valence": 0.036
    },
    "novelty_need": 0.5,
    "open_loops_due": 0,
@@ -5502,110 +5704,111 @@
     "enabled": false
    },
    "reflection": {
-    "a": 0.06433733165000846,
-    "d": 0.022802004799100828,
+    "a": 0.060751602741297026,
+    "d": 0.021446338065443195,
     "social": 0,
-    "v": -0.08010399259896107
+    "v": -0.07606857105620143
    },
-   "reflection_tree": {
-    "count": 0,
-    "hidden_count": 0,
-    "roots": []
-   },
-   "refusal_readiness": 0.106,
+   "refusal_readiness": 0.103,
    "regulation": "none",
    "regulation_stats": {
-    "distraction": {
-     "cost": 0.024,
-     "last_update": 1793276520.0,
-     "stress_delta": -0.04646,
-     "success": 4,
-     "uses": 4
-    },
     "express": {
-     "cost": 0.014,
-     "last_update": 1793271870.0,
-     "stress_delta": -0.01204,
-     "success": 7,
-     "uses": 7
+     "cost": 0.01,
+     "last_update": 1793272490.0,
+     "stress_delta": -0.0123,
+     "success": 5,
+     "uses": 5
     },
     "label_emotion": {
-     "cost": 0.002,
+     "cost": 0.001,
      "last_update": 1793272490.0,
-     "stress_delta": -0.00778,
-     "success": 2,
-     "uses": 2
+     "stress_delta": -0.00325,
+     "success": 1,
+     "uses": 1
+    },
+    "reappraise": {
+     "cost": 0.002,
+     "last_update": 1793272920.0,
+     "stress_delta": -0.00418,
+     "success": 1,
+     "uses": 1
+    },
+    "suppress": {
+     "cost": 0.01,
+     "last_update": 1793272890.0,
+     "stress_delta": 0.00142,
+     "success": 0,
+     "uses": 1
     }
    },
    "ripple": {
-    "energy": 0.154,
-    "lower": 0.189,
-    "overlap": 0.119,
-    "upper": 0.119
+    "energy": 0.144,
+    "lower": 0.188,
+    "overlap": 0.1,
+    "upper": 0.1
    },
    "sec": {
-    "coping_potential": 0.503,
-    "implication": 0.283,
+    "coping_potential": 0.501,
+    "implication": 0.269,
     "normative": 0.62,
     "relevance": 0.371
    },
+   "seen_need": 0.045,
    "self_timeline": {
     "future": [],
     "past": [],
     "present": ""
    },
-   "social": 0.4936,
+   "social": 0.5061,
    "spectrum": [
     {
-     "distance": 0.0,
-     "key": "joy",
-     "name": "快乐"
-    },
-    {
-     "distance": 0.075,
-     "key": "contentment",
-     "name": "满足"
-    },
-    {
-     "distance": 0.168,
+     "distance": 0.127,
      "key": "confusion",
      "name": "困惑"
+    },
+    {
+     "distance": 0.199,
+     "key": "disgust",
+     "name": "厌恶"
+    },
+    {
+     "distance": 0.227,
+     "key": "contempt",
+     "name": "轻蔑"
     }
    ],
    "spectrum_calibration": {
-    "calibrated": 14,
-    "families": 4,
+    "calibrated": 3,
+    "families": 2,
     "samples": 24
    },
    "spectrum_probs": [
     {
-     "key": "joy",
-     "name": "快乐",
-     "p": 0.9811
-    },
-    {
-     "key": "contentment",
-     "name": "满足",
-     "p": 0.0131
-    },
-    {
      "key": "confusion",
      "name": "困惑",
-     "p": 0.0058
+     "p": 0.455
+    },
+    {
+     "key": "disgust",
+     "name": "厌恶",
+     "p": 0.2904
+    },
+    {
+     "key": "contempt",
+     "name": "轻蔑",
+     "p": 0.2546
     }
    ],
    "spiking": {
-    "ei": 0.378,
-    "rate": 0.037,
-    "variance": 0.0221
+    "ei": 0.35,
+    "rate": 0.05,
+    "variance": 0.0234
    },
    "stimuli": [],
-   "stress": 0.2425,
-   "ticks": 41,
-   "trust": 0.5935,
-   "user_trust_seed_delta": -0.012,
-   "user_trust_seeded": true,
-   "v": -0.1935
+   "stress": 0.2696,
+   "talked": 0.3217,
+   "ticks": 24,
+   "v": -0.1855
   },
   "users/10001.json": {
    "absence": {
@@ -5618,6 +5821,9 @@
    "first_seen": 1793000000.0,
    "interactions": 10,
    "last_seen": 1793272490.0,
+   "names": [
+    "芒果"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -5628,9 +5834,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3091,
-     "avoidant": 0.2378,
-     "safe": 0.4531
+     "anxious": 0.3138,
+     "avoidant": 0.2444,
+     "safe": 0.4418
     },
     "calibration": {
      "sources": {}
@@ -5650,63 +5856,63 @@
     "repair_state": {
      "evidence": [
       {
-       "conflict": 0.2549,
+       "conflict": 0.2555,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793000000.0
       },
       {
-       "conflict": 0.2488,
+       "conflict": 0.2553,
        "phase": "stable",
-       "repair": 0.004,
+       "repair": 0.0,
        "ts": 1793000090.0
       },
       {
-       "conflict": 0.281,
+       "conflict": 0.2827,
        "phase": "stable",
-       "repair": 0.006,
+       "repair": 0.0,
        "ts": 1793011740.0
       },
       {
-       "conflict": 0.2661,
+       "conflict": 0.2805,
        "phase": "stable",
-       "repair": 0.008,
+       "repair": 0.0,
        "ts": 1793011770.0
       },
       {
-       "conflict": 0.2621,
+       "conflict": 0.2673,
        "phase": "stable",
-       "repair": 0.008,
+       "repair": 0.0,
        "ts": 1793098170.0
       },
       {
-       "conflict": 0.2336,
+       "conflict": 0.2557,
        "phase": "stable",
-       "repair": 0.024,
+       "repair": 0.0,
        "ts": 1793271800.0
       },
       {
-       "conflict": 0.2609,
+       "conflict": 0.2882,
        "phase": "stable",
-       "repair": 0.018,
+       "repair": 0.0,
        "ts": 1793271820.0
       },
       {
-       "conflict": 0.2851,
+       "conflict": 0.3029,
        "phase": "stable",
-       "repair": 0.014,
+       "repair": 0.0,
        "ts": 1793271840.0
       },
       {
-       "conflict": 0.2984,
+       "conflict": 0.3094,
        "phase": "stable",
-       "repair": 0.008,
+       "repair": 0.0,
        "ts": 1793271870.0
       },
       {
-       "conflict": 0.3071,
+       "conflict": 0.3104,
        "phase": "stable",
-       "repair": 0.006,
+       "repair": 0.0,
        "ts": 1793272490.0
       }
      ],
@@ -5718,91 +5924,91 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.548,
-     "conflict": 0.3071,
-     "predictability": 0.994,
-     "repair": 0.006,
-     "trust": 0.55
+     "closeness": 0.5342,
+     "conflict": 0.3104,
+     "predictability": 1.0,
+     "repair": 0.0,
+     "trust": 0.5
     },
     "trajectory": [
      {
-      "closeness": 0.5236,
-      "conflict": 0.2549,
+      "closeness": 0.5225,
+      "conflict": 0.2555,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.502,
+      "trust": 0.5,
       "ts": 1793000000.0
      },
      {
-      "closeness": 0.5428,
-      "conflict": 0.2488,
-      "predictability": 0.996,
-      "repair": 0.004,
-      "trust": 0.504,
+      "closeness": 0.5308,
+      "conflict": 0.2553,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793000090.0
      },
      {
-      "closeness": 0.5516,
-      "conflict": 0.281,
-      "predictability": 0.994,
-      "repair": 0.006,
-      "trust": 0.507,
+      "closeness": 0.5443,
+      "conflict": 0.2827,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793011740.0
      },
      {
-      "closeness": 0.5683,
-      "conflict": 0.2661,
-      "predictability": 0.992,
-      "repair": 0.008,
-      "trust": 0.511,
+      "closeness": 0.5476,
+      "conflict": 0.2805,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793011770.0
      },
      {
-      "closeness": 0.5617,
-      "conflict": 0.2621,
-      "predictability": 0.992,
-      "repair": 0.008,
-      "trust": 0.515,
+      "closeness": 0.5528,
+      "conflict": 0.2673,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793098170.0
      },
      {
-      "closeness": 0.6069,
-      "conflict": 0.2336,
-      "predictability": 0.976,
-      "repair": 0.024,
-      "trust": 0.527,
+      "closeness": 0.5619,
+      "conflict": 0.2557,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271800.0
      },
      {
-      "closeness": 0.5933,
-      "conflict": 0.2609,
-      "predictability": 0.982,
-      "repair": 0.018,
-      "trust": 0.536,
+      "closeness": 0.5513,
+      "conflict": 0.2882,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271820.0
      },
      {
-      "closeness": 0.5806,
-      "conflict": 0.2851,
-      "predictability": 0.986,
-      "repair": 0.014,
-      "trust": 0.543,
+      "closeness": 0.5465,
+      "conflict": 0.3029,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271840.0
      },
      {
-      "closeness": 0.5609,
-      "conflict": 0.2984,
-      "predictability": 0.992,
-      "repair": 0.008,
-      "trust": 0.547,
+      "closeness": 0.5339,
+      "conflict": 0.3094,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271870.0
      },
      {
-      "closeness": 0.548,
-      "conflict": 0.3071,
-      "predictability": 0.994,
-      "repair": 0.006,
-      "trust": 0.55,
+      "closeness": 0.5342,
+      "conflict": 0.3104,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793272490.0
      }
     ],
@@ -5814,23 +6020,23 @@
      "你可以的": 1,
      "你还记得我早上让你唱什么吗": 1,
      "先别气坏自己": 1,
+     "听着也好难过": 1,
      "哼哼": 1,
      "太过分了": 1,
      "好嘞": 1,
+     "好委屈啊": 1,
      "好紧张": 1,
      "小爱": 2,
      "小爱早呀": 1,
      "就唱上次那首吧": 1,
      "想听哪首": 1,
      "想哭": 1,
+     "我也生气": 1,
+     "我在呢": 1,
      "我好难过": 1,
      "我考完了": 1,
-     "早呀": 1,
-     "明天要考试了": 1,
-     "气死了": 1,
-     "气死我了": 1,
-     "真的受够了": 1,
-     "真的很委屈": 1
+     "抱抱你": 1,
+     "早呀": 1
     },
     "we_memory": []
    },
@@ -5839,7 +6045,7 @@
    "sessions": [
     "default:FriendMessage:10001"
    ],
-   "trust": 0.55
+   "trust": 0.5
   },
   "users/10002.json": {
    "absence": {
@@ -5852,6 +6058,9 @@
    "first_seen": 1793000690.0,
    "interactions": 5,
    "last_seen": 1793271400.0,
+   "names": [
+    "柠檬"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -5862,9 +6071,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3046,
-     "avoidant": 0.2384,
-     "safe": 0.457
+     "anxious": 0.3091,
+     "avoidant": 0.2447,
+     "safe": 0.4462
     },
     "calibration": {
      "sources": {}
@@ -5898,33 +6107,33 @@
     "repair_state": {
      "evidence": [
       {
-       "conflict": 0.2449,
+       "conflict": 0.2558,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793000690.0
       },
       {
-       "conflict": 0.2478,
+       "conflict": 0.2538,
        "phase": "stable",
-       "repair": 0.006,
+       "repair": 0.0,
        "ts": 1793000790.0
       },
       {
-       "conflict": 0.2553,
+       "conflict": 0.269,
        "phase": "stable",
-       "repair": 0.01,
+       "repair": 0.0,
        "ts": 1793098470.0
       },
       {
-       "conflict": 0.2353,
+       "conflict": 0.2501,
        "phase": "stable",
-       "repair": 0.016,
+       "repair": 0.0,
        "ts": 1793271380.0
       },
       {
-       "conflict": 0.2259,
+       "conflict": 0.2467,
        "phase": "stable",
-       "repair": 0.018,
+       "repair": 0.0,
        "ts": 1793271400.0
       }
      ],
@@ -5936,51 +6145,51 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5994,
-     "conflict": 0.2259,
-     "predictability": 0.982,
-     "repair": 0.018,
-     "trust": 0.528
+     "closeness": 0.5587,
+     "conflict": 0.2467,
+     "predictability": 1.0,
+     "repair": 0.0,
+     "trust": 0.5
     },
     "trajectory": [
      {
-      "closeness": 0.5516,
-      "conflict": 0.2449,
+      "closeness": 0.5328,
+      "conflict": 0.2558,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.503,
+      "trust": 0.5,
       "ts": 1793000690.0
      },
      {
-      "closeness": 0.5539,
-      "conflict": 0.2478,
-      "predictability": 0.994,
-      "repair": 0.006,
-      "trust": 0.506,
+      "closeness": 0.5419,
+      "conflict": 0.2538,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793000790.0
      },
      {
-      "closeness": 0.5707,
-      "conflict": 0.2553,
-      "predictability": 0.99,
-      "repair": 0.01,
-      "trust": 0.511,
+      "closeness": 0.5526,
+      "conflict": 0.269,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793098470.0
      },
      {
-      "closeness": 0.5829,
-      "conflict": 0.2353,
-      "predictability": 0.984,
-      "repair": 0.016,
-      "trust": 0.519,
+      "closeness": 0.5545,
+      "conflict": 0.2501,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271380.0
      },
      {
-      "closeness": 0.5994,
-      "conflict": 0.2259,
-      "predictability": 0.982,
-      "repair": 0.018,
-      "trust": 0.528,
+      "closeness": 0.5587,
+      "conflict": 0.2467,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271400.0
      }
     ],
@@ -5997,6 +6206,7 @@
      "小爱帮我们算算保底还差多少": 1,
      "心态崩了": 1,
      "恭喜恭喜": 1,
+     "我也好开心": 1,
      "我已经歪了三次了": 1,
      "我算算哦": 1,
      "我终于抽到了": 1,
@@ -6012,7 +6222,7 @@
    "sessions": [
     "default:GroupMessage:900001"
    ],
-   "trust": 0.528
+   "trust": 0.5
   },
   "users/10003.json": {
    "absence": {
@@ -6025,6 +6235,9 @@
    "first_seen": 1793000730.0,
    "interactions": 4,
    "last_seen": 1793276520.0,
+   "names": [
+    "阿星"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6035,9 +6248,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3118,
-     "avoidant": 0.2466,
-     "safe": 0.4415
+     "anxious": 0.314,
+     "avoidant": 0.2468,
+     "safe": 0.4392
     },
     "calibration": {
      "sources": {}
@@ -6071,27 +6284,27 @@
     "repair_state": {
      "evidence": [
       {
-       "conflict": 0.2461,
+       "conflict": 0.255,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793000730.0
       },
       {
-       "conflict": 0.3063,
+       "conflict": 0.3013,
        "phase": "stable",
-       "repair": 0.01,
+       "repair": 0.0,
        "ts": 1793272890.0
       },
       {
-       "conflict": 0.2932,
+       "conflict": 0.2952,
        "phase": "stable",
-       "repair": 0.008,
+       "repair": 0.0,
        "ts": 1793272920.0
       },
       {
-       "conflict": 0.2784,
+       "conflict": 0.2805,
        "phase": "stable",
-       "repair": 0.008,
+       "repair": 0.0,
        "ts": 1793276520.0
       }
      ],
@@ -6103,43 +6316,43 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5317,
-     "conflict": 0.2784,
-     "predictability": 0.992,
-     "repair": 0.008,
-     "trust": 0.516
+     "closeness": 0.5365,
+     "conflict": 0.2805,
+     "predictability": 1.0,
+     "repair": 0.0,
+     "trust": 0.5
     },
     "trajectory": [
      {
-      "closeness": 0.554,
-      "conflict": 0.2461,
+      "closeness": 0.5383,
+      "conflict": 0.255,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.503,
+      "trust": 0.5,
       "ts": 1793000730.0
      },
      {
-      "closeness": 0.5141,
-      "conflict": 0.3063,
-      "predictability": 0.99,
-      "repair": 0.01,
-      "trust": 0.508,
+      "closeness": 0.5266,
+      "conflict": 0.3013,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793272890.0
      },
      {
-      "closeness": 0.5222,
-      "conflict": 0.2932,
-      "predictability": 0.992,
-      "repair": 0.008,
-      "trust": 0.512,
+      "closeness": 0.5281,
+      "conflict": 0.2952,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793272920.0
      },
      {
-      "closeness": 0.5317,
-      "conflict": 0.2784,
-      "predictability": 0.992,
-      "repair": 0.008,
-      "trust": 0.516,
+      "closeness": 0.5365,
+      "conflict": 0.2805,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793276520.0
      }
     ],
@@ -6155,19 +6368,19 @@
      "太开心了": 1,
      "好呀": 1,
      "好激动": 1,
+     "好高兴": 1,
      "小爱": 4,
      "小爱帮我们算算保底还差多少": 1,
      "小爱快夸我": 1,
      "心态崩了": 1,
      "恭喜恭喜": 1,
+     "我也好开心": 1,
      "我们约好下周一起打副本吧": 1,
      "我已经歪了三次了": 1,
      "我算算哦": 1,
      "我终于抽到了": 1,
      "抱抱": 1,
-     "按爱弥斯的设定在聊": 1,
-     "是呀": 1,
-     "是诶": 1
+     "按爱弥斯的设定在聊": 1
     },
     "we_memory": []
    },
@@ -6176,7 +6389,7 @@
    "sessions": [
     "default:GroupMessage:900001"
    ],
-   "trust": 0.516
+   "trust": 0.5
   },
   "users/10004.json": {
    "absence": {
@@ -6189,6 +6402,9 @@
    "first_seen": 1793004390.0,
    "interactions": 4,
    "last_seen": 1793271350.0,
+   "names": [
+    "桃子"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6199,9 +6415,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3067,
-     "avoidant": 0.2398,
-     "safe": 0.4535
+     "anxious": 0.31,
+     "avoidant": 0.244,
+     "safe": 0.446
     },
     "calibration": {
      "sources": {}
@@ -6221,27 +6437,27 @@
     "repair_state": {
      "evidence": [
       {
-       "conflict": 0.2425,
+       "conflict": 0.2508,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793004390.0
       },
       {
-       "conflict": 0.2576,
+       "conflict": 0.2687,
        "phase": "stable",
-       "repair": 0.008,
+       "repair": 0.0,
        "ts": 1793004510.0
+      },
+      {
+       "conflict": 0.2616,
+       "phase": "stable",
+       "repair": 0.0,
+       "ts": 1793271330.0
       },
       {
        "conflict": 0.2571,
        "phase": "stable",
-       "repair": 0.01,
-       "ts": 1793271330.0
-      },
-      {
-       "conflict": 0.246,
-       "phase": "stable",
-       "repair": 0.012,
+       "repair": 0.0,
        "ts": 1793271350.0
       }
      ],
@@ -6253,43 +6469,43 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5741,
-     "conflict": 0.246,
-     "predictability": 0.988,
-     "repair": 0.012,
-     "trust": 0.519
+     "closeness": 0.5535,
+     "conflict": 0.2571,
+     "predictability": 1.0,
+     "repair": 0.0,
+     "trust": 0.5
     },
     "trajectory": [
      {
-      "closeness": 0.5638,
-      "conflict": 0.2425,
+      "closeness": 0.548,
+      "conflict": 0.2508,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.504,
+      "trust": 0.5,
       "ts": 1793004390.0
      },
      {
-      "closeness": 0.562,
-      "conflict": 0.2576,
-      "predictability": 0.992,
-      "repair": 0.008,
-      "trust": 0.508,
+      "closeness": 0.5454,
+      "conflict": 0.2687,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793004510.0
      },
      {
-      "closeness": 0.559,
-      "conflict": 0.2571,
-      "predictability": 0.99,
-      "repair": 0.01,
-      "trust": 0.513,
+      "closeness": 0.5514,
+      "conflict": 0.2616,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271330.0
      },
      {
-      "closeness": 0.5741,
-      "conflict": 0.246,
-      "predictability": 0.988,
-      "repair": 0.012,
-      "trust": 0.519,
+      "closeness": 0.5535,
+      "conflict": 0.2571,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793271350.0
      }
     ],
@@ -6309,7 +6525,7 @@
    "sessions": [
     "default:GroupMessage:900002"
    ],
-   "trust": 0.519
+   "trust": 0.5
   },
   "users/10005.json": {
    "absence": {
@@ -6322,6 +6538,9 @@
    "first_seen": 1793098530.0,
    "interactions": 1,
    "last_seen": 1793098530.0,
+   "names": [
+    "路人"
+   ],
    "relationship": {
     "absence": {
      "bucket": "same_day",
@@ -6361,7 +6580,7 @@
     "repair_state": {
      "evidence": [
       {
-       "conflict": 0.2563,
+       "conflict": 0.2665,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793098530.0
@@ -6375,19 +6594,19 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5637,
-     "conflict": 0.2563,
+     "closeness": 0.5503,
+     "conflict": 0.2665,
      "predictability": 1.0,
      "repair": 0.0,
-     "trust": 0.506
+     "trust": 0.5
     },
     "trajectory": [
      {
-      "closeness": 0.5637,
-      "conflict": 0.2563,
+      "closeness": 0.5503,
+      "conflict": 0.2665,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.506,
+      "trust": 0.5,
       "ts": 1793098530.0
      }
     ],
@@ -6412,7 +6631,7 @@
    "sessions": [
     "default:GroupMessage:900001"
    ],
-   "trust": 0.506
+   "trust": 0.5
   }
  },
  "log": [],
@@ -6437,11 +6656,6 @@
      "voice": ""
     },
     "functions": {
-     "diary": {
-      "default_enabled": false,
-      "enabled": false,
-      "provider": "follow_llm"
-     },
      "empathy_hint": {
       "default_enabled": false,
       "enabled": false,
@@ -6475,6 +6689,11 @@
      "memory_summary": {
       "default_enabled": true,
       "enabled": true,
+      "provider": "follow_llm"
+     },
+     "notebook": {
+      "default_enabled": false,
+      "enabled": false,
       "provider": "follow_llm"
      },
      "persona_compile": {
@@ -6563,92 +6782,89 @@
    "astrbot_llm": {},
    "astrbot_rerank": {},
    "astrbot_tts": {},
-   "bc_prompt_mode": "telemetry",
-   "circadian_alertness": 0.5,
    "cores": [
     {
      "intent": {
       "compound": "希望",
-      "dominance": 0.67,
-      "emotion": "joy",
-      "energy": "low",
-      "expression": "short",
-      "intent": "withdraw",
+      "dominance": 0.6,
+      "emotion": "neutral",
+      "energy": "normal",
+      "expression": "normal",
+      "intent": "hold",
       "need": "talk",
       "plan": "自然回应",
       "regulation": "none",
-      "social": 0.5,
+      "social": 0.52,
       "spectrum": [
        {
-        "distance": 0.0,
-        "key": "joy",
-        "name": "快乐"
-       },
-       {
-        "distance": 0.019,
-        "key": "contentment",
-        "name": "满足"
-       },
-       {
-        "distance": 0.159,
+        "distance": 0.155,
         "key": "confusion",
         "name": "困惑"
+       },
+       {
+        "distance": 0.228,
+        "key": "calmness",
+        "name": "平静"
+       },
+       {
+        "distance": 0.242,
+        "key": "disappointment",
+        "name": "失望"
        }
       ],
-      "stress": "calm",
-      "trust": 0.59
+      "stress": "calm"
      },
      "key": "her",
      "snapshot": {
-      "a": 0.4235,
+      "a": 0.3836,
       "allostatic_load": 0.0,
+      "ambient": 0.0333,
       "appraisal": {
        "agency": 0.5,
-       "coping": 0.503,
+       "coping": 0.501,
        "expectedness": 1.0,
        "goal_relevance": 0.53,
        "norm_compatibility": 0.62,
        "novelty": 0.0,
-       "urgency": 0.466
+       "urgency": 0.405
       },
-      "attention": 0.199,
+      "attention": 0.347,
       "boredom": 0.0,
       "boundary_pressure": 0.0,
-      "circadian_alertness": 0.586,
       "compound": "希望",
-      "coping": 0.503,
+      "coping": 0.501,
       "core_self": "",
-      "d": 0.6742,
+      "d": 0.5991,
       "daily_digests": [
        {
         "date": "2026-10-26",
         "dominant_emotion": "neutral",
         "event_ids": [],
         "interaction_count": 4,
-        "mean_a": 0.4192,
-        "mean_stress": 0.2562,
-        "mean_v": 0.0119
+        "mean_a": 0.3928,
+        "mean_stress": 0.2664,
+        "mean_v": -0.0387
        },
        {
         "date": "2026-10-27",
         "dominant_emotion": "neutral",
         "event_ids": [],
         "interaction_count": 2,
-        "mean_a": 0.4106,
-        "mean_stress": 0.2502,
-        "mean_v": -0.0222
+        "mean_a": 0.371,
+        "mean_stress": 0.264,
+        "mean_v": -0.0663
        }
       ],
-      "echo": -0.367,
-      "echo_trace": -0.4009,
-      "energy": 0.1767,
+      "echo": -0.2621,
+      "echo_trace": -0.2982,
+      "energy": 0.344,
       "goal_conflict": [],
       "goal_focus": "和重要的人保持亲近",
       "goal_scores": {
        "autonomy": 0.0,
        "competence": 0.24,
        "relationship": 0.53,
-       "stability": 0.011
+       "stability": 0.0
       },
       "goals": [
        {
@@ -6657,7 +6873,7 @@
         "last_update": 1793276520.0,
         "name": "和重要的人保持亲近",
         "priority": 0.777,
-        "progress": 0.007
+        "progress": 0.022
        },
        {
         "horizon": "long",
@@ -6686,288 +6902,263 @@
       ],
       "history": [
        {
+        "a": 0.368,
+        "compound": "希望",
+        "d": 0.557,
+        "emotion": "neutral",
+        "intensity": 0.184,
+        "social": 0.457,
+        "ts": 1793000000.0,
+        "v": 0.002
+       },
+       {
+        "a": 0.353,
+        "compound": "",
+        "d": 0.546,
+        "emotion": "neutral",
+        "intensity": 0.173,
+        "social": 0.484,
+        "ts": 1793000090.0,
+        "v": -0.007
+       },
+       {
+        "a": 0.363,
+        "compound": "希望",
+        "d": 0.546,
+        "emotion": "neutral",
+        "intensity": 0.18,
+        "social": 0.492,
+        "ts": 1793000690.0,
+        "v": -0.024
+       },
+       {
+        "a": 0.372,
+        "compound": "",
+        "d": 0.539,
+        "emotion": "neutral",
+        "intensity": 0.179,
+        "social": 0.509,
+        "ts": 1793000730.0,
+        "v": -0.017
+       },
+       {
+        "a": 0.371,
+        "compound": "希望",
+        "d": 0.537,
+        "emotion": "neutral",
+        "intensity": 0.177,
+        "social": 0.52,
+        "ts": 1793000790.0,
+        "v": -0.007
+       },
+       {
         "a": 0.405,
         "compound": "希望",
-        "d": 0.582,
-        "emotion": "joy",
-        "intensity": 0.224,
-        "social": 0.488,
-        "ts": 1793000000.0,
-        "v": 0.113
-       },
-       {
-        "a": 0.42,
-        "compound": "",
-        "d": 0.591,
-        "emotion": "joy",
-        "intensity": 0.255,
-        "social": 0.542,
-        "ts": 1793000090.0,
-        "v": 0.186
-       },
-       {
-        "a": 0.413,
-        "compound": "希望",
-        "d": 0.582,
+        "d": 0.552,
         "emotion": "neutral",
-        "intensity": 0.228,
+        "intensity": 0.194,
         "social": 0.536,
-        "ts": 1793000690.0,
-        "v": 0.109
-       },
-       {
-        "a": 0.398,
-        "compound": "",
-        "d": 0.556,
-        "emotion": "sadness",
-        "intensity": 0.193,
-        "social": 0.538,
-        "ts": 1793000730.0,
-        "v": 0.017
-       },
-       {
-        "a": 0.429,
-        "compound": "希望",
-        "d": 0.575,
-        "emotion": "joy",
-        "intensity": 0.244,
-        "social": 0.574,
-        "ts": 1793000790.0,
-        "v": 0.128
-       },
-       {
-        "a": 0.434,
-        "compound": "希望",
-        "d": 0.576,
-        "emotion": "neutral",
-        "intensity": 0.224,
-        "social": 0.572,
         "ts": 1793004390.0,
-        "v": 0.059
+        "v": -0.014
+       },
+       {
+        "a": 0.407,
+        "compound": "",
+        "d": 0.526,
+        "emotion": "neutral",
+        "intensity": 0.215,
+        "social": 0.538,
+        "ts": 1793004510.0,
+        "v": -0.083
+       },
+       {
+        "a": 0.435,
+        "compound": "失落",
+        "d": 0.515,
+        "emotion": "neutral",
+        "intensity": 0.235,
+        "social": 0.54,
+        "ts": 1793011740.0,
+        "v": -0.119
+       },
+       {
+        "a": 0.451,
+        "compound": "希望",
+        "d": 0.511,
+        "emotion": "neutral",
+        "intensity": 0.243,
+        "social": 0.552,
+        "ts": 1793011770.0,
+        "v": -0.125
+       },
+       {
+        "a": 0.375,
+        "compound": "希望",
+        "d": 0.534,
+        "emotion": "neutral",
+        "intensity": 0.195,
+        "social": 0.556,
+        "ts": 1793098170.0,
+        "v": -0.042
+       },
+       {
+        "a": 0.367,
+        "compound": "希望",
+        "d": 0.529,
+        "emotion": "neutral",
+        "intensity": 0.209,
+        "social": 0.559,
+        "ts": 1793098470.0,
+        "v": -0.091
+       },
+       {
+        "a": 0.382,
+        "compound": "希望",
+        "d": 0.526,
+        "emotion": "neutral",
+        "intensity": 0.202,
+        "social": 0.551,
+        "ts": 1793098530.0,
+        "v": -0.062
+       },
+       {
+        "a": 0.404,
+        "compound": "希望",
+        "d": 0.544,
+        "emotion": "neutral",
+        "intensity": 0.203,
+        "social": 0.55,
+        "ts": 1793271330.0,
+        "v": -0.036
+       },
+       {
+        "a": 0.396,
+        "compound": "",
+        "d": 0.545,
+        "emotion": "neutral",
+        "intensity": 0.188,
+        "social": 0.553,
+        "ts": 1793271350.0,
+        "v": 0.001
+       },
+       {
+        "a": 0.412,
+        "compound": "",
+        "d": 0.559,
+        "emotion": "neutral",
+        "intensity": 0.218,
+        "social": 0.572,
+        "ts": 1793271380.0,
+        "v": 0.067
+       },
+       {
+        "a": 0.428,
+        "compound": "希望",
+        "d": 0.578,
+        "emotion": "neutral",
+        "intensity": 0.239,
+        "social": 0.581,
+        "ts": 1793271400.0,
+        "v": 0.108
+       },
+       {
+        "a": 0.395,
+        "compound": "希望",
+        "d": 0.52,
+        "emotion": "neutral",
+        "intensity": 0.211,
+        "social": 0.578,
+        "ts": 1793271800.0,
+        "v": -0.067
        },
        {
         "a": 0.415,
         "compound": "失落",
-        "d": 0.533,
+        "d": 0.511,
         "emotion": "sadness",
-        "intensity": 0.226,
-        "social": 0.56,
-        "ts": 1793004510.0,
-        "v": -0.098
-       },
-       {
-        "a": 0.501,
-        "compound": "",
-        "d": 0.537,
-        "emotion": "joy",
-        "intensity": 0.229,
-        "social": 0.583,
-        "ts": 1793011740.0,
-        "v": -0.017
-       },
-       {
-        "a": 0.504,
-        "compound": "希望",
-        "d": 0.531,
-        "emotion": "neutral",
-        "intensity": 0.242,
-        "social": 0.587,
-        "ts": 1793011770.0,
-        "v": -0.051
-       },
-       {
-        "a": 0.442,
-        "compound": "希望",
-        "d": 0.559,
-        "emotion": "joy",
-        "intensity": 0.231,
-        "social": 0.588,
-        "ts": 1793098170.0,
-        "v": 0.071
-       },
-       {
-        "a": 0.418,
-        "compound": "希望",
-        "d": 0.551,
-        "emotion": "neutral",
-        "intensity": 0.203,
-        "social": 0.586,
-        "ts": 1793098470.0,
-        "v": -0.005
-       },
-       {
-        "a": 0.423,
-        "compound": "希望",
-        "d": 0.545,
-        "emotion": "neutral",
-        "intensity": 0.202,
-        "social": 0.574,
-        "ts": 1793098530.0,
-        "v": 0.007
-       },
-       {
-        "a": 0.469,
-        "compound": "希望",
-        "d": 0.57,
-        "emotion": "joy",
-        "intensity": 0.241,
-        "social": 0.582,
-        "ts": 1793271330.0,
-        "v": 0.079
-       },
-       {
-        "a": 0.486,
-        "compound": "亲近",
-        "d": 0.593,
-        "emotion": "joy",
-        "intensity": 0.292,
-        "social": 0.612,
-        "ts": 1793271350.0,
-        "v": 0.204
-       },
-       {
-        "a": 0.518,
-        "compound": "亲近",
-        "d": 0.618,
-        "emotion": "joy",
-        "intensity": 0.352,
-        "social": 0.656,
-        "ts": 1793271380.0,
-        "v": 0.338
-       },
-       {
-        "a": 0.544,
-        "compound": "希望",
-        "d": 0.647,
-        "emotion": "joy",
-        "intensity": 0.394,
-        "social": 0.683,
-        "ts": 1793271400.0,
-        "v": 0.425
-       },
-       {
-        "a": 0.46,
-        "compound": "希望",
-        "d": 0.571,
-        "emotion": "sadness",
-        "intensity": 0.248,
-        "social": 0.644,
-        "ts": 1793271800.0,
-        "v": 0.076
-       },
-       {
-        "a": 0.45,
-        "compound": "失落",
-        "d": 0.551,
-        "emotion": "sadness",
-        "intensity": 0.294,
-        "social": 0.599,
+        "intensity": 0.272,
+        "social": 0.563,
         "ts": 1793271820.0,
-        "v": -0.239
+        "v": -0.24
        },
        {
-        "a": 0.632,
+        "a": 0.577,
         "compound": "失落",
-        "d": 0.646,
+        "d": 0.596,
         "emotion": "anger",
-        "intensity": 0.419,
-        "social": 0.546,
+        "intensity": 0.364,
+        "social": 0.535,
         "ts": 1793271840.0,
-        "v": -0.415
+        "v": -0.334
        },
        {
-        "a": 0.757,
+        "a": 0.606,
         "compound": "失落",
-        "d": 0.74,
+        "d": 0.621,
         "emotion": "anger",
-        "intensity": 0.52,
-        "social": 0.48,
+        "intensity": 0.374,
+        "social": 0.522,
         "ts": 1793271870.0,
-        "v": -0.55
+        "v": -0.334
        },
        {
-        "a": 0.767,
-        "compound": "委屈",
-        "d": 0.798,
+        "a": 0.697,
+        "compound": "失落",
+        "d": 0.683,
         "emotion": "anger",
-        "intensity": 0.565,
-        "social": 0.439,
-        "ts": 1793272490.0,
-        "v": -0.613
-       },
-       {
-        "a": 0.619,
-        "compound": "希望",
-        "d": 0.761,
-        "emotion": "loneliness",
-        "intensity": 0.443,
-        "social": 0.442,
-        "ts": 1793272890.0,
-        "v": -0.431
-       },
-       {
-        "a": 0.555,
-        "compound": "希望",
-        "d": 0.719,
-        "emotion": "loneliness",
-        "intensity": 0.39,
-        "social": 0.452,
-        "ts": 1793272920.0,
-        "v": -0.368
-       },
-       {
-        "a": 0.488,
-        "compound": "希望",
-        "d": 0.718,
-        "emotion": "joy",
-        "intensity": 0.298,
+        "intensity": 0.423,
         "social": 0.494,
+        "ts": 1793272490.0,
+        "v": -0.369
+       },
+       {
+        "a": 0.633,
+        "compound": "希望",
+        "d": 0.674,
+        "emotion": "anger",
+        "intensity": 0.375,
+        "social": 0.489,
+        "ts": 1793272890.0,
+        "v": -0.293
+       },
+       {
+        "a": 0.62,
+        "compound": "希望",
+        "d": 0.649,
+        "emotion": "anger",
+        "intensity": 0.353,
+        "social": 0.492,
+        "ts": 1793272920.0,
+        "v": -0.256
+       },
+       {
+        "a": 0.455,
+        "compound": "希望",
+        "d": 0.619,
+        "emotion": "neutral",
+        "intensity": 0.271,
+        "social": 0.506,
         "ts": 1793276520.0,
-        "v": -0.194
+        "v": -0.186
        }
       ],
       "homeostasis": {
-       "L_int": 0.0776,
+       "L_int": 0.0214,
        "action": {
-        "mode": "rest",
-        "reason": "low_energy_fatigue",
-        "strength": 0.5077
-       },
-       "body": {
-        "energy": 0.153,
-        "fatigue": 0.3929,
-        "hydration": 0.5531,
-        "warmth": 0.6155
+        "mode": "engage",
+        "reason": "baseline",
+        "strength": 0.5423
        },
        "drives": {
         "curiosity": 0.82,
-        "energy": 0.1826,
-        "safety": 0.6516,
-        "social": 0.5164
+        "seen": 0.045,
+        "social": 0.5589
        },
-       "interoception": {
-        "expression_hint": "normal",
-        "label": "steady",
-        "signal": 0.4199
-       },
-       "last_metabolic_cost": 0.0166,
-       "need_pyramid": {
-        "deficits": {
-         "belonging": 0.4836,
-         "esteem": 0.4481,
-         "physiological": 0.8174,
-         "safety": 0.3484,
-         "self_actualization": 0.18
-        },
-        "dominant": "physiological",
-        "score": 0.5724
-       },
-       "readiness": 0.3458,
+       "readiness": 0.4674,
        "set_points": {
         "curiosity": 0.811306,
-        "energy": 0.362195,
-        "safety": 0.690078,
-        "social": 0.599945
+        "seen": 0.082736,
+        "social": 0.576698
        },
        "setpoint_ticks": 24,
        "tick": 24,
@@ -6975,69 +7166,73 @@
       },
       "interpersonal": {
        "coupling": 0.0,
-       "dampening": 1.0,
+       "dampening": 0.55,
        "other_valence_est": 0.0
       },
       "labels": {
-       "emotion": "joy",
-       "energy": "low",
-       "expression": "short",
-       "intent": "withdraw",
+       "emotion": "neutral",
+       "energy": "normal",
+       "expression": "normal",
+       "intent": "hold",
        "need": "talk",
        "stress": "calm"
       },
       "learning": {
        "evidence": {
         "regulation_q": {
-         "distraction": {
-          "n": 4,
-          "sum_pe": 0.702179776346959
-         },
          "express": {
-          "n": 2,
-          "sum_pe": 0.17948968591401165
+          "n": 0,
+          "sum_pe": 0.0
          },
          "label_emotion": {
-          "n": 2,
-          "sum_pe": 0.2240232221522447
+          "n": 1,
+          "sum_pe": 0.10220241467531646
+         },
+         "reappraise": {
+          "n": 1,
+          "sum_pe": 0.10373328798479338
+         },
+         "suppress": {
+          "n": 1,
+          "sum_pe": 0.048545787938237134
          }
         }
        },
-       "last_update": 1793271840.0,
+       "last_update": 1793272490.0,
        "log": [
         {
-         "new": 0.00296,
+         "new": 0.00495,
          "old": 0.0,
          "param": "regulation_q.express",
          "reason": "delta_stress",
          "samples": 5,
-         "ts": 1793271840.0
+         "ts": 1793272490.0
         }
        ],
        "params": {
         "learning_rate": 0.2,
         "regulation_q": {
-         "express": 0.00296
+         "express": 0.00495
         },
         "trust_alpha": 0.3
        },
        "updates_count": 1,
        "version": 1
       },
-      "meta_emotion": "对孤独的承认",
+      "meta_emotion": "",
       "momentum": {
-       "a": 0.042375748397642556,
-       "d": 0.02768606837434591,
-       "social": -0.005095511837962368,
-       "v": -0.012759906675581117
+       "a": 0.04215567130348063,
+       "d": 0.02530203845366487,
+       "social": -0.01393158998514991,
+       "v": -0.04391957405634457
       },
       "narrative_self": "",
       "noise": {
        "attention": 0.04,
        "energy": 0.034,
        "social": -0.036,
-       "stress": 0.061,
-       "valence": 0.055
+       "stress": 0.074,
+       "valence": 0.036
       },
       "novelty_need": 0.5,
       "open_loops_due": 0,
@@ -7101,110 +7296,111 @@
        "enabled": false
       },
       "reflection": {
-       "a": 0.06433733165000846,
-       "d": 0.022802004799100828,
+       "a": 0.060751602741297026,
+       "d": 0.021446338065443195,
        "social": 0,
-       "v": -0.08010399259896107
+       "v": -0.07606857105620143
       },
-      "reflection_tree": {
-       "count": 0,
-       "hidden_count": 0,
-       "roots": []
-      },
-      "refusal_readiness": 0.106,
+      "refusal_readiness": 0.103,
       "regulation": "none",
       "regulation_stats": {
-       "distraction": {
-        "cost": 0.024,
-        "last_update": 1793276520.0,
-        "stress_delta": -0.04646,
-        "success": 4,
-        "uses": 4
-       },
        "express": {
-        "cost": 0.014,
-        "last_update": 1793271870.0,
-        "stress_delta": -0.01204,
-        "success": 7,
-        "uses": 7
+        "cost": 0.01,
+        "last_update": 1793272490.0,
+        "stress_delta": -0.0123,
+        "success": 5,
+        "uses": 5
        },
        "label_emotion": {
-        "cost": 0.002,
+        "cost": 0.001,
         "last_update": 1793272490.0,
-        "stress_delta": -0.00778,
-        "success": 2,
-        "uses": 2
+        "stress_delta": -0.00325,
+        "success": 1,
+        "uses": 1
+       },
+       "reappraise": {
+        "cost": 0.002,
+        "last_update": 1793272920.0,
+        "stress_delta": -0.00418,
+        "success": 1,
+        "uses": 1
+       },
+       "suppress": {
+        "cost": 0.01,
+        "last_update": 1793272890.0,
+        "stress_delta": 0.00142,
+        "success": 0,
+        "uses": 1
        }
       },
       "ripple": {
-       "energy": 0.154,
-       "lower": 0.189,
-       "overlap": 0.119,
-       "upper": 0.119
+       "energy": 0.144,
+       "lower": 0.188,
+       "overlap": 0.1,
+       "upper": 0.1
       },
       "sec": {
-       "coping_potential": 0.503,
-       "implication": 0.283,
+       "coping_potential": 0.501,
+       "implication": 0.269,
        "normative": 0.62,
        "relevance": 0.371
       },
+      "seen_need": 0.1492,
       "self_timeline": {
        "future": [],
        "past": [],
        "present": ""
       },
-      "social": 0.5047,
+      "social": 0.5157,
       "spectrum": [
        {
-        "distance": 0.0,
-        "key": "joy",
-        "name": "快乐"
-       },
-       {
-        "distance": 0.019,
-        "key": "contentment",
-        "name": "满足"
-       },
-       {
-        "distance": 0.159,
+        "distance": 0.155,
         "key": "confusion",
         "name": "困惑"
+       },
+       {
+        "distance": 0.228,
+        "key": "calmness",
+        "name": "平静"
+       },
+       {
+        "distance": 0.242,
+        "key": "disappointment",
+        "name": "失望"
        }
       ],
       "spectrum_calibration": {
-       "calibrated": 14,
-       "families": 4,
+       "calibrated": 3,
+       "families": 2,
        "samples": 24
       },
       "spectrum_probs": [
        {
-        "key": "joy",
-        "name": "快乐",
-        "p": 0.9444
-       },
-       {
-        "key": "contentment",
-        "name": "满足",
-        "p": 0.0497
-       },
-       {
         "key": "confusion",
         "name": "困惑",
-        "p": 0.0059
+        "p": 0.431
+       },
+       {
+        "key": "calmness",
+        "name": "平静",
+        "p": 0.293
+       },
+       {
+        "key": "disappointment",
+        "name": "失望",
+        "p": 0.276
        }
       ],
       "spiking": {
-       "ei": 0.378,
-       "rate": 0.037,
-       "variance": 0.0221
+       "ei": 0.35,
+       "rate": 0.05,
+       "variance": 0.0234
       },
       "stimuli": [],
-      "stress": 0.2396,
-      "ticks": 41,
-      "trust": 0.5935,
-      "user_trust_seed_delta": -0.012,
-      "user_trust_seeded": true,
-      "v": -0.1392
+      "stress": 0.2593,
+      "talked": 0.2705,
+      "ticks": 24,
+      "v": -0.1279
      },
      "working_set": {
       "capacity": 8,
@@ -7233,18 +7429,18 @@
       "inhibition": 0.0,
       "lexical": 1.01,
       "recency": 0.9921,
-      "regulation": 0.96,
+      "regulation": 1.0,
       "retention": 0.9857,
       "schema": 0.0,
       "sensitive": 1.0,
-      "source_weight": 1.0034
+      "source_weight": 1.0035
      },
      "conflict": false,
      "cosine": 0.547723,
      "entry_id": "a473a739b8d5",
-     "importance": 0.5983,
+     "importance": 0.6054,
      "rank": 1,
-     "score": 0.4207,
+     "score": 0.4408,
      "source": "direct",
      "tier": "hot"
     },
@@ -7253,28 +7449,28 @@
       "inhibition": 0.0,
       "lexical": 1.0133,
       "recency": 0.9888,
-      "regulation": 0.96,
+      "regulation": 1.0,
       "retention": 0.9887,
       "schema": 0.0,
       "sensitive": 1.0,
-      "source_weight": 1.0027
+      "source_weight": 1.0019
      },
      "conflict": false,
      "cosine": 0.434122,
      "entry_id": "632d7be7d6dd",
-     "importance": 0.5529,
+     "importance": 0.4936,
      "rank": 2,
-     "score": 0.3476,
+     "score": 0.3415,
      "source": "direct",
      "tier": "hot"
     }
    ],
    "last_memory_meta": {
     "abstain": false,
-    "answer_confidence": 0.7759,
+    "answer_confidence": 0.7739,
     "calibration_delta": 0.0,
     "calibration_sources": 0,
-    "confidence": 0.8255,
+    "confidence": 0.8234,
     "conflicts": 0,
     "consistency": 1.0,
     "count": 2,
@@ -7294,17 +7490,12 @@
      "a473a739b8d5",
      "632d7be7d6dd"
     ],
-    "stress_delta": 0.0003,
+    "stress_delta": 0.0006,
     "ts": 1793276520.0,
-    "valence": -0.07
+    "valence": -0.118
    },
    "last_strategy_hint": "",
    "llm_functions": {
-    "diary": {
-     "default_enabled": false,
-     "enabled": false,
-     "provider": "follow_llm"
-    },
     "empathy_hint": {
      "default_enabled": false,
      "enabled": false,
@@ -7338,6 +7529,11 @@
     "memory_summary": {
      "default_enabled": true,
      "enabled": true,
+     "provider": "follow_llm"
+    },
+    "notebook": {
+     "default_enabled": false,
+     "enabled": false,
      "provider": "follow_llm"
     },
     "persona_compile": {
@@ -7381,7 +7577,7 @@
     }
    ],
    "memory": {
-    "entries": 45,
+    "entries": 47,
     "sessions": 1
    },
    "memory_dedup_embedding": true,
@@ -7395,18 +7591,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.447,
+       "effective_importance": 0.4367,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "96f2356d0110",
-       "importance": 0.481,
+       "importance": 0.47,
        "last_recall": 0.0,
        "last_used": 1793004390.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8185,
+       "memory_confidence": 0.8176,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7432,12 +7628,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4023,
+       "effective_importance": 0.393,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "c33e2b31d4bb",
-       "importance": 0.433,
+       "importance": 0.423,
        "last_recall": 0.0,
        "last_used": 1793004390.0,
        "last_write_op": "",
@@ -7470,18 +7666,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4398,
+       "effective_importance": 0.4536,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "7015b26f2702",
-       "importance": 0.473,
+       "importance": 0.488,
        "last_recall": 0.0,
        "last_used": 1793004510.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8179,
+       "memory_confidence": 0.8191,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7507,12 +7703,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4052,
-       "encoding_emotion": "sadness",
-       "encoding_emotion_secondary": "disappointment",
+       "effective_importance": 0.4082,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "5eba53d35e3a",
-       "importance": 0.436,
+       "importance": 0.439,
        "last_recall": 0.0,
        "last_used": 1793004510.0,
        "last_write_op": "",
@@ -7545,18 +7741,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4695,
+       "effective_importance": 0.4746,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "0b67eae10905",
-       "importance": 0.471,
+       "importance": 0.476,
        "last_recall": 0.0,
        "last_used": 1793271330.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8176,
+       "memory_confidence": 0.8181,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7582,12 +7778,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.443,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.4271,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "629ea9185c27",
-       "importance": 0.444,
+       "importance": 0.428,
        "last_recall": 0.0,
        "last_used": 1793271330.0,
        "last_write_op": "",
@@ -7620,18 +7816,18 @@
         "sender_name": "桃子"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4878,
+       "effective_importance": 0.4625,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "056021c8ff14",
-       "importance": 0.489,
+       "importance": 0.464,
        "last_recall": 0.0,
        "last_used": 1793271350.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8191,
+       "memory_confidence": 0.8171,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7657,12 +7853,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4749,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "amusement",
+       "effective_importance": 0.4163,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "2deba7ca30c9",
-       "importance": 0.476,
+       "importance": 0.417,
        "last_recall": 0.0,
        "last_used": 1793271350.0,
        "last_write_op": "",
@@ -7695,18 +7891,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4299,
+       "effective_importance": 0.4369,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "4d92732580e3",
-       "importance": 0.462,
+       "importance": 0.469,
        "last_recall": 1793011770.0,
        "last_used": 1793000000.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8157,
+       "memory_confidence": 0.8163,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7732,12 +7928,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4057,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.3794,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "0e8057db4c28",
-       "importance": 0.437,
+       "importance": 0.409,
        "last_recall": 0.0,
        "last_used": 1793000000.0,
        "last_write_op": "",
@@ -7770,18 +7966,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4356,
+       "effective_importance": 0.4178,
        "encoding_emotion": "neutral",
-       "encoding_emotion_secondary": "confusion",
+       "encoding_emotion_secondary": "calmness",
        "hits": 1,
        "id": "99136ad47b58",
-       "importance": 0.47,
+       "importance": 0.45,
        "last_recall": 0.0,
        "last_used": 1793000090.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8176,
+       "memory_confidence": 0.816,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7807,12 +8003,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4405,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.3911,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "calmness",
        "hits": 1,
        "id": "bbc4b59bb507",
-       "importance": 0.473,
+       "importance": 0.42,
        "last_recall": 1793011740.0,
        "last_used": 1793000090.0,
        "last_write_op": "",
@@ -7845,18 +8041,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4995,
+       "effective_importance": 0.4973,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "faa00a605aa5",
-       "importance": 0.524,
+       "importance": 0.522,
        "last_recall": 1793098170.0,
        "last_used": 1793011740.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8208,
+       "memory_confidence": 0.8206,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7882,12 +8078,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4129,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.4249,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "1a9000d96cb1",
-       "importance": 0.444,
+       "importance": 0.456,
        "last_recall": 0.0,
        "last_used": 1793011740.0,
        "last_write_op": "",
@@ -7920,18 +8116,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4675,
+       "effective_importance": 0.4786,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "f3cf5ee6569a",
-       "importance": 0.502,
+       "importance": 0.514,
        "last_recall": 0.0,
        "last_used": 1793011770.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8202,
+       "memory_confidence": 0.8211,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -7957,12 +8153,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4207,
+       "effective_importance": 0.4307,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "e042cc33c872",
-       "importance": 0.452,
+       "importance": 0.463,
        "last_recall": 0.0,
        "last_used": 1793011770.0,
        "last_write_op": "",
@@ -7995,18 +8191,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4405,
+       "effective_importance": 0.4432,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "32ed0168a98d",
-       "importance": 0.462,
+       "importance": 0.465,
        "last_recall": 0.0,
        "last_used": 1793098170.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.817,
+       "memory_confidence": 0.8172,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8032,12 +8228,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4148,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.4001,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "5921a74eb614",
-       "importance": 0.435,
+       "importance": 0.42,
        "last_recall": 0.0,
        "last_used": 1793098170.0,
        "last_write_op": "",
@@ -8070,18 +8266,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5319,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "amusement",
+       "effective_importance": 0.4682,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "ce2f0fced43d",
-       "importance": 0.533,
+       "importance": 0.469,
        "last_recall": 0.0,
        "last_used": 1793271800.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8226,
+       "memory_confidence": 0.8175,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8105,23 +8301,58 @@
       },
       {
        "conflict": false,
+       "destination": null,
+       "effective_assoc": 1,
+       "effective_importance": 0.4608,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
+       "hits": 1,
+       "id": "a0b2d8b7db1c",
+       "importance": 0.462,
+       "last_recall": 1793271870.0,
+       "last_used": 1793271800.0,
+       "last_write_op": "",
+       "legacy": false,
+       "links": 1,
+       "memory_confidence": 0.7,
+       "memory_source": "direct",
+       "memory_tier": "warm",
+       "poison_risk": false,
+       "previous_versions": [],
+       "provenance": {
+        "message_refs": [],
+        "sender_id": "self",
+        "sender_name": "她",
+        "session": "default:FriendMessage:10001",
+        "ts": 1793271800.0
+       },
+       "role": "assistant",
+       "scope": "session",
+       "self_defining": false,
+       "summarized": false,
+       "text": "我在呢，听着也好难过",
+       "ts": 1793271800.0,
+       "verification": "verified"
+      },
+      {
+       "conflict": false,
        "destination": {
         "sender_id": "10001",
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4926,
+       "effective_importance": 0.5193,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "bd2144a04c59",
-       "importance": 0.494,
+       "importance": 0.52,
        "last_recall": 0.0,
        "last_used": 1793271820.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8195,
+       "memory_confidence": 0.8216,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8145,23 +8376,58 @@
       },
       {
        "conflict": false,
+       "destination": null,
+       "effective_assoc": 0,
+       "effective_importance": 0.4762,
+       "encoding_emotion": "sadness",
+       "encoding_emotion_secondary": "disappointment",
+       "hits": 1,
+       "id": "d33fb3482f65",
+       "importance": 0.477,
+       "last_recall": 0.0,
+       "last_used": 1793271820.0,
+       "last_write_op": "",
+       "legacy": false,
+       "links": 0,
+       "memory_confidence": 0.7,
+       "memory_source": "direct",
+       "memory_tier": "warm",
+       "poison_risk": false,
+       "previous_versions": [],
+       "provenance": {
+        "message_refs": [],
+        "sender_id": "self",
+        "sender_name": "她",
+        "session": "default:FriendMessage:10001",
+        "ts": 1793271820.0
+       },
+       "role": "assistant",
+       "scope": "session",
+       "self_defining": false,
+       "summarized": false,
+       "text": "抱抱你，好委屈啊",
+       "ts": 1793271820.0,
+       "verification": "verified"
+      },
+      {
+       "conflict": false,
        "destination": {
         "sender_id": "10001",
         "sender_name": "芒果"
        },
-       "effective_assoc": 0,
-       "effective_importance": 0.5748,
+       "effective_assoc": 1,
+       "effective_importance": 0.5845,
        "encoding_emotion": "sadness",
        "encoding_emotion_secondary": "disappointment",
        "hits": 1,
        "id": "0e573ca31ece",
-       "importance": 0.576,
+       "importance": 0.586,
        "last_recall": 1793271870.0,
        "last_used": 1793271840.0,
        "last_write_op": "ADD",
        "legacy": false,
-       "links": 0,
-       "memory_confidence": 0.8249,
+       "links": 1,
+       "memory_confidence": 0.8257,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8187,12 +8453,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5679,
+       "effective_importance": 0.5481,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
-       "id": "81e6c28e762a",
-       "importance": 0.569,
+       "id": "6b9ffa9313c5",
+       "importance": 0.549,
        "last_recall": 0.0,
        "last_used": 1793271840.0,
        "last_write_op": "",
@@ -8214,7 +8480,7 @@
        "scope": "session",
        "self_defining": false,
        "summarized": false,
-       "text": "太过分了",
+       "text": "太过分了，我也生气",
        "ts": 1793271840.0,
        "verification": "verified"
       },
@@ -8225,18 +8491,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6434,
+       "effective_importance": 0.6319,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "98bbacc6b4e4",
-       "importance": 0.645,
+       "importance": 0.633,
        "last_recall": 1793272490.0,
        "last_used": 1793271870.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8304,
+       "memory_confidence": 0.8295,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8262,12 +8528,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.6397,
+       "effective_importance": 0.5572,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "49143f08b827",
-       "importance": 0.641,
+       "importance": 0.558,
        "last_recall": 0.0,
        "last_used": 1793271870.0,
        "last_write_op": "",
@@ -8300,18 +8566,18 @@
         "sender_name": "芒果"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6653,
+       "effective_importance": 0.6206,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "0d547e081dfd",
-       "importance": 0.667,
+       "importance": 0.622,
        "last_recall": 0.0,
        "last_used": 1793272490.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8333,
+       "memory_confidence": 0.8297,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8337,12 +8603,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.6597,
+       "effective_importance": 0.594,
        "encoding_emotion": "anger",
        "encoding_emotion_secondary": "contempt",
        "hits": 1,
-       "id": "b72dc3f05c12",
-       "importance": 0.661,
+       "id": "684420aea238",
+       "importance": 0.595,
        "last_recall": 0.0,
        "last_used": 1793272490.0,
        "last_write_op": "",
@@ -8364,7 +8630,7 @@
        "scope": "session",
        "self_defining": false,
        "summarized": false,
-       "text": "我陪着你",
+       "text": "我陪着你，真让人生气",
        "ts": 1793272490.0,
        "verification": "verified"
       },
@@ -8375,18 +8641,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4523,
+       "effective_importance": 0.4248,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "d7aab5b251fc",
-       "importance": 0.487,
+       "importance": 0.458,
        "last_recall": 0.0,
        "last_used": 1793000690.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.819,
+       "memory_confidence": 0.8166,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8412,12 +8678,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4071,
+       "effective_importance": 0.3824,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "bc56663cb1ba",
-       "importance": 0.439,
+       "importance": 0.412,
        "last_recall": 0.0,
        "last_used": 1793000690.0,
        "last_write_op": "",
@@ -8450,18 +8716,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4717,
+       "effective_importance": 0.4521,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "95dca9d8d49b",
-       "importance": 0.495,
+       "importance": 0.475,
        "last_recall": 1793098470.0,
        "last_used": 1793000730.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8184,
+       "memory_confidence": 0.8168,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8487,9 +8753,9 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.384,
-       "encoding_emotion": "sadness",
-       "encoding_emotion_secondary": "disappointment",
+       "effective_importance": 0.3839,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "781a213968a2",
        "importance": 0.414,
@@ -8525,18 +8791,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4246,
+       "effective_importance": 0.4238,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "5f2d3fc90ecf",
-       "importance": 0.458,
+       "importance": 0.457,
        "last_recall": 0.0,
        "last_used": 1793000790.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8166,
+       "memory_confidence": 0.8165,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8562,12 +8828,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4147,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.3814,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "cff62c984628",
-       "importance": 0.447,
+       "importance": 0.411,
        "last_recall": 0.0,
        "last_used": 1793000790.0,
        "last_write_op": "",
@@ -8600,18 +8866,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.489,
+       "effective_importance": 0.5047,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "df67f56093b6",
-       "importance": 0.49,
+       "importance": 0.506,
        "last_recall": 1793271400.0,
        "last_used": 1793098470.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8168,
+       "memory_confidence": 0.8181,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8637,12 +8903,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.3936,
+       "effective_importance": 0.4082,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "00e870cdd88e",
-       "importance": 0.413,
+       "importance": 0.429,
        "last_recall": 0.0,
        "last_used": 1793098470.0,
        "last_write_op": "",
@@ -8675,18 +8941,18 @@
         "sender_name": "路人"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.4395,
+       "effective_importance": 0.4507,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "9c01ab2838a3",
-       "importance": 0.461,
+       "importance": 0.473,
        "last_recall": 0.0,
        "last_used": 1793098530.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8169,
+       "memory_confidence": 0.8178,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8712,12 +8978,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.3955,
+       "effective_importance": 0.4066,
        "encoding_emotion": "neutral",
        "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "a9a485266c1e",
-       "importance": 0.415,
+       "importance": 0.427,
        "last_recall": 0.0,
        "last_used": 1793098530.0,
        "last_write_op": "",
@@ -8750,18 +9016,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5054,
+       "effective_importance": 0.4611,
        "encoding_emotion": "neutral",
-       "encoding_emotion_secondary": "interest",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "d753390d2089",
-       "importance": 0.507,
+       "importance": 0.462,
        "last_recall": 0.0,
        "last_used": 1793271380.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8205,
+       "memory_confidence": 0.817,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8787,12 +9053,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5123,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "amusement",
+       "effective_importance": 0.4363,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
-       "id": "cae62a4877c2",
-       "importance": 0.514,
+       "id": "08ca9e921633",
+       "importance": 0.437,
        "last_recall": 0.0,
        "last_used": 1793271380.0,
        "last_write_op": "",
@@ -8814,7 +9080,7 @@
        "scope": "session",
        "self_defining": false,
        "summarized": false,
-       "text": "恭喜恭喜！",
+       "text": "恭喜恭喜！我也好开心",
        "ts": 1793271380.0,
        "verification": "verified"
       },
@@ -8825,18 +9091,18 @@
         "sender_name": "柠檬"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5524,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "amusement",
+       "effective_importance": 0.4931,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "632d7be7d6dd",
-       "importance": 0.553,
+       "importance": 0.494,
        "last_recall": 1793272890.0,
        "last_used": 1793271400.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8231,
+       "memory_confidence": 0.8183,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8862,12 +9128,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.538,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "amusement",
+       "effective_importance": 0.4505,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
-       "id": "4131ac724af3",
-       "importance": 0.539,
+       "id": "edd1982fd56b",
+       "importance": 0.452,
        "last_recall": 0.0,
        "last_used": 1793271400.0,
        "last_write_op": "",
@@ -8889,7 +9155,7 @@
        "scope": "session",
        "self_defining": false,
        "summarized": false,
-       "text": "超厉害的！",
+       "text": "超厉害的！好高兴",
        "ts": 1793271400.0,
        "verification": "verified"
       },
@@ -8900,18 +9166,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6391,
-       "encoding_emotion": "loneliness",
-       "encoding_emotion_secondary": "disappointment",
+       "effective_importance": 0.6191,
+       "encoding_emotion": "anger",
+       "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "10e46405a873",
-       "importance": 0.64,
+       "importance": 0.62,
        "last_recall": 0.0,
        "last_used": 1793272890.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8312,
+       "memory_confidence": 0.8296,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -8937,12 +9203,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.5724,
-       "encoding_emotion": "loneliness",
-       "encoding_emotion_secondary": "disappointment",
+       "effective_importance": 0.5566,
+       "encoding_emotion": "anger",
+       "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "86c805465d4b",
-       "importance": 0.573,
+       "importance": 0.558,
        "last_recall": 0.0,
        "last_used": 1793272890.0,
        "last_write_op": "",
@@ -8975,18 +9241,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.6133,
-       "encoding_emotion": "loneliness",
-       "encoding_emotion_secondary": "disappointment",
+       "effective_importance": 0.6204,
+       "encoding_emotion": "anger",
+       "encoding_emotion_secondary": "contempt",
        "hits": 1,
        "id": "a473a739b8d5",
-       "importance": 0.614,
+       "importance": 0.621,
        "last_recall": 1793276520.0,
        "last_used": 1793272920.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8279,
+       "memory_confidence": 0.8285,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9015,18 +9281,18 @@
         "sender_name": "阿星"
        },
        "effective_assoc": 0,
-       "effective_importance": 0.5427,
-       "encoding_emotion": "loneliness",
-       "encoding_emotion_secondary": "disappointment",
+       "effective_importance": 0.5288,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "8bbef4ae3aa2",
-       "importance": 0.543,
+       "importance": 0.529,
        "last_recall": 0.0,
        "last_used": 1793276520.0,
        "last_write_op": "ADD",
        "legacy": false,
        "links": 0,
-       "memory_confidence": 0.8235,
+       "memory_confidence": 0.8223,
        "memory_source": "direct",
        "memory_tier": "hot",
        "poison_risk": false,
@@ -9052,12 +9318,12 @@
        "conflict": false,
        "destination": null,
        "effective_assoc": 0,
-       "effective_importance": 0.4766,
-       "encoding_emotion": "joy",
-       "encoding_emotion_secondary": "contentment",
+       "effective_importance": 0.4772,
+       "encoding_emotion": "neutral",
+       "encoding_emotion_secondary": "confusion",
        "hits": 1,
        "id": "9e860730071f",
-       "importance": 0.477,
+       "importance": 0.478,
        "last_recall": 0.0,
        "last_used": 1793276520.0,
        "last_write_op": "",
@@ -9133,9 +9399,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3118,
-       "avoidant": 0.2466,
-       "safe": 0.4415
+       "anxious": 0.314,
+       "avoidant": 0.2468,
+       "safe": 0.4392
       },
       "calibration": {
        "sources": {}
@@ -9169,27 +9435,27 @@
       "repair_state": {
        "evidence": [
         {
-         "conflict": 0.2461,
+         "conflict": 0.255,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793000730.0
         },
         {
-         "conflict": 0.3063,
+         "conflict": 0.3013,
          "phase": "stable",
-         "repair": 0.01,
+         "repair": 0.0,
          "ts": 1793272890.0
         },
         {
-         "conflict": 0.2932,
+         "conflict": 0.2952,
          "phase": "stable",
-         "repair": 0.008,
+         "repair": 0.0,
          "ts": 1793272920.0
         },
         {
-         "conflict": 0.2784,
+         "conflict": 0.2805,
          "phase": "stable",
-         "repair": 0.008,
+         "repair": 0.0,
          "ts": 1793276520.0
         }
        ],
@@ -9200,43 +9466,43 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5317,
-       "conflict": 0.2784,
-       "predictability": 0.992,
-       "repair": 0.008,
-       "trust": 0.516
+       "closeness": 0.5365,
+       "conflict": 0.2805,
+       "predictability": 1.0,
+       "repair": 0.0,
+       "trust": 0.5
       },
       "trajectory": [
        {
-        "closeness": 0.554,
-        "conflict": 0.2461,
+        "closeness": 0.5383,
+        "conflict": 0.255,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.503,
+        "trust": 0.5,
         "ts": 1793000730.0
        },
        {
-        "closeness": 0.5141,
-        "conflict": 0.3063,
-        "predictability": 0.99,
-        "repair": 0.01,
-        "trust": 0.508,
+        "closeness": 0.5266,
+        "conflict": 0.3013,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793272890.0
        },
        {
-        "closeness": 0.5222,
-        "conflict": 0.2932,
-        "predictability": 0.992,
-        "repair": 0.008,
-        "trust": 0.512,
+        "closeness": 0.5281,
+        "conflict": 0.2952,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793272920.0
        },
        {
-        "closeness": 0.5317,
-        "conflict": 0.2784,
-        "predictability": 0.992,
-        "repair": 0.008,
-        "trust": 0.516,
+        "closeness": 0.5365,
+        "conflict": 0.2805,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793276520.0
        }
       ],
@@ -9252,19 +9518,19 @@
        "太开心了": 1,
        "好呀": 1,
        "好激动": 1,
+       "好高兴": 1,
        "小爱": 4,
        "小爱帮我们算算保底还差多少": 1,
        "小爱快夸我": 1,
        "心态崩了": 1,
        "恭喜恭喜": 1,
+       "我也好开心": 1,
        "我们约好下周一起打副本吧": 1,
        "我已经歪了三次了": 1,
        "我算算哦": 1,
        "我终于抽到了": 1,
        "抱抱": 1,
-       "按爱弥斯的设定在聊": 1,
-       "是呀": 1,
-       "是诶": 1
+       "按爱弥斯的设定在聊": 1
       },
       "we_memory": []
      },
@@ -9273,7 +9539,7 @@
      "sessions": [
       "default:GroupMessage:900001"
      ],
-     "trust": 0.516
+     "trust": 0.5
     },
     {
      "belief_state": {
@@ -9294,9 +9560,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3091,
-       "avoidant": 0.2378,
-       "safe": 0.4531
+       "anxious": 0.3138,
+       "avoidant": 0.2444,
+       "safe": 0.4418
       },
       "calibration": {
        "sources": {}
@@ -9316,63 +9582,63 @@
       "repair_state": {
        "evidence": [
         {
-         "conflict": 0.2549,
+         "conflict": 0.2555,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793000000.0
         },
         {
-         "conflict": 0.2488,
+         "conflict": 0.2553,
          "phase": "stable",
-         "repair": 0.004,
+         "repair": 0.0,
          "ts": 1793000090.0
         },
         {
-         "conflict": 0.281,
+         "conflict": 0.2827,
          "phase": "stable",
-         "repair": 0.006,
+         "repair": 0.0,
          "ts": 1793011740.0
         },
         {
-         "conflict": 0.2661,
+         "conflict": 0.2805,
          "phase": "stable",
-         "repair": 0.008,
+         "repair": 0.0,
          "ts": 1793011770.0
         },
         {
-         "conflict": 0.2621,
+         "conflict": 0.2673,
          "phase": "stable",
-         "repair": 0.008,
+         "repair": 0.0,
          "ts": 1793098170.0
         },
         {
-         "conflict": 0.2336,
+         "conflict": 0.2557,
          "phase": "stable",
-         "repair": 0.024,
+         "repair": 0.0,
          "ts": 1793271800.0
         },
         {
-         "conflict": 0.2609,
+         "conflict": 0.2882,
          "phase": "stable",
-         "repair": 0.018,
+         "repair": 0.0,
          "ts": 1793271820.0
         },
         {
-         "conflict": 0.2851,
+         "conflict": 0.3029,
          "phase": "stable",
-         "repair": 0.014,
+         "repair": 0.0,
          "ts": 1793271840.0
         },
         {
-         "conflict": 0.2984,
+         "conflict": 0.3094,
          "phase": "stable",
-         "repair": 0.008,
+         "repair": 0.0,
          "ts": 1793271870.0
         },
         {
-         "conflict": 0.3071,
+         "conflict": 0.3104,
          "phase": "stable",
-         "repair": 0.006,
+         "repair": 0.0,
          "ts": 1793272490.0
         }
        ],
@@ -9383,91 +9649,91 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.548,
-       "conflict": 0.3071,
-       "predictability": 0.994,
-       "repair": 0.006,
-       "trust": 0.55
+       "closeness": 0.5342,
+       "conflict": 0.3104,
+       "predictability": 1.0,
+       "repair": 0.0,
+       "trust": 0.5
       },
       "trajectory": [
        {
-        "closeness": 0.5236,
-        "conflict": 0.2549,
+        "closeness": 0.5225,
+        "conflict": 0.2555,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.502,
+        "trust": 0.5,
         "ts": 1793000000.0
        },
        {
-        "closeness": 0.5428,
-        "conflict": 0.2488,
-        "predictability": 0.996,
-        "repair": 0.004,
-        "trust": 0.504,
+        "closeness": 0.5308,
+        "conflict": 0.2553,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793000090.0
        },
        {
-        "closeness": 0.5516,
-        "conflict": 0.281,
-        "predictability": 0.994,
-        "repair": 0.006,
-        "trust": 0.507,
+        "closeness": 0.5443,
+        "conflict": 0.2827,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793011740.0
        },
        {
-        "closeness": 0.5683,
-        "conflict": 0.2661,
-        "predictability": 0.992,
-        "repair": 0.008,
-        "trust": 0.511,
+        "closeness": 0.5476,
+        "conflict": 0.2805,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793011770.0
        },
        {
-        "closeness": 0.5617,
-        "conflict": 0.2621,
-        "predictability": 0.992,
-        "repair": 0.008,
-        "trust": 0.515,
+        "closeness": 0.5528,
+        "conflict": 0.2673,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793098170.0
        },
        {
-        "closeness": 0.6069,
-        "conflict": 0.2336,
-        "predictability": 0.976,
-        "repair": 0.024,
-        "trust": 0.527,
+        "closeness": 0.5619,
+        "conflict": 0.2557,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271800.0
        },
        {
-        "closeness": 0.5933,
-        "conflict": 0.2609,
-        "predictability": 0.982,
-        "repair": 0.018,
-        "trust": 0.536,
+        "closeness": 0.5513,
+        "conflict": 0.2882,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271820.0
        },
        {
-        "closeness": 0.5806,
-        "conflict": 0.2851,
-        "predictability": 0.986,
-        "repair": 0.014,
-        "trust": 0.543,
+        "closeness": 0.5465,
+        "conflict": 0.3029,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271840.0
        },
        {
-        "closeness": 0.5609,
-        "conflict": 0.2984,
-        "predictability": 0.992,
-        "repair": 0.008,
-        "trust": 0.547,
+        "closeness": 0.5339,
+        "conflict": 0.3094,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271870.0
        },
        {
-        "closeness": 0.548,
-        "conflict": 0.3071,
-        "predictability": 0.994,
-        "repair": 0.006,
-        "trust": 0.55,
+        "closeness": 0.5342,
+        "conflict": 0.3104,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793272490.0
        }
       ],
@@ -9479,23 +9745,23 @@
        "你可以的": 1,
        "你还记得我早上让你唱什么吗": 1,
        "先别气坏自己": 1,
+       "听着也好难过": 1,
        "哼哼": 1,
        "太过分了": 1,
        "好嘞": 1,
+       "好委屈啊": 1,
        "好紧张": 1,
        "小爱": 2,
        "小爱早呀": 1,
        "就唱上次那首吧": 1,
        "想听哪首": 1,
        "想哭": 1,
+       "我也生气": 1,
+       "我在呢": 1,
        "我好难过": 1,
        "我考完了": 1,
-       "早呀": 1,
-       "明天要考试了": 1,
-       "气死了": 1,
-       "气死我了": 1,
-       "真的受够了": 1,
-       "真的很委屈": 1
+       "抱抱你": 1,
+       "早呀": 1
       },
       "we_memory": []
      },
@@ -9504,7 +9770,7 @@
      "sessions": [
       "default:FriendMessage:10001"
      ],
-     "trust": 0.55
+     "trust": 0.5
     },
     {
      "belief_state": {
@@ -9525,9 +9791,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3046,
-       "avoidant": 0.2384,
-       "safe": 0.457
+       "anxious": 0.3091,
+       "avoidant": 0.2447,
+       "safe": 0.4462
       },
       "calibration": {
        "sources": {}
@@ -9561,33 +9827,33 @@
       "repair_state": {
        "evidence": [
         {
-         "conflict": 0.2449,
+         "conflict": 0.2558,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793000690.0
         },
         {
-         "conflict": 0.2478,
+         "conflict": 0.2538,
          "phase": "stable",
-         "repair": 0.006,
+         "repair": 0.0,
          "ts": 1793000790.0
         },
         {
-         "conflict": 0.2553,
+         "conflict": 0.269,
          "phase": "stable",
-         "repair": 0.01,
+         "repair": 0.0,
          "ts": 1793098470.0
         },
         {
-         "conflict": 0.2353,
+         "conflict": 0.2501,
          "phase": "stable",
-         "repair": 0.016,
+         "repair": 0.0,
          "ts": 1793271380.0
         },
         {
-         "conflict": 0.2259,
+         "conflict": 0.2467,
          "phase": "stable",
-         "repair": 0.018,
+         "repair": 0.0,
          "ts": 1793271400.0
         }
        ],
@@ -9598,51 +9864,51 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5994,
-       "conflict": 0.2259,
-       "predictability": 0.982,
-       "repair": 0.018,
-       "trust": 0.528
+       "closeness": 0.5587,
+       "conflict": 0.2467,
+       "predictability": 1.0,
+       "repair": 0.0,
+       "trust": 0.5
       },
       "trajectory": [
        {
-        "closeness": 0.5516,
-        "conflict": 0.2449,
+        "closeness": 0.5328,
+        "conflict": 0.2558,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.503,
+        "trust": 0.5,
         "ts": 1793000690.0
        },
        {
-        "closeness": 0.5539,
-        "conflict": 0.2478,
-        "predictability": 0.994,
-        "repair": 0.006,
-        "trust": 0.506,
+        "closeness": 0.5419,
+        "conflict": 0.2538,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793000790.0
        },
        {
-        "closeness": 0.5707,
-        "conflict": 0.2553,
-        "predictability": 0.99,
-        "repair": 0.01,
-        "trust": 0.511,
+        "closeness": 0.5526,
+        "conflict": 0.269,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793098470.0
        },
        {
-        "closeness": 0.5829,
-        "conflict": 0.2353,
-        "predictability": 0.984,
-        "repair": 0.016,
-        "trust": 0.519,
+        "closeness": 0.5545,
+        "conflict": 0.2501,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271380.0
        },
        {
-        "closeness": 0.5994,
-        "conflict": 0.2259,
-        "predictability": 0.982,
-        "repair": 0.018,
-        "trust": 0.528,
+        "closeness": 0.5587,
+        "conflict": 0.2467,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271400.0
        }
       ],
@@ -9659,6 +9925,7 @@
        "小爱帮我们算算保底还差多少": 1,
        "心态崩了": 1,
        "恭喜恭喜": 1,
+       "我也好开心": 1,
        "我已经歪了三次了": 1,
        "我算算哦": 1,
        "我终于抽到了": 1,
@@ -9674,7 +9941,7 @@
      "sessions": [
       "default:GroupMessage:900001"
      ],
-     "trust": 0.528
+     "trust": 0.5
     },
     {
      "belief_state": {
@@ -9695,9 +9962,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3067,
-       "avoidant": 0.2398,
-       "safe": 0.4535
+       "anxious": 0.31,
+       "avoidant": 0.244,
+       "safe": 0.446
       },
       "calibration": {
        "sources": {}
@@ -9717,27 +9984,27 @@
       "repair_state": {
        "evidence": [
         {
-         "conflict": 0.2425,
+         "conflict": 0.2508,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793004390.0
         },
         {
-         "conflict": 0.2576,
+         "conflict": 0.2687,
          "phase": "stable",
-         "repair": 0.008,
+         "repair": 0.0,
          "ts": 1793004510.0
+        },
+        {
+         "conflict": 0.2616,
+         "phase": "stable",
+         "repair": 0.0,
+         "ts": 1793271330.0
         },
         {
          "conflict": 0.2571,
          "phase": "stable",
-         "repair": 0.01,
-         "ts": 1793271330.0
-        },
-        {
-         "conflict": 0.246,
-         "phase": "stable",
-         "repair": 0.012,
+         "repair": 0.0,
          "ts": 1793271350.0
         }
        ],
@@ -9748,43 +10015,43 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5741,
-       "conflict": 0.246,
-       "predictability": 0.988,
-       "repair": 0.012,
-       "trust": 0.519
+       "closeness": 0.5535,
+       "conflict": 0.2571,
+       "predictability": 1.0,
+       "repair": 0.0,
+       "trust": 0.5
       },
       "trajectory": [
        {
-        "closeness": 0.5638,
-        "conflict": 0.2425,
+        "closeness": 0.548,
+        "conflict": 0.2508,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.504,
+        "trust": 0.5,
         "ts": 1793004390.0
        },
        {
-        "closeness": 0.562,
-        "conflict": 0.2576,
-        "predictability": 0.992,
-        "repair": 0.008,
-        "trust": 0.508,
+        "closeness": 0.5454,
+        "conflict": 0.2687,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793004510.0
        },
        {
-        "closeness": 0.559,
-        "conflict": 0.2571,
-        "predictability": 0.99,
-        "repair": 0.01,
-        "trust": 0.513,
+        "closeness": 0.5514,
+        "conflict": 0.2616,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271330.0
        },
        {
-        "closeness": 0.5741,
-        "conflict": 0.246,
-        "predictability": 0.988,
-        "repair": 0.012,
-        "trust": 0.519,
+        "closeness": 0.5535,
+        "conflict": 0.2571,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793271350.0
        }
       ],
@@ -9804,7 +10071,7 @@
      "sessions": [
       "default:GroupMessage:900002"
      ],
-     "trust": 0.519
+     "trust": 0.5
     },
     {
      "belief_state": {
@@ -9854,7 +10121,7 @@
       "repair_state": {
        "evidence": [
         {
-         "conflict": 0.2563,
+         "conflict": 0.2665,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793098530.0
@@ -9867,19 +10134,19 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5637,
-       "conflict": 0.2563,
+       "closeness": 0.5503,
+       "conflict": 0.2665,
        "predictability": 1.0,
        "repair": 0.0,
-       "trust": 0.506
+       "trust": 0.5
       },
       "trajectory": [
        {
-        "closeness": 0.5637,
-        "conflict": 0.2563,
+        "closeness": 0.5503,
+        "conflict": 0.2665,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.506,
+        "trust": 0.5,
         "ts": 1793098530.0
        }
       ],
@@ -9904,31 +10171,29 @@
      "sessions": [
       "default:GroupMessage:900001"
      ],
-     "trust": 0.506
+     "trust": 0.5
     }
    ],
    "safety_enabled": false,
    "self_model": {
     "_history": [
      {
-      "narrative": "",
+      "notebook": 0,
       "ts": 1793000000.0,
-      "who_am_i": "一个会持续受聊天影响、但不会被单条消息完全定义的角色。"
+      "who_am_i": ""
      }
     ],
-    "boundaries": [
-     "不接受被当作没有感受的工具",
-     "不会被一次互动改写全部立场"
-    ],
-    "consistency": [
-     "情绪会变，但核心立场不因单次互动翻转"
-    ],
+    "boundaries": [],
+    "consistency": [],
     "diary": [],
+    "heart": 1,
     "narrative": "",
     "narrative_items": [],
+    "notebook": [],
+    "notebook_night": {},
     "relationship_narratives": [],
     "version": 1,
-    "who_am_i": "一个会持续受聊天影响、但不会被单条消息完全定义的角色。"
+    "who_am_i": ""
    },
    "summary_max_chars": 0,
    "we_memory_enabled": false
@@ -9942,6 +10207,7 @@
  "routes": [
   "/astrbot_plugin_ams_life/page/status",
   "/astrbot_plugin_ams_life/page/self_model",
+  "/astrbot_plugin_ams_life/page/owner_rules",
   "/astrbot_plugin_ams_life/page/toggle",
   "/astrbot_plugin_ams_life/page/api_config",
   "/astrbot_plugin_ams_life/page/models",
@@ -9960,7 +10226,7 @@
   {
    "clean": "早呀~ 想听哪首？",
    "inject": [
-    "[BC] v=0.00 a=0.37 d=0.56 s=0.46 t=0.55 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=engage | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 1；信任 0.50；关系 亲近0.52 冲突0.25 修复0.00 可预测1.00 | spk=芒果（10001）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 还不太熟"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -9968,7 +10234,7 @@
   {
    "clean": "好嘞，哼哼",
    "inject": [
-    "[BC] v=0.07 a=0.38 d=0.57 s=0.51 t=0.55 e=neutral c=- n=talk plan=自然回应 reg=none need=physiological action=engage | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 2；信任 0.50；关系 亲近0.54 冲突0.25 修复0.00 可预测1.00；常谈 今天想听你唱歌、小爱早呀、想听哪首 | spk=芒果（10001）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 还不太熟，常聊今天想听你唱歌、小爱早呀"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -9976,7 +10242,7 @@
   {
    "clean": "别灰心嘛",
    "inject": [
-    "[BC] v=0.11 a=0.41 d=0.58 s=0.54 t=0.56 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=engage | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=柠檬；互动 1；信任 0.50；关系 亲近0.55 冲突0.24 修复0.00 可预测1.00 | spk=柠檬（10002）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 还不太熟"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -9984,7 +10250,7 @@
   {
    "clean": "抱抱，下次一定出",
    "inject": [
-    "[BC] v=0.08 a=0.41 d=0.57 s=0.55 t=0.56 e=neutral c=- n=talk plan=自然回应 reg=none need=physiological action=engage | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=阿星；互动 1；信任 0.50；关系 亲近0.55 冲突0.25 修复0.00 可预测1.00；常谈 你说今天抽卡会不会歪、别灰心嘛、小爱 | spk=阿星（10003）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 还不太熟"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -9992,7 +10258,7 @@
   {
    "clean": "我算算哦",
    "inject": [
-    "[BC] v=0.02 a=0.39 d=0.55 s=0.54 t=0.56 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=engage | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=柠檬；互动 2；信任 0.51；关系 亲近0.55 冲突0.25 修复0.01 可预测0.99；常谈 下次一定出、你说今天抽卡会不会歪、别灰心嘛 | spk=柠檬（10002）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 还不太熟\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -10000,7 +10266,7 @@
   {
    "clean": "晚上好~",
    "inject": [
-    "[BC] v=0.06 a=0.43 d=0.58 s=0.57 t=0.57 e=neutral c=希望 n=talk plan=自然回应 reg=none alert=high need=physiological action=engage | mem=- （别处）有人：小爱帮我们算算保底还差多少 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=桃子；互动 1；信任 0.50；关系 亲近0.56 冲突0.24 修复0.00 可预测1.00 | spk=桃子（10004）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 还不太熟\n[她想起来的] （别处）有人说过：小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900002",
    "system": "你是小爱。"
@@ -10008,7 +10274,7 @@
   {
    "clean": "辛苦啦，快去歇会儿",
    "inject": [
-    "[BC] v=-0.03 a=0.43 d=0.55 s=0.57 t=0.57 e=neutral c=- n=talk plan=自然回应 reg=none alert=high need=physiological action=rest | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=桃子；互动 2；信任 0.51；关系 亲近0.56 冲突0.26 修复0.01 可预测0.99；常谈 晚上好、小爱 | spk=桃子（10004）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 还不太熟"
    ],
    "session": "default:GroupMessage:900002",
    "system": "你是小爱。"
@@ -10016,7 +10282,7 @@
   {
    "clean": "你可以的！",
    "inject": [
-    "[BC] v=-0.12 a=0.46 d=0.52 s=0.55 t=0.57 e=neutral c=失落 n=talk plan=自然回应 reg=none need=physiological action=rest | mem=- 你：好嘞，哼哼\n- （别处）有人：我已经歪了三次了 心态崩了\n- （别处）你：辛苦啦，快去歇会儿 | memn=1 memc=0.70 ansc=0.62 | loops=1 due=1 soon=明天要考试了 好紧张 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 3；信任 0.51；关系 亲近0.55 冲突0.28 修复0.01 可预测0.99；常谈 今天想听你唱歌、哼哼、好嘞 | spk=芒果（10001） | cont=关系 近0.55/冲突0.28\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识，常聊今天想听你唱歌、哼哼\n[她想起来的] 她自己说过：好嘞，哼哼；（别处）有人说过：我已经歪了三次了 心态崩了；（别处）她自己说过：辛苦啦，快去歇会儿（这些记得不太准）\n[没做完的] 明天要考试了 好紧张"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -10024,7 +10290,7 @@
   {
    "clean": "上次那首嘛~",
    "inject": [
-    "[BC] v=-0.05 a=0.50 d=0.53 s=0.59 t=0.58 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=rest | mem=- 芒果：小爱早呀，今天想听你唱歌 | memn=1 memc=0.82 | loops=2 due=1 soon=明天要考试了 好紧张 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 4；信任 0.51；关系 亲近0.57 冲突0.27 修复0.01 可预测0.99；常谈 今天想听你唱歌、你可以的、哼哼 | spk=芒果（10001） | hint=cause=4d92732580e3:0.34\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊今天想听你唱歌、你可以的\n[她想起来的] 芒果说过：小爱早呀，今天想听你唱歌\n[没做完的] 明天要考试了 好紧张；你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -10032,7 +10298,7 @@
   {
    "clean": "考得怎么样？",
    "inject": [
-    "[BC] v=-0.04 a=0.40 d=0.54 s=0.56 t=0.58 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=rest | mem=- 芒果：明天要考试了 好紧张 | memn=1 memc=0.82 | loops=2 due=1 soon=明天要考试了 好紧张 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 5；信任 0.52；关系 亲近0.56 冲突0.26 修复0.01 可预测0.99；回归=short；常谈 上次那首嘛、今天想听你唱歌、你可以的 | spk=芒果（10001） | cont=未完成：明天要考试了 好紧张、你还记得我早上让你唱什么吗；关系 近0.56/冲突0.26；回归=short\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识，常聊上次那首嘛、今天想听你唱歌\n[她想起来的] 芒果说过：明天要考试了 好紧张\n[没做完的] 明天要考试了 好紧张；你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -10040,7 +10306,7 @@
   {
    "clean": "是诶，大家都去哪了",
    "inject": [
-    "[BC] v=-0.01 a=0.42 d=0.55 s=0.59 t=0.59 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=rest | mem=- 阿星：我已经歪了三次了 心态崩了 | memn=1 memc=0.82 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=柠檬；互动 3；信任 0.51；关系 亲近0.57 冲突0.26 修复0.01 可预测0.99；回归=short；常谈 下次一定出、你说今天抽卡会不会歪、别灰心 | spk=柠檬（10002） | cont=未完成：小爱帮我们算算保底还差多少；关系 近0.57/冲突0.26；回归=short\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 认识\n[她想起来的] 阿星说过：我已经歪了三次了 心态崩了\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -10048,7 +10314,7 @@
   {
    "clean": "是呀，按爱弥斯的设定在聊~",
    "inject": [
-    "[BC] v=0.01 a=0.42 d=0.54 s=0.57 t=0.59 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=rest | mem=- 柠檬：小爱 今天群里好安静 | memn=1 memc=0.82 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=路人；互动 1；信任 0.51；关系 亲近0.56 冲突0.26 修复0.00 可预测1.00；常谈 小爱、下次一定出、今天群里好安静 | spk=路人（10005）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 还不太熟\n[她想起来的] 柠檬说过：小爱 今天群里好安静\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -10056,7 +10322,7 @@
   {
    "clean": "好久不见！",
    "inject": [
-    "[BC] v=-0.03 a=0.43 d=0.55 s=0.55 t=0.59 e=neutral c=希望 n=talk plan=自然回应 reg=none need=physiological action=rest | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=桃子；互动 3；信任 0.51；关系 亲近0.56 冲突0.26 修复0.01 可预测0.99；回归=medium；常谈 晚上好、小爱、快去歇会儿 | spk=桃子（10004） | cont=关系 近0.56/冲突0.26；回归=medium\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识"
    ],
    "session": "default:GroupMessage:900002",
    "system": "你是小爱。"
@@ -10064,47 +10330,47 @@
   {
    "clean": "太好了！",
    "inject": [
-    "[BC] v=0.09 a=0.45 d=0.57 s=0.58 t=0.60 e=neutral c=- n=share plan=顺着分享接话 reg=none need=physiological action=rest | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=桃子；互动 4；信任 0.52；关系 亲近0.57 冲突0.25 修复0.01 可预测0.99；常谈 晚上好、好久不见、好久不见小爱 | spk=桃子（10004）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 认识"
    ],
    "session": "default:GroupMessage:900002",
    "system": "你是小爱。"
   },
   {
-   "clean": "恭喜恭喜！",
+   "clean": "恭喜恭喜！我也好开心",
    "inject": [
-    "[BC] v=0.16 a=0.46 d=0.58 s=0.61 t=0.61 e=neutral c=- n=share plan=顺着分享接话 reg=none need=physiological action=rest | mem=- （别处）你：好久不见！\n- （别处）你：太好了！ | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=柠檬；互动 4；信任 0.52；关系 亲近0.58 冲突0.24 修复0.02 可预测0.98；回归=short；常谈 小爱、ai、下次一定出 | spk=柠檬（10002） | cont=未完成：小爱帮我们算算保底还差多少；关系 近0.58/冲突0.23；回归=short\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 认识\n[她想起来的] （别处）她自己说过：好久不见！；（别处）她自己说过：太好了！\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
   },
   {
-   "clean": "超厉害的！",
+   "clean": "超厉害的！好高兴",
    "inject": [
-    "[BC] v=0.25 a=0.49 d=0.61 s=0.64 t=0.63 e=joy c=希望 n=share plan=顺着分享接话 reg=none need=physiological action=rest | mem=- 柠檬：小爱 今天群里好安静 | memn=1 memc=0.82 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=柠檬；互动 5；信任 0.53；关系 亲近0.60 冲突0.23 修复0.02 可预测0.98；常谈 小爱、ai、下次一定出 | spk=柠檬（10002）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 认识\n[她想起来的] 柠檬说过：小爱 今天群里好安静\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
   },
   {
-   "clean": "我在呢",
+   "clean": "我在呢，听着也好难过",
    "inject": [
-    "[BC] v=0.23 a=0.50 d=0.60 s=0.66 t=0.65 e=joy c=希望 n=share plan=顺着分享接话 reg=none need=physiological action=rest | mem=- （别处）有人：啊啊啊啊 好激动 小爱快夸我 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 6；信任 0.53；关系 亲近0.61 冲突0.23 修复0.02 可预测0.98；回归=short；常谈 上次那首嘛、今天想听你唱歌、你可以的 | spk=芒果（10001） | cont=未完成：明天要考试了 好紧张、你还记得我早上让你唱什么吗；关系 近0.61/冲突0.23；回归=short\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心情平平。\n[她跟对方] 认识，常聊上次那首嘛、今天想听你唱歌\n[她想起来的] （别处）有人说过：啊啊啊啊 好激动 小爱快夸我\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
   },
   {
-   "clean": "抱抱你",
+   "clean": "抱抱你，好委屈啊",
    "inject": [
-    "[BC] v=-0.08 a=0.48 d=0.58 s=0.62 t=0.64 e=neutral c=- n=be_heard plan=先接住情绪 reg=none need=physiological action=rest | mem=- （别处）有人：我换工作了 现在轻松多了 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 7；信任 0.54；关系 亲近0.59 冲突0.26 修复0.02 可预测0.98；常谈 小爱、上次那首嘛、今天想听你唱歌 | spk=芒果（10001）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] （别处）有人说过：我换工作了 现在轻松多了\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
   },
   {
-   "clean": "太过分了",
+   "clean": "太过分了，我也生气",
    "inject": [
-    "[BC] v=-0.28 a=0.53 d=0.58 s=0.59 t=0.63 e=sadness c=失落 n=be_heard plan=先接住情绪 reg=express need=physiological action=rest | mem=- （别处）你：好久不见！\n- （别处）有人：太开心了！！！我终于抽到了！！！ | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 8；信任 0.54；关系 亲近0.58 冲突0.29 修复0.01 可预测0.99；常谈 小爱、上次那首嘛、今天想听你唱歌 | spk=芒果（10001）\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 她自己说过：我在呢，听着也好难过；（别处）她自己说过：好久不见！；（别处）有人说过：太开心了！！！我终于抽到了！！！（这些记得不太准）\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -10112,15 +10378,15 @@
   {
    "clean": "先别气坏自己",
    "inject": [
-    "[BC] v=-0.40 a=0.65 d=0.66 s=0.53 t=0.62 e=anger c=失落 n=be_heard plan=先接住情绪 reg=express need=physiological action=rest | mem=- 芒果：气死我了！！！他凭什么这样说我\n- （别处）有人：太开心了！！！我终于抽到了！！！\n- （别处）你：好久不见！ | memn=1 memc=0.82 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 9；信任 0.55；关系 亲近0.56 冲突0.30 修复0.01 可预测0.99；常谈 小爱、上次那首嘛、今天想听你唱歌 | spk=芒果（10001） | hint=empathy=supportive\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 芒果说过：气死我了！！！他凭什么这样说我；她自己说过：我在呢，听着也好难过；（别处）她自己说过：好久不见！\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
   },
   {
-   "clean": "我陪着你",
+   "clean": "我陪着你，真让人生气",
    "inject": [
-    "[BC] v=-0.45 a=0.71 d=0.72 s=0.49 t=0.60 e=anger c=失落 n=space plan=留出空间 reg=label_emotion need=physiological action=rest mtrace=heavy | mem=- 芒果：气死我了！！！他凭什么这样说我\n- 芒果：真的受够了！！！气死了！！！\n- （别处）你：好久不见！\n- （别处）有人：太开心了！！！我终于抽到了！！！ | memn=2 memc=0.83 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=芒果；互动 10；信任 0.55；关系 亲近0.55 冲突0.31 修复0.01 可预测0.99；常谈 小爱、上次那首嘛、今天想听你唱歌 | spk=芒果（10001） | hint=empathy=supportive | cont=未完成：你还记得我早上让你唱什么吗；关系 近0.55/冲突0.31\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 芒果说过：气死我了！！！他凭什么这样说我；芒果说过：真的受够了！！！气死了！！！；她自己说过：我在呢，听着也好难过\n[没做完的] 你还记得我早上让你唱什么吗"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -10128,7 +10394,7 @@
   {
    "clean": "好呀，说定了~",
    "inject": [
-    "[BC] v=-0.43 a=0.62 d=0.76 s=0.44 t=0.58 e=loneliness c=希望 n=space plan=留出空间 reg=distraction need=physiological action=rest | mem=- 柠檬：啊啊啊啊 好激动 小爱快夸我 | memn=1 memc=0.82 | loops=1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=阿星；互动 2；信任 0.51；关系 亲近0.51 冲突0.31 修复0.01 可预测0.99；回归=medium；常谈 小爱、ai、下次一定出 | spk=阿星（10003） | hint=empathy=supportive | cont=未完成：小爱帮我们算算保底还差多少；关系 近0.51/冲突0.31；回归=medium\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 还不太熟\n[她想起来的] 柠檬说过：啊啊啊啊 好激动 小爱快夸我\n[没做完的] 小爱帮我们算算保底还差多少"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -10136,7 +10402,7 @@
   {
    "clean": "记下啦",
    "inject": [
-    "[BC] v=-0.37 a=0.55 d=0.72 s=0.45 t=0.58 e=loneliness c=希望 n=space plan=留出空间 reg=distraction need=physiological action=rest | loops=2 due=1 soon=记得提醒我明天交报告 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=阿星；互动 3；信任 0.51；关系 亲近0.52 冲突0.29 修复0.01 可预测0.99；常谈 小爱、ai、下次一定出 | spk=阿星（10003） | hint=empathy=supportive\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。\n[她跟对方] 认识\n[没做完的] 小爱帮我们算算保底还差多少；记得提醒我明天交报告"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"
@@ -10144,7 +10410,7 @@
   {
    "clean": "太好了~",
    "inject": [
-    "[BC] v=-0.30 a=0.45 d=0.69 s=0.46 t=0.58 e=loneliness c=希望 n=talk plan=自然回应 reg=distraction ready=low need=physiological action=rest | mem=- 阿星：记得提醒我明天交报告\n- 柠檬：啊啊啊啊 好激动 小爱快夸我\n- （别处）有人：好久不见小爱 | memn=2 memc=0.83 memwho=阿星×1,柠檬×1 | self=我是：一个会持续受聊天影响、但不会被单条消息完全定义的角色。；边界：不接受被当作没有感受的工具；不会被一次互动改写全部立场；一致性：情绪会变，但核心立场不因单次互动翻转 | u=阿星；互动 4；信任 0.52；关系 亲近0.53 冲突0.28 修复0.01 可预测0.99；常谈 小爱、ai、下次一定出 | spk=阿星（10003） | cont=未完成：记得提醒我明天交报告、小爱帮我们算算保底还差多少；关系 近0.53/冲突0.28\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；不解释、不输出任何数值 delta。"
+    "[她现在] 心里有点发紧。各处这会儿都挺安静。\n[她跟对方] 认识\n[她想起来的] 阿星说过：记得提醒我明天交报告；柠檬说过：啊啊啊啊 好激动 小爱快夸我；（别处）有人说过：好久不见小爱"
    ],
    "session": "default:GroupMessage:900001",
    "system": "你是小爱。"

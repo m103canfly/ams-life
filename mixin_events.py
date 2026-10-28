@@ -1444,26 +1444,17 @@ class EventsMixin:
             insight = interpretation.parse_insight(raw)
             if not insight:
                 return False
+            # ams-life step 1-2: an insight lives with the events (memory), not in her
+            # body; its origin is that of the events it was drawn from, so forgetting
+            # finds it and it is never shown where those events could not be.
             self._append_insight({
                 "ts": time.time(), "insight": insight,
                 "emotion": str(getattr(core, "labels", {}).get("emotion") or "neutral") if core else "neutral",
+                "event_ids": [str(e.get("id") or "") for e in events[:6]],
+                "origin": discretion.merge([discretion.origin_of(e) for e in events[:6]]),
             })
             try:
                 if core is not None:
-                    tree = getattr(core, "reflection_tree", None)
-                    if not isinstance(tree, dict):
-                        tree = {"roots": [], "count": 0}
-                    node = {"ts": time.time(), "insight": insight,
-                            "emotion": str(getattr(core, "labels", {}).get("emotion") or "neutral"),
-                            "children": []}
-                    roots = tree.get("roots") or []
-                    if roots:
-                        roots[-1].setdefault("children", []).append(node)
-                    else:
-                        roots.append(node)
-                    tree["roots"] = roots[-10:]
-                    tree["count"] = int(tree.get("count", 0)) + 1
-                    core.reflection_tree = tree
                     core.integrate_noise("reflection", attention=0.006, valence=0.003)
             except Exception:
                 pass
@@ -1479,9 +1470,6 @@ class EventsMixin:
         if len(events) < 3:
             return
         await self._generate_insight(event, core, events[:6])
-
-    def _segment_event_texts(self, entries) -> list:
-        return [[txt for txt, _e in seg] for seg in self._segment_event_rows(entries)]
 
     def _segment_event_rows(self, entries) -> list:
         """The last three stretches of conversation, each a list of (text, entry).
@@ -2324,9 +2312,8 @@ class EventsMixin:
                     core.update_daily_digest(event_ids=[record.get("id")])
             except Exception:
                 pass
-            if _memory_point:
-                self._update_self_narrative(title, reflection or meaning, origin=record.get("origin"),
-                                            names=discretion.names_in(record))
+            # ams-life step 1-2: the meaning and reflection stay in the event record as
+            # material; whether they go into her notebook is hers to decide at night.
             logger.info("[biocore] strong event archived: %s mp=%s", title, _memory_point)
         except Exception as exc:
             logger.warning("[biocore] strong event summary failed: %s", exc)
