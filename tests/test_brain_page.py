@@ -150,6 +150,81 @@ process.stdout.write(JSON.stringify(out));
         self.assertEqual(self.r['openPerson'], [4])            # no associations: its own line
 
 
+class Ball(unittest.TestCase):
+    """The stars make a ball you turn and flick by hand (owner, 10-28)."""
+
+    def test_layout_is_a_ball_not_a_disc(self):
+        text = (SRC / 'brain.js').read_text(encoding='utf-8')
+        physics = re.search(r'const PHYSICS = \{([^}]*)\}', text).group(1)
+        for key in ('flatten', 'coreGravity', 'spiral'):
+            self.assertRegex(physics, key + r': 0\b')
+        self.assertRegex(physics, r'ballStrength: 0\.[1-9]')
+        self.assertIn('ball: ballRadius(nodes.length)', text)
+        for f in ('forceWorker.ts', 'MainThreadForceLayout.ts'):   # both layout engines use the ball force
+            self.assertIn("forceBall(", (SRC / 'galaxy' / 'layout' / f).read_text(encoding='utf-8'))
+
+    def test_turned_by_hand_with_touch(self):
+        globe = (SRC / 'globe.js').read_text(encoding='utf-8')
+        for word in ('pointerdown', 'pointermove', 'pointerup', 'pinchDistance', 'spinSpeed', 'autoSpeed('):
+            self.assertIn(word, globe)
+        self.assertIn('touch-action:none', (PAGE / 'brain.css').read_text(encoding='utf-8'))
+        text = (SRC / 'brain.js').read_text(encoding='utf-8')
+        self.assertIn('new GlobeCamera(', text)
+        self.assertNotIn('CameraDirector', text)
+
+
+@unittest.skipUnless(shutil.which('node'), 'Node.js not installed')
+class BallRules(unittest.TestCase):
+    """tools/brain/src/ball.js, run with Node."""
+
+    @classmethod
+    def setUpClass(cls):
+        script = r"""
+const B = await import(process.argv[1]);
+const R = B.ballRadius(800);
+const out = { R, R8000: B.ballRadius(8000) };
+const nodes = [{ x: 2 * R, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }, { x: R / 2, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }];
+const f = B.forceBall(R, 0.6); f.initialize(nodes); f(1);
+out.outside = nodes[0].vx; out.inside = nodes[1].vx;
+out.sides = [B.sideTarget(-1, R), B.sideTarget(0, R), B.sideTarget(1, R)];
+out.dragRight = B.dragAngles(100, 0, 800); out.dragDown = B.dragAngles(0, 100, 800);
+let s = 2; for (let k = 0; k < 600 && s > 0; k++) s = B.coast(s, 1 / 60); out.coastAfter10s = s;
+out.coastHalf = B.coast(2, 0.2);
+out.autoAtTouch = B.autoSpeed(0, true); out.autoLater = B.autoSpeed(B.SPIN.resumeMs + B.SPIN.rampMs, true);
+out.autoOff = B.autoSpeed(1e9, false);
+process.stdout.write(JSON.stringify(out));
+"""
+        out = subprocess.run(['node', '--input-type=module', '-e', script, (SRC / 'ball.js').as_uri()],
+                             capture_output=True, text=True, encoding='utf-8', timeout=60, check=True).stdout
+        cls.r = json.loads(out)
+
+    def test_ball_grows_slowly_with_more_stars(self):
+        self.assertGreater(self.r['R8000'], self.r['R'])
+        self.assertLess(self.r['R8000'], self.r['R'] * 2.2)    # cube root: 10x stars, about 2x radius
+
+    def test_outside_pulled_in_inside_left_alone(self):
+        self.assertLess(self.r['outside'], 0)
+        self.assertEqual(self.r['inside'], 0)
+
+    def test_private_chats_lean_to_the_other_side(self):
+        g, p, priv = self.r['sides']
+        self.assertLess(g, 0)
+        self.assertEqual(p, 0)
+        self.assertGreater(priv, 0)
+
+    def test_drag_turns_and_a_flick_coasts_to_a_stop(self):
+        self.assertLess(self.r['dragRight']['yaw'], 0)
+        self.assertEqual(self.r['dragRight']['pitch'], 0)
+        self.assertLess(self.r['dragDown']['pitch'], 0)
+        self.assertTrue(0 < self.r['coastHalf'] < 2)            # still turning, slower
+        self.assertEqual(self.r['coastAfter10s'], 0)            # and stops
+
+    def test_turns_by_itself_only_when_left_alone(self):
+        self.assertEqual(self.r['autoAtTouch'], 0)
+        self.assertGreater(self.r['autoLater'], 0)
+        self.assertEqual(self.r['autoOff'], 0)
+
+
 @unittest.skipUnless(shutil.which('node'), 'Node.js not installed')
 class SampleFormat(unittest.TestCase):
     @classmethod

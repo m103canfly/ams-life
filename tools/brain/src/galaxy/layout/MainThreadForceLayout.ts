@@ -3,6 +3,7 @@ import type { SimLink, SimNode, Simulation } from 'd3-force-3d';
 import type { GraphData, LayoutParams } from '../types';
 import type { LayoutEngine } from './LayoutEngine';
 import { forceRadialCore, forceSpiral } from './galaxyForces';
+import { forceBall, sideTarget } from '../../ball.js';
 
 interface LNode extends SimNode {
 	x: number;
@@ -40,11 +41,13 @@ export class MainThreadForceLayout implements LayoutEngine {
 			.velocityDecay(params.velocityDecay)
 			.force('link', forceLink<LNode>(links).distance(params.linkDistance).strength(this.linkStrengthFn(params.linkStrength)))
 			.force('charge', forceManyBody<LNode>().strength(params.charge).distanceMax(800))
-			.force('x', forceX<LNode>(0).strength(params.centerPull))
+			// ams-life: lean each star to its side of the ball (centerPull + sidePull)
+			.force('x', forceX<LNode>((_n: LNode, i: number) => sideTarget(data.nodes[i]?.side ?? 0, params.ball ?? 0)).strength(params.centerPull + (params.sidePull ?? 0)))
 			.force('y', forceY<LNode>(0).strength(params.centerPull + params.flatten))
 			.force('z', forceZ<LNode>(0).strength(params.centerPull))
 			.force('core', forceRadialCore(params.coreGravity, this.degrees))
 			.force('spiral', forceSpiral(params.spiral))
+			.force('ball', forceBall(params.ball ?? 0, params.ballStrength ?? 0))
 			.stop();
 		this.sim.alpha(initialAlpha);
 		this._ticks = 0;

@@ -10,7 +10,6 @@
 // otherwise the invented sample (sample.js, loaded before this bundle).
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DynamicDrawUsage, NormalBlending, Points, ShaderMaterial, Vector3 } from 'three';
 import { AggregateRenderer } from './galaxy/render/AggregateRenderer';
-import { CameraDirector } from './galaxy/interactions/CameraDirector';
 import { WorkerForceLayout } from './galaxy/layout/WorkerForceLayout';
 import { MainThreadForceLayout } from './galaxy/layout/MainThreadForceLayout';
 import { buildAdjacency, neighborhood } from './galaxy/data/Adjacency';
@@ -19,6 +18,8 @@ import { TIERS } from './galaxy/quality/tiers';
 import { DAYLIGHT, DEEP_SPACE } from './galaxy/render/presets';
 import { CURVE_BOW } from './galaxy/render/linkCurves';
 import { elapsedFrameSeconds, frameDeltaSeconds } from './galaxy/timing/frameClock';
+import { GlobeCamera } from './globe.js';
+import { ballRadius } from './ball.js';
 import { SHOW_ALL_DEFAULT, TURN, baseLinesVisible, lineMap, openedLines, turnFrame, turnSteps } from './lines.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,7 +33,11 @@ const LOOK = {
 	space: { nebula: 0.35, fieldStars: 0.25, clusterClouds: 0.3 },
 	frameElevDeg: 50,
 };
-const PHYSICS = { charge: -170, linkDistance: 55, linkStrength: 1.1, centerPull: 0.05, flatten: 0.55, coreGravity: 0.1, spiral: 0.02, velocityDecay: 0.6 };
+// A ball, not Galaxy View's flat disc: no flattening, core pull or spiral; a
+// force gathers the stars into a ball (ball.js), private chats lean to one side.
+const PHYSICS = { charge: -170, linkDistance: 55, linkStrength: 1.1, centerPull: 0.02, flatten: 0, coreGravity: 0, spiral: 0, velocityDecay: 0.6,
+	ball: 0, ballStrength: 0.6, sidePull: 0.05 };
+let physics = PHYSICS;
 const DIM = { lit: 1, near: 1, rest: 0.12, turnRest: 0.07 };
 
 const KIND = { window: '窗口', person: '人', memory: '记忆', event: '事件', note: '本子' };
@@ -167,8 +172,13 @@ function rebuild(initial) {
 	}
 	src = keep;
 	idx = new Map(keep.map((n, i) => [n.id, i]));
+	const sideOf = (n) => {
+		if (n.kind === 'person') return 0;
+		const w = n.kind === 'window' ? n : rawById.get(n.where);
+		return w && w.sub === 'private' ? 1 : -1;
+	};
 	const nodes = keep.map((n) => ({ id: n.id, name: n.label || n.id, folderTop: n.where || n.id, degree: 0, inDegree: 0, outDegree: 0,
-		fileSize: 0, tags: [], unresolved: n.vis === 'private' && n.kind !== 'window', tag: false }));
+		fileSize: 0, tags: [], unresolved: n.vis === 'private' && n.kind !== 'window', tag: false, side: sideOf(n) }));
 	const links = [];
 	for (const e of raw.edges) {
 		const s = idx.get(e.s), t = idx.get(e.t);
@@ -180,11 +190,13 @@ function rebuild(initial) {
 	adj = buildAdjacency(G);
 	lines = lineMap(links);
 	const R = seedRadius(nodes.length);
+	physics = Object.assign({}, PHYSICS, { ball: ballRadius(nodes.length) });
 	const positions = new Float32Array(nodes.length * 3);
 	keep.forEach((n, i) => {
 		let p = posCache.get(n.id);
 		if (!p) {
-			const s = seedPosition(n.id, R);
+			const s = seedPosition(n.id, physics.ball * 0.8);
+			s[0] += nodes[i].side * physics.ball * 0.3;
 			const home = n.where && posCache.get(n.where);
 			p = home ? [home[0] + s[0] * 0.25, home[1] + s[1] * 0.25, home[2] + s[2] * 0.25] : s;
 		}
@@ -205,10 +217,10 @@ function initLayout(data, positions, alpha) {
 	const wantMain = params.get('settle') === '1';
 	try {
 		layout = wantMain ? new MainThreadForceLayout() : new WorkerForceLayout();
-		layout.init(data, positions, PHYSICS, alpha);
+		layout.init(data, positions, physics, alpha);
 	} catch (e) {
 		layout = new MainThreadForceLayout();
-		layout.init(data, positions, PHYSICS, alpha);
+		layout.init(data, positions, physics, alpha);
 	}
 	if (wantMain) { while (layout.step()) { /* lay out fully before the first frame */ } renderer.updatePositions(); }
 	layoutStarted = performance.now();
@@ -221,7 +233,7 @@ function workerWatchdog(now) {
 	const positions = layout.positions;
 	layout.dispose();
 	layout = new MainThreadForceLayout();
-	layout.init(G, positions, PHYSICS, 1);
+	layout.init(G, positions, physics, 1);
 }
 
 // ------------------------------------------------------------------ colour and focus
@@ -288,13 +300,9 @@ function updateStat() {
 function createRenderer() {
 	const stage = $('galaxy');
 	renderer = new AggregateRenderer(stage, graphRadius);
-	director = new CameraDirector(renderer.camera, renderer.renderer.domElement, {
-		onFlyToSelected: () => { if (sel >= 0) director.flyTo(nodePos(sel), renderer.nodeRadius(sel)); },
-		onResetView: () => recenter(),
-	});
-	director.setFramingElev(LOOK.frameElevDeg);
+	director = new GlobeCamera(renderer.camera, renderer.renderer.domElement);
 	renderer.setBloomParams(LOOK.bloom);
-	renderer.setNodeScale(LOOK.nodeSize);
+	renderer.setNodeScale(LOOK.nodeSize * (tier.id === 'mobile' ? 1.9 : 1));   // phones: no bloom, so bigger stars
 	renderer.setLinkOpacity(LOOK.linkOpacity);
 	renderer.setLinkCurve(LOOK.linkCurve);
 	renderer.setSizeMode('degree');
@@ -307,6 +315,7 @@ function createRenderer() {
 	cores.build();
 	sparks.build();
 	marks.build();
+	shell.build();
 }
 
 const tmpV = new Vector3();
@@ -322,22 +331,25 @@ function computeFraming() {
 	const d = new Float64Array(n);
 	for (let i = 0; i < n; i++) d[i] = nodePos(i, tmpV).distanceTo(center);
 	d.sort();
-	const radius = Math.max(d[Math.min(n - 1, Math.floor(n * 0.95))] || graphRadius, graphRadius * 0.3);
+	const radius = Math.max(d[Math.min(n - 1, Math.floor(n * 0.98))] || graphRadius, graphRadius * 0.3);
 	viewRadius = radius;
+	ballCenter.copy(center);
 	return { center, radius };
 }
-function recenter() {
+const ballCenter = new Vector3();
+function recenter() {   // the whole ball, keeping the way it is turned
 	const f = computeFraming();
-	director.resetView(f.center, f.radius * 0.8, () => director.beginFocusOrbit(null));
+	shell.place(f.center, f.radius);
+	director.frame(f.center, f.radius * 1.08, null);
 }
 function frameIndices(list) {
 	if (!list.length) return;
 	const center = new Vector3();
 	for (const i of list) center.add(nodePos(i, tmpV));
 	center.divideScalar(list.length);
-	const d = list.map((i) => nodePos(i, tmpV).distanceTo(center)).sort((a, b) => a - b);
-	const r = d[Math.min(d.length - 1, Math.floor(d.length * 0.85))] || 0;
-	director.resetView(center, Math.max(r * 0.75, viewRadius * 0.12), () => director.beginFocusOrbit(null));
+	let r = 0;
+	for (const i of list) r = Math.max(r, nodePos(i, tmpV).distanceTo(center));
+	director.frame(center, Math.max(r * 1.1, viewRadius * 0.35), ballCenter);   // the ball turns them towards you
 }
 
 function resize() {
@@ -345,7 +357,7 @@ function resize() {
 	renderer?.resize(el.clientWidth, el.clientHeight);
 	const ph = el.clientHeight * (renderer ? renderer.renderer.getPixelRatio() : 1);
 	pixelScale = ph / (2 * Math.tan(((renderer ? renderer.camera.fov : 60) / 2) * Math.PI / 180));
-	cores.setPixelScale(pixelScale); sparks.setPixelScale(pixelScale); marks.setPixelScale(pixelScale);
+	cores.setPixelScale(pixelScale); sparks.setPixelScale(pixelScale); marks.setPixelScale(pixelScale); shell.setPixelScale(pixelScale);
 }
 let pixelScale = 1;
 
@@ -358,10 +370,10 @@ void main() { vAlpha = aAlpha; vColor = aColor;
 	gl_PointSize = min(aSize * uPixelScale / max(-mv.z, 1.0), 220.0);
 	gl_Position = projectionMatrix * mv; }`;
 const GLOW_FRAGMENT = /* glsl */ `
-varying float vAlpha; varying vec3 vColor; uniform float uLight;
+varying float vAlpha; varying vec3 vColor; uniform float uLight; uniform float uFade;
 void main() { float d = length(gl_PointCoord - 0.5);
 	float halo = smoothstep(0.5, 0.0, d); float core = smoothstep(0.16, 0.0, d);
-	float a = (halo * halo * 0.9 + core) * vAlpha; if (a < 0.01) discard;
+	float a = (halo * halo * 0.9 + core) * vAlpha * uFade; if (a < 0.01) discard;
 	if (uLight > 0.5) { gl_FragColor = vec4(mix(vColor, vColor * 0.7, core), min(a, 1.0)); return; }   // on paper: plain ink
 	vec3 col = mix(vColor, vec3(1.0), core * 0.7);
 	gl_FragColor = vec4(col * a, a); }`;
@@ -372,7 +384,7 @@ function glowPoints(count) {
 	geo.setAttribute('aAlpha', new BufferAttribute(new Float32Array(count), 1).setUsage(DynamicDrawUsage));
 	geo.setAttribute('aColor', new BufferAttribute(new Float32Array(count * 3), 3).setUsage(DynamicDrawUsage));
 	const mat = new ShaderMaterial({ vertexShader: GLOW_VERTEX, fragmentShader: GLOW_FRAGMENT, transparent: true, depthWrite: false,
-		blending: dark ? AdditiveBlending : NormalBlending, uniforms: { uPixelScale: { value: 1 }, uLight: { value: dark ? 0 : 1 } } });
+		blending: dark ? AdditiveBlending : NormalBlending, uniforms: { uPixelScale: { value: 1 }, uLight: { value: dark ? 0 : 1 }, uFade: { value: 1 } } });
 	const pts = new Points(geo, mat);
 	glowMaterials.push(mat);
 	pts.frustumCulled = false; pts.renderOrder = 3;
@@ -401,7 +413,8 @@ const cores = {
 		CORES.forEach((c, k) => {
 			const ang = k / CORES.length * Math.PI * 2;
 			this.pos[k].set(Math.cos(ang) * ring, 0, Math.sin(ang) * ring);
-			P.setXYZ(k, this.pos[k].x, 0, this.pos[k].z);
+			this.pos[k].add(ballCenter);
+			P.setXYZ(k, this.pos[k].x, this.pos[k].y, this.pos[k].z);
 			let v = this.value(k);
 			if (c.key === 'valence') {   // mood: blue when low, warm yellow when high
 				const cc = new Color(v >= 0 ? '#f2c14e' : '#5b8def');
@@ -449,6 +462,39 @@ const marks = {
 			C.setXYZ(k, m[1].r, m[1].g, m[1].b);
 		}
 		P.needsUpdate = S.needsUpdate = A.needsUpdate = C.needsUpdate = true;
+	},
+};
+
+// A faint layer of stars on the surface, so the ball's outline shows.
+const shell = {
+	pts: null, count: 900,
+	build() {
+		this.pts = glowPoints(this.count);
+		const C = this.pts.geometry.getAttribute('aColor'), A = this.pts.geometry.getAttribute('aAlpha');
+		for (let k = 0; k < this.count; k++) { C.setXYZ(k, 0.72, 0.8, 1); A.setX(k, 0); }
+	},
+	setPixelScale(v) { if (this.pts) this.pts.material.uniforms.uPixelScale.value = v; },
+	radius: 0,
+	update() {   // the outline is for looking at the ball from outside: it fades as the camera comes close
+		if (!this.pts || !this.radius) return;
+		const d = renderer.camera.position.distanceTo(ballCenter);
+		this.pts.material.uniforms.uFade.value = Math.max(0, Math.min(1, (d - this.radius * 1.6) / (this.radius * 0.8)));
+	},
+	place(center, radius) {
+		this.radius = radius;
+		if (!this.pts) return;
+		const g = this.pts.geometry, P = g.getAttribute('position'), S = g.getAttribute('aSize'), A = g.getAttribute('aAlpha');
+		const golden = Math.PI * (3 - Math.sqrt(5));
+		let seed = 11;
+		const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+		for (let k = 0; k < this.count; k++) {   // evenly over the sphere (Fibonacci), a little jitter
+			const y = 1 - (k + 0.5) / this.count * 2, r = Math.sqrt(1 - y * y), th = k * golden;
+			const rr = radius * (1.06 + (rnd() - 0.5) * 0.05);
+			P.setXYZ(k, center.x + Math.cos(th) * r * rr, center.y + y * rr, center.z + Math.sin(th) * r * rr);
+			S.setX(k, radius * (0.016 + rnd() * 0.02));
+			A.setX(k, (dark ? 0.3 : 0.4) + rnd() * 0.3);
+		}
+		P.needsUpdate = S.needsUpdate = A.needsUpdate = true;
 	},
 };
 
@@ -556,7 +602,7 @@ function setTurn(k) {
 			' 条（金色，按顺序亮，顺着线想过去），' + ((tr.held || []).length ? (tr.held || []).length + ' 条她知道但在这里没说（灰的）。' : '没有被挡下的。') +
 			(tr.body ? ' 中间的核是那一刻的身体。' : '') + (missing ? '（有 ' + missing + ' 条被筛掉了）' : '');
 		recolor();
-		frameIndices(rec.concat(held, where === undefined ? [] : [where]));
+		frameIndices(rec.concat(where === undefined ? [] : [where]));   // what she recalled; a held-back star may be off to the side
 	} else {
 		$('turnHint').textContent = '点一轮看她这次想起了谁。平常星之间不连线，她想起来时才连。';
 		recolor();
@@ -612,7 +658,7 @@ function updateLabels() {
 		for (const i of hits) { if (k++ > 15) break; put('q' + i, i, src[i].label, 'hit', 10); }
 	}
 	const cam = renderer.camera;
-	cores.pos.forEach((p, k) => {
+	if (w >= 600) cores.pos.forEach((p, k) => {   // narrow screens: the nuclei glow without names (tap one to see it)
 		const v = tmpV.copy(p).project(cam);
 		if (v.z > 1) return;
 		const val = cores.value(k);
@@ -722,7 +768,7 @@ function select(i, fly) {
 		const near = [i];
 		for (const li of openedLines(G.links, i)) { const l = G.links[li]; near.push(l.source === i ? l.target : l.source); }
 		if (near.length > 1) frameIndices(near);
-		else director.flyTo(nodePos(i), renderer.nodeRadius(i), () => director.beginFocusOrbit(null));
+		else director.frame(nodePos(i), viewRadius * 0.15, ballCenter);
 	}
 }
 function selectId(id, fly) {
@@ -850,7 +896,7 @@ function wire() {
 	$('fitBtn').addEventListener('click', () => { select(-1); recenter(); });
 	$('motionBtn').addEventListener('click', () => {
 		motion = !motion; $('motionBtn').classList.toggle('on', motion); storeSet('brain_motion', motion ? '1' : '0');
-		director.cruiseEnabled = motion; renderer.twinkleFreq = motion ? LOOK.twinkle : 0;
+		director.autoEnabled = motion; renderer.twinkleFreq = motion ? LOOK.twinkle : 0;
 	});
 	$('themeBtn').addEventListener('click', () => { const d = !dark; applyTheme(d); storeSet('bio_theme', d ? 'dark' : 'light'); });
 	$('panelBtn').addEventListener('click', () => $('side').classList.toggle('open'));
@@ -860,6 +906,7 @@ function wire() {
 		if (ev.key === 'Escape') { if (turn >= 0) setTurn(-1); else select(-1); }
 		else if (ev.key === 'ArrowRight') $('turnNext').click();
 		else if (ev.key === 'ArrowLeft') $('turnPrev').click();
+		else if (ev.key === 'r' || ev.key === 'R') recenter();
 	});
 
 	// Click to open, hover for a one-line tip (Galaxy View's screen-space picking).
@@ -918,12 +965,13 @@ function frame(now) {
 	if (layout.step()) renderer.updatePositions();
 	const settled = layout.isSettled();
 	if (settled && !settledOnce) { settledOnce = true; renderer.refreshClusterClouds(); $('loading').style.display = 'none'; if (!framed) { framed = true; if (turn < 0 && sel < 0 && !filter.win) recenter(); } }
-	try { director.update(now, ad, d); } catch (e) { director.cancelMotion(); }
+	director.update(d);
 	stepTurn(now);
 	sparks.ambient(now);
 	sparks.update(now);
 	cores.update(now);
 	marks.update(now);
+	shell.update();
 	if (renderer.linkSegments) renderer.linkSegments.visible = baseLinesVisible(showAll);   // Galaxy View's layer of every line
 	renderer.render(d, ad);
 	updateLabels();
@@ -949,11 +997,12 @@ async function boot() {
 	buildControls();
 	// Lay windows out first so their stars seed their clusters, then everything.
 	rebuild(true);
-	director.cruiseEnabled = motion;
+	director.autoEnabled = motion;
 	resize();
 	const f = computeFraming();
 	// Cold start: the stars are still seeds near the middle; frame what they will spread to.
-	director.setInitialFraming(f.center, layout.isSettled() ? f.radius * 0.8 : Math.max(f.radius, graphRadius * 2.4));
+	director.setInitial(f.center, layout.isSettled() ? f.radius * 1.08 : Math.max(f.radius, physics.ball) * 1.08);
+	if (layout.isSettled()) shell.place(f.center, f.radius);
 	if (layout.isSettled()) { framed = true; }
 	wire();
 	renderTurns();

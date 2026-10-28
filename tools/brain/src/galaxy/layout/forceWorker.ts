@@ -2,6 +2,7 @@ import { forceLink, forceManyBody, forceSimulation, forceX, forceY, forceZ } fro
 import type { SimLink, SimNode, Simulation } from 'd3-force-3d';
 import type { LayoutParams } from '../types';
 import { forceRadialCore, forceSpiral } from './galaxyForces';
+import { forceBall, sideTarget } from '../../ball.js';
 
 /**
  * 布局 Worker（M3）：d3-force-3d 完全离主线程。
@@ -21,6 +22,7 @@ interface InitMsg {
 	positions: ArrayBuffer;
 	links: ArrayBuffer; // Uint32Array [s0,t0,s1,t1,...]
 	degrees: ArrayBuffer; // Float32Array
+	sides?: ArrayBuffer; // ams-life: Float32Array, -1/0/1
 	params: LayoutParams;
 	initialAlpha: number;
 	bufA: ArrayBuffer;
@@ -43,6 +45,7 @@ const ctx = self as unknown as WorkerCtx;
 let sim: Simulation<WNode> | null = null;
 let nodes: WNode[] = [];
 let degrees: Float32Array = new Float32Array(0);
+let sides: Float32Array = new Float32Array(0);
 let freeBuffers: ArrayBuffer[] = [];
 let settled = true;
 let tickCount = 0;
@@ -64,12 +67,13 @@ function applyParams(params: LayoutParams): void {
 	const link = sim.force('link') as import('d3-force-3d').LinkForce<WNode> | undefined;
 	link?.distance(params.linkDistance);
 	link?.strength(linkStrengthFn(params.linkStrength));
-	(sim.force('x') as import('d3-force-3d').PositionForce<WNode> | undefined)?.strength(params.centerPull);
+	(sim.force('x') as import('d3-force-3d').PositionForce<WNode> | undefined)?.strength(params.centerPull + (params.sidePull ?? 0));
 	(sim.force('y') as import('d3-force-3d').PositionForce<WNode> | undefined)?.strength(params.centerPull + params.flatten);
 	(sim.force('z') as import('d3-force-3d').PositionForce<WNode> | undefined)?.strength(params.centerPull);
 	// 自定义力无干净 .strength() setter → 用新强度重建（O(n) initialize 一次）
 	sim.force('core', forceRadialCore(params.coreGravity, degrees));
 	sim.force('spiral', forceSpiral(params.spiral));
+	sim.force('ball', forceBall(params.ball ?? 0, params.ballStrength ?? 0));
 }
 
 function schedule(): void {
@@ -121,6 +125,7 @@ ctx.onmessage = (e: MessageEvent) => {
 			sim?.stop();
 			const pos = new Float32Array(msg.positions);
 			degrees = new Float32Array(msg.degrees);
+			sides = msg.sides ? new Float32Array(msg.sides) : new Float32Array(msg.count);
 			const linkIdx = new Uint32Array(msg.links);
 			nodes = [];
 			for (let i = 0; i < msg.count; i++) {
@@ -135,11 +140,13 @@ ctx.onmessage = (e: MessageEvent) => {
 				.velocityDecay(msg.params.velocityDecay)
 				.force('link', forceLink<WNode>(links).distance(msg.params.linkDistance).strength(linkStrengthFn(msg.params.linkStrength)))
 				.force('charge', forceManyBody<WNode>().strength(msg.params.charge).distanceMax(800))
-				.force('x', forceX<WNode>(0).strength(msg.params.centerPull))
+				// ams-life: lean each star to its side of the ball (centerPull + sidePull)
+				.force('x', forceX<WNode>((_n: WNode, i: number) => sideTarget(sides[i] ?? 0, msg.params.ball ?? 0)).strength(msg.params.centerPull + (msg.params.sidePull ?? 0)))
 				.force('y', forceY<WNode>(0).strength(msg.params.centerPull + msg.params.flatten))
 				.force('z', forceZ<WNode>(0).strength(msg.params.centerPull))
 				.force('core', forceRadialCore(msg.params.coreGravity, degrees))
 				.force('spiral', forceSpiral(msg.params.spiral))
+				.force('ball', forceBall(msg.params.ball ?? 0, msg.params.ballStrength ?? 0))
 				.stop();
 			sim.alpha(msg.initialAlpha);
 			freeBuffers = [msg.bufA, msg.bufB];

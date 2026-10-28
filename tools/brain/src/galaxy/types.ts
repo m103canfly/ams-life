@@ -10,6 +10,8 @@ export interface GraphNode {
 	tags: string[];
 	unresolved: boolean;
 	tag: boolean; // true=有界标签 hub（非文件），与 unresolved 并列的判别位
+	/** ams-life: -1 group side, 1 private side, 0 either */
+	side?: number;
 }
 
 /** 边用节点数组下标表示——聚合渲染按索引 gather 坐标 */
@@ -32,6 +34,10 @@ export interface LayoutParams {
 	coreGravity: number; // 径向核心引力：致密亮核 + 径向密度梯度（度数加权，hub 沉核）
 	spiral: number; // 切向旋臂力：把盘梳成对数旋臂（0=无臂）
 	velocityDecay: number;
+	/** ams-life: gather the stars into a ball of this radius (0 = off), private ones to one side */
+	ball?: number;
+	ballStrength?: number;
+	sidePull?: number;
 }
 
 export interface FrameStats {

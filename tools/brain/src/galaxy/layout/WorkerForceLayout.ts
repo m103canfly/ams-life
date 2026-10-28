@@ -57,6 +57,8 @@ export class WorkerForceLayout implements LayoutEngine {
 		});
 		const degrees = new Float32Array(n);
 		data.nodes.forEach((node, i) => (degrees[i] = Math.max(node.degree, 1)));
+		const sides = new Float32Array(n); // ams-life: which side of the ball each star leans to
+		data.nodes.forEach((node, i) => (sides[i] = node.side ?? 0));
 		const bufA = new ArrayBuffer(n * 3 * 4);
 		const bufB = new ArrayBuffer(n * 3 * 4);
 
@@ -68,12 +70,13 @@ export class WorkerForceLayout implements LayoutEngine {
 				positions: posCopy.buffer,
 				links: linkIdx.buffer,
 				degrees: degrees.buffer,
+				sides: sides.buffer,
 				params,
 				initialAlpha,
 				bufA,
 				bufB,
 			},
-			[posCopy.buffer, linkIdx.buffer, degrees.buffer, bufA, bufB],
+			[posCopy.buffer, linkIdx.buffer, degrees.buffer, sides.buffer, bufA, bufB],
 		);
 	}
 
