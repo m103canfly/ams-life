@@ -663,7 +663,7 @@
   }
 
   const LLM_FUNCTIONS=["persona_compile","event_summary","event_ranking","insight","memory_summary","image_caption",
-  "relationship_impression","repair_hint","empathy_hint","pragmatics_hint","tom_probe","notebook","relationship_narrative","humor_hint","group_impressions"];
+  "relationship_impression","repair_hint","empathy_hint","pragmatics_hint","tom_probe","notebook","relationship_narrative","humor_hint","group_impressions","daily_digest"];
   const MEM_SOURCE_LABELS={direct:"用户直述",media:"图片/语音",told:"转述",retrieved:"检索",inferred:"推断",unknown:"未标注"};
   const MEM_TIER_LABELS={hot:"HOT 热",warm:"WARM 温",cold:"COLD 冷"};
   const MEM_REL_FIELDS=[["trust","信任"],["closeness","亲近"],["conflict","冲突"],["repair","修复"],["predictability","可预测"]];

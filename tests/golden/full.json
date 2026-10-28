@@ -7,6 +7,10 @@
  "files": {
   "api_config.json": {
    "functions": {
+    "daily_digest": {
+     "enabled": true,
+     "provider": "follow_llm"
+    },
     "empathy_hint": {
      "enabled": true,
      "provider": "follow_llm"
@@ -7166,6 +7170,7 @@
    ],
    "boundaries": [],
    "consistency": [],
+   "digest_night": {},
    "heart": 1,
    "narrative": "",
    "narrative_items": [],
@@ -8629,6 +8634,11 @@
      "voice": ""
     },
     "functions": {
+     "daily_digest": {
+      "default_enabled": false,
+      "enabled": true,
+      "provider": "follow_llm"
+     },
      "empathy_hint": {
       "default_enabled": false,
       "enabled": true,
@@ -10150,6 +10160,11 @@
    },
    "last_strategy_hint": "",
    "llm_functions": {
+    "daily_digest": {
+     "default_enabled": false,
+     "enabled": true,
+     "provider": "follow_llm"
+    },
     "empathy_hint": {
      "default_enabled": false,
      "enabled": true,
@@ -12868,6 +12883,7 @@
     "boundaries": [],
     "consistency": [],
     "diary": [],
+    "digest_night": {},
     "heart": 1,
     "narrative": "",
     "narrative_items": [],

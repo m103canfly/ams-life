@@ -213,19 +213,10 @@ def addressed(lines, picked, day, self_id=""):
     return out[-ADDRESSED_LINES:]
 
 
-def material(picked, names=None, said_to=(), red=redline.hit) -> tuple:
-    """(text for the model, {code: qq}). Each picked person a code P1, P2...; everyone else in
-    the group the model only sees mentioned gets Q1, Q2... -- every name anyone in the group
-    goes by (`names`, from group_names) and every @ becomes a code, long numbers '#', pictures
-    and the like '[图]'; red-line lines are left out."""
-    codes = {"P%d" % (i + 1): p["qq"] for i, p in enumerate(picked)}
-    code_of = {qq: c for c, qq in codes.items()}
-    names = {str(q): set(v) for q, v in (names or {}).items()}
-    for p in picked:
-        if p.get("name"):
-            names.setdefault(p["qq"], set()).add(p["name"])
-    for qq in sorted(q for q in names if q not in code_of):
-        code_of[qq] = "Q%d" % (len(code_of) - len(codes) + 1)
+def masker(code_of, names):
+    """text -> text as the model may see it: every QQ number in `code_of` ({qq: code}) and
+    every name in `names` ({qq: names}, each qq in code_of) its code, long numbers '#',
+    pictures and the like '[图]', any other @ '@某人'."""
     swaps = sorted(((n, code_of[q]) for q, ns in names.items() for n in ns if len(n) >= 2),
                    key=lambda x: -len(x[0]))
     # a one-character name only where it plainly names someone (as discretion.anonymize does)
@@ -245,6 +236,23 @@ def material(picked, names=None, said_to=(), red=redline.hit) -> tuple:
             text = pattern.sub(lambda m, c=c: ("@" if m.group(0).startswith("@") else "") + c, text)
         text = PART.sub("[图]", LONG_NUMBER.sub("#", text))
         return re.sub(r"@(?![PQ]\d)\S{1,20}", "@某人", text)
+    return mask
+
+
+def material(picked, names=None, said_to=(), red=redline.hit) -> tuple:
+    """(text for the model, {code: qq}). Each picked person a code P1, P2...; everyone else in
+    the group the model only sees mentioned gets Q1, Q2... -- every name anyone in the group
+    goes by (`names`, from group_names) and every @ becomes a code, long numbers '#', pictures
+    and the like '[图]'; red-line lines are left out."""
+    codes = {"P%d" % (i + 1): p["qq"] for i, p in enumerate(picked)}
+    code_of = {qq: c for c, qq in codes.items()}
+    names = {str(q): set(v) for q, v in (names or {}).items()}
+    for p in picked:
+        if p.get("name"):
+            names.setdefault(p["qq"], set()).add(p["name"])
+    for qq in sorted(q for q in names if q not in code_of):
+        code_of[qq] = "Q%d" % (len(code_of) - len(codes) + 1)
+    mask = masker(code_of, names)
     out = []
     for code, p in zip(codes, picked):
         out.append("%s：今天说了 %d 句" % (code, p["count"]))

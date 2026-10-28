@@ -25,6 +25,7 @@ class PeopleMixin:
             "narrative_items": [],
             "notebook": [],
             "notebook_night": {},       # tonight's sittings tried (a failed try counts) and changes made
+            "digest_night": {},         # tonight's windows gone over (by a hash of each; a failed try counts)
             "heart": 1,
             "version": 0,
             "_history": [],
