@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!-- ams-life (AGPL-3.0); see NOTICE.md. Read-only brain map: nothing here can change her. -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light dark" />
+<title>她的脑子</title>
+<link rel="stylesheet" href="./brain.css" />
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="mark"></span><div><b>她的脑子</b><small>记忆 · 人 · 窗口 · 本子 · 身体</small></div></div>
+    <span class="badge" id="sourceBadge" hidden>示例数据（编造）</span>
+    <div class="top-right">
+      <span class="stat" id="statLine"></span>
+      <button class="btn" id="motionBtn" title="连线上的亮点和身体的核会动">动起来</button>
+      <button class="btn" id="fitBtn" title="双击图也可以">看全图</button>
+      <button class="btn" id="themeBtn">深色</button>
+      <button class="btn only-narrow" id="panelBtn">筛选</button>
+    </div>
+  </header>
+
+  <aside class="side" id="side">
+    <section>
+      <label class="lbl" for="q">搜</label>
+      <input id="q" type="search" placeholder="类别、窗口、编号，或记忆里的字" autocomplete="off" />
+      <ol class="hits" id="hits"></ol>
+    </section>
+    <section>
+      <div class="lbl">点</div>
+      <div id="kindBoxes" class="boxes"></div>
+    </section>
+    <section>
+      <div class="lbl">线</div>
+      <div id="edgeBoxes" class="boxes"></div>
+    </section>
+    <section>
+      <label class="lbl" for="winSel">窗口</label>
+      <select id="winSel"></select>
+      <div class="seg" id="visSeg">
+        <button data-vis="all" class="on">都看</button><button data-vis="public">只看公开</button><button data-vis="private">只看私下</button>
+      </div>
+    </section>
+    <section>
+      <div class="lbl">时间 <span id="timeText" class="muted"></span></div>
+      <div class="range"><span>从</span><input id="tFrom" type="range" min="0" max="24" step="1" /><span>天前</span></div>
+      <div class="range"><span>到</span><input id="tTo" type="range" min="0" max="24" step="1" /><span>天前</span></div>
+      <p class="hint">人和窗口不按时间筛。</p>
+    </section>
+    <section class="legend">
+      <div class="lbl">怎么看</div>
+      <p>左半边是群里听到的（公开），右半边是私聊里听到的（私下）。空心的点是私下的。</p>
+      <p>中间那几个会呼吸的核是她的身体，越大越亮，数值越高。</p>
+      <p>这一页只能看，不能改她。删东西请回原来的面板。</p>
+    </section>
+  </aside>
+
+  <main class="stage" id="stage">
+    <canvas id="brain"></canvas>
+    <div class="tip" id="tip" hidden></div>
+    <div class="loading" id="loading">正在铺开…</div>
+
+    <aside class="drawer" id="drawer" hidden>
+      <button class="x" id="drawerClose" title="关上 (Esc)">×</button>
+      <div class="d-kind" id="dKind"></div>
+      <h2 id="dTitle"></h2>
+      <dl id="dMeta"></dl>
+      <div class="d-body" id="dBody"></div>
+      <div id="dLinks"></div>
+    </aside>
+
+    <section class="turns" id="turns">
+      <div class="turns-head">
+        <b>每次回话想起了什么</b>
+        <span class="muted" id="turnHint">点一轮看她这次想起了谁。亮的是想起的，灰的是她知道、但在这里没说的。</span>
+        <span class="turns-nav"><button class="btn" id="turnPrev" title="上一轮 (←)">◀</button><button class="btn" id="turnNext" title="下一轮 (→)">▶</button><button class="btn" id="turnOff">不看了</button></span>
+      </div>
+      <ol class="turn-list" id="turnList"></ol>
+    </section>
+  </main>
+</div>
+<script src="./sample.js"></script>
+<script src="./graph.js"></script>
+<script src="./brain.js"></script>
+</body>
+</html>
