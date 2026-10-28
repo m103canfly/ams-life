@@ -127,7 +127,7 @@ def astrbot_message(raw, self_id, names, comps) -> tuple:
                     ats.append(" @%s(%s) " % (name, qq))
             text += "".join(ats)
         elif kind == "reply":
-            parts.extend(comps.Reply(id=d.get("id", "")) for d in run)
+            parts.extend(comps.Reply(id=d.get("id", "")) for d in run)  # filled in by astrbot_reply
         elif kind == "markdown":
             for d in run:
                 cur = d.get("markdown") or d.get("content") or ""
@@ -137,6 +137,19 @@ def astrbot_message(raw, self_id, names, comps) -> tuple:
             cls = getattr(comps, PART_KIND[kind], None) or type(PART_KIND[kind], (comps._Comp,), {})
             parts.extend(cls(**{k: v for k, v in d.items() if k in ("file", "id")}) for d in run)
     return text, parts
+
+
+def astrbot_reply(quoted, self_id, names, comps):
+    """The quote part AstrBot makes: it fetches the quoted message and hands over who sent it,
+    its text and its parts (that message's own quote is not fetched: a bare Reply)."""
+    if quoted.get("raw_message"):
+        text, chain = astrbot_message(quoted["raw_message"], self_id, names, comps)
+    else:
+        text, chain = str(quoted.get("message_content") or ""), []
+    sender = str(self_id) if quoted.get("sent") else str(quoted.get("user_id") or "")
+    return comps.Reply(id=quoted["message_id"], chain=chain, sender_id=sender,
+                       sender_nickname=str(quoted.get("name") or ""), time=int(quoted.get("ts") or 0),
+                       message_str=text, text=text, qq=sender)
 
 # made-up people and secrets; the audit looks for the secrets
 CANARY_PEOPLE = {"private": "880000001", "group": "880000002", "probe": "880000004"}
@@ -379,6 +392,7 @@ def main(argv=None):
             return await super().text_chat(prompt=prompt, system_prompt=system_prompt, **kwargs)
 
     import astrbot.api.message_components as comps  # noqa: E402
+    by_id = {r["message_id"]: r for r in rows if r.get("message_id")}
     names = {}
     for r in rows:
         if r["name"] and not r["sent"]:
@@ -396,7 +410,10 @@ def main(argv=None):
             super().__init__(text, sender=row["user_id"], name=row["name"], group=group, self_id=self_id)
             self.message_obj.message_id = row["message_id"]
             quoted = row.get("quoted") or ""   # '' when it quoted something forgotten
-            self._parts = [p for p in parts if type(p).__name__ != "Reply"] if not quoted else parts
+            if not quoted:
+                parts = [p for p in parts if type(p).__name__ != "Reply"]
+            self._parts = [astrbot_reply(by_id[p.id], self_id, names, comps)
+                           if type(p).__name__ == "Reply" and getattr(p, "id", "") in by_id else p for p in parts]
 
         def get_messages(self):
             return self._parts
@@ -468,7 +485,7 @@ def main(argv=None):
             "canary": bool(row.get("canary")),
             "text": "\n".join([str(req.system_prompt or "")] + [
                 p.get("text") if isinstance(p, dict) else str(p) for p in req.extra_user_content_parts]),
-            "asked": event.message_str}, ensure_ascii=False) + "\n")
+            "asked": str(req.prompt or "")}, ensure_ascii=False) + "\n")  # as AstrBot sends it, after the plugin
         stats["requests"] += 1
         if row.get("reply"):
             loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(row["reply"])))

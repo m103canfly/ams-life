@@ -8,8 +8,10 @@ passed, 1 = at least one failed. The report names places only by label (ç¾¤1, ç§
 never quotes a message.
 
 Checks (a "piece" is 8 characters in a row, letters and digits only, lower case, taken from one
-line of a message or a prompt, or from one text field of a data file -- never across two -- and
-never all digits: numbers are the qq check's):
+line of a message or a prompt, or from one text field of a data file -- never across two. An
+all-digit piece that is part of a known number (someone's, a group's, the registry's) is the
+qq check's; any other all-digit piece -- a phone number, a code -- counts like words. A reply
+prompt is checked with what AstrBot sends the model of the message, "asked", added to it):
 
 private      A reply prompt somewhere else holds a piece that only ever occurred in one private
              chat -- said by the other person or by her (her replies there, and what the old account
@@ -68,13 +70,19 @@ def norm(text) -> str:
 
 
 def pieces(text) -> set:
-    """The pieces of one line (digit-only pieces are left to the qq check)."""
+    """The pieces of one line."""
     t = norm(text)
     if len(t) < PIECE:
-        out = {t} if len(t) >= 6 else set()
-    else:
-        out = {t[i:i + PIECE] for i in range(len(t) - PIECE + 1)}
-    return {p for p in out if not p.isdigit()}
+        return {t} if len(t) >= 6 else set()
+    return {t[i:i + PIECE] for i in range(len(t) - PIECE + 1)}
+
+
+def number_pieces(numbers) -> set:
+    """The all-digit pieces that are part of these numbers (left to the qq check)."""
+    out = set()
+    for n in numbers:
+        out |= pieces(n)
+    return out
 
 
 def line_pieces(text) -> set:
@@ -155,6 +163,9 @@ def audit(replay_dir, chat) -> dict:
     label = meta["labels"]
     canaries = json.loads((replay_dir / "canaries.json").read_text("utf-8"))
     prompts = [json.loads(line) for line in (replay_dir / "prompts.jsonl").read_text("utf-8").splitlines() if line]
+    for pr in prompts:  # the model sees what AstrBot sends of the message too
+        if pr.get("asked"):
+            pr["text"] = "%s\n%s" % (pr["text"], pr["asked"])
     log = load_log(chat)
     rows = [r for r in log if not r["sent"]]
     hers = [r for r in log if r["sent"]]  # her words: they belong to where she said them
@@ -191,13 +202,15 @@ def audit(replay_dir, chat) -> dict:
     for r in hers:
         for p in line_pieces(r["message_content"]):
             piece_places[p].add(r["place"])
-    gone_pieces -= kept_pieces  # only what nobody else also said
-    private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
-                    if len(pl) == 1 and next(iter(pl)).startswith("private:")}
     # the old account itself, every group, the registry's people and messages count too
     known_qq |= {str(r.get("self_id") or "") for r in log} | {str(r.get("group_id") or "") for r in log}
     known_qq |= gone_people | gone_ids
     known_qq = {q for q in known_qq if len(q) >= 5 and q.isdigit()}
+    # digits of a known number are the qq check's; any other digits count like words
+    numbers_only = number_pieces(known_qq)
+    gone_pieces -= kept_pieces | numbers_only  # only what nobody else also said
+    private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
+                    if len(pl) == 1 and next(iter(pl)).startswith("private:") and p not in numbers_only}
     # a person's number is off limits only while he still may not be kept (a forget row read as a
     # cutoff lets what he says later back in, number and all)
     still_gone = {q for q in gone_people if reg.why_not(qq=q, at=float("inf"))}

@@ -142,7 +142,35 @@ class Replay(unittest.TestCase):
                                                      'utf-8')
             checks = audit_replay.audit(bad, self.chat)['checks']
             self.assertEqual(checks['forgotten']['examples'], [{'file': 'whole.json'}])
-        self.assertEqual(audit_replay.pieces('12345678ab'), {'2345678a', '345678ab'})   # digits: the qq check's
+
+    def test_digits_count_unless_part_of_a_known_number(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            # a phone number said only in a private chat, then in a group's prompt
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            from contextlib import closing
+            with closing(sqlite3.connect(str(chat))) as db:
+                db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
+                           "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
+                           "processed, created_at) VALUES (9999, '9999', ?, ?, NULL, 'private', 'friend', 'message', "
+                           "'13812345678', '13812345678', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                           (fake.BOT, fake.MANGO, int(fake.T0 + 100)))
+                db.commit()
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得有人的号码是13812345678')])
+            self.assertFalse(audit_replay.audit(bad, chat)['checks']['private']['pass'])
+        # digits of a known number stay the qq check's
+        self.assertEqual(audit_replay.number_pieces(['9876543210']), {'98765432', '87654321', '76543210'})
+
+    def test_what_astrbot_sends_the_model_is_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / 'bad'
+            shutil.copytree(self.out, bad)
+            with open(bad / 'prompts.jsonl', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9000, 'place': 'group:' + fake.G_BUSY,
+                                    'who': fake.MANGO, 'text': '你是小爱。',
+                                    'asked': ' @柠檬(%s) 一起玩' % fake.LEMON}, ensure_ascii=False) + '\n')
+            self.assertEqual(audit_replay.audit(bad, self.chat)['checks']['qq']['fails'], 1)
 
     def test_refuses_a_live_folder_and_says_what_it_cannot_see(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -190,6 +218,20 @@ class AstrBotMessage(unittest.TestCase):
         self.assertEqual(parts[3].name, '桃子')                 # the name he writes under
         text, _ = replay.astrbot_message('[CQ:at,qq=20002][CQ:at,qq=20002] 哈哈', '20002', {}, comps)
         self.assertEqual(text, ' @(20002) 哈哈')                 # a second @ of her in the same run stays
+        # group cards with a space and with brackets (of people who never wrote: the name in the @)
+        text, _ = replay.astrbot_message('明天叫上 [CQ:at,qq=10077,name=Tom Lee] 和 [CQ:at,qq=10078,name=小明（学生）] 一起',
+                                         '20002', {}, comps)
+        self.assertEqual(text, '明天叫上 @Tom Lee(10077) 和 @小明（学生）(10078) 一起')
+
+    def test_a_quote_as_astrbot_makes_it(self):
+        from tools import replay
+        sys.path.insert(0, str(HERE / 'stubs'))
+        import astrbot.api.message_components as comps
+        hers = {'message_id': '81', 'sent': True, 'user_id': '', 'name': '小爱', 'ts': 5.0,
+                'raw_message': '好呀', 'message_content': '好呀'}
+        reply = replay.astrbot_reply(hers, '20002', {}, comps)
+        self.assertEqual((reply.id, reply.sender_id, reply.message_str), ('81', '20002', '好呀'))  # quoting her wakes her
+        self.assertEqual([type(p).__name__ for p in reply.chain], ['Plain'])
 
 
 class EmbedStub:
