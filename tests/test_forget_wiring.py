@@ -94,6 +94,40 @@ class OwnerDeletes(unittest.TestCase):
         self.assertEqual(r['vector_ids'], [])                      # their vectors went with them
 
 
+class Review(unittest.TestCase):
+    """PR #9 review: a registry that cannot be read never empties the library; deleting a person
+    does not touch someone else who merely has an everyday name or a number inside a timestamp;
+    the old rollback / restore endpoints are gone; a registered person's picture is not described."""
+
+    def test_unreadable_registry_writes_nothing_and_drops_nothing(self):
+        r = run_case('registry_broken')
+        self.assertEqual(r['after'], r['before'])                   # nothing lost, nothing new
+        self.assertEqual(r['vectors'][1], r['vectors'][0])
+        self.assertEqual(r['notebook'], ['今天群里很热闹'])
+        self.assertFalse(r['phone_food'])
+
+    def test_deleting_someone_leaves_unrelated_records_alone(self):
+        r = run_case('mention')
+        self.assertTrue(r['untouched'])
+        self.assertEqual(r['user_10002'].get('destination_map'), {})   # this one did draw from him
+        self.assertEqual(r['user_10002']['state'], {'trust': 0.5})
+
+    def test_old_rollback_and_restore_are_gone(self):
+        r = run_case('old_endpoints')
+        self.assertEqual((r['routes'], r['methods']), ([], []))
+        self.assertTrue(r['backup_restore_kept'])      # the owner's whole-folder restore stays
+
+    def test_no_picture_description_for_someone_registered(self):
+        r = run_case('picture')
+        self.assertFalse(r['blocked'])
+        self.assertEqual(r['allowed'], ['k-10002'])
+
+    def test_migration_does_not_reread_the_library_for_every_id(self):
+        r = run_case('migrate_many')
+        self.assertEqual(r['ids'], [30, 30, True])
+        self.assertLessEqual(r['reads_at_start'], 5)
+
+
 class NoChatCommands(unittest.TestCase):
     def test_saying_it_changes_nothing(self):
         r = run_case('chat_commands')

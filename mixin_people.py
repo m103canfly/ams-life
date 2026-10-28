@@ -78,6 +78,15 @@ class PeopleMixin:
 
     def _save_self_model(self) -> None:
         try:
+            # ams-life: nothing the forget registry rules out stays in her notes; when the
+            # registry cannot be read, nothing is written this time (nothing is dropped)
+            try:
+                _kept = {_key: [x for x in self.self_model[_key] if self._origin_kept(x)]
+                         for _key in ("notebook", "narrative_items", "diary", "relationship_narratives")
+                         if isinstance(self.self_model.get(_key), list)}
+            except forget_registry.Unreadable as exc:
+                logger.warning("[ams-life] forget registry unreadable, self model not written: %s", exc)
+                return
             SELF_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
             self.self_model["version"] = int(self.self_model.get("version", 0) or 0) + 1
             _h = list(self.self_model.get("_history") or [])[-20:]
@@ -85,10 +94,7 @@ class PeopleMixin:
                        "who_am_i": self.self_model.get("who_am_i", ""),
                        "notebook": len(self.self_model.get("notebook") or [])})
             self.self_model["_history"] = _h[-20:]
-            # ams-life: nothing the forget registry rules out stays in her notes
-            for _key in ("notebook", "narrative_items", "diary", "relationship_narratives"):
-                if isinstance(self.self_model.get(_key), list):
-                    self.self_model[_key] = [x for x in self.self_model[_key] if self._origin_kept(x)]
+            self.self_model.update(_kept)
             SELF_MODEL_PATH.write_text(json.dumps(self.self_model, ensure_ascii=False, indent=1), encoding="utf-8")
         except Exception:
             pass

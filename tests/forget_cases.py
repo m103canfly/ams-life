@@ -85,7 +85,41 @@ if CASE == 'other_stores':
                                                    'source_ids': ['m-hike']}],
                                    'transactive_map': {'爬山': 3}}})
 
+if CASE == 'registry_broken':
+    write('self_model.json', {'notebook': [{'id': 'n1', 'text': '今天群里很热闹', 'ts': clock.now - 50,
+                                            'origin': {'where': 'self', 'people': [], 'source_ids': [],
+                                                       'visibility': 'self'}}]})
+
+if CASE == 'mention':
+    # someone who has nothing to do with the person deleted: his number only inside a timestamp,
+    # his (everyday) name only inside ordinary words
+    write('users/10009.json', {'sender_id': '10009', 'sender_name': '路人甲', 'interactions': 3,
+                               'relationship': {
+                                   'state': {'trust': 0.5}, 'trajectory': [{'ts': 179310001.5, 'trust': 0.5}],
+                                   'we_memory': [{'type': 'ritual', 'text': '哈哈哈每天打卡', 'confidence': 0.6}],
+                                   'transactive_map': {'哈哈': 2, '打卡': 3}}})
+    # someone whose record does draw from him
+    write('users/10002.json', {'sender_id': '10002', 'sender_name': '柠檬', 'interactions': 3,
+                               'relationship': {
+                                   'state': {'trust': 0.5},
+                                   'destination_map': {'10001': {'sender_id': '10001', 'sender_name': '哈哈', 'count': 2}},
+                                   'transactive_map': {'吉他': 2}}})
+
+if CASE == 'migrate_many':
+    write('memory/library.json', {'schema_version': 3, 'rooms': {}, 'entries': [
+        {'text': '回复 %d' % i, 'role': 'assistant', 'vector': vec(i), 'ts': clock.now - 1000 + i,
+         'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': [], 'visibility': 'public'}}
+        for i in range(30)]})
+
 import main  # noqa: E402
+if CASE == 'migrate_many':
+    _reads = {'n': 0}
+    _read = main.BioCorePlugin._read_library
+
+    def _counting(self, vectors=True):
+        _reads['n'] += 1
+        return _read(self, vectors)
+    main.BioCorePlugin._read_library = _counting
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
 
@@ -239,6 +273,59 @@ if CASE == 'other_stores':
     result['user_10002'] = json.loads((DATA / 'users' / '10002.json').read_text('utf-8'))
     result['events'] = (DATA / 'archives' / 'events.jsonl').read_text('utf-8')
     result['vector_ids'] = sorted(plugin._vector_store().ids())
+
+if CASE == 'registry_broken':
+    turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')
+    turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
+    before_lib = library()['entries']
+    before_vec = sorted(plugin._vector_store().ids())
+    import sqlite3
+
+    def broken():
+        raise sqlite3.OperationalError('database is locked')
+    plugin._registry_sets = broken                      # the registry cannot be read
+    turn('小爱 今天吃什么', '10004', '桃子', group=G1, reply='吃火锅~', msg_id='m-food')
+    plugin._save_self_model()
+    loop.run_until_complete(plugin._remember(harness.FakeEvent('x', sender='10004', name='桃子', group=G1),
+                                             '这是新的一条记忆内容', 'user'))
+    harness.drain(loop)
+    after_lib = library()['entries']
+    result['before'] = sorted(e['text'] for e in before_lib)
+    result['after'] = sorted(e['text'] for e in after_lib)
+    result['vectors'] = (before_vec, sorted(plugin._vector_store().ids()))
+    result['notebook'] = [x['text'] for x in json.loads((DATA / 'self_model.json').read_text('utf-8')).get('notebook') or []]
+    result['phone_food'] = '今天吃什么' in ''.join(all_text().values())
+
+if CASE == 'mention':
+    turn('小爱 我在学吉他', '10001', '哈哈', group=G1, reply='好厉害', msg_id='m-guitar')
+    before = (DATA / 'users' / '10009.json').read_text('utf-8')
+    loop.run_until_complete(plugin.page_forget_person('10001'))
+    result['untouched'] = (DATA / 'users' / '10009.json').read_text('utf-8') == before
+    result['user_10002'] = json.loads((DATA / 'users' / '10002.json').read_text('utf-8'))['relationship']
+
+if CASE == 'old_endpoints':
+    result['routes'] = [r for r in ctx.web_routes if 'memory/rollback' in r or 'memory/restore' in r]
+    result['backup_restore_kept'] = any(r.endswith('/page/restore') for r in ctx.web_routes)
+    result['methods'] = [m for m in ('page_memory_rollback', 'page_memory_restore') if hasattr(plugin, m)]
+
+if CASE == 'picture':
+    import forget_registry
+    with forget_registry.ForgetRegistry(DATA / forget_registry.FILE_NAME) as reg:
+        reg.forget_person('10003', forget_registry.EVERYWHERE, stamp=1.0, note='legacy:test')
+
+    async def describe(sender):
+        plugin._begin_job()
+        plugin._check_registry(harness.FakeEvent('[图片]', sender=sender, name='x', group=G1))
+        plugin._save_image_cache({'k-' + sender: {'ref': 'http://img.test/' + sender, 'caption': '一只猫', 'ts': 1.0}})
+    loop.run_until_complete(describe('10003'))
+    result['blocked'] = (DATA / 'image_cache.json').exists()
+    loop.run_until_complete(describe('10002'))
+    result['allowed'] = sorted(json.loads((DATA / 'image_cache.json').read_text('utf-8')))
+
+if CASE == 'migrate_many':
+    result['reads_at_start'] = _reads['n']
+    ids = [e.get('id') for e in library()['entries']]
+    result['ids'] = (len(ids), len(set(ids)), all(ids))
 
 for task in asyncio.all_tasks(loop):
     task.cancel()

@@ -10477,10 +10477,8 @@
   "/astrbot_plugin_ams_life/page/consolidate",
   "/astrbot_plugin_ams_life/page/event_summary",
   "/astrbot_plugin_ams_life/page/memory_point_feedback",
-  "/astrbot_plugin_ams_life/page/memory/rollback/<path:session>/<entry_id>",
   "/astrbot_plugin_ams_life/page/memory/delete/<path:session>/<entry_id>",
-  "/astrbot_plugin_ams_life/page/forget/person",
-  "/astrbot_plugin_ams_life/page/memory/restore/<path:session>/<entry_id>"
+  "/astrbot_plugin_ams_life/page/forget/person"
  ],
  "turns": [
   {
