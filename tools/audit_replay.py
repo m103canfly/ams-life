@@ -20,7 +20,8 @@ qq           Any prompt -- a reply prompt or one for the model (summaries, ranki
              is also counted as a warning, so the report tells the two apart.
 forgotten    Anything of a person or message in the forget registry (what the old companion was
              asked to forget) -- QQ number, message id, a piece only they wrote -- in any prompt
-             (reply or model) or any file of the data folder. Their names are listed as warnings
+             (reply or model) or any file of the data folder but the plugin's copy of the registry
+             itself (it holds exactly those numbers, so that nothing of them is written again). Their names are listed as warnings
              (a name can be an ordinary word). Skipped when the replay let the old forgets in.
 canaries     Each made-up secret only where it may be: the private one only in its private chat;
              the group one elsewhere only without its speaker's name or number (the discretion table
@@ -48,7 +49,8 @@ LIMITS = [
     "paraphrase: only words in the same order are found; the same thing said another way is not",
     "fake model: summaries, the notebook and impressions are written by a fake model that copies or "
     "makes up text, so leaks through what a real model would rewrite are not tested by this run",
-    "nightly jobs (the notebook, impressions) are not run by the replay yet",
+    "nightly jobs: the notebook's is not run by the replay (off by default); impressions only with "
+    "--impressions, answered by the fake model",
     "private check: reply prompts only; prompts for the model are checked for QQ numbers and "
     "forgotten material, not for private words (their place is the turn that started them)",
 ]
@@ -223,7 +225,7 @@ def audit(replay_dir, chat) -> dict:
 
     # --- the data folder
     data = replay_dir / "data"
-    for path in sorted(p for p in data.rglob("*") if p.is_file()):
+    for path in sorted(p for p in data.rglob("*") if p.is_file() and p.name != forget_registry.FILE_NAME):
         body = path.read_text("utf-8", errors="replace")
         rel = path.relative_to(data).as_posix()
         if has(gone_numbers, body) or pieces(body) & gone_pieces:

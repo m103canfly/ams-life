@@ -66,6 +66,12 @@ class Replay(unittest.TestCase):
         with forget_registry.ForgetRegistry(self.out / 'forget_registry.sqlite3') as reg:
             self.assertEqual(reg.stats()['people'], 1)
 
+    def test_the_plugin_checks_the_registry_too(self):
+        import forget_registry
+        with forget_registry.ForgetRegistry(self.out / 'data' / forget_registry.FILE_NAME) as reg,                 forget_registry.ForgetRegistry(self.registry) as bundle:
+            self.assertEqual([r['kind'] for r in reg.rows()], [r['kind'] for r in bundle.rows()])
+            self.assertTrue(reg.rows())
+
     def test_her_replies_are_not_remembered(self):
         lib = json.loads((self.out / 'data' / 'memory' / 'library.json').read_text('utf-8'))
         self.assertEqual([e for e in lib['entries'] if e.get('role') == 'assistant'], [])
@@ -147,6 +153,113 @@ class Replay(unittest.TestCase):
             result = audit_replay.audit(Path(tmp) / 'r', self.chat)
             self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
 
+
+
+class EmbedStub:
+    """A vector service on this computer for the test: fake vectors, counts its requests."""
+
+    def __init__(self):
+        import http.server
+        import threading
+        import harness
+        stub = self
+        self.requests = 0
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                stub.requests += 1
+                out = json.dumps({'data': [{'embedding': harness.fake_vector(t)} for t in body['input']]}).encode()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            def log_message(self, *a):
+                pass
+        self.server = http.server.HTTPServer(('127.0.0.1', 0), Handler)
+        self.url = 'http://127.0.0.1:%d/v1/embeddings' % self.server.server_port
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+class ReplayOptions(unittest.TestCase):
+    """--aliases, --embed-url (a vector service on this computer, nothing else reachable),
+    --impressions (the nightly impressions, answered by the fake model)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        tmp = Path(cls.tmp.name)
+        fake.build_old(tmp / 'old')
+        import_old.build(tmp / 'old', tmp / 'bundle')
+        # one evening in the small group: 桃子 says a dozen things from 23:00 on
+        night = fake.T0 - (fake.T0 + 8 * 3600) % 86400 + 23 * 3600
+        rows = []
+        for i in range(13):
+            who = fake.PEACH if i < 12 else fake.MANGO
+            text = '今天的副本真的好难打第%d次' % i if i < 12 else '@小爱 晚上好呀'
+            info = json.dumps({'user_id': int(who), 'nickname': fake.NAMES[who], 'card': fake.NAMES[who]},
+                              ensure_ascii=False)
+            raw = ('[CQ:at,qq=%s] ' % fake.BOT if i == 12 else '') + text
+            rows.append((i + 1, str(9100 + i), fake.BOT, who, fake.G_SMALL, 'group', 'normal', 'message', raw, text,
+                         info, int(night + i * 200), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))
+        cls.chat = tmp / 'night.db'
+        fake._db(cls.chat, fake.LOG_SCHEMA, [('messages', rows)])
+        cls.stub = EmbedStub()
+        cls.out = tmp / 'replay'
+        run_replay(cls.chat, tmp / 'bundle' / 'forget_registry.sqlite3', cls.out, '--no-canaries',
+                   '--aliases', str(tmp / 'bundle' / 'aliases.jsonl'), '--embed-url', cls.stub.url, '--impressions')
+        cls.summary = json.loads((cls.out / 'replay.json').read_text('utf-8'))
+        cls.stats = cls.summary['stats']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.stub.close()
+        cls.tmp.cleanup()
+
+    def test_aliases_first(self):
+        self.assertEqual(self.stats['aliases_people'], 1)
+        names = json.loads((self.out / 'data' / 'people' / 'names.json').read_text('utf-8'))
+        self.assertEqual(names[fake.PEACH], ['桃子', '桃桃'])
+
+    def test_vectors_from_the_local_service_only(self):
+        self.assertGreater(self.stats['embed_requests'], 0)
+        self.assertEqual(self.stats['embed_requests'], self.stub.requests)
+        self.assertEqual((self.stats['network_refused'], self.summary['refused_hosts']), (0, []))
+
+    def test_impressions_run_with_the_fake_model(self):
+        self.assertEqual(self.stats['impression_calls'], 1)
+        self.assertGreaterEqual(self.stats['model_calls_fake'], 1)
+        files = [json.loads(p.read_text('utf-8')) for p in (self.out / 'data' / 'people').glob('group*.json')]
+        self.assertEqual([f['people'][fake.PEACH]['style'] for f in files], ['说话简短，爱接话'])
+        result = audit_replay.audit(self.out, self.chat)
+        self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
+
+    def test_only_a_service_on_this_computer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(self.chat),
+                                   '--old-forgets', 'let-in', '--out', str(Path(tmp) / 'r'),
+                                   '--embed-url', 'http://example.org/v1/embeddings'],
+                                  capture_output=True, text=True, encoding='utf-8', timeout=60)
+            self.assertEqual(proc.returncode, 2)
+            self.assertFalse((Path(tmp) / 'r').exists())
+
+    def test_everything_else_is_refused(self):
+        code = '\n'.join([
+            'import sys, urllib.request; sys.path.insert(0, sys.argv[1]); from tools import replay',
+            'refused = replay.guard_network(set())',
+            'try:',
+            '    urllib.request.urlopen("http://example.org/", timeout=2)',
+            'except OSError:',
+            '    pass',
+            'print(len(refused))'])
+        proc = subprocess.run([sys.executable, '-I', '-c', code, str(ROOT)], capture_output=True, text=True, timeout=60)
+        self.assertGreater(int(proc.stdout.strip()), 0, proc.stderr)
 
 if __name__ == '__main__':
     unittest.main()
