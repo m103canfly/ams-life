@@ -1,0 +1,112 @@
+"""The forget registry (step 1, part 3): who and what she must not keep. All numbers are made up."""
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
+import fake_old_data as fake  # noqa: E402
+import forget_registry as fr  # noqa: E402
+
+G1, G2 = 'group:900001', 'group:900002'
+
+
+class Rows(unittest.TestCase):
+    def setUp(self):
+        self.reg = fr.ForgetRegistry()
+
+    def tearDown(self):
+        self.reg.close()
+
+    def test_forget_person_hides_everything_before(self):
+        self.reg.forget_person('10001', G1, stamp=100)
+        self.assertEqual(self.reg.why_not('10001', G1, at=50), 'forgotten')
+        self.assertEqual(self.reg.why_not('10001', G1, at=100), 'forgotten')
+        self.assertTrue(self.reg.may_keep('10001', G2, at=50))       # only in that group
+        self.assertTrue(self.reg.may_keep('10002', G1, at=50))       # only him
+
+    def test_after_forget_me_depends_on_the_reading(self):
+        self.reg.forget_person('10001', G1, stamp=100)
+        self.assertEqual(self.reg.why_not('10001', G1, at=200), 'optout')                  # default: not again
+        self.assertEqual(self.reg.why_not('10001', G1, at=200, forget_me=fr.FORGET_ME_CUTOFF), '')
+
+    def test_optout_and_optin(self):
+        self.reg.opt_out('10001', stamp=100)
+        self.assertTrue(self.reg.may_keep('10001', G1, at=50))
+        self.assertFalse(self.reg.may_keep('10001', G2, at=150))     # everywhere
+        self.reg.opt_in('10001', stamp=300)
+        self.assertTrue(self.reg.may_keep('10001', G1, at=350))
+        self.assertFalse(self.reg.may_keep('10001', G1, at=250))
+
+    def test_optin_does_not_bring_back_what_was_forgotten(self):
+        self.reg.forget_person('10001', fr.EVERYWHERE, stamp=100)
+        self.reg.opt_in('10001', stamp=300)
+        self.assertEqual(self.reg.why_not('10001', G1, at=50), 'forgotten')
+        self.assertEqual(self.reg.why_not('10001', G1, at=200), 'optout')
+        self.assertEqual(self.reg.why_not('10001', G1, at=400), '')
+
+    def test_forget_a_message(self):
+        self.reg.forget_message('m1', G1)
+        self.assertEqual(self.reg.why_not(source_id='m1', place=G1), 'source')
+        self.assertEqual(self.reg.why_not(source_id='m1', place=''), 'source')
+        self.assertEqual(self.reg.why_not(source_id='m1', place=G2), '')
+        self.reg.forget_message('m2')
+        self.assertEqual(self.reg.why_not(source_id='m2', place=G2), 'source')
+
+    def test_everyone_in_a_place(self):
+        self.reg.forget_person('*', G1, stamp=100)
+        self.assertFalse(self.reg.may_keep('10009', G1, at=50))
+        self.assertTrue(self.reg.may_keep('10009', G1, at=150))
+        self.assertTrue(self.reg.may_keep('10009', G2, at=50))
+
+    def test_several_people_and_messages(self):
+        self.reg.forget_message('m1', G1)
+        self.reg.opt_out('10002', stamp=0)
+        self.assertTrue(self.reg.may_keep_all(['10001'], G1, 10, ['m9']))
+        self.assertFalse(self.reg.may_keep_all(['10001'], G1, 10, ['m9', 'm1']))
+        self.assertFalse(self.reg.may_keep_all(['10001', '10002'], G1, 10, []))
+
+    def test_places_are_normalised_and_rows_not_doubled(self):
+        self.assertTrue(self.reg.forget_message('m1', 'default:GroupMessage:900001'))
+        self.assertEqual(self.reg.forget_message('m1', G1), 0)
+        self.assertEqual(self.reg.rows()[0]['place'], G1)
+        self.assertEqual(self.reg.stats()['source'], 1)
+
+    def test_bad_rows(self):
+        with self.assertRaises(ValueError):
+            self.reg.add('nope', qq='1')
+        with self.assertRaises(ValueError):
+            self.reg.add('source')
+        with self.assertRaises(ValueError):
+            self.reg.add('qq')
+
+    def test_on_disk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / fr.FILE_NAME
+            with fr.ForgetRegistry(path) as reg:
+                reg.forget_person('10001', stamp=100)
+            with fr.ForgetRegistry(path) as reg:
+                self.assertEqual(reg.people(), {'10001'})
+                self.assertEqual(reg.last_seq(), 1)
+
+
+class Legacy(unittest.TestCase):
+    def test_old_registries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            snow = fake.build_old(tmp)
+            with fr.ForgetRegistry() as reg:
+                a = fr.import_notebook_tombstones(reg, snow / 'notebook-forget.sqlite3')
+                b = fr.import_ledger_registry(reg, snow / 'ledger' / 'forget-registry.sqlite3')
+                self.assertEqual(a, {'rows': 3, 'added': 3, 'already': 0, 'skipped': 0})
+                # marker row skipped, -5001 already there, 5003 new, entry-only row, cutoff for the same moment already there
+                self.assertEqual(b, {'rows': 5, 'added': 1, 'already': 2, 'skipped': 1, 'entry_rows': 1})
+                self.assertEqual(reg.stats(), {'qq': 1, 'source': 3, 'optout': 0, 'optin': 0, 'people': 1})
+                self.assertEqual(reg.why_not(fake.STAR, 'group:' + fake.G_BUSY, at=fake.T0 + 10), 'forgotten')
+                self.assertEqual(reg.why_not(source_id='5003', place='group:' + fake.G_BUSY), 'source')
+                self.assertTrue(reg.may_keep(fake.LEMON, 'group:' + fake.G_TEST, at=fake.T0 + 200))
+
+
+if __name__ == '__main__':
+    unittest.main()
