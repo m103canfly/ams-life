@@ -26,6 +26,10 @@ except ImportError:
 
 WINDOW_MAX = 1000                   # lines per window, everyone's (AstrBot's group context keeps 1000 too)
 WINDOW_SECONDS = 24 * 3600          # every line stays 24 hours, hers too; older things live in memory
+# A message that does not wake her still moves two numbers of her body, and only these:
+# someone @-ing or quoting her (she was seen) and how lively the chats are. No model, no
+# text, no reply (the owner, step 1-2).
+LISTEN_MOVES_BODY = True
 WINDOW_LINE_CHARS = 80              # her reply lines
 WINDOW_MESSAGE_CHARS = 300          # others' messages
 # What non-text parts of a message become in the window (no files are kept).
@@ -172,6 +176,55 @@ class PhoneMixin:
         return text
 
     # ------------------------------------------------------------------
+    # What the phone tells her body: numbers only, never text
+    # ------------------------------------------------------------------
+    def _heard_times(self, now=None) -> list:
+        """When others' messages came in over the last AMBIENT_WINDOW_SECONDS, every window:
+        times only, in memory. Read from the window files once, then kept as they come."""
+        now = time.time() if now is None else now
+        times = getattr(self, "_heard_ts", None)
+        if times is None:
+            times = []
+            for place in self._window_places():
+                times.extend(float(x.get("ts", 0) or 0) for x in self._read_window(place)["recent"]
+                             if x.get("role") != "assistant")
+            times.sort()
+        times = [t for t in times if now - t <= AMBIENT_WINDOW_SECONDS]
+        self._heard_ts = times
+        return times
+
+    def _ambient_level(self, now=None) -> float:
+        """How lively the chats around her are now (0..1): others' messages in the last
+        AMBIENT_WINDOW_SECONDS over every window, counted by their times only."""
+        return min(1.0, len(self._heard_times(now)) / float(AMBIENT_BUSY_COUNT))
+
+    @staticmethod
+    def _addresses_her(event) -> bool:
+        """Someone @-ed her, quoted her, or called her by name (AstrBot's wake check)."""
+        try:
+            self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+            if self_id:
+                for comp in event.get_messages() or []:
+                    kind = type(comp).__name__
+                    if kind == "At" and str(getattr(comp, "qq", "") or "") == self_id:
+                        return True
+                    if kind == "Reply" and str(getattr(comp, "sender_id", "") or "") == self_id:
+                        return True
+            return bool(getattr(event, "is_at_or_wake_command", False))
+        except Exception:
+            return False
+
+    def _listen_body(self, event) -> None:
+        """A message she only listened to: she was seen if it addresses her, and the chats'
+        liveliness is updated. No text, no model, no reply."""
+        if not LISTEN_MOVES_BODY:
+            return
+        core = self._core(None)
+        if self._addresses_her(event):
+            core.be_seen()
+        core.set_ambient(self._ambient_level())
+
+    # ------------------------------------------------------------------
     # Everyone's messages, and her replies, in their own window
     # ------------------------------------------------------------------
     def _window_add_message(self, event) -> None:
@@ -202,6 +255,9 @@ class PhoneMixin:
         win = self._read_window(here)
         win["recent"].append(line)
         self._write_window(here, win)
+        if getattr(self, "_heard_ts", None) is not None:  # not yet read: the first read finds it
+            self._heard_ts.append(line["ts"])
+        self._note_name(line["sender_id"], line["sender_name"])  # every name he goes by
 
     def _window_add_reply(self, event, text) -> None:
         text = str(text or "").strip()

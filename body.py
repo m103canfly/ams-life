@@ -7,6 +7,29 @@ try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
+import zlib
+
+
+# ams-life: habituation compares what was just heard with what was heard a few minutes
+# ago. It keeps a MinHash fingerprint of the character pairs instead of the words: the
+# words cannot be read back from it, and the share of equal positions estimates the
+# same pair-overlap (Jaccard) that _text_similarity measures on the words.
+_FINGERPRINT_SIZE = 32
+
+
+def _fingerprint(text) -> tuple:
+    text = str(text or "")
+    pairs = {text[i:i + 2] for i in range(max(0, len(text) - 1))}
+    if not pairs:
+        return ()
+    encoded = [x.encode("utf-8") for x in pairs]
+    return tuple(min(zlib.crc32(b"%d|" % k + x) for x in encoded) for k in range(_FINGERPRINT_SIZE))
+
+
+def _fingerprint_similarity(a, b) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    return sum(1 for x, y in zip(a, b) if x == y) / float(len(a))
 
 
 class BioCore:
@@ -27,12 +50,10 @@ class BioCore:
         cold = sum(1 for w in cold_words if self._word_hit(t, w))
         warm = sum(1 for w in warm_words if self._word_hit(t, w))
         if cold:
-            self.trust = _clip(self.trust - 0.055 * cold, 0, 1)
             self.v = _clip(self.v - 0.035 * cold, -1, 1)
             self.stress = _clip(self.stress + 0.035 * cold, 0, 1)
             self.echo_trace = _clip(self.echo_trace - 0.03 * cold, -1, 1)
         if warm:
-            self.trust = _clip(self.trust + 0.012 * warm, 0, 1)
             self.v = _clip(self.v + 0.02 * warm, -1, 1)
             self.stress = _clip(self.stress - 0.01 * warm, 0, 1)
 
@@ -46,7 +67,12 @@ class BioCore:
         self.social = _clip(self.profile.get("baseline_social", self.profile.get("social_baseline", 0.55)), 0, 1)
         self.stress = 0.1
         self.energy = _clip(self.profile.get("energy_baseline", 0.55), 0, 1)
-        self.trust = _clip(self.profile.get("trust", 0.55), 0, 1)
+        # ams-life: an electronic ghost's own urges, numbers only. There is no
+        # global trust: trust lives in each person's relationship record.
+        self.seen_need = 0.3        # wanting to be seen: rises while nobody answers her
+        self.talked = 0.0           # having talked a lot: every reply adds, it fades over hours
+        self.ambient = 0.0          # how lively the chats around her are (message times only)
+        self._partner_trust = None  # trust in the person she is answering, during one observe()
         self._derive()
         self.ticks = 0
         self.labels = {"emotion": "neutral", "intent": "hold", "expression": "normal",
@@ -99,10 +125,8 @@ class BioCore:
         self.refusal_readiness = 0.0
         # B-T09: interpersonal coupling (co-regulation proxy, not "being dragged").
         self.interpersonal = {"other_valence_est": 0.0, "coupling": 0.0, "dampening": 1.0}
-        self._metabolic_energy_offset = 0.0
-        # Circadian / allostatic paper mechanisms (bounded, no prompt).
-        self.circadian_alertness = circadian_alertness(
-            time.localtime(time.time()).tm_hour + time.localtime(time.time()).tm_min / 60.0)
+        # Allostatic paper mechanism (bounded, no prompt). ams-life: no circadian
+        # rhythm; how lively the chats are (self.ambient) takes its place.
         self.allostatic_load = 0.0
         # B-T12: deterministic daily digest base (no narrative text).
         self.daily_digests = []
@@ -139,7 +163,6 @@ class BioCore:
         self.meta_emotion = ""
         self.goal_conflict = []
         self.self_timeline = {"past": [], "present": "", "future": []}
-        self.reflection_tree = {"roots": [], "count": 0}
         self.sec = {}
         self.core_self = ""
         self.narrative_self = ""
@@ -154,38 +177,10 @@ class BioCore:
         self.spiking = {"rate": 0.0, "variance": 0.0, "ei": 0.0}
         self._rng = __import__("random").Random()
 
-    def set_relationship_context(self, relationship=None) -> None:
-        """Attach the last per-user relationship record for the slow C6 loop.
-
-        The plugin refreshes this hook after persisting the user doc each turn;
-        only conflict/closeness are consumed by homeostasis._drives.
-        """
-        self.relationship_context = relationship if isinstance(relationship, dict) else None
-
-    def seed_trust_from_user(self, user_trust, weight=0.2, max_delta=0.05) -> float:
-        """G3: one-shot bounded trust seed from the user-level record.
-
-        The caller decides *when* (cold start / context rebuild); this method
-        only applies the bounded EMA step and marks the core as seeded. Trust
-        stays in [0,1] and a single step moves it by at most max_delta.
-        """
-        try:
-            target = _clip(float(user_trust), 0.0, 1.0)
-            current = _clip(float(self.trust), 0.0, 1.0)
-            delta = float(weight) * (target - current)
-            limit = abs(float(max_delta))
-            delta = max(-limit, min(limit, delta))
-            self.trust = _clip(current + delta, 0.0, 1.0)
-            self._user_trust_seeded = True
-            self._user_trust_seed_delta = round(delta, 4)
-            return round(float(self.trust), 4)
-        except Exception:
-            return float(getattr(self, "trust", 0.5))
-
     def load_state(self, d: dict) -> None:
         if not isinstance(d, dict):
             return
-        for key in ("v", "a", "d", "stress", "energy", "trust", "social"):
+        for key in ("v", "a", "d", "stress", "energy", "social"):
             if key in d:
                 try:
                     lo = -1 if key in ("v", "d") else 0
@@ -251,7 +246,7 @@ class BioCore:
         # ams-life: the body keeps no text. Older state files may still carry
         # what was said (stimulus text, reply text); it is left behind here.
         if isinstance(d.get("stimuli"), list):
-            self.stimuli = [{k: v for k, v in x.items() if k != "text"}
+            self.stimuli = [{k: v for k, v in x.items() if k not in ("text", "fp")}
                             for x in d["stimuli"] if isinstance(x, dict)][-40:]
         if isinstance(d.get("history"), list):
             self.history = [{k: v for k, v in x.items() if k != "text"}
@@ -264,7 +259,7 @@ class BioCore:
             self.attention = _clip(d.get("attention", 0.5), 0, 1)
         except Exception:
             self.attention = 0.5
-        for _key in ("circadian_alertness", "allostatic_load"):
+        for _key in ("allostatic_load",):
             if _key in d:
                 try:
                     setattr(self, _key, _clip(d[_key], 0, 1))
@@ -275,7 +270,8 @@ class BioCore:
         except Exception:
             self.homeostasis = homeostasis.default_state()
         # BUG-01: restore the remaining bounded biological fields.
-        for _key in ("novelty_need", "boredom", "boundary_pressure", "refusal_readiness"):
+        for _key in ("novelty_need", "boredom", "boundary_pressure", "refusal_readiness",
+                     "seen_need", "talked", "ambient"):
             if _key in d:
                 try:
                     setattr(self, _key, _clip(d[_key], 0.0, 1.0))
@@ -321,10 +317,6 @@ class BioCore:
                 continue
             _g.setdefault("priority", 0.5)
             _g.setdefault("last_update", 0.0)
-        if isinstance(d.get("reflection_tree"), dict):
-            self.reflection_tree = d["reflection_tree"]
-        elif isinstance(d.get("reflection_tree"), list):
-            self.reflection_tree = {"roots": [x for x in d["reflection_tree"] if isinstance(x, dict)][-10:], "count": len(d["reflection_tree"])}
         if isinstance(d.get("sec"), dict):
             self.sec = dict(d["sec"])
         self.last_tick = __import__("time").time()
@@ -362,12 +354,47 @@ class BioCore:
         d = float(getattr(self, "d", 0.55))
         soc = float(getattr(self, "social", 0.55))
         self.stress = _clip(0.45 * max(0.0, -v) * a + 0.35 * (1.0 - d) + 0.20 * (1.0 - soc), 0, 1)
-        _offset = 0.0
-        try:
-            _offset = _clip(float(getattr(self, "_metabolic_energy_offset", 0.0)), 0.0, 0.20)
-        except Exception:
-            _offset = 0.0
-        self.energy = _clip(0.45 * a + 0.25 * max(0.0, v) + 0.20 * d + 0.10 * soc - _offset, 0, 1)
+        self.energy = _clip(0.45 * a + 0.25 * max(0.0, v) + 0.20 * d + 0.10 * soc, 0, 1)
+
+    def _trust(self) -> float:
+        """ams-life: no global trust. The trust in the person she is answering, while
+        one observe() runs (it is passed in, never kept), else neutral."""
+        t = getattr(self, "_partner_trust", None)
+        return 0.5 if t is None else float(t)
+
+    def _lexicon_deltas(self, t: str):
+        """Mood deltas from the emotion word lists (negation-aware), and the labels hit."""
+        v_delta, a_delta, d_delta, social_delta = 0.0, 0.0, 0.0, 0.0
+        _hits = []
+        for label, words in LEX.items():
+            if not any(self._word_hit(t, w) for w in words):
+                continue
+            _hits.append(label)
+            if label == "joy":
+                v_delta += 0.12
+                a_delta += 0.05
+                d_delta += 0.04
+                social_delta += 0.03
+            elif label == "sadness":
+                v_delta -= 0.14
+                a_delta -= 0.03
+                d_delta -= 0.05
+            elif label == "loneliness":
+                v_delta -= 0.12
+                a_delta -= 0.03
+                d_delta -= 0.04
+                social_delta -= 0.16
+            elif label == "anger":
+                v_delta -= 0.12
+                a_delta += 0.15
+                d_delta += 0.10
+                social_delta -= 0.05
+            elif label == "fear":
+                v_delta -= 0.16
+                a_delta += 0.14
+                d_delta -= 0.12
+                social_delta -= 0.03
+        return v_delta, a_delta, d_delta, social_delta, _hits
 
     def _intensity(self) -> float:
         """Normalized current emotional intensity (0..1)."""
@@ -594,7 +621,7 @@ class BioCore:
 
     def _update_meta_emotion(self) -> None:
         e = str((self.labels or {}).get("emotion") or "neutral")
-        t = float(self.trust)
+        t = self._trust()
         soc = float(self.social)
         if e == "sadness" and t < 0.55:
             self.meta_emotion = "对难过的羞耻"
@@ -607,52 +634,37 @@ class BioCore:
         else:
             self.meta_emotion = ""
 
-    def observe(self, text: str, embedding=None) -> None:
+    def observe(self, text: str, embedding=None, relationship=None) -> None:
+        """A message that woke her. ams-life: `relationship` is the record of the person
+        she is answering; its trust is used during this call and not kept."""
+        try:
+            state = (relationship or {}).get("state") if isinstance(relationship, dict) else None
+            self._partner_trust = _clip(float((state or {}).get("trust", 0.5) or 0.5), 0, 1)
+        except Exception:
+            self._partner_trust = None
+        try:
+            self._observe(text, embedding, relationship)
+        finally:
+            self._partner_trust = None
+
+    def _observe(self, text: str, embedding=None, relationship=None) -> None:
         self._decay_to_now()
         self._query_embedding = embedding
         _pre_stress = float(self.stress)
         t = str(text or "")
         self._update_goals(t)
         _event_key = ""
-        v_delta, a_delta, d_delta, social_delta = 0.0, 0.0, 0.0, 0.0
-        _hits = []
-        for label, words in LEX.items():
-            if not any(self._word_hit(t, w) for w in words):
-                continue
-            _hits.append(label)
-            if label == "joy":
-                v_delta += 0.12
-                a_delta += 0.05
-                d_delta += 0.04
-                social_delta += 0.03
-            elif label == "sadness":
-                v_delta -= 0.14
-                a_delta -= 0.03
-                d_delta -= 0.05
-            elif label == "loneliness":
-                v_delta -= 0.12
-                a_delta -= 0.03
-                d_delta -= 0.04
-                social_delta -= 0.16
-            elif label == "anger":
-                v_delta -= 0.12
-                a_delta += 0.15
-                d_delta += 0.10
-                social_delta -= 0.05
-            elif label == "fear":
-                v_delta -= 0.16
-                a_delta += 0.14
-                d_delta -= 0.12
-                social_delta -= 0.03
+        v_delta, a_delta, d_delta, social_delta, _hits = self._lexicon_deltas(t)
         # Short-term habituation: repeated equivalent emotional stimuli decay.
         _now = time.time()
         # B-T06: generic novelty history (also covers non-emotional repeated text).
         try:
-            _novelty_text = re.sub(r"\s+", "", t)[:160]
+            # ams-life: a fingerprint of what was said, never the words (see _fingerprint)
+            _novelty_text = _fingerprint(re.sub(r"\s+", "", t)[:160])
             if _novelty_text:
                 _hist = getattr(self, "_novelty_history", [])
                 _seen_before = any(
-                    self._text_similarity(_novelty_text, str(x)) >= 0.65
+                    _fingerprint_similarity(_novelty_text, x) >= 0.65
                     for x in _hist[-12:])
                 if _seen_before:
                     self.boredom = _clip(self.boredom + 0.06 * (1.0 - self.boredom), 0.0, 1.0)
@@ -677,7 +689,7 @@ class BioCore:
                         if _now - float(x.get("ts", 0) or 0) <= float(getattr(self, "stimulus_decay_seconds", 300))]
         if _hits:
             _labels = tuple(sorted(set(_hits)))
-            _norm = re.sub(r"\s+", "", t)[:120]
+            _norm = _fingerprint(re.sub(r"\s+", "", t)[:120])
             _item = None
             for _cand in self.stimuli:
                 if _event_key:
@@ -687,7 +699,7 @@ class BioCore:
                     break
                 if tuple(_cand.get("labels") or ()) != _labels:
                     continue
-                if self._text_similarity(_norm, str(_cand.get("text", ""))) >= 0.55:
+                if _fingerprint_similarity(_norm, _cand.get("fp")) >= 0.55:
                     _item = _cand
                     break
             if _item:
@@ -714,12 +726,12 @@ class BioCore:
                 if v_delta <= SENSITIZATION_STRONG_NEG_DV:
                     _rep = 0.0
                     for _old in _prior_sens:
-                        if self._text_similarity(_norm, str(_old.get("text", ""))) < 0.55:
+                        if _fingerprint_similarity(_norm, _old.get("fp")) < 0.55:
                             continue
                         _age_h = max(0.0, _now - float(_old.get("ts", 0) or 0)) / 3600.0
                         _rep += 0.5 ** (_age_h / SENSITIZATION_HALF_LIFE_HOURS)
                     _sens = min(SENSITIZATION_MAX, 1.0 + SENSITIZATION_STEP * _rep)
-                    _prior_sens.append({"text": _norm, "ts": _now})
+                    _prior_sens.append({"fp": _norm, "ts": _now})
                 self._sensitization_history = _prior_sens[-SENSITIZATION_HISTORY_MAX:]
             except Exception:
                 _sens = 1.0
@@ -727,7 +739,7 @@ class BioCore:
                 _item["n"] = _count + 1
                 _item["ts"] = _now
             else:
-                self.stimuli.append({"labels": _labels, "text": _norm, "n": 1, "ts": _now, "event_key": _event_key})
+                self.stimuli.append({"labels": _labels, "fp": _norm, "n": 1, "ts": _now, "event_key": _event_key})
             v_delta *= _hab * _sens
             a_delta *= _hab * _sens
             d_delta *= _hab * _sens
@@ -849,17 +861,17 @@ class BioCore:
             self.noise["stress"] = _clip(0.8 * self.noise["stress"] + 0.2 * (self.stress - 0.2), -0.3, 0.3)
         self.echo_trace = _clip(0.88 * self.echo_trace + 0.12 * (self.v - self.stress * 0.5), -1, 1)
         self.echo = _clip(0.7 * self.echo + 0.3 * self.echo_trace, -1, 1)
-        upper = _clip(0.6 * max(0.0, self.v) + 0.2 * self.trust, 0, 1)
+        upper = _clip(0.6 * max(0.0, self.v) + 0.2 * self._trust(), 0, 1)
         lower = _clip(0.6 * max(0.0, -self.v) + 0.3 * self.stress, 0, 1)
         self.ripple = {"upper": round(upper, 3), "lower": round(lower, 3),
                        "overlap": round(min(upper, lower), 3), "energy": round((upper + lower) / 2, 3)}
         self.spiking = {"rate": round(0.02 + self.energy * 0.08, 3),
                         "variance": round(0.01 + self.stress * 0.05, 4),
-                        "ei": round(0.2 + self.trust * 0.3, 3)}
+                        "ei": round(0.2 + self._trust() * 0.3, 3)}
         self.ticks += 1
         self.infer_labels(force=True)
         try:
-            homeostasis.step(self, relationship=getattr(self, "relationship_context", None))
+            homeostasis.step(self, relationship=relationship)
         except Exception:
             pass
         # Task-15: affect tick + homeostasis drive deviation feed L1 noise.
@@ -997,7 +1009,7 @@ class BioCore:
         a = float(getattr(self, "a", 0.5))
         d = float(getattr(self, "d", 0.5))
         soc = float(getattr(self, "social", 0.5))
-        trust = float(getattr(self, "trust", 0.5))
+        trust = self._trust()
         w = {
             "joy": max(0.0, v) * max(0.2, a),
             "trust": trust * max(0.0, 1.0 - abs(v)),
@@ -1089,7 +1101,7 @@ class BioCore:
 
     def _choose_regulation(self) -> str:
         stress = float(getattr(self, "stress", 0.0))
-        trust = float(getattr(self, "trust", 0.5))
+        trust = self._trust()
         soc = float(getattr(self, "social", 0.5))
         arousal = float(getattr(self, "a", 0.5))
         attention = float(getattr(self, "attention", 0.5))
@@ -1232,7 +1244,7 @@ class BioCore:
         soc = float(getattr(self, "social", 0.55))
         stress = float(getattr(self, "stress", 0.0))
         energy = float(getattr(self, "energy", 0.8))
-        trust = float(getattr(self, "trust", 0.5))
+        trust = self._trust()
         inferred = {}
         if soc <= 0.47 and v <= 0.00:
             inferred["emotion"] = "loneliness"
@@ -1283,7 +1295,6 @@ class BioCore:
             "emotion": labels.get("emotion", "neutral"),
             "energy": labels.get("energy", "normal"),
             "stress": labels.get("stress", "calm"),
-            "trust": round(self.trust, 2),
             "intent": labels.get("intent", "hold"),
             "expression": labels.get("expression", "normal"),
             "need": labels.get("need", "talk"),
@@ -1294,77 +1305,11 @@ class BioCore:
             "regulation": self.regulation,
         }
 
-    def apply_affect(self, meta: dict) -> None:
-        if not isinstance(meta, dict):
-            return
-        def delta(key, lo=-0.30, hi=0.30):
-            try:
-                return _clip(meta.get(key, 0.0), lo, hi)
-            except Exception:
-                return 0.0
-        self.v = _clip(self.v + delta("valence_delta"), -1, 1)
-        self.a = _clip(self.a + delta("arousal_delta"), 0, 1)
-        self.d = _clip(self.d + delta("dominance_delta"), -1, 1)
-        self.social = _clip(self.social + delta("social_delta"), 0, 1)
-        # Backward compatibility with old tags that only sent stress/energy.
-        if "dominance_delta" not in meta and "stress_delta" in meta:
-            self.d = _clip(self.d - delta("stress_delta") * 0.5, -1, 1)
-        if "social_delta" not in meta and "stress_delta" in meta:
-            self.social = _clip(self.social - max(0.0, delta("stress_delta")) * 0.4, 0, 1)
-        self.trust = _clip(self.trust + delta("trust_delta"), 0, 1)
-        self.momentum["v"] = _clip(0.75 * float(self.momentum.get("v", 0.0)) + 0.25 * delta("valence_delta"), -1, 1)
-        self.momentum["a"] = _clip(0.75 * float(self.momentum.get("a", 0.0)) + 0.25 * delta("arousal_delta"), -1, 1)
-        self.momentum["d"] = _clip(0.75 * float(self.momentum.get("d", 0.0)) + 0.25 * delta("dominance_delta"), -1, 1)
-        self.momentum["social"] = _clip(0.75 * float(self.momentum.get("social", 0.0)) + 0.25 * delta("social_delta"), -1, 1)
-        self.v = _clip(self.v + 0.12 * self.momentum["v"], -1, 1)
-        self.a = _clip(self.a + 0.12 * self.momentum["a"], 0, 1)
-        self.d = _clip(self.d + 0.12 * self.momentum["d"], -1, 1)
-        self.social = _clip(self.social + 0.12 * self.momentum["social"], 0, 1)
-        for _k in ("novelty", "goal_relevance", "coping", "agency"):
-            if _k + "_delta" in meta:
-                self.appraisal[_k] = _clip(float(self.appraisal.get(_k, 0.0)) + delta(_k + "_delta"), 0, 1)
-        self._derive()
-        allowed = {
-            "emotion": {"joy", "sadness", "anger", "fear", "loneliness", "neutral"},
-            "intent": {"approach", "hold", "withdraw"},
-            "expression": {"open", "normal", "short"},
-            "need": {"share", "space", "vent", "be_heard", "talk"},
-            "energy": {"low", "normal", "high"},
-            "stress": {"calm", "tense", "overloaded"},
-        }
-        for key, values in allowed.items():
-            value = str(meta.get(key) or "").strip()
-            if value in values:
-                self.labels[key] = value
-        self._derive()
-        self.infer_labels(force=False)
-        self.ticks += 1
-        self.noise["valence"] = _clip(0.7 * self.noise["valence"] + 0.3 * delta("valence_delta"), -0.3, 0.3)
-        self.noise["stress"] = _clip(0.8 * self.noise["stress"] + 0.2 * delta("stress_delta"), -0.3, 0.3)
-        self.echo_trace = _clip(0.88 * self.echo_trace + 0.12 * (self.v - self.stress * 0.5), -1, 1)
-        self.echo = _clip(0.7 * self.echo + 0.3 * self.echo_trace, -1, 1)
-        upper = _clip(0.6 * max(0.0, self.v) + 0.2 * self.trust, 0, 1)
-        lower = _clip(0.6 * max(0.0, -self.v) + 0.3 * self.stress, 0, 1)
-        self.ripple = {"upper": round(upper, 3), "lower": round(lower, 3),
-                       "overlap": round(min(upper, lower), 3), "energy": round((upper + lower) / 2, 3)}
-        self.spiking = {"rate": round(0.02 + self.energy * 0.08, 3),
-                        "variance": round(0.01 + self.stress * 0.05, 4),
-                        "ei": round(0.2 + self.trust * 0.3, 3)}
-
-    def feedback(self, reply: str) -> None:
-        r = str(reply or "")
-        warm = 0.008 * sum(1 for w in ("谢谢", "在", "陪", "懂", "一起", "抱") if w in r)
-        self.trust = _clip(self.trust + warm, 0, 1)
-        self.social = _clip(self.social + warm * 0.5, 0, 1)
-        self._derive()
-        self.echo_trace = _clip(0.9 * self.echo_trace + 0.1 * warm, -1, 1)
-
     def _recovery_speed(self) -> float:
         """Batch4 B4: contextual recovery-speed multiplier, bounded [0.8, 1.2].
 
         speed = clamp(0.85 + 0.30*recovery_rate
-                      + 0.05*(2*coping_success - 1)
-                      + 0.05*(circadian_alertness - 0.5), 0.8, 1.2)
+                      + 0.05*(2*coping_success - 1), 0.8, 1.2)
         Applied as HL/speed only to dimensions below baseline (v<0, a>0.40,
         social<0.55), so recovery is faster after rest/support and slower when
         recovery_rate is low. Deterministic, no LLM, no new stored field.
@@ -1385,12 +1330,7 @@ class BioCore:
                 success = _clip(succ / uses, 0.0, 1.0)
         except Exception:
             success = 0.5
-        try:
-            alert = _clip(float(getattr(self, "circadian_alertness", 0.5) or 0.5), 0.0, 1.0)
-        except Exception:
-            alert = 0.5
-        speed = (0.85 + 0.30 * rate + 0.05 * (2.0 * success - 1.0)
-                 + 0.05 * (alert - 0.5))
+        speed = 0.85 + 0.30 * rate + 0.05 * (2.0 * success - 1.0)
         return max(RECOVERY_CONTEXT_MIN, min(RECOVERY_CONTEXT_MAX, speed))
 
     def _decay_to_now(self) -> None:
@@ -1399,9 +1339,9 @@ class BioCore:
             dt_min = max(0.0, (now - float(getattr(self, "last_tick", now))) / 60.0)
         except Exception:
             dt_min = 0.0
-        self.last_tick = now
         if dt_min < 0.5:
-            return
+            return  # ams-life: last_tick stays, so these seconds count at the next decay
+        self.last_tick = now
         def factor(halflife):
             try:
                 hl = max(1.0, float(halflife))
@@ -1413,26 +1353,61 @@ class BioCore:
         # Batch4 B4: contextual recovery speed shortens the half-life only for
         # dimensions that are recovering toward baseline.
         _rec = self._recovery_speed()
+        # ams-life: arousal settles a little higher when the chats around her are
+        # lively and lower when they are quiet (instead of a day-night rhythm)
+        _a_rest = 0.40 + 0.08 * (_clip(getattr(self, "ambient", 0.0), 0, 1) - 0.5)
         _v_rec = _rec if self.v < 0 else 1.0
-        _a_rec = _rec if self.a > 0.40 else 1.0
+        _a_rec = _rec if self.a > _a_rest else 1.0
         _soc_rec = _rec if self.social < 0.55 else 1.0
         self.v = _clip(self.v * factor(self.valence_decay_minutes * _ef / _v_rec), -1, 1)
-        self.a = _clip(0.40 + (self.a - 0.40) * factor(
+        self.a = _clip(_a_rest + (self.a - _a_rest) * factor(
             self.arousal_decay_minutes * max(0.5, _ef) / _a_rec), 0, 1)
         self.d = _clip(0.55 + (self.d - 0.55) * factor(self.valence_decay_minutes * _ef), -1, 1)
         self.social = _clip(0.55 + (self.social - 0.55) * factor(
             self.social_decay_minutes * _ef / _soc_rec), 0, 1)
         self._derive()
         try:
-            self._apply_circadian_effects()
             self._update_allostatic_load()
         except Exception:
             pass
-        try:
-            self._metabolic_energy_offset = _clip(
-                float(getattr(self, "_metabolic_energy_offset", 0.0)) * 0.98, 0.0, 0.20)
-        except Exception:
-            self._metabolic_energy_offset = 0.0
+        # ams-life: having talked fades (half in TALKED_HALF_LIFE_MIN); wanting to be
+        # seen grows back toward 1 while nobody answers her (half in SEEN_HALF_LIFE_MIN)
+        self.talked = _clip(float(getattr(self, "talked", 0.0)) * factor(TALKED_HALF_LIFE_MIN), 0, 1)
+        self.seen_need = _clip(1.0 - (1.0 - float(getattr(self, "seen_need", 0.3)))
+                               * factor(SEEN_HALF_LIFE_MIN), 0, 1)
+
+    def record_talk(self, text: str = "") -> float:
+        """ams-life: she said something (in any chat): "talked" goes up by its length."""
+        self._decay_to_now()
+        cost = 0.03 + 0.0004 * min(150, len(str(text or "")))
+        self.talked = _clip(float(getattr(self, "talked", 0.0)) + cost, 0, 1)
+        return cost
+
+    def be_seen(self) -> None:
+        """ams-life: someone answered her, called her or quoted her."""
+        self._decay_to_now()
+        self.seen_need = _clip(float(getattr(self, "seen_need", 0.3)) * SEEN_RELIEF, 0, 1)
+
+    def set_ambient(self, value: float) -> None:
+        """ams-life: how lively the chats around her are now (0 quiet .. 1 busy)."""
+        self.ambient = _clip(value, 0, 1)
+
+    def observe_own(self, text: str) -> None:
+        """ams-life: her own reply moves her mood a little (half of hearing the same words),
+        from the same word lists. No model self-report is used."""
+        t = str(text or "")
+        if not t:
+            return
+        self._decay_to_now()
+        v_delta, a_delta, d_delta, social_delta, _hits = self._lexicon_deltas(t)
+        if not _hits:
+            return
+        self.v = _clip(self.v + 0.5 * v_delta, -1, 1)
+        self.a = _clip(self.a + 0.5 * a_delta, 0, 1)
+        self.d = _clip(self.d + 0.5 * d_delta, -1, 1)
+        self.social = _clip(self.social + 0.5 * social_delta, 0, 1)
+        self._derive()
+        self.infer_labels(force=True)
 
     def apply_memory_trace(self, v_delta: float = 0.0, stress_delta: float = 0.0) -> dict:
         """Single BioCore writer for L3 memory-trace nudges (bounded)."""
@@ -1465,21 +1440,6 @@ class BioCore:
                 self.history = self.history[-80:]
         except Exception:
             pass
-
-    def _apply_circadian_effects(self, alert=None, now=None) -> float:
-        """Small attention/energy modulation from local-hour alertness."""
-        try:
-            if alert is None:
-                current = time.localtime(time.time() if now is None else now)
-                alert = circadian_alertness(current.tm_hour + current.tm_min / 60.0)
-            alert = max(0.0, min(1.0, float(alert)))
-            self.circadian_alertness = round(alert, 3)
-            delta = 0.01 * (alert - 0.5)
-            self.energy = _clip(self.energy + delta, 0.0, 1.0)
-            self.attention = _clip(self.attention + delta * 0.5, 0.0, 1.0)
-            return alert
-        except Exception:
-            return 0.5
 
     def _update_allostatic_load(self) -> float:
         """Slow allostatic accumulation/recovery; bounded, tiny stress offset."""
@@ -1543,43 +1503,6 @@ class BioCore:
             return dict(accum)
         except Exception:
             return {}
-
-    def _reflection_tree_view(self) -> dict:
-        """G15: read-only reflection tree with old nodes softly forgotten.
-
-        Nodes carry their creation ts; nodes older than REFLECTION_TREE_TTL_DAYS
-        are hidden from snapshots/dashboard without deleting stored history.
-        """
-        try:
-            tree = self.reflection_tree if isinstance(self.reflection_tree, dict) else {}
-            cutoff = time.time() - REFLECTION_TREE_TTL_DAYS * 86400.0
-
-            def _alive(node):
-                try:
-                    ts = float(node.get("ts", 0) or 0)
-                except Exception:
-                    ts = 0.0
-                return ts <= 0 or ts >= cutoff
-
-            roots = []
-            for node in (tree.get("roots") or [])[:10]:
-                if not isinstance(node, dict) or not _alive(node):
-                    continue
-                item = dict(node)
-                item["children"] = [dict(child) for child in
-                                    (node.get("children") or [])[-10:]
-                                    if isinstance(child, dict) and _alive(child)]
-                roots.append(item)
-            stored_roots = [node for node in (tree.get("roots") or [])
-                            if isinstance(node, dict)]
-            stored_total = sum(
-                1 + len([c for c in (node.get("children") or []) if isinstance(c, dict)])
-                for node in stored_roots)
-            visible_total = sum(1 + len(item.get("children") or []) for item in roots)
-            return {"roots": roots[-10:], "count": int(tree.get("count", 0) or 0),
-                    "hidden_count": max(0, stored_total - visible_total)}
-        except Exception:
-            return {"roots": [], "count": 0, "hidden_count": 0}
 
     def integrate_noise(self, source: str = "", **deltas) -> dict:
         """L1 task-15: decayed addition into the 5-channel noise integrator.
@@ -2217,14 +2140,17 @@ class BioCore:
         out = {"v": round(self.v, 4), "a": round(self.a, 4),
                 "d": round(self.d, 4), "social": round(self.social, 4),
                 "stress": round(self.stress, 4), "energy": round(self.energy, 4),
-                "trust": round(self.trust, 4), "ticks": self.ticks,
+                "seen_need": round(float(getattr(self, "seen_need", 0.3)), 4),
+                "talked": round(float(getattr(self, "talked", 0.0)), 4),
+                "ambient": round(float(getattr(self, "ambient", 0.0)), 4),
+                "ticks": self.ticks,
                 "noise": {k: round(float(v), 3) for k, v in self.noise.items()},
                 "echo": round(self.echo, 4), "echo_trace": round(self.echo_trace, 4),
                 "ripple": dict(self.ripple), "spiking": dict(self.spiking),
                 "reflection": dict(self.reflection),
                 "momentum": dict(self.momentum),
                 "appraisal": dict(self.appraisal),
-                "stimuli": [{k: v for k, v in x.items() if k != "text"}
+                "stimuli": [{k: v for k, v in x.items() if k not in ("text", "fp")}
                             for x in list(self.stimuli)[-8:] if isinstance(x, dict)],
                 "history": list(self.history)[-80:],
                 "open_loops_due": int((getattr(self, "loop_pressure", None) or {}).get("due", 0) or 0),
@@ -2235,14 +2161,10 @@ class BioCore:
                 "attention": round(float(self.attention), 3),
                 "novelty_need": round(float(getattr(self, "novelty_need", 0.5)), 3),
                 "boredom": round(float(getattr(self, "boredom", 0.0)), 3),
-                "circadian_alertness": round(float(getattr(self, "circadian_alertness", 0.5)), 3),
                 "allostatic_load": round(float(getattr(self, "allostatic_load", 0.0)), 3),
                 "homeostasis": dict(getattr(self, "homeostasis", {}) or {}),
                 "boundary_pressure": round(float(getattr(self, "boundary_pressure", 0.0)), 3),
                 "refusal_readiness": round(float(getattr(self, "refusal_readiness", 0.0)), 3),
-                "user_trust_seeded": bool(getattr(self, "_user_trust_seeded", False)),
-                "user_trust_seed_delta": round(
-                    float(getattr(self, "_user_trust_seed_delta", 0.0) or 0.0), 4),
                 "interpersonal": {k: round(float(v), 4) for k, v in (getattr(self, "interpersonal", {}) or {}).items()},
                 "daily_digests": [dict(x) for x in (getattr(self, "daily_digests", []) or [])[-30:]],
                 "meta_emotion": self.meta_emotion,
@@ -2254,7 +2176,6 @@ class BioCore:
                 "goal_conflict": list(self.goal_conflict),
                 "goal_scores": dict(getattr(self, "goal_scores", {}) or {}),
                 "self_timeline": dict(self.self_timeline),
-                "reflection_tree": self._reflection_tree_view(),
                 "spectrum_probs": self._spectrum_probs(),
                 "sec": dict(self.sec),
                 "core_self": self.core_self,

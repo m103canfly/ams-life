@@ -310,7 +310,9 @@ class PagesMixin:
                 register("/astrbot_plugin_ams_life/page/status", self.page_status, ["GET"],
                          "BioCore dashboard status")
                 register("/astrbot_plugin_ams_life/page/self_model", self.page_self_model,
-                         ["GET", "POST"], "BioCore self model editor")
+                         ["GET"], "her self model and notebook (read-only)")
+                register("/astrbot_plugin_ams_life/page/owner_rules", self.page_owner_rules,
+                         ["GET", "POST"], "the owner's rules")
                 register("/astrbot_plugin_ams_life/page/toggle", self.page_toggle, ["POST"],
                          "BioCore dashboard toggle")
                 register("/astrbot_plugin_ams_life/page/api_config", self.page_api_config, ["POST"],
@@ -709,7 +711,6 @@ class PagesMixin:
             "llm_memory_candidates": bool(
                 getattr(self, "llm_memory_candidates", True)),
             "we_memory_enabled": bool(getattr(self, "we_memory_enabled", False)),
-            "bc_prompt_mode": str(getattr(self, "bc_prompt_mode", "telemetry") or "telemetry"),
             "summary_max_chars": int(getattr(self, "summary_max_chars", 0) or 0),
             "llm_only_reply_summary": bool(
                 getattr(self, "llm_only_reply_summary", True)),
@@ -733,7 +734,6 @@ class PagesMixin:
             "last_memory_trace": {**DEFAULT_MEMORY_TRACE,
                                   **dict(getattr(self, "_last_memory_trace", {}) or {})},
             # Paper mechanisms also at top level for dashboard/API consumers.
-            "circadian_alertness": round(float(getattr(cores[0], "circadian_alertness", 0.5)), 3) if cores else 0.5,
             "allostatic_load": round(float(getattr(cores[0], "allostatic_load", 0.0)), 3) if cores else 0.0,
             "homeostasis": dict(getattr(cores[0], "homeostasis", {}) or {}) if cores else {},
             # L-T02/L-T03..L-T12 read-only runtime surface (bounded, no prompt text)
@@ -758,21 +758,28 @@ class PagesMixin:
         }}
 
     async def page_self_model(self):
+        """ams-life step 1-2: read-only. Her heart is only what she writes herself."""
+        from quart import request
+        if request.method != "GET":
+            return {"status": "error", "message": "她的自我描述只由她自己写，面板只能看"}
+        return {"status": "ok", "data": {"self_model": self.self_model}}
+
+    async def page_owner_rules(self):
+        """The owner's rules: kept apart from her self model, shown in every chat's reply."""
         from quart import request
         if request.method == "POST":
             body = await request.get_json(silent=True) or {}
-            for key in ("who_am_i", "boundaries", "consistency", "narrative"):
-                if key not in body:
-                    continue
-                val = body.get(key)
-                if key in ("boundaries", "consistency"):
-                    if isinstance(val, str):
-                        val = [x.strip() for x in val.splitlines() if x.strip()]
-                    self.self_model[key] = [str(x)[:300] for x in (val or [])[:10]]
-                else:
-                    self.self_model[key] = str(val or "")[:1500]
-            self._save_self_model()
-        return {"status": "ok", "data": {"self_model": self.self_model}}
+            raw = body.get("rules")
+            if isinstance(raw, str):
+                raw = raw.splitlines()
+            rules = [str(x).strip()[:OWNER_RULES_CHARS] for x in (raw or []) if str(x or "").strip()]
+            OWNER_RULES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = OWNER_RULES_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"rules": rules[:OWNER_RULES_MAX]}, ensure_ascii=False, indent=1),
+                           encoding="utf-8")
+            os.replace(str(tmp), str(OWNER_RULES_PATH))
+        return {"status": "ok", "data": {"rules": self._owner_rules(),
+                                         "max": OWNER_RULES_MAX, "chars": OWNER_RULES_CHARS}}
 
     async def page_toggle(self):
         from quart import request

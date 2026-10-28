@@ -45,17 +45,18 @@ SCRIPT = [
     (60, dict(text='小爱 你是AI吗', sender='10005', name='路人', group=GROUP_A), '是呀，按爱弥斯的设定在聊~'),
     (172800, dict(text='好久不见小爱', sender='10004', name='桃子', group=GROUP_B), '好久不见！' + TAG_JOY),
     (20, dict(text='我换工作了 现在轻松多了', sender='10004', name='桃子', group=GROUP_B), '太好了！' + TAG_JOY),
-    # strong feelings: should push the core over the archive thresholds
+    # strong feelings: should push the core over the archive thresholds. Her replies
+    # carry words of feeling too (step 1-2: the state tags are cut out and not used)
     (30, dict(text='太开心了！！！我终于抽到了！！！', sender='10002', name='柠檬', group=GROUP_A),
-     '恭喜恭喜！<bc>{"e":"joy","i":0.95}</bc>'),
+     '恭喜恭喜！我也好开心<bc>{"e":"joy","i":0.95}</bc>'),
     (20, dict(text='啊啊啊啊 好激动 小爱快夸我', sender='10002', name='柠檬', group=GROUP_A),
-     '超厉害的！<bc>{"e":"joy","i":0.9,"x":"open"}</bc>'),
+     '超厉害的！好高兴<bc>{"e":"joy","i":0.9,"x":"open"}</bc>'),
     (400, dict(text='小爱 我好难过 想哭', sender='10001', name='芒果'),
-     '我在呢<bc>{"e":"sadness","i":0.9,"n":"be_heard"}</bc>'),
-    (20, dict(text='今天被骂了 真的很委屈', sender='10001', name='芒果'), '抱抱你<bc>{"e":"sadness","i":0.85}</bc>'),
-    (20, dict(text='气死我了！！！他凭什么这样说我', sender='10001', name='芒果'), '太过分了<bc>{"e":"anger","i":0.8}</bc>'),
+     '我在呢，听着也好难过<bc>{"e":"sadness","i":0.9,"n":"be_heard"}</bc>'),
+    (20, dict(text='今天被骂了 真的很委屈', sender='10001', name='芒果'), '抱抱你，好委屈啊<bc>{"e":"sadness","i":0.85}</bc>'),
+    (20, dict(text='气死我了！！！他凭什么这样说我', sender='10001', name='芒果'), '太过分了，我也生气<bc>{"e":"anger","i":0.8}</bc>'),
     (30, dict(text='真的受够了！！！气死了！！！', sender='10001', name='芒果'), '先别气坏自己<bc>{"e":"anger","i":0.9}</bc>'),
-    (620, dict(text='我还是好生气！！！凭什么啊！！！', sender='10001', name='芒果'), '我陪着你<bc>{"e":"anger","i":0.9}</bc>'),
+    (620, dict(text='我还是好生气！！！凭什么啊！！！', sender='10001', name='芒果'), '我陪着你，真让人生气<bc>{"e":"anger","i":0.9}</bc>'),
     (400, dict(text='小爱 我们约好下周一起打副本吧', sender='10003', name='阿星', group=GROUP_A), '好呀，说定了~'),
     (30, dict(text='记得提醒我明天交报告', sender='10003', name='阿星', group=GROUP_A), '记下啦'),
     (3600, dict(text='小爱 报告我交了', sender='10003', name='阿星', group=GROUP_A), '太好了~' + TAG_JOY),
@@ -63,7 +64,7 @@ SCRIPT = [
 
 FULL_CONFIG = {'llm_only_reply_summary': False, 'safety_enabled': True, 'we_memory_enabled': True,
                'proactive_autonomy': True, 'autonomy_loop_enabled': True, 'noise_seed': 7,
-               'bc_prompt_mode': 'semantic', 'memory_worthiness_enabled': False}
+               'memory_worthiness_enabled': False}
 
 
 def files_snapshot(root):
@@ -96,6 +97,7 @@ def main_run():
     for delay, ev, reply in SCRIPT:
         clock.advance(delay)
         event = harness.FakeEvent(**ev)
+        event.is_at_or_wake_command = reply is not None  # the scripted replies are to messages that wake her
         loop.run_until_complete(plugin.on_message(event))  # AstrBot calls it for every message
         harness.drain(loop)
         if reply is None:

@@ -43,12 +43,13 @@ class Identity(unittest.TestCase):
 
 class Interpretation(unittest.TestCase):
     def test_reply_tag_is_stripped(self):
-        clean, meta = interpretation.parse_response('好呀~<bc>{"e":"joy","i":0.6}</bc>')
-        self.assertEqual(clean, '好呀~')
-        self.assertTrue(meta)
+        # no tag is asked for; one the model writes anyway is cut out, parsed or not
+        self.assertEqual(interpretation.strip_state_tags('好呀~<bc>{"e":"joy","i":0.6}</bc>'), '好呀~')
+        self.assertEqual(interpretation.strip_state_tags('好呀~<bc>{坏掉的'), '好呀~')
+        self.assertEqual(interpretation.strip_state_tags('<biocore>{}</biocore>好呀<BC>{}</BC>~'), '好呀~')
 
     def test_no_tag(self):
-        self.assertEqual(interpretation.parse_response('好呀~'), ('好呀~', None))
+        self.assertEqual(interpretation.strip_state_tags('好呀~'), '好呀~')
 
 
 class Split(unittest.TestCase):
@@ -65,7 +66,7 @@ class Split(unittest.TestCase):
         # 210 upstream methods minus __init__, plus 10 for one-her (library, migration, discretion, forgetting)
         # and 18 for her phone (on_message, windows, open loops per window, moving old body texts)
         # and 3 for the forget count (_forget_count, _begin_job, _job_stale)
-        self.assertEqual(len(methods), 245)
+        self.assertEqual(len(methods), 266)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

@@ -3,6 +3,7 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   let bridge = null;
+  let ownerRulesLoaded = false;
   const demo = {
     enabled: true, inject_intent: true, proactive_reply: false, memory_dedup_embedding: false, persona_loaded: true,
     memory: { entries: 42, sessions: 3 },
@@ -13,7 +14,7 @@
         {ts:1793000600, who_am_i:"一个会持续受聊天影响的角色", narrative:"开始愿意承认自己也会担心。"},
         {ts:1793001200, who_am_i:"一个会持续受聊天影响的角色", narrative:"被认真问一句，就能安心很多。"}
       ] },
-    cores: [{ key:"demo:session", snapshot:{ v:.42,a:.66,d:.52,social:.61,stress:.24,energy:.81,trust:.57,ticks:18,
+    cores: [{ key:"demo:session", snapshot:{ v:.42,a:.66,d:.52,social:.61,stress:.24,energy:.81,talked:.20,ticks:18,
       history:[
         {ts:1793000000,emotion:"neutral",intensity:.22},
         {ts:1793000300,emotion:"joy",intensity:.68},
@@ -32,13 +33,10 @@
       spectrum_probs:[{key:"joy",name:"快乐",p:.62},{key:"contentment",name:"满足",p:.23},{key:"amusement",name:"好笑",p:.15}],
       sec:{relevance:.72,implication:.41,coping_potential:.58,normative:.66},
       spectrum_calibration:{samples:18,families:2,calibrated:3},
-      circadian_alertness:.62, allostatic_load:.18, boundary_pressure:.12, refusal_readiness:.08,
+      ambient:.42, seen_need:.35, talked:.20, allostatic_load:.18, boundary_pressure:.12, refusal_readiness:.08,
       homeostasis:{L_int:.14, readiness:.71, tick:42, setpoint_ticks:9,
-        body:{energy:.74,fatigue:.22,hydration:.68,warmth:.63},
-        drives:{energy:.72,social:.66,safety:.58,curiosity:.61},
-        set_points:{energy:.68,social:.60,safety:.60,curiosity:.55},
-        need_pyramid:{score:.19,dominant:"belonging",deficits:{physiological:.10,safety:.12,belonging:.26,esteem:.14,self_actualization:.20}},
-        interoception:{signal:.67,label:"steady",expression_hint:"normal"},
+        drives:{social:.66,curiosity:.61,seen:.35},
+        set_points:{social:.60,curiosity:.55,seen:.40},
         action:{mode:"engage",reason:"ready",strength:.64}},
       goals:[{key:"relationship",name:"和重要的人保持亲近",horizon:"long",progress:.5}], goal_conflict:[], autobiography:[{ts:1793001000,title:"对方的承诺",meaning:"确认自己没有被当成工具"}],
       regulation_stats:{reappraise:{uses:6,success:5,stress_delta:-.14,cost:.018,last_update:1793002000}} },
@@ -286,7 +284,7 @@
       const raw=(r.variants||[]).join(" | ")||r.canonical;
       let state="无在线状态";
       if(core){ const i=core.intent||{},ss=core.snapshot||{};
-        state=esc(L(i.emotion))+" · "+esc(i.compound||"")+" · "+esc(L(i.intent))+" · trust "+Number(ss.trust||0).toFixed(2)+" · "+Number(ss.ticks||0)+"t";
+        state=esc(L(i.emotion))+" · "+esc(i.compound||"")+" · "+esc(L(i.intent))+" · "+Number(ss.ticks||0)+"t";
       } else {
         const bits=[]; if(r.hasMemory) bits.push("记忆"); if(r.hasEvent) bits.push("事件");
         state=esc(bits.length?("无在线状态 · 有"+bits.join("+")):"无在线状态");
@@ -348,6 +346,7 @@
         ]);
         data=raw&&raw.data?raw.data:raw;
         $("linkState").textContent="已连接"; $("topStatus").textContent="已连接";
+        if(!ownerRulesLoaded){ ownerRulesLoaded=true; loadOwnerRules(); }
         $("statusDot").style.background="var(--green)";
       }else{
         if(!themeInitialized) chooseTheme(false);
@@ -664,7 +663,7 @@
   }
 
   const LLM_FUNCTIONS=["persona_compile","event_summary","event_ranking","insight","memory_summary","image_caption",
-  "relationship_impression","repair_hint","empathy_hint","pragmatics_hint","tom_probe","diary","relationship_narrative","humor_hint"];
+  "relationship_impression","repair_hint","empathy_hint","pragmatics_hint","tom_probe","notebook","relationship_narrative","humor_hint"];
   const MEM_SOURCE_LABELS={direct:"用户直述",media:"图片/语音",told:"转述",retrieved:"检索",inferred:"推断",unknown:"未标注"};
   const MEM_TIER_LABELS={hot:"HOT 热",warm:"WARM 温",cold:"COLD 冷"};
   const MEM_REL_FIELDS=[["trust","信任"],["closeness","亲近"],["conflict","冲突"],["repair","修复"],["predictability","可预测"]];
@@ -1331,23 +1330,23 @@
     const body=(s&&s.homeostasis&&typeof s.homeostasis==="object")?s.homeostasis:{};
     const top=(data&&typeof data==="object")?data:{};
     const set=(id,value)=>{const el=$(id); if(el) el.textContent=value;};
-    const circ=(s&&s.circadian_alertness!=null)?s.circadian_alertness:top.circadian_alertness;
+    // ams-life: an electronic ghost's body: no day-night rhythm, need pyramid or
+    // interoception; how lively the chats are, wanting to be seen, wanting to talk.
+    const amb=(s&&s.ambient!=null)?s.ambient:null;
     const allo=(s&&s.allostatic_load!=null)?s.allostatic_load:top.allostatic_load;
-    set("sCircadian",circ==null?"—":Number(circ).toFixed(2));
+    set("sCircadian",amb==null?"—":Number(amb).toFixed(2));
     set("sAllostatic",allo==null?"—":Number(allo).toFixed(2));
     set("sLint",body.L_int==null?"—":Number(body.L_int).toFixed(3));
     set("sReadiness",body.readiness==null?"—":Number(body.readiness).toFixed(2));
-    const pyr=(body.need_pyramid&&typeof body.need_pyramid==="object")?body.need_pyramid:{};
-    set("sNeedDominant",pyr.dominant?_needLabel(pyr.dominant):"—");
-    const intero=(body.interoception&&typeof body.interoception==="object")?body.interoception:{};
-    set("sIntero",intero.label?(_interoLabel(intero.label)+(intero.signal==null?"":" "+Number(intero.signal).toFixed(2))):"—");
+    set("sNeedDominant",s&&s.seen_need!=null?Number(s.seen_need).toFixed(2):"—");
+    set("sIntero",s&&s.social!=null?Number(s.social).toFixed(2):"—");
     set("sBoundary",s&&s.boundary_pressure!=null?Number(s.boundary_pressure).toFixed(2):"—");
     set("sRefusalLevel",s&&s.refusal_readiness!=null?Number(s.refusal_readiness).toFixed(2):"—");
     const note=$("steadyNote");
     if(note){
       const hasBody=Object.keys(body).length>0;
       note.textContent=hasBody
-        ? "只读投影：昼夜警觉与稳态负荷只反映内部状态；边界压力 / 拒绝就绪只是倾向标记，不决定是否回复。"
+        ? "只读投影：这些数只反映她的内部状态；边界压力 / 拒绝就绪只是倾向标记，不决定是否回复。"
         : "只读投影：当前状态文件没有 homeostasis（旧数据或该能力未开启），缺失项显示 —；不会补算，也不写回。";
     }
   }
@@ -1570,7 +1569,7 @@
     $("orbEcho").textContent=fmt(s.echo,3);
     $("orbRipple").textContent=Number(_rp.overlap||0).toFixed(2);
     $("orbSpike").textContent=Number(_sp.rate||0).toFixed(3);
-    setMetric("mStress","bStress",s.stress); setMetric("mEnergy","bEnergy",s.energy); setMetric("mTrust","bTrust",s.trust); setMetric("mArousal","bArousal",s.a);
+    setMetric("mStress","bStress",s.stress); setMetric("mEnergy","bEnergy",s.energy); setMetric("mTrust","bTrust",s.talked); setMetric("mArousal","bArousal",s.a);
     const _dom=Number(s.d==null?0.5:s.d); $("mDominance").textContent=_dom.toFixed(2); $("bDominance").style.width=pct((_dom+1)/2);
     setMetric("mSocial","bSocial",s.social==null?0.5:s.social);
     const noise=s.noise||{};
@@ -1614,7 +1613,7 @@
     if($("iMeta"))$("iMeta").textContent=s.meta_emotion||"-";
     $("personaBars").innerHTML=["O","C","E","A","N"].map(k=>'<div class="p-row"><span>'+k+'</span><div class="p-track"><i style="width:'+pct(p[k])+'"></i></div><b>'+Number(p[k]||0).toFixed(2)+"</b></div>").join("");
     $("personaNote").textContent="stress "+Number(p.stress_reactivity||0).toFixed(2)+" · recovery "+Number(p.recovery_rate||0).toFixed(2)+" · social "+Number(p.social_baseline||0).toFixed(2);
-    if($("selfWho")){const sm=data.self_model||{}; $("selfWho").value=sm.who_am_i||""; $("selfNarrative").value=sm.narrative||""; $("selfBoundaries").value=(sm.boundaries||[]).join("\n"); $("selfConsistency").value=(sm.consistency||[]).join("\n");}
+    if($("selfNotebook")){const sm=data.self_model||{}; const nb=Array.isArray(sm.notebook)?sm.notebook:[]; $("selfNotebook").innerHTML=nb.length?nb.map(x=>'<div class="event-card"><p>'+esc(String(x.text||""))+'</p></div>').join(""):'<p class="api-note">还是空的。</p>';}
     if($("goalList")){const gs=s.goals||[]; const cf=s.goal_conflict||[]; $("goalList").innerHTML=(gs.length?gs.map(g=>'<div><small>'+esc(g.name||"")+'</small><b>'+Number(g.progress||0).toFixed(2)+'</b></div>').join(""):'<div><small>goals</small><b>-</b></div>')+(cf.length?'<div><small>conflict</small><b>'+esc(cf.join(" / "))+'</b></div>':'');}
     if($("autoBioList")){
       const ab=s.autobiography||[];
@@ -1791,12 +1790,21 @@
     try{ ["bio_show_noise","bio_show_echo","bio_show_ripple","bio_show_dominance","bio_show_social","bio_show_links","bio_show_nodes","bio_show_node_links","bio_show_memory_nodes","bio_show_memory_balls_important","bio_show_orb_legend","bio_show_autonomy_panel","bio_show_learning_panel","bio_show_chain_list","bio_show_emotion_rings","bio_intensity"].forEach(k=>localStorage.removeItem(k)); }catch(e){}
     try{ location.reload(); }catch(e){}
   });
-  const selfSave=$("selfSaveBtn");
-  if(selfSave) selfSave.addEventListener("click",async()=>{
-    const st=$("selfSaveState");
+  // ams-life: her self model is read-only; the owner's rules are kept apart from it.
+  const rulesBox=$("ownerRules");
+  function loadOwnerRules(){
+    if(!rulesBox || !bridge) return;
+    bridge.apiGet("page/owner_rules",{}).then(raw=>{
+      const d=(raw&&raw.data)||raw||{}; rulesBox.value=(d.rules||[]).join("\n");
+    }).catch(()=>{});
+  }
+  const rulesSave=$("ownerRulesSaveBtn");
+  if(rulesSave) rulesSave.addEventListener("click",async()=>{
+    const st=$("ownerRulesState");
     if(!bridge){if(st)st.textContent="未连接";return;}
     try{
-      await bridge.apiPost("page/self_model",{who_am_i:$("selfWho").value,narrative:$("selfNarrative").value,boundaries:$("selfBoundaries").value.split("\n"),consistency:$("selfConsistency").value.split("\n")});
+      const raw=await bridge.apiPost("page/owner_rules",{rules:rulesBox.value.split("\n")});
+      const d=(raw&&raw.data)||raw||{}; rulesBox.value=(d.rules||[]).join("\n");
       if(st)st.textContent="已保存";
     }catch(e){if(st)st.textContent="保存失败";}
   });

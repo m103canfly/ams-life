@@ -15,13 +15,17 @@ except ImportError:
 
 class PeopleMixin:
     def _load_self_model(self) -> dict:
+        # ams-life step 1-2: her heart is only what she writes herself. Nothing is
+        # preset; her notebook entries each carry an origin (see _notebook_for).
         d = {
-            "who_am_i": "一个会持续受聊天影响、但不会被单条消息完全定义的角色。",
-            "boundaries": ["不接受被当作没有感受的工具", "不会被一次互动改写全部立场"],
-            "consistency": ["情绪会变，但核心立场不因单次互动翻转"],
+            "who_am_i": "",
+            "boundaries": [],
+            "consistency": [],
             "narrative": "",
-            # ams-life: the narrative again, one line per event, each with its origin
             "narrative_items": [],
+            "notebook": [],
+            "notebook_night": {},       # tonight's sittings tried (a failed try counts) and changes made
+            "heart": 1,
             "version": 0,
             "_history": [],
         }
@@ -29,11 +33,18 @@ class PeopleMixin:
             if SELF_MODEL_PATH.exists():
                 raw = json.loads(SELF_MODEL_PATH.read_text(encoding="utf-8"))
                 if isinstance(raw, dict):
+                    cleared = raw.get("heart") != 1
+                    if cleared:
+                        raw = self._clear_written_for_her(raw)
                     for k in d:
                         if k in raw:
                             d[k] = raw[k]
-        except Exception:
-            pass
+                    d["heart"] = 1
+                    if cleared:
+                        self.self_model = d
+                        self._save_self_model()
+        except Exception as exc:
+            logger.warning("[ams-life] self model load failed: %s", exc)
         try:
             if not SELF_MODEL_PATH.exists():
                 self.self_model = d
@@ -42,6 +53,29 @@ class PeopleMixin:
             pass
         return d
 
+    @staticmethod
+    def _clear_written_for_her(raw: dict) -> dict:
+        """Once (step 1-2): the old file is kept as self_model.before_heart.json; the
+        preset sentences (word for word), the narrative the event summaries wrote, the
+        diary and the edit history are cleared. What anyone else wrote stays."""
+        try:
+            kept = SELF_MODEL_PATH.with_name("self_model.before_heart.json")
+            if not kept.exists():
+                shutil.copy2(str(SELF_MODEL_PATH), str(kept))
+        except Exception as exc:
+            logger.warning("[ams-life] self model archive failed: %s", exc)
+            raise
+        out = dict(raw)
+        if str(out.get("who_am_i") or "") == PRESET_SELF["who_am_i"]:
+            out["who_am_i"] = ""
+        for key in ("boundaries", "consistency"):
+            out[key] = [x for x in (out.get(key) or []) if x not in PRESET_SELF[key]]
+        out["narrative"] = ""
+        out["narrative_items"] = []
+        out["diary"] = []
+        out["_history"] = []
+        return out
+
     def _save_self_model(self) -> None:
         try:
             SELF_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -49,28 +83,9 @@ class PeopleMixin:
             _h = list(self.self_model.get("_history") or [])[-20:]
             _h.append({"ts": __import__("time").time(),
                        "who_am_i": self.self_model.get("who_am_i", ""),
-                       "narrative": self.self_model.get("narrative", "")})
+                       "notebook": len(self.self_model.get("notebook") or [])})
             self.self_model["_history"] = _h[-20:]
             SELF_MODEL_PATH.write_text(json.dumps(self.self_model, ensure_ascii=False, indent=1), encoding="utf-8")
-        except Exception:
-            pass
-
-    def _update_self_narrative(self, title: str, reflection: str, origin=None, names=None) -> None:
-        if self._job_stale():
-            return
-        try:
-            if not (title or reflection):
-                return
-            line = ("%s：%s" % (title, reflection)).strip("： ")
-            old = str(self.self_model.get("narrative") or "").strip()
-            self.self_model["narrative"] = (line + ("；" + old if old else ""))[:600]
-            items = self.self_model.get("narrative_items")
-            items = [x for x in items if isinstance(x, dict)] if isinstance(items, list) else []
-            self.self_model["narrative_items"] = ([{
-                "text": line[:300], "ts": time.time(),
-                "origin": origin if isinstance(origin, dict) else discretion.make_origin(""),
-                "names": [str(x) for x in (names or [])][:24]}] + items)[:20]
-            self._save_self_model()
         except Exception:
             pass
 
@@ -117,6 +132,11 @@ class PeopleMixin:
                     d = {}
             d["sender_id"] = sid
             d["sender_name"] = name or d.get("sender_name", "")
+            # ams-life: every name he has gone by (group cards differ), for anonymizing
+            _names = [str(x) for x in (d.get("names") or []) if str(x or "").strip()]
+            if name and name not in _names:
+                _names.append(name)
+            d["names"] = _names[-20:]
             try:
                 _prev_last_seen = float(d.get("last_seen", 0) or 0)
             except Exception:
@@ -193,10 +213,6 @@ class PeopleMixin:
                                  if isinstance(_prev_rel.get("annotations"), list) else None),
                 )
                 if core is not None:
-                    try:
-                        core.set_relationship_context(d.get("relationship"))
-                    except Exception:
-                        pass
                     # Task-15: relationship delta feeds L1 social/valence noise.
                     try:
                         _rel_now = d.get("relationship") if isinstance(d.get("relationship"), dict) else {}
