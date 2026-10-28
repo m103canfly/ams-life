@@ -946,8 +946,6 @@
       let linkText="关联 "+Number(e.links||0)+" 条";
       if(Number.isFinite(e.effectiveAssoc)) linkText+="（有效 "+Number(e.effectiveAssoc).toFixed(0)+"）";
       const delLabel=armed&&armed.op==="delete"?"再点确认删除":"删除";
-      const rbLabel=armed&&armed.op==="rollback"?"再点确认回滚":"回滚";
-      const rbDisabled=e.versions>0?"":' disabled title="没有上一版本"';
       const memSessionTag='<span class="mem-session-tag" title="'+esc(rowSession)+'">'+esc(sessionLabel(rowSession))+'</span>';
       return '<div class="mem-card" data-key="'+esc(key)+'" data-session="'+esc(rowSession)+'" data-id="'+esc(e.id)+'">'+
         '<div class="mem-card-head">'+
@@ -965,7 +963,6 @@
           '<small>写入 '+esc(e.lastOp||"—")+'</small>'+
         '</div>'+
         '<div class="mem-actions">'+
-          '<button type="button" class="btn mini" data-mem-op="rollback" data-key="'+esc(key)+'" data-session="'+esc(rowSession)+'" data-id="'+esc(e.id)+'"'+rbDisabled+'>'+rbLabel+'</button>'+
           '<button type="button" class="btn mini danger" data-mem-op="delete" data-key="'+esc(key)+'" data-session="'+esc(rowSession)+'" data-id="'+esc(e.id)+'"'+(e.id?"":' disabled title="缺少条目 ID，无法删除"')+'>'+delLabel+'</button>'+
           '<span class="mem-op-state">'+esc(stateText)+'</span>'+
         '</div>'+
@@ -977,7 +974,6 @@
         const _sid=String(item._session||currentSession||memSessionFilter);
         const _tid=String(item.id||"");
         return '<div class="mem-tomb-row"><span class="mem-flag mem-flag-danger">已删除</span><small>'+esc(memWhen(item.ts))+' · #'+esc(_tid.slice(0,12))+'</small><span class="mem-tomb-text">'+esc(String(item.text||"").slice(0,160))+'</span>'+
-          (_tid?'<button type="button" class="btn mini" data-mem-restore="1" data-session="'+esc(_sid)+'" data-id="'+esc(_tid)+'">恢复</button>':'')+
           '</div>';
       }).join(""):'<div class="empty-mini">这个会话没有墓碑记录。</div>';
     }

@@ -47,6 +47,13 @@ except ImportError:
     import discretion
 
 FILE_NAME = "forget_registry.sqlite3"
+
+
+class Unreadable(Exception):
+    """The registry could not be read (locked, damaged, ...). Whatever was about to be written
+    is not written; nothing already kept is dropped because of it."""
+
+
 KINDS = ("qq", "source", "optout", "optin", "impression")
 EVERYWHERE = "*"
 FORGET_ME_OPTOUT, FORGET_ME_CUTOFF = "optout", "cutoff"

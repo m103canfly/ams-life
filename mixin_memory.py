@@ -279,19 +279,33 @@ class MemoryMixin:
         memories no longer in the library go with them."""
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         lib["schema_version"] = MEMORY_SCHEMA_VERSION
-        lib["entries"] = [e for e in lib.get("entries") or [] if self._origin_kept(e)]
+        try:
+            kept = [e for e in lib.get("entries") or [] if self._origin_kept(e)]
+        except forget_registry.Unreadable as exc:
+            # never filter with a registry that cannot be read: nothing is written this time
+            logger.warning("[ams-life] forget registry unreadable, library not written: %s", exc)
+            return
+        lib["entries"] = kept
         store = self._vector_store()
         out = dict(lib, entries=store.detach(lib["entries"]))
         tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
         tmp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
         os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
         store.keep_only(str(e["id"]) for e in lib["entries"] if isinstance(e, dict) and e.get("id"))
+        self._known_memory_ids = {str(e.get("id") or "") for e in lib["entries"] if isinstance(e, dict)}
+
+    def _library_ids(self) -> set:
+        """The ids in the library: read once, then kept up to date by _write_library."""
+        ids = getattr(self, "_known_memory_ids", None)
+        if ids is None:
+            ids = self._known_memory_ids = {str(e.get("id") or "") for e in
+                                            self._read_library(vectors=False)["entries"] if isinstance(e, dict)}
+        return ids
 
     def _new_memory_id(self, *seed, taken=()) -> str:
         """An id no other memory has: a hash of where, when and what, lengthened on the
         (unlikely) chance it is taken. `taken`: ids not written to the library yet."""
-        used = {str(e.get("id") or "") for e in self._read_library(vectors=False)["entries"] if isinstance(e, dict)}
-        used |= {str(x) for x in taken}
+        used = self._library_ids() | {str(x) for x in taken}
         base = _sha256("|".join(str(x) for x in seed))[:12]
         eid, n = base, 1
         while eid in used:
@@ -329,6 +343,7 @@ class MemoryMixin:
             tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
             tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
             os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
+            self._known_memory_ids = set(seen)
             logger.info("[ams-life] gave %d memories an id of their own", len(fixes))
         moved = vector_store.migrate_library(MEMORY_LIBRARY_PATH, MEMORY_VECTOR_PATH, MEMORY_ARCHIVE_DIR)
         if moved.get("moved"):

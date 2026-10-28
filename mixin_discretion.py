@@ -80,7 +80,8 @@ class DiscretionMixin:
 
     def _may_keep(self, people=(), place="", at=None, source_ids=()) -> bool:
         """May she keep something about these people / from these messages, said here and
-        then? When the registry cannot be read: no (nothing is written)."""
+        then? When the registry cannot be read this raises forget_registry.Unreadable: the
+        caller writes nothing this time (it never drops what is already kept)."""
         try:
             gone_people, gone_ids = self._registry_sets()
             people = {str(x) for x in (people or ()) if str(x or "").strip()}
@@ -89,11 +90,20 @@ class DiscretionMixin:
                 return True
             return self._registry().may_keep_all(sorted(people), place, at, sorted(ids))
         except Exception as exc:
-            logger.warning("[ams-life] forget registry unreadable, nothing kept: %s", exc)
+            raise forget_registry.Unreadable(str(exc)) from exc
+
+    def _new_item_kept(self, item) -> bool:
+        """One new item (an event, an insight): may it be written? Not when the registry
+        cannot be read (it is just not written)."""
+        try:
+            return self._origin_kept(item)
+        except forget_registry.Unreadable as exc:
+            logger.warning("[ams-life] forget registry unreadable, not written: %s", exc)
             return False
 
     def _origin_kept(self, item) -> bool:
-        """May an item (memory, event, note, phone line) with this origin be kept?"""
+        """May an item (memory, event, note, phone line) with this origin be kept? Raises
+        forget_registry.Unreadable when the registry cannot be read."""
         if not isinstance(item, dict):
             return True
         o = discretion.origin_of(item)
@@ -110,10 +120,13 @@ class DiscretionMixin:
             sid, _name = self._speaker(event)
         except Exception:
             sid = ""
-        if self._may_keep([sid] if sid else [], self._here(event), time.time(), self._source_ids(event)):
-            return True
+        try:
+            if self._may_keep([sid] if sid else [], self._here(event), time.time(), self._source_ids(event)):
+                return True
+            logger.info("[ams-life] a message she may not keep: nothing of it is written")
+        except forget_registry.Unreadable as exc:
+            logger.warning("[ams-life] forget registry unreadable: nothing of this message is written: %s", exc)
         _KEEP_NOTHING.set(True)
-        logger.info("[ams-life] a message she may not keep: nothing of it is written")
         return False
 
     # ------------------------------------------------------------------
@@ -417,11 +430,10 @@ class DiscretionMixin:
         if person and USER_DIR.exists():
             for upath in USER_DIR.glob("*.json"):
                 try:
-                    body = upath.read_text(encoding="utf-8")
-                    rec = json.loads(body)
+                    rec = json.loads(upath.read_text(encoding="utf-8"))
                 except Exception:
                     continue
-                if any(n in body for n in [person] + his_names):
+                if isinstance(rec, dict) and self._record_mentions(rec, person, his_names):
                     others.add(str(rec.get("sender_id") or upath.stem))
         if others:
             counts["relationship_text"] = self._forget_relationship_text(
@@ -453,6 +465,43 @@ class DiscretionMixin:
 
     _REL_TEXT_LISTS = ("we_memory", "annotations", "milestones")
     _REL_TEXT_MAPS = ("transactive_map", "destination_map", "social_world")
+    # names that are everyday words: a record "mentions" such a person only by his number or
+    # in a name field, never because the word turns up in what was said
+    _EVERYDAY_WORDS = {"哈哈", "哈哈哈", "嘿嘿", "嗯嗯", "好的", "可以", "你好", "什么", "这个", "那个", "大家",
+                       "真的", "没有", "就是", "然后", "知道", "有人", "某人"}
+
+    def _record_mentions(self, rec, person, names) -> bool:
+        """Does someone else's relationship record draw from `person`? Only its name and text
+        fields are looked at (never timestamps or counts): his number as a whole number, his
+        names in name fields, and in text only names that are not everyday words."""
+        rel = rec.get("relationship") if isinstance(rec.get("relationship"), dict) else {}
+        texts, name_fields, ids = [], [], []
+
+        def take(x):
+            if isinstance(x, dict):
+                texts.extend(str(x.get(k) or "") for k in ("text", "key", "title"))
+                name_fields.append(str(x.get("sender_name") or x.get("name") or ""))
+                ids.append(str(x.get("sender_id") or x.get("qq") or ""))
+            elif isinstance(x, str):
+                texts.append(x)
+        for key in self._REL_TEXT_LISTS + self._REL_TEXT_MAPS:
+            value = rel.get(key)
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    texts.append(str(k))
+                    take(v)
+            elif isinstance(value, list):
+                for v in value:
+                    take(v)
+        if person in ids or person in name_fields:
+            return True
+        number = re.compile(r"(?<![0-9])%s(?![0-9])" % re.escape(person))
+        if any(number.search(t) for t in texts):
+            return True
+        names = [n for n in names if len(n) >= 2 and not n.isdigit()]
+        if any(n in name_fields for n in names):
+            return True
+        return any(n in t for n in names if n not in self._EVERYDAY_WORDS for t in texts)
 
     def _forget_relationship_text(self, people, refs) -> int:
         """Relationship records of `people`: drop sub-records that came from `refs` (message,

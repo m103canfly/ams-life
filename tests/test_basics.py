@@ -70,9 +70,11 @@ class Split(unittest.TestCase):
         # and 3 for the forget count (_forget_count, _begin_job, _job_stale)
         # step 1-3: -1 for /biocore, +18 for the forget registry, the owner's deletes, what
         # else holds people's words, unique memory ids and the vector store;
+        # review of PR #9: -6 for the old rollback / restore endpoints and their helpers,
+        # +4 (_new_item_kept, _record_mentions, _EVERYDAY_WORDS, _library_ids);
         # +11 for the group members she knows (mixin_impressions, the panel's delete);
         # +1 for counting the backups a delete leaves alone
-        self.assertEqual(len(methods), 295)
+        self.assertEqual(len(methods), 293)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
