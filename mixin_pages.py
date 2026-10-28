@@ -730,7 +730,7 @@ class PagesMixin:
             tmp = OWNER_RULES_PATH.with_suffix(".tmp")
             tmp.write_text(json.dumps({"rules": rules[:OWNER_RULES_MAX]}, ensure_ascii=False, indent=1),
                            encoding="utf-8")
-            os.replace(str(tmp), str(OWNER_RULES_PATH))
+            atomic_file.replace(tmp, OWNER_RULES_PATH)
         return {"status": "ok", "data": {"rules": self._owner_rules(),
                                          "max": OWNER_RULES_MAX, "chars": OWNER_RULES_CHARS}}
 

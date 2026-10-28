@@ -7,13 +7,17 @@
   the panel. Nothing here changes her: files are read as they are (no phone
   window is pruned on the way), the body is read without moving it on, and the
   forget registry is asked about everything; when it cannot be read nothing is
-  returned.
+  returned. Files are read on the event loop's thread, where she writes them
+  (on Windows a file held open for reading cannot be replaced, so a read in
+  another thread could make her lose a write); only the build, from what was
+  read and a copy of the registry, runs in a worker thread.
 - Every reply's recall is noted, ids only, the last brain_graph.TURNS_MAX
   turns, after the same checks as any other write (the forget registry, the
   forget count). The owner's deletes take it out of there too (_forget), and a
   restore deletes again from it what the owner deleted (_forget_registered).
 """
 from __future__ import annotations
+import copy
 try:
     from .common import *  # noqa: F401,F403
 except ImportError:
@@ -25,6 +29,22 @@ except ImportError:
 
 BRAIN_TURNS_PATH = DATA_DIR / "brain_turns.json"
 BRAIN_CACHE_SECONDS = 30   # one build serves the parts, the stars opened and the searches meanwhile
+
+
+class BrainBusy(RuntimeError):
+    """Something kept being deleted while the page's data was read."""
+
+
+def _failed(exc, what) -> str:
+    """A short reason for the page; the whole error (it may name a path on this computer) goes
+    to AstrBot's log only."""
+    if isinstance(exc, forget_registry.Unreadable):
+        logger.warning("[ams-life] brain page: forget registry unreadable: %s", exc)
+        return "遗忘登记读不出来，先不给%s。" % what
+    logger.warning("[ams-life] brain page failed: %r", exc)
+    if isinstance(exc, BrainBusy):
+        return str(exc)
+    return "出错了，没取到%s（详情在 AstrBot 日志里）。" % what
 
 
 def _arg(args, name) -> str:
@@ -109,7 +129,8 @@ class BrainMixin:
         return key
 
     def _brain_sources(self) -> dict:
-        """Read what she keeps, as it is on disk (no writes; may run in a worker thread)."""
+        """Read what she keeps, as it is on disk (no writes). Call it on the event loop's thread:
+        her writes replace these files there, never while one is open here."""
         now = time.time()
         out = {"memories": self._read_library(vectors=False)["entries"], "events": [], "records": {},
                "impressions": {}, "windows": {}, "turns": self._turn_log().read()}
@@ -164,6 +185,32 @@ class BrainMixin:
     def _brain_person_kept(self, qq, at=None) -> bool:
         return self._may_keep([qq], "", at)
 
+    def _brain_build(self, src, rows, key):
+        """The build, in a worker thread: only what was read into memory, and a copy of the
+        registry made here (SQLite lets hers be read only in the thread that opened it)."""
+        try:
+            reg = forget_registry.ForgetRegistry.copy_of(rows)
+        except Exception as exc:
+            raise forget_registry.Unreadable(str(exc)) from exc
+
+        def asked(question, *args):
+            try:
+                return question(*args)
+            except Exception as exc:
+                raise forget_registry.Unreadable(str(exc)) from exc
+        try:
+            src["impressions"] = {place: {qq: rec for qq, rec in people.items()
+                                          if asked(reg.impression_allowed, qq, place)}
+                                  for place, people in src["impressions"].items()}
+            snap = brain_graph.build(
+                src, brain_graph.PageIds(key),
+                lambda item: asked(self._registry_keeps, reg, *self._origin_args(item)),
+                lambda qq, at=None: asked(self._registry_keeps, reg, [qq], "", at))
+        finally:
+            reg.close()
+        snap.impressions = src["impressions"]
+        return snap
+
     async def _brain_snapshot(self):
         """The page's data, built at most every BRAIN_CACHE_SECONDS, and again at once when
         anything was deleted or registered meanwhile."""
@@ -171,29 +218,25 @@ class BrainMixin:
         cache = getattr(self, "_brain_cache", None)
         if cache is not None and cache[0] == mark and time.time() - cache[1].made < BRAIN_CACHE_SECONDS:
             return cache[1]
-        reg = self._registry()
-
-        def impression_kept(qq, place):
-            try:
-                return reg.impression_allowed(qq, place)
-            except Exception as exc:
-                raise forget_registry.Unreadable(str(exc)) from exc
         for _attempt in range(3):
-            src = await asyncio.to_thread(self._brain_sources)
-            src["notes"] = [x for x in (self.self_model or {}).get("notebook") or [] if isinstance(x, dict)]
+            # all read here, in one go (nothing can change in between: no await)
+            src = self._brain_sources()
+            src["notes"] = copy.deepcopy([x for x in (self.self_model or {}).get("notebook") or []
+                                          if isinstance(x, dict)])
             src["body"] = self._brain_body(self._core(None))
             src["now"] = time.time()
-            src["impressions"] = {place: {qq: rec for qq, rec in people.items() if impression_kept(qq, place)}
-                                  for place, people in src["impressions"].items()}
-            snap = brain_graph.build(src, brain_graph.PageIds(self._brain_key()), self._origin_kept,
-                                     self._brain_person_kept)
-            snap.impressions = src["impressions"]
+            try:
+                rows = self._registry().rows()
+            except Exception as exc:
+                raise forget_registry.Unreadable(str(exc)) from exc
+            mark = self._brain_mark()
+            snap = await asyncio.to_thread(self._brain_build, src, rows, self._brain_key())
             again = self._brain_mark()
             if again == mark:
                 self._brain_cache = (mark, snap)
                 return snap
-            mark = again   # something was deleted while reading: read again
-        raise RuntimeError("她的记忆正在变，请稍后再打开")
+            # something was deleted while it was being built: again
+        raise BrainBusy("她的记忆正在变，请稍后再打开")
 
     @staticmethod
     def _page_args(args):
@@ -224,10 +267,8 @@ class BrainMixin:
                 return {"status": "ok", "data": cache[1].part(part)}
             snap = await self._brain_snapshot()
             return {"status": "ok", "data": snap.part(0)}
-        except forget_registry.Unreadable:
-            return {"status": "error", "message": "遗忘登记读不出来，先不给数据。", "data": {}}
         except Exception as exc:
-            return {"status": "error", "message": str(exc)[:180], "data": {}}
+            return {"status": "error", "message": _failed(exc, "数据"), "data": {}}
 
     async def page_brain_node(self, args=None):
         """One star, when the owner opens it: ?id=<id>; a person's QQ number with &reveal=qq."""
@@ -236,10 +277,8 @@ class BrainMixin:
             snap = await self._brain_snapshot()
             d = brain_graph.detail(snap, _arg(args, "id"), getattr(snap, "impressions", None),
                                    reveal_qq=_arg(args, "reveal") == "qq")
-        except forget_registry.Unreadable:
-            return {"status": "error", "message": "遗忘登记读不出来，先不给内容。", "data": {}}
         except Exception as exc:
-            return {"status": "error", "message": str(exc)[:180], "data": {}}
+            return {"status": "error", "message": _failed(exc, "内容"), "data": {}}
         if d is None:
             return {"status": "error", "message": "没有这颗星了（也许刚被删掉）", "data": {}}
         return {"status": "ok", "data": d}
@@ -250,7 +289,5 @@ class BrainMixin:
         try:
             snap = await self._brain_snapshot()
             return {"status": "ok", "data": {"ids": brain_graph.search(snap, _arg(args, "q"))}}
-        except forget_registry.Unreadable:
-            return {"status": "error", "message": "遗忘登记读不出来，先不搜。", "data": {"ids": []}}
         except Exception as exc:
-            return {"status": "error", "message": str(exc)[:180], "data": {"ids": []}}
+            return {"status": "error", "message": _failed(exc, "搜索结果"), "data": {"ids": []}}

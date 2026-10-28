@@ -61,6 +61,10 @@ try:
     from . import vector_store
 except Exception:
     import vector_store
+try:
+    from . import atomic_file
+except Exception:
+    import atomic_file
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 _LEGACY_DATA_DIR = PLUGIN_DIR / "data"

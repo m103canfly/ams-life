@@ -325,7 +325,7 @@ class EventsMixin:
                         f.write(str(value) + "\n")
                     else:
                         f.write(json.dumps(value, ensure_ascii=False) + "\n")
-            os.replace(tmp, path)
+            atomic_file.replace(tmp, path)
             tmp = None
             return changed
         except Exception as exc:
@@ -933,7 +933,7 @@ class EventsMixin:
             tmp = target.with_name(target.name + ".tmp_%s_%s" % (
                 os.getpid(), int(time.time() * 1000)))
             tmp.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
-            os.replace(tmp, target)
+            atomic_file.replace(tmp, target)
             return dropped
         except Exception:
             return 0
@@ -1139,7 +1139,7 @@ class EventsMixin:
                 EVENT_ARCHIVE_PATH.name + ".tmp_%s_%s" % (
                     os.getpid(), int(time.time() * 1000)))
             tmp.write_text("\n".join(out) + ("\n" if out else ""), encoding="utf-8")
-            os.replace(tmp, EVENT_ARCHIVE_PATH)
+            atomic_file.replace(tmp, EVENT_ARCHIVE_PATH)
             removed = len(dropped_ids)
         except Exception as exc:
             logger.warning("[biocore] dedupe global rewrite failed: %s", exc)

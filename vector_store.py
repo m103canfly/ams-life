@@ -34,13 +34,17 @@ Only the standard library; no AstrBot.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sqlite3
 import time
 from array import array
 from collections import Counter
 from pathlib import Path
+
+try:
+    from . import atomic_file
+except ImportError:
+    import atomic_file
 
 FILE_NAME = "vectors.sqlite3"
 
@@ -235,5 +239,5 @@ def migrate_library(library_path, store_path, archive_dir) -> dict:
         e.pop("vector", None)
     tmp = library_path.with_suffix(".tmp")
     tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
-    os.replace(str(tmp), str(library_path))
+    atomic_file.replace(tmp, library_path)
     return counts

@@ -208,18 +208,55 @@ if CASE == 'deletes':
 if CASE == 'registry_broken':
     import sqlite3
 
-    def broken():
-        raise sqlite3.OperationalError('database is locked')
-    real = plugin._registry_sets
-    plugin._registry_sets = broken
+    class Broken:
+        def __getattr__(self, name):
+            def fail(*a, **k):
+                raise sqlite3.OperationalError('database is locked')
+            return fail
+    real = plugin._registry()
+    plugin._forget_reg, plugin._forget_snap = Broken(), None          # the whole registry
     result['page'] = run(plugin.page_brain({}))
     result['node'] = run(plugin.page_brain_node({'id': 'x'}))
     result['search'] = run(plugin.page_brain_search({'q': '吉他'}))
     n_before = len(turns_file())
     turn('小爱 吉他练得怎么样', '10002', '柠檬', group=G1, reply='还在练呢', msg_id='m-later')
     result['turns_noted_while_broken'] = len(turns_file()) - n_before
-    plugin._registry_sets = real
+    plugin._forget_reg, plugin._forget_snap = real, None
+
+    def rows_fail(since=0):                                          # only its rows
+        raise sqlite3.OperationalError('database is locked')
+    plugin._brain_cache = None
+    real.rows, real_rows = rows_fail, real.rows
+    result['page_rows'] = run(plugin.page_brain({}))
+    real.rows = real_rows
     result['page_after'] = run(plugin.page_brain({}))['status']
+
+if CASE == 'errors':
+    # an error that names a path on this computer: the page gets a short reason, the log the rest
+    def boom():
+        raise OSError(2, 'No such file', 'D:/made-up-folder/x.json')
+    plugin._brain_sources = boom
+    result['page'] = run(plugin.page_brain({}))
+    result['node'] = run(plugin.page_brain_node({'id': 'x'}))
+    result['search'] = run(plugin.page_brain_search({'q': 'x'}))
+
+if CASE == 'threads':
+    # files are read on the event loop's thread (where she writes them); only the build runs elsewhere
+    import threading
+    seen = {}
+    real_sources, real_build = plugin._brain_sources, plugin._brain_build
+
+    def sources():
+        seen['read'] = threading.get_ident()
+        return real_sources()
+
+    def build(*a):
+        seen['build'] = threading.get_ident()
+        return real_build(*a)
+    plugin._brain_sources, plugin._brain_build = sources, build
+    result['status'] = run(plugin.page_brain({}))['status']
+    result['read_on_loop'] = seen.get('read') == threading.get_ident()
+    result['built_elsewhere'] = seen.get('build') not in (None, threading.get_ident())
 
 if CASE == 'stale':
     # something is deleted between the message coming in and the turn being noted: not noted

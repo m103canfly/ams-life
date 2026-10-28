@@ -50,15 +50,15 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import os
 import re
 import time
 from collections import Counter
 from pathlib import Path
 
 try:
-    from . import discretion, redline
+    from . import atomic_file, discretion, redline
 except ImportError:
+    import atomic_file
     import discretion
     import redline
 
@@ -398,7 +398,7 @@ class Store:
         self.root.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(content, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(str(tmp), str(path))
+        atomic_file.replace(tmp, path)
         st = path.stat()
         self._cache[path] = ((st.st_mtime_ns, st.st_size), copy.deepcopy(content))
 

@@ -291,7 +291,7 @@ class MemoryMixin:
         out = dict(lib, entries=store.detach(lib["entries"]))
         tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
         tmp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-        os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
+        atomic_file.replace(tmp, MEMORY_LIBRARY_PATH)
         store.keep_only(str(e["id"]) for e in lib["entries"] if isinstance(e, dict) and e.get("id"))
         self._known_memory_ids = {str(e.get("id") or "") for e in lib["entries"] if isinstance(e, dict)}
         return True
@@ -344,7 +344,7 @@ class MemoryMixin:
                 seen.add(e["id"])
             tmp = MEMORY_LIBRARY_PATH.with_suffix(".tmp")
             tmp.write_text(json.dumps(lib, ensure_ascii=False), encoding="utf-8")
-            os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
+            atomic_file.replace(tmp, MEMORY_LIBRARY_PATH)
             self._known_memory_ids = set(seen)
             logger.info("[ams-life] gave %d memories an id of their own", len(fixes))
         moved = vector_store.migrate_library(MEMORY_LIBRARY_PATH, MEMORY_VECTOR_PATH, MEMORY_ARCHIVE_DIR)

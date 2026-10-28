@@ -28,8 +28,9 @@ import time
 from pathlib import Path
 
 try:
-    from . import discretion
+    from . import atomic_file, discretion
 except ImportError:
+    import atomic_file
     import discretion
 
 SCHEMA = "ams-life.brain/1"
@@ -453,7 +454,7 @@ class TurnLog:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"turns": turns[-TURNS_MAX:]}, ensure_ascii=False), encoding="utf-8")
-        os.replace(str(tmp), str(self.path))
+        atomic_file.replace(tmp, self.path)
 
     @staticmethod
     def clean(turn) -> dict:

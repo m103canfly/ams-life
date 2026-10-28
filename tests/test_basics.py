@@ -76,7 +76,8 @@ class Split(unittest.TestCase):
         # +1 for counting the backups a delete leaves alone;
         # review of PR #10: +2 (_material_names, _forget_registered)
         # brain map stage 2: +14 (mixin_brain: three read-only pages, noting each turn's recall)
-        self.assertEqual(len(methods), 309)
+        # review of PR #11: +3 (_brain_build in a worker thread, _registry_keeps, _origin_args)
+        self.assertEqual(len(methods), 312)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

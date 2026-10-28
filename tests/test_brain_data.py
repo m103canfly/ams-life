@@ -154,7 +154,27 @@ class RegistryUnreadable(unittest.TestCase):
         self.assertNotIn('nodes', r['page']['data'])
         self.assertEqual(r['search']['data']['ids'], [])
         self.assertEqual(r['turns_noted_while_broken'], 0)
+        self.assertEqual(r['page_rows']['status'], 'error')
+        self.assertNotIn('nodes', r['page_rows']['data'])
         self.assertEqual(r['page_after'], 'ok')
+
+
+class Errors(unittest.TestCase):
+    def test_only_a_short_reason(self):
+        r = run_case('errors')
+        for key in ('page', 'node', 'search'):
+            self.assertEqual(r[key]['status'], 'error', key)
+            self.assertNotIn('made-up-folder', r[key]['message'], key)
+            self.assertNotIn('x.json', r[key]['message'], key)
+            self.assertIn('日志', r[key]['message'], key)
+
+
+class Threads(unittest.TestCase):
+    def test_files_read_where_she_writes_them(self):
+        r = run_case('threads')
+        self.assertEqual(r['status'], 'ok')
+        self.assertTrue(r['read_on_loop'])
+        self.assertTrue(r['built_elsewhere'])
 
 
 class Parts(unittest.TestCase):

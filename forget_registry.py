@@ -97,6 +97,18 @@ class ForgetRegistry:
         self._db.executescript(_SCHEMA)
         self._db.commit()
 
+    @classmethod
+    def copy_of(cls, rows):
+        """A registry in memory holding these rows (as rows() gives them). SQLite lets a
+        registry be read only in the thread that opened it; work in another thread makes
+        its own copy there."""
+        reg = cls(None)
+        reg._db.executemany("INSERT INTO forget (seq, kind, place, qq, source_id, stamp, note) VALUES (?,?,?,?,?,?,?)",
+                            [(r["seq"], r["kind"], r["place"], r["qq"], r["source_id"], r["stamp"], r["note"])
+                             for r in rows])
+        reg._db.commit()
+        return reg
+
     def close(self) -> None:
         self._db.close()
 

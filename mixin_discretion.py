@@ -88,9 +88,26 @@ class DiscretionMixin:
             ids = {str(x) for x in (source_ids or ()) if str(x or "").strip()}
             if "*" not in gone_people and not (people & gone_people) and not (ids & gone_ids):
                 return True
-            return self._registry().may_keep_all(sorted(people), place, at, sorted(ids))
+            return self._registry_keeps(self._registry(), people, place, at, ids)
         except Exception as exc:
             raise forget_registry.Unreadable(str(exc)) from exc
+
+    @staticmethod
+    def _registry_keeps(reg, people=(), place="", at=None, source_ids=()) -> bool:
+        """The registry's own answer (reg: hers, or a copy of it made in another thread)."""
+        people = {str(x) for x in (people or ()) if str(x or "").strip()}
+        ids = {str(x) for x in (source_ids or ()) if str(x or "").strip()}
+        return reg.may_keep_all(sorted(people), place, at, sorted(ids))
+
+    @staticmethod
+    def _origin_args(item) -> tuple:
+        """(people, place, at, source_ids): what the registry is asked about an item."""
+        o = discretion.origin_of(item)
+        try:
+            at = float(item.get("ts")) if item.get("ts") is not None else None
+        except (TypeError, ValueError):
+            at = None
+        return o["people"], o["where"], at, o["source_ids"]
 
     def _new_item_kept(self, item) -> bool:
         """One new item (an event, an insight): may it be written? Not when the registry
@@ -106,12 +123,7 @@ class DiscretionMixin:
         forget_registry.Unreadable when the registry cannot be read."""
         if not isinstance(item, dict):
             return True
-        o = discretion.origin_of(item)
-        try:
-            at = float(item.get("ts")) if item.get("ts") is not None else None
-        except (TypeError, ValueError):
-            at = None
-        return self._may_keep(o["people"], o["where"], at, o["source_ids"])
+        return self._may_keep(*self._origin_args(item))
 
     def _check_registry(self, event) -> bool:
         """The message this job is about: may she keep anything of it? If not, nothing this
@@ -367,7 +379,7 @@ class DiscretionMixin:
             if dropped:
                 tmp = path.with_suffix(".tmp")
                 tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
-                os.replace(str(tmp), str(path))
+                atomic_file.replace(tmp, path)
                 if path == EVENT_ARCHIVE_PATH:
                     counts["events"] += dropped
                 elif path == INSIGHT_ARCHIVE_PATH:
@@ -607,7 +619,7 @@ class DiscretionMixin:
             kept.append(line)
         tmp = path.with_suffix(".tmp")
         tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
-        os.replace(str(tmp), str(path))
+        atomic_file.replace(tmp, path)
 
     # ------------------------------------------------------------------
     # The owner's deletes (panel only; never from a chat).

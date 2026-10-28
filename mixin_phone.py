@@ -85,7 +85,7 @@ class PhoneMixin:
         win["recent"] = self._window_pruned(win.get("recent") or [])
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(win, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(str(tmp), str(path))
+        atomic_file.replace(tmp, path)
 
     @staticmethod
     def _window_pruned(lines, now=None) -> list:

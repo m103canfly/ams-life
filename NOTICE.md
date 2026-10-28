@@ -12,6 +12,7 @@ repository is the unmodified upstream snapshot; every later change is in the git
 
 | Date | Change |
 | --- | --- |
+| 2026-10-28 | Review of PR #11: the brain map reads files on the event loop's thread (where she writes them) and builds in a worker thread from memory and a copy of the forget registry (`ForgetRegistry.copy_of`); her temp-file writes go through `atomic_file.replace`, which retries `os.replace` briefly on `PermissionError`; the brain pages answer errors with a short reason only. |
 | 2026-10-28 | Brain map stage 2: read-only panel routes `page/brain`, `page/brain/node`, `page/brain/search` (`mixin_brain.py`, `brain_graph.py`); each reply's recall noted as ids only (`brain_turns.json`, last 200 turns), pruned by the owner's deletes and after a restore. |
 | 2026-10-28 | Added the read-only brain map page (`pages/brain/`, built from `tools/brain/`), with invented sample data only. |
 | 2026-10-27 | Split `main.py` into `common.py`, `body.py` and eight `mixin_*.py` modules without changing behaviour (golden traces identical). Dashboard backup now archives every `.py` module. |
