@@ -5,9 +5,10 @@
 // "what each reply recalled". Read only: the page only ever reads through
 // bridge.apiGet and has no way to write.
 //
-// Data: from the panel API when opened inside AstrBot's plugin view (stage 2;
-// until then the API is missing and the invented sample is shown with a badge),
-// otherwise the invented sample (sample.js, loaded before this bundle).
+// Data: from the panel API (mixin_brain.py, fetched in parts by data.js) when
+// opened inside AstrBot's plugin view; when the API cannot be reached, or the
+// page is opened on its own, the invented sample (sample.js, loaded before this
+// bundle) with a badge saying so.
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DynamicDrawUsage, NormalBlending, Points, ShaderMaterial, Vector3 } from 'three';
 import { AggregateRenderer } from './galaxy/render/AggregateRenderer';
 import { WorkerForceLayout } from './galaxy/layout/WorkerForceLayout';
@@ -20,6 +21,7 @@ import { CURVE_BOW } from './galaxy/render/linkCurves';
 import { elapsedFrameSeconds, frameDeltaSeconds } from './galaxy/timing/frameClock';
 import { GlobeCamera } from './globe.js';
 import { ballRadius } from './ball.js';
+import { fetchGraph, sampleBadge } from './data.js';
 import { SHOW_ALL_DEFAULT, TURN, baseLinesVisible, lineMap, openedLines, turnFrame, turnSteps } from './lines.js';
 
 const $ = (id) => document.getElementById(id);
@@ -59,7 +61,7 @@ const LIT = new Color('#ffc861');
 const HELD = new Color('#7d7f88');
 
 // ------------------------------------------------------------------ state
-let raw = null, source = 'sample', sample = null, bridge = null;
+let raw = null, source = 'sample', sample = null, bridge = null, whyNot = '';
 let rawById = new Map(), rawAdj = new Map();
 let G = { nodes: [], links: [] }, idx = new Map(), adj = null, src = [];
 const posCache = new Map();
@@ -89,10 +91,10 @@ async function loadGraph() {
 		try {
 			const ctx0 = await Promise.race([bridge.ready(), new Promise((r) => setTimeout(() => r(null), 3000))]);
 			if (!params.get('theme') && !storeGet('bio_theme') && ctx0) dark = !!ctx0.isDark;
-			const g = unwrap(await Promise.race([bridge.apiGet('page/brain', {}),
-				new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]));
-			if (g && Array.isArray(g.nodes)) { source = 'live'; return g; }
-		} catch (e) { /* the API comes in stage 2; fall back to the sample */ }
+			const g = await fetchGraph((route, q) => bridge.apiGet(route, q));
+			source = 'live';
+			return g;
+		} catch (e) { whyNot = String((e && e.message) || e || '').slice(0, 60); }   // the sample, saying so
 	}
 	sample = window.BrainSample.make({ n: Number(params.get('n')) || 900 });
 	source = bridge ? 'sample-embedded' : 'sample';
@@ -102,9 +104,20 @@ async function loadGraph() {
 // Content only travels when the owner opens a point.
 async function getDetail(id) {
 	if (source === 'live') {
-		try { return unwrap(await bridge.apiGet('page/brain/node', { id })); } catch (e) { return { error: '没取到：' + (e && e.message || e) }; }
+		try {
+			const r = await bridge.apiGet('page/brain/node', { id });
+			return r && r.status === 'error' ? { error: r.message || '没取到' } : unwrap(r);
+		} catch (e) { return { error: '没取到：' + (e && e.message || e) }; }
 	}
-	return (sample && sample.details[id]) || null;
+	const d = sample && sample.details[id];
+	return d ? Object.assign({}, d, { qq: undefined, has_qq: !!d.qq }) : null;
+}
+// A QQ number only on a second click, fetched on its own.
+async function getQQ(id) {
+	if (source === 'live') {
+		try { const r = await bridge.apiGet('page/brain/node', { id, reveal: 'qq' }); return (unwrap(r) || {}).qq || '没取到'; } catch (e) { return '没取到'; }
+	}
+	return (sample && sample.details[id] && sample.details[id].qq) || '';
 }
 async function searchContent(q) {
 	if (source === 'live') {
@@ -716,10 +729,10 @@ async function openDrawer(n) {
 	if (d.title) $('dTitle').textContent = d.title;
 	if (d.text) html += '<div class="text">' + esc(d.text) + '</div>';
 	if (Array.isArray(d.lines) && d.lines.length) html += '<dl>' + d.lines.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>';
-	if (d.qq) html += '<div class="reveal"><button class="btn" id="qqBtn">显示 QQ 号</button> <span id="qqVal"></span></div>';
+	if (d.has_qq) html += '<div class="reveal"><button class="btn" id="qqBtn">显示 QQ 号</button> <span id="qqVal"></span></div>';
 	$('dBody').innerHTML = html || '<span class="muted">没有更多内容。</span>';
 	const b = $('qqBtn');
-	if (b) b.onclick = () => { $('qqVal').textContent = d.qq; b.remove(); };
+	if (b) b.onclick = async () => { b.disabled = true; const qq = await getQQ(n.id); if (drawerFor === n.id) { $('qqVal').textContent = qq; b.remove(); } };
 }
 function openCoreDrawer(k) {
 	drawerFor = 'core:' + k;
@@ -991,7 +1004,7 @@ async function boot() {
 	if (source !== 'live') {
 		const b = $('sourceBadge');
 		b.hidden = false;
-		if (source === 'sample-embedded') b.textContent = '示例数据（编造）· 接口还没接上';
+		b.textContent = sampleBadge(source === 'sample-embedded', whyNot);
 	}
 	indexRaw(g);
 	buildControls();
@@ -1013,4 +1026,7 @@ async function boot() {
 	if (params.get('q')) { $('q').value = params.get('q'); runSearch(); }
 	requestAnimationFrame(frame);
 }
-boot();
+// AstrBot adds its bridge script at the end of the page, after this bundle: start once
+// the whole page is parsed, so the bridge is there to be found.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+else boot();

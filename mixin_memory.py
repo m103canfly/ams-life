@@ -1565,6 +1565,7 @@ class MemoryMixin:
         # Memory graph links (A-MEM-like): co-recalled memories get weighted
         # directed links; the working set keeps a bounded read set per session.
         _link_lines = []
+        _link_pairs = []   # ams-life: (recalled, its linked memory) for the brain map
         _consistency = memory_meta.answer_consistency(top)
         try:
             for _i in range(len(_ids)):
@@ -1602,6 +1603,7 @@ class MemoryMixin:
                     if getattr(self, "safety_enabled", False) and _nb.get("sensitive"):
                         _nb_text = memory_meta.mask_sensitive(_nb_text)
                     _link_lines.append("- 关联记忆：%s" % _nb_text[:200])
+                    _link_pairs.append((str(e.get("id") or ""), str(_lid)))
             try:
                 _umo = str(getattr(event, "unified_msg_origin", "") or "")
                 _chain_lines = self._chain_event_lines(_umo, text, limit=2)
@@ -1612,6 +1614,7 @@ class MemoryMixin:
             self._save_memory(event, doc)
         except Exception:
             _link_lines = []
+            _link_pairs = []
             _consistency = 1.0
         # Retrieval-induced forgetting: similar memories that lost this
         # competition become temporarily inhibited (they are not deleted and
@@ -1630,6 +1633,7 @@ class MemoryMixin:
         # openly elsewhere come back without naming who said them; things told
         # in private never leave that private chat. Nothing is copied into this place.
         _foreign_lines = []
+        _foreign_ids, _held = [], []   # ams-life: for the brain map (ids only)
         try:
             _known_texts = {str(e.get("text") or "") for e in entries
                             if isinstance(e, dict) and not e.get("deleted")}
@@ -1642,14 +1646,17 @@ class MemoryMixin:
                         _entry.get("sensitive") or _entry.get("poison_risk")):
                     continue
                 _verdict = discretion.verdict(discretion.origin_of(_entry), _here)
-                if _verdict == discretion.DROP:
-                    continue
                 _evec = _entry.get("vector") or []
                 _ecos = self._cosine(vec, _evec) if _evec else 0.0
                 if _ecos < PARTIAL_MATCH_THRESHOLD:
                     continue
                 _escore = self._memory_score(core, _entry, _ecos)
                 if _escore < RETRIEVAL_THRESHOLD:
+                    continue
+                if _verdict == discretion.DROP:
+                    # it would have come up, but it was told in private elsewhere: held back
+                    # here (only its id is noted, for the brain map)
+                    _held.append((_escore, str(_entry.get("id") or "")))
                     continue
                 _foreign.append((_escore, _verdict, _entry))
             _foreign.sort(key=lambda item: item[0], reverse=True)
@@ -1661,8 +1668,10 @@ class MemoryMixin:
                     _line = self._anonymized(_line, discretion.names_in(_entry))
                 _foreign_lines.append("- （别处）" + _line)
                 _known_texts.add(str(_entry.get("text") or "").strip())
+                _foreign_ids.append(str(_entry.get("id") or ""))
         except Exception:
             _foreign_lines = []
+            _foreign_ids, _held = [], []
         # G1/L12: bounded calibration -> confidence consumer. The recalled
         # top entries get a <=0.05 per-source adjustment (relationship.
         # calibration EWMA matched on memory_source) on a transient copy; the
@@ -1732,6 +1741,15 @@ class MemoryMixin:
             _meta["withheld"] = True
             _meta["abstain"] = True
             return ""
+        # ams-life: what this turn recalled, in order (the best match first, then what it
+        # called up along its links, then what came from elsewhere), the lines it went along,
+        # and what the discretion table held back here. Ids only (BrainMixin._note_turn).
+        _top_ids = [str(e.get("id") or "") for _s, e in top if str(e.get("id") or "")]
+        turn["recall_order"] = list(dict.fromkeys(
+            _top_ids + [b for _a, b in _link_pairs if b] + [x for x in _foreign_ids if x]))
+        turn["recall_path"] = [[a, b] for a, b in zip(_top_ids, _top_ids[1:])] + [
+            [a, b] for a, b in _link_pairs if a and b]
+        turn["recall_held"] = [i for _s, i in sorted(_held, key=lambda x: -x[0]) if i][:8]
         return memory_text
 
     @staticmethod

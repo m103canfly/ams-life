@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PAGE = ROOT / 'pages' / 'brain'
 SRC = ROOT / 'tools' / 'brain' / 'src'
 FILES = sorted(p for p in PAGE.iterdir() if p.is_file())
-OURS = [SRC / 'brain.js', PAGE / 'index.html', PAGE / 'sample.js']
+OURS = [SRC / 'brain.js', SRC / 'data.js', PAGE / 'index.html', PAGE / 'sample.js']
 
 # What the graph may carry for one point: categories and ids, never content.
 NODE_KEYS = {'id', 'kind', 'sub', 'label', 'cat', 'where', 'ts', 'w', 'vis', 'self'}
@@ -30,7 +30,7 @@ INERT_URLS = {'http://www.w3.org/1999/xhtml', 'https://jcgt.org/published/0007/0
 
 class StaysLocal(unittest.TestCase):
     def test_nothing_is_loaded_from_or_sent_to_the_network(self):
-        for f in FILES + [SRC / 'brain.js']:
+        for f in FILES + [SRC / 'brain.js', SRC / 'data.js']:
             text = f.read_text(encoding='utf-8')
             for bad in ('fetch(', 'XMLHttpRequest', 'WebSocket', 'sendBeacon', 'EventSource',
                         'importScripts', '@import', 'import('):
@@ -62,15 +62,21 @@ class StaysLocal(unittest.TestCase):
 
 class ReadOnly(unittest.TestCase):
     def test_page_never_writes(self):
-        for f in FILES + [SRC / 'brain.js']:
+        for f in FILES + [SRC / 'brain.js', SRC / 'data.js']:
             text = f.read_text(encoding='utf-8')
             for bad in ('apiPost', 'apiPut', 'apiDelete', 'apiPatch'):
                 self.assertFalse(bad in text, f'{f.name} contains {bad!r}')
 
     def test_reads_only_the_brain_routes(self):
-        text = (SRC / 'brain.js').read_text(encoding='utf-8')
+        text = (SRC / 'brain.js').read_text(encoding='utf-8') + (SRC / 'data.js').read_text(encoding='utf-8')
         routes = set(re.findall(r"apiGet\('([^']+)'", text))
         self.assertEqual(routes, {'page/brain', 'page/brain/node', 'page/brain/search'})
+
+    def test_qq_only_on_a_second_click(self):
+        text = (SRC / 'brain.js').read_text(encoding='utf-8')
+        self.assertIn("apiGet('page/brain/node', { id, reveal: 'qq' })", text)
+        self.assertIn('if (d.has_qq)', text)
+        self.assertNotIn('textContent = d.qq', text)   # the number comes from its own call, not the detail
 
     def test_bundle_is_built_from_this_source(self):
         bundle = (PAGE / 'brain.bundle.js').read_text(encoding='utf-8')
@@ -93,6 +99,65 @@ class LinesOnlyWhenRecalled(unittest.TestCase):
         text = (SRC / 'brain.js').read_text(encoding='utf-8')
         self.assertIn('renderer.linkSegments.visible = baseLinesVisible(showAll)', text)
         self.assertIn('if (!showAll || !motion', text)   # no lights running along hidden lines
+
+
+@unittest.skipUnless(shutil.which('node'), 'Node.js not installed')
+class FetchRules(unittest.TestCase):
+    """tools/brain/src/data.js: the graph in parts, run with Node against a stand-in API."""
+
+    @classmethod
+    def setUpClass(cls):
+        script = r"""
+const D = await import(process.argv[1]);
+const node = (i) => ({ id: 'm:' + i, kind: 'memory' });
+function api(parts, opts) {
+  let calls = 0, staleOnce = !!(opts && opts.staleOnce), build = 1;
+  const fn = async (route, q) => {
+    calls++;
+    if (opts && opts.down) throw new Error('404');
+    if (opts && opts.refuse) return { status: 'error', message: '遗忘登记读不出来，先不给数据。', data: {} };
+    const k = Number((q && q.part) || 0);
+    if (k === 0) { const snap = 's' + build; return { status: 'ok', data: { schema: opts && opts.schema || D.SCHEMA, sample: false,
+      now: 1, body: {}, turns: [], nodes: [node(0), node(1)], edges: [{ s: 'm:0', t: 'm:1', kind: 'link' }], part: 0, parts, snap } }; }
+    if (staleOnce) { staleOnce = false; build++; return { stale: true }; }   // as AstrBot's bridge hands it on
+    if (q.snap !== 's' + build) return { status: 'ok', data: { stale: true } };
+    return { nodes: [node(10 * k), node(10 * k + 1)], edges: [], part: k, parts, snap: q.snap };
+  };
+  fn.count = () => calls;
+  return fn;
+}
+const out = {};
+const whole = await D.fetchGraph(api(3));
+out.whole = { nodes: whole.nodes.map((n) => n.id), edges: whole.edges.length, keys: Object.keys(whole).sort() };
+const a = api(3, { staleOnce: true });
+const again = await D.fetchGraph(a);
+out.again = { nodes: again.nodes.length, calls: a.count() };
+for (const [name, opts] of [['down', { down: true }], ['refuse', { refuse: true }], ['schema', { schema: 'other' }]]) {
+  try { await D.fetchGraph(api(1, opts)); out[name] = 'no error'; } catch (e) { out[name] = e.message; }
+}
+out.badgeEmbedded = D.sampleBadge(true, '404');
+out.badgeAlone = D.sampleBadge(false, '');
+process.stdout.write(JSON.stringify(out));
+"""
+        out = subprocess.run(['node', '--input-type=module', '-e', script, (SRC / 'data.js').as_uri()],
+                             capture_output=True, text=True, encoding='utf-8', timeout=60, check=True).stdout
+        cls.r = json.loads(out)
+
+    def test_parts_are_joined(self):
+        self.assertEqual(self.r['whole']['nodes'], ['m:0', 'm:1', 'm:10', 'm:11', 'm:20', 'm:21'])
+        self.assertNotIn('snap', self.r['whole']['keys'])
+
+    def test_starts_again_once_when_the_data_changed(self):
+        self.assertEqual(self.r['again'], {'nodes': 6, 'calls': 5})
+
+    def test_no_api_means_the_sample_saying_so(self):
+        self.assertEqual(self.r['down'], '404')
+        self.assertEqual(self.r['refuse'], '遗忘登记读不出来，先不给数据。')
+        self.assertEqual(self.r['schema'], '不是她的数据')
+        for badge in (self.r['badgeEmbedded'], self.r['badgeAlone']):
+            self.assertTrue(badge.startswith('示例数据（编造）'))
+            self.assertNotIn('还没接上', badge)
+        self.assertIn('接口没连上：404', self.r['badgeEmbedded'])
 
 
 @unittest.skipUnless(shutil.which('node'), 'Node.js not installed')

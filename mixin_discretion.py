@@ -340,6 +340,8 @@ class DiscretionMixin:
                 room["last_recall_trace"] = [x for x in room["last_recall_trace"]
                                              if not (isinstance(x, dict) and str(x.get("entry_id") or "") in gone)]
         library_written = self._write_library(lib) if counts["memories"] or person else True
+        if hasattr(self, "_forget_turns"):   # what each reply recalled (the brain map)
+            counts["turns"] = self._forget_turns(gone, person)
 
         # 2) the event archive and its per-place copies, and the insights drawn from events
         paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
@@ -486,6 +488,8 @@ class DiscretionMixin:
                 self._impression_store().forget_impression(qq)
         if not self._write_library(self._read_library()):   # rows for everyone in a place
             raise forget_registry.Unreadable("the forget registry could not be read")
+        if hasattr(self, "_turns_to_library"):   # no turn names a memory that is gone
+            self._turns_to_library()
         return {"people": len(people), "messages": len(sources)}
 
     _REL_TEXT_LISTS = ("we_memory", "annotations", "milestones")
