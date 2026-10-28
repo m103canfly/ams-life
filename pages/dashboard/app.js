@@ -1167,7 +1167,7 @@
     const parts=Object.entries(red.by_line||{}).filter(([,n])=>Number(n)>0)
       .map(([k,n])=>(RED_NAMES[k]||k)+" "+Number(n)+" 条");
     note.textContent=(red.filter?"红线过滤：开（碰到的不存）。":"红线过滤：关（一律不挡，只记数）。")+
-      (parts.length?"碰到过："+parts.join("，")+"。":"还没有碰到红线的话。");
+      (parts.length?"现在存着的里面碰到红线的："+parts.join("，")+"。":"现在存着的里面没有碰到红线的话。");
   }
   function renderImpressions(){
     renderRedLines();

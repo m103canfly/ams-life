@@ -6819,23 +6819,6 @@
    ],
    "umo": "default:FriendMessage:10001"
   },
-  "redline_counts.json": {
-   "by_line": {
-    "hardship": 2
-   },
-   "by_store": {
-    "event": {
-     "hardship": 1
-    },
-    "memory": {
-     "hardship": 1
-    }
-   },
-   "seen": [
-    "5b5503d91d9f",
-    "6cd0b9bad5c5"
-   ]
-  },
   "self_model.json": {
    "_history": [
     {

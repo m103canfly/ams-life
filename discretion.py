@@ -165,8 +165,9 @@ def anonymize(text, names, to=SOMEONE) -> str:
     return out
 
 
-# an @ as AstrBot writes it into the text, " @昵称(号码) ", and a bare "@号码"
-_AT_NAMED = re.compile(r"@([^@\s()（）]{0,40}?)\s*[(（](\d{5,})[)）]")
+# an @ as AstrBot writes it into the text, " @昵称(号码) " -- a group card may hold spaces and
+# brackets, so the name is anything up to the brackets that hold a number -- and a bare "@号码"
+_AT_NAMED = re.compile(r"@([^@\n]{0,40}?)\s*[(（](\d{5,})[)）]")
 _AT_NUMBER = re.compile(r"@(\d{5,})(?![0-9])")
 
 
@@ -175,10 +176,11 @@ def at_names(text) -> list:
     return [(m.group(1).strip(), m.group(2)) for m in _AT_NAMED.finditer(str(text or ""))]
 
 
-def strip_numbers(text, numbers=(), her=(), her_name="", gone=()) -> str:
+def strip_numbers(text, numbers=(), her=(), her_name="", gone=(), ats=()) -> str:
     """A message as she keeps it: an @ keeps the name only ("@昵称"; "@某人" with no name or
     for someone deleted; her own name for an @ of her), and every number in `numbers` (whole
-    numbers only) becomes NUMBER. Other long numbers are left alone."""
+    numbers only) becomes NUMBER. Other long numbers are left alone. `ats`: (name, number) of
+    the message's own @ parts, replaced exactly first ("@名字(号码)", whatever the name holds)."""
     her, gone = {str(x) for x in her}, {str(x) for x in gone}
 
     def at(name, qq):
@@ -187,7 +189,11 @@ def strip_numbers(text, numbers=(), her=(), her_name="", gone=()) -> str:
         if qq in gone:
             return "@" + SOMEBODY
         return "@" + (name.strip() or SOMEBODY)
-    out = _AT_NAMED.sub(lambda m: at(m.group(1), m.group(2)), str(text or ""))
+    out = str(text or "")
+    for name, qq in sorted(ats, key=lambda x: -len(str(x[0]))):
+        if name and qq:
+            out = out.replace("@%s(%s)" % (name, qq), at(name, str(qq)))
+    out = _AT_NAMED.sub(lambda m: at(m.group(1), m.group(2)), out)
     out = _AT_NUMBER.sub(lambda m: at("", m.group(1)), out)
     nums = sorted({str(n) for n in numbers if len(str(n)) >= 5 and str(n).isdigit()}, key=len, reverse=True)
     if nums:

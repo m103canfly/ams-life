@@ -110,7 +110,6 @@ MEMORY_ARCHIVE_DIR = MEMORY_DIR / "archive"
 # who and what she must not keep: the old companion's forget list, and the owner's
 # deletions from the panel (no one can make her forget by a chat command)
 FORGET_REGISTRY_PATH = DATA_DIR / forget_registry.FILE_NAME
-REDLINE_COUNTS_PATH = DATA_DIR / "redline_counts.json"   # red-line hits by line: numbers only, never text
 # ams-life: her phone. Every group and private chat is one window; what was
 # said there (her recent replies, open loops) is kept only in that window.
 # The body keeps no text at all.

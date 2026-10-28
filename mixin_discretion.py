@@ -12,7 +12,6 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 import contextvars
-import hashlib
 
 # ams-life: the forget count when the current job (one request, one reply, one
 # background task) started. A task started from a request inherits its mark.
@@ -237,9 +236,18 @@ class DiscretionMixin:
 
     def _scrubber(self, event=None):
         """_scrub with what it needs looked up once (for many texts at a time)."""
+        ats = []
         if event is not None:
             self._note_her(event)
-        gone, numbers = self._gone_people(), self._known_numbers()
+            try:  # the message's own @ parts: their numbers are known, their "@名字(号码)" exact
+                for comp in event.get_messages() or []:
+                    if type(comp).__name__ == "At":
+                        qq = str(getattr(comp, "qq", "") or "")
+                        if qq.isdigit():
+                            ats.append((str(getattr(comp, "name", "") or "").strip(), qq))
+            except Exception:
+                pass
+        gone, numbers = self._gone_people(), self._known_numbers() | {qq for _n, qq in ats}
         her = set(getattr(self, "_her_ids", None) or ())
         seen = getattr(self, "_gone_names", None)
         if not isinstance(seen, dict):
@@ -253,7 +261,7 @@ class DiscretionMixin:
             for name, qq in discretion.at_names(text):
                 if qq in gone and name:
                     seen.setdefault(qq, set()).add(name)
-            out = discretion.strip_numbers(text, numbers, her, HER_NAME, gone)
+            out = discretion.strip_numbers(text, numbers, her, HER_NAME, gone, ats)
             if gone:
                 names = {n for p in gone for n in gone_names[p] | seen.get(p, set()) if not str(n).isdigit()}
                 out = discretion.anonymize(out, names, to=discretion.SOMEBODY)
@@ -353,55 +361,76 @@ class DiscretionMixin:
             logger.info("[ams-life] numbers taken out of what she keeps: %s files", counts)
         return counts
 
-    def _red_line(self, text, what) -> str:
+    def _red_line(self, text, what="") -> str:
         """The red line (health, money, love life, family...) `text` crosses, when it must not
-        be kept for it -- only while the switch redline_filter is on (off by default). Either
-        way a hit is counted, by line and by store, once per text: numbers only."""
-        line = redline.hit(text)
-        if not line:
-            return ""
-        self._count_red_line(line, what, text)
+        be kept for it: only while the switch redline_filter is on (off by default: nothing is
+        held back). Nothing is recorded of a hit; the panel counts what is kept now
+        (_red_line_census)."""
         if not getattr(self, "redline_filter", False):
             return ""
-        logger.info("[ams-life] not kept (%s): red line %s", what, line)
+        line = redline.hit(text)
+        if line:
+            logger.info("[ams-life] not kept (%s): red line %s", what, line)
         return line
 
     def _red_lines_for(self, what):
         """_red_line as impressions.py takes it: text -> the line it may not cross, or ''."""
         return lambda text: self._red_line(text, what)
 
-    def _red_line_counts(self) -> dict:
-        try:
-            data = json.loads(REDLINE_COUNTS_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
-        if not isinstance(data, dict):
-            data = {}
-        for key in ("by_line", "by_store"):
-            if not isinstance(data.get(key), dict):
-                data[key] = {}
-        if not isinstance(data.get("seen"), list):
-            data["seen"] = []
-        return data
+    def _sweep_red_lines(self) -> dict:
+        """With the switch on, at start: what was kept before that crosses a red line goes --
+        memories, events and insights, her notes. Each file that changes is copied into
+        MEMORY_ARCHIVE_DIR first, so turning the switch on loses nothing for good. Off: nothing."""
+        if not getattr(self, "redline_filter", False):
+            return {}
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        counts = {}
 
-    def _count_red_line(self, line, what, text) -> None:
-        """One more hit of `line` in `what` (memory, event, insight, notes, impressions), unless
-        this text was counted there before (a short hash is kept for that, never the text)."""
-        key = hashlib.sha1(("%s|%s" % (what, text)).encode("utf-8")).hexdigest()[:12]
-        try:
-            data = self._red_line_counts()
-            if key in data["seen"]:
-                return
-            data["seen"] = (data["seen"] + [key])[-20000:]
-            data["by_line"][line] = int(data["by_line"].get(line, 0) or 0) + 1
-            store = data["by_store"].setdefault(what, {})
-            store[line] = int(store.get(line, 0) or 0) + 1
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            tmp = REDLINE_COUNTS_PATH.with_suffix(".tmp")
-            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-            os.replace(str(tmp), str(REDLINE_COUNTS_PATH))
-        except Exception as exc:
-            logger.warning("[ams-life] red-line count not written: %s", exc)
+        def archive(path, name):
+            dest = MEMORY_ARCHIVE_DIR / name if path == MEMORY_LIBRARY_PATH else \
+                MEMORY_ARCHIVE_DIR / ("before-redline-" + stamp) / path.relative_to(DATA_DIR)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(path), str(dest))
+
+        if MEMORY_LIBRARY_PATH.exists():
+            lib = self._read_library()
+            keep = [e for e in lib["entries"] if not (isinstance(e, dict) and redline.hit(e.get("text")))]
+            if len(keep) != len(lib["entries"]):
+                archive(MEMORY_LIBRARY_PATH, "library.before-redline-%s.json" % stamp)
+                counts["memory"] = len(lib["entries"]) - len(keep)
+                lib["entries"] = keep
+                self._write_library(lib)
+        for path, what in ((EVENT_ARCHIVE_PATH, "event"), (INSIGHT_ARCHIVE_PATH, "insight")):
+            if not path.exists():
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            kept = []
+            for line in lines:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    kept.append(line)
+                    continue
+                text = " ".join(str(rec.get(k) or "") for k in self._KEPT_TEXT_KEYS) if isinstance(rec, dict) else ""
+                if not redline.hit(text):
+                    kept.append(line)
+            if len(kept) != len(lines):
+                archive(path, "")
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
+                os.replace(str(tmp), str(path))
+                counts[what] = len(lines) - len(kept)
+        if isinstance(getattr(self, "self_model", None), dict):
+            dropped = sum(1 for key in ("notebook", "narrative_items", "diary", "relationship_narratives")
+                          for x in self.self_model.get(key) or [] if isinstance(x, dict) and redline.hit(x.get("text")))
+            if dropped:
+                if SELF_MODEL_PATH.exists():
+                    archive(SELF_MODEL_PATH, "")
+                self._save_self_model()  # its red-line check drops them
+                counts["notes"] = dropped
+        if counts:
+            logger.info("[ams-life] red lines on: taken out of what she kept (copies archived first): %s", counts)
+        return counts
 
     def _anonymized(self, text, names) -> str:
         """`text` without any name of the people in `names` (ids or names): each id brings

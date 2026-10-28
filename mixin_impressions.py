@@ -131,14 +131,60 @@ class ImpressionsMixin:
 
     def _judgements_for(self, what):
         """impressions.judged as the red-line switch has it: a judgement of a person is held
-        back only while redline_filter is on; either way it is counted ("judgement")."""
+        back only while redline_filter is on."""
         def judge(text):
-            line = impressions.judged(text)
-            if not line:
+            if not getattr(self, "redline_filter", False):
                 return ""
-            self._count_red_line(line, what, text)
-            return line if getattr(self, "redline_filter", False) else ""
+            line = impressions.judged(text)
+            if line:
+                logger.info("[ams-life] not kept (%s): %s", what, line)
+            return line
         return judge
+
+    def _red_line_census(self) -> dict:
+        """What she keeps now that crosses a red line, counted afresh by line and by store
+        (numbers only; what was deleted is not counted): memory, event, insight, notes;
+        impressions -- what she wrote of people (style, topics, names; a judgement of a person
+        counts as "judgement"); material -- the lines of her group windows, what the nightly
+        impressions are made from."""
+        by_store = {}
+
+        def add(store, text, judge=False):
+            line = redline.hit(text) or (impressions.judged(text) if judge else "")
+            if line:
+                counts = by_store.setdefault(store, {})
+                counts[line] = counts.get(line, 0) + 1
+        for e in self._read_library(vectors=False)["entries"]:
+            if isinstance(e, dict):
+                add("memory", e.get("text"))
+        for path, store in ((EVENT_ARCHIVE_PATH, "event"), (INSIGHT_ARCHIVE_PATH, "insight")):
+            for line in path.read_text(encoding="utf-8").splitlines() if path.exists() else []:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(rec, dict):
+                    add(store, " ".join(str(rec.get(k) or "") for k in self._KEPT_TEXT_KEYS))
+        for key in ("notebook", "narrative_items", "diary", "relationship_narratives"):
+            for x in (getattr(self, "self_model", None) or {}).get(key) or []:
+                if isinstance(x, dict):
+                    add("notes", x.get("text"))
+        store = self._impression_store()
+        for place in store.places():
+            for rec in store.load(place)["people"].values():
+                for text in [rec.get("style")] + list(rec.get("topics") or []) + list(rec.get("aliases") or []):
+                    if text:
+                        add("impressions", text, judge=True)
+        for place in self._window_places():
+            if place.startswith("group:"):
+                for x in self._read_window(place)["recent"]:
+                    if isinstance(x, dict) and x.get("role") != "assistant":
+                        add("material", x.get("text"))
+        by_line = {}
+        for counts in by_store.values():
+            for line, n in counts.items():
+                by_line[line] = by_line.get(line, 0) + n
+        return {"by_line": by_line, "by_store": by_store}
 
     def _material_names(self, place, lines) -> dict:
         """{qq: names} the nightly material turns into codes besides this window's cards: for

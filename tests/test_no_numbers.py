@@ -63,27 +63,51 @@ class WhatSheKeeps(unittest.TestCase):
         self.assertIn('记得提醒我 @桃子 明天要还我书 我号 [号码] @小爱', r['library'])
         self.assertIn('记得提醒我 @桃子 明天要还我书 我号 [号码] @小爱', r['loops'])
 
+    def test_group_cards_with_spaces_and_brackets(self):
+        # people who never wrote here: only the message's own @ parts know their numbers
+        r = run_case('at')
+        for text in r['phone'] + r['library'] + r['loops'] + [r['users']] + r['asked']:
+            self.assertNotIn('10077', text)
+            self.assertNotIn('10078', text)
+        self.assertIn('明天叫上 @Tom Lee 一起去爬山', r['library'])
+        self.assertIn('记得提醒 @小明（学生） 周五交作业', r['library'])
+
+    def test_what_astrbot_sends_the_model(self):
+        r = run_case('at')
+        self.assertEqual(r['asked'][0], '记得提醒我 @桃子 明天要还我书 我号 [号码] @小爱')
+        for text in r['asked']:
+            self.assertIsNone(LONG.search(text), text)
+
     def test_someone_deleted_is_somebody(self):
         r = run_case('at')
         self.assertEqual(r['phone'][4:6], ['@某人 某人你还在吗', '某人昨天也这么说'])
         self.assertFalse([t for t in r['phone'] + r['library'] if '阿星' in t or '10003' in t])
 
     def test_red_lines_are_counted_not_held_back_by_default(self):
-        # the owner, 10-28: nothing is held back in the first version, the hits are counted
+        # the owner, 10-28: nothing is held back in the first version; the panel counts what
+        # is kept now, afresh (nothing of a hit is recorded, what is deleted is not counted)
         r = run_case('redline')
         self.assertIn('小爱 我最近失眠好严重 每天都睡不着', r['library'])
-        self.assertEqual(r['counts']['by_line'], {'health': 1})
-        self.assertEqual(r['counts']['by_store'], {'memory': {'health': 1}})
-        self.assertEqual(r['page'], {'filter': False, 'by_line': {'health': 1}, 'by_store': {'memory': {'health': 1}}})
-        for word in ('失眠', '睡不着', '10002', '柠檬'):                # no text, nobody
-            self.assertNotIn(word, r['counts_file'])
+        self.assertEqual(r['page'], {'filter': False, 'by_line': {'health': 2},
+                                     'by_store': {'memory': {'health': 1}, 'material': {'health': 1}}})
+        self.assertEqual(r['page_after_delete'], {'filter': False, 'by_line': {}, 'by_store': {}})
+        self.assertNotIn('redline_counts.json', r['files'])
 
     def test_red_lines_are_not_kept_when_the_switch_is_on(self):
         r = run_case('redline_on')
         self.assertEqual(r['library'], ['小爱 我周末想去海边看日落'])
         self.assertIn('小爱 我最近失眠好严重 每天都睡不着', r['phone'])   # her phone keeps everyone's words, 24 hours
-        self.assertEqual(r['counts']['by_line'], {'health': 1})
+        self.assertEqual(r['page']['by_store'], {'material': {'health': 1}})
         self.assertTrue(r['page']['filter'])
+
+    def test_turning_the_switch_on_archives_first(self):
+        r = run_case('sweep')
+        self.assertEqual(r['library'], ['小爱 我周末想去海边看日落'])
+        self.assertEqual(r['archived'], 1)
+        self.assertIn('小爱 我最近失眠好严重', r['copy'])
+        off = run_case('sweep_off')
+        self.assertEqual(off['library'], ['小爱 我最近失眠好严重', '小爱 我周末想去海边看日落'])
+        self.assertEqual(off['archived'], 0)
 
 
 class OldNumbers(unittest.TestCase):

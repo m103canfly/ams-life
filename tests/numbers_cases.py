@@ -27,8 +27,18 @@ import main  # noqa: E402
 from astrbot.api.message_components import At, Plain  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
+if CASE in ('sweep', 'sweep_off'):
+    # kept before the switch was turned on: one memory over a red line, one not
+    lib = {'schema_version': 3, 'rooms': {}, 'entries': [
+        {'id': 'r1', 'text': '小爱 我最近失眠好严重', 'role': 'user', 'ts': clock.now, 'sender_id': '10002',
+         'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['s1'], 'visibility': 'public'}},
+        {'id': 'r2', 'text': '小爱 我周末想去海边看日落', 'role': 'user', 'ts': clock.now, 'sender_id': '10002',
+         'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['s2'], 'visibility': 'public'}}]}
+    (DATA / 'memory').mkdir(parents=True, exist_ok=True)
+    (DATA / 'memory' / 'library.json').write_text(json.dumps(lib, ensure_ascii=False), 'utf-8')
+
 ctx = harness.FakeContext()
-plugin = main.BioCorePlugin(ctx, config={'redline_filter': True} if CASE == 'redline_on' else {})
+plugin = main.BioCorePlugin(ctx, config={'redline_filter': True} if CASE in ('redline_on', 'sweep') else {})
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -55,8 +65,12 @@ def turn(parts, message_str, sender, name, reply=None, advance=60):
         req = ProviderRequest(prompt=message_str, system_prompt='你是小爱。')
         loop.run_until_complete(plugin.on_llm_request(event, req))
         harness.drain(loop)
+        asked.append(req.prompt)   # what AstrBot sends the model of this message
         loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(reply)))
         harness.drain(loop)
+
+
+asked = []
 
 
 def phone():
@@ -81,21 +95,35 @@ if CASE == 'at':
     # a request: what she remembers of it, her open loops
     turn([At(qq=HER, name='小爱bot'), Plain(text=' 记得提醒我 @桃子(10004) 明天要还我书 我号 10002')],
          '记得提醒我 @桃子(10004) 明天要还我书 我号 10002 @小爱bot(20002)', '10002', '柠檬', reply='好的，我记住啦')
+    # group cards with a space and with brackets, of people who never wrote here
+    turn([At(qq=HER, name='小爱bot'), Plain(text=' 明天叫上 '), At(qq='10077', name='Tom Lee'), Plain(text=' 一起去爬山')],
+         '明天叫上 @Tom Lee(10077) 一起去爬山', '10002', '柠檬', reply='好呀')
+    turn([At(qq=HER, name='小爱bot'), Plain(text=' 记得提醒 '), At(qq='10078', name='小明（学生）'),
+          Plain(text=' 周五交作业')], '记得提醒 @小明（学生）(10078) 周五交作业', '10002', '柠檬', reply='好的')
     result['phone'] = phone()
     result['library'] = library()
     result['loops'] = [x.get('text') for x in plugin._read_window('group:' + G1).get('open_loops') or []]
+    result['users'] = ''.join(p.read_text('utf-8') for p in (DATA / 'users').glob('*.json'))
+    result['asked'] = asked
 
 if CASE in ('redline', 'redline_on'):
     turn([Plain(text='小爱 我最近失眠好严重 每天都睡不着')], '小爱 我最近失眠好严重 每天都睡不着', '10002', '柠檬',
          reply='抱抱你')
     turn([Plain(text='小爱 我周末想去海边看日落')], '小爱 我周末想去海边看日落', '10002', '柠檬', reply='好呀')
-    plugin._write_library(plugin._read_library())                       # written again: not counted again
+    plugin._write_library(plugin._read_library())                       # written again: counted once
     result['phone'] = phone()
     result['library'] = library()
-    result['counts_file'] = (DATA / 'redline_counts.json').read_text('utf-8')
-    result['counts'] = json.loads(result['counts_file'])
-    status = loop.run_until_complete(plugin.page_status())
-    result['page'] = status['data']['red_lines']
+    result['page'] = loop.run_until_complete(plugin.page_status())['data']['red_lines']
+    loop.run_until_complete(plugin.page_forget_person('10002'))          # deleted: no longer counted
+    result['page_after_delete'] = loop.run_until_complete(plugin.page_status())['data']['red_lines']
+    result['files'] = sorted(p.name for p in DATA.iterdir())
+
+if CASE in ('sweep', 'sweep_off'):
+    result['library'] = library()
+    archive = DATA / 'memory' / 'archive'
+    copies = sorted(archive.glob('library.before-redline-*.json')) if archive.exists() else []
+    result['archived'] = len(copies)
+    result['copy'] = [e['text'] for e in json.loads(copies[0].read_text('utf-8'))['entries']] if copies else []
 
 if CASE == 'migrate':
     # kept before this change: numbers in the library, her phone and a relationship record

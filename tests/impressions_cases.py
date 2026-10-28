@@ -188,7 +188,7 @@ if CASE in ('red', 'red_on'):
     plugin.llm_functions = dict(plugin.llm_functions or {}, group_impressions={'enabled': True, 'provider': 'follow_llm'})
     loop.run_until_complete(plugin._maybe_update_impressions(now=EVENING + 3.5 * 3600))
     result['seen'] = '工资' in getattr(ctx.provider, 'last', '')
-    result['counts'] = json.loads((DATA / 'redline_counts.json').read_text('utf-8'))['by_store'].get('impressions')
+    result['counts'] = {k: v for k, v in plugin._red_line_census()['by_store'].items() if k in ('impressions', 'material')}
     rec = plugin._impression_store().load('group:' + G1)['people']['10002']
     result['written'] = {'style': rec.get('style'), 'topics': rec.get('topics')}
 

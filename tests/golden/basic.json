@@ -5468,19 +5468,6 @@
    ],
    "umo": "default:FriendMessage:10001"
   },
-  "redline_counts.json": {
-   "by_line": {
-    "hardship": 1
-   },
-   "by_store": {
-    "memory": {
-     "hardship": 1
-    }
-   },
-   "seen": [
-    "5b5503d91d9f"
-   ]
-  },
   "self_model.json": {
    "_history": [
     {

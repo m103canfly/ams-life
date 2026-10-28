@@ -136,9 +136,12 @@ class Review(unittest.TestCase):
         self.assertEqual(run_case('card_here')['other_group'], '[认识的人] 小柠檬（大家叫 柠柠）')
 
     def test_red_lines_by_the_switch(self):
-        self.assertEqual((run_case('red')['seen'], run_case('red')['counts']), (True, {'finance': 1, 'judgement': 2}))
+        # counted afresh: the material (her group window) either way; what she wrote of him only
+        # when it was written (switch off)
+        self.assertEqual((run_case('red')['seen'], run_case('red')['counts']),
+                         (True, {'impressions': {'judgement': 2}, 'material': {'finance': 1}}))
         self.assertEqual((run_case('red_on')['seen'], run_case('red_on')['counts']),
-                         (False, {'finance': 1, 'judgement': 2}))
+                         (False, {'material': {'finance': 1}}))
 
     def test_judgements_by_the_switch(self):
         # what a person is ("性格开朗", "靠谱"): written down with the switch off (counted), not when on
