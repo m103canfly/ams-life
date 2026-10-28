@@ -374,44 +374,123 @@ class LLMMixin:
         except Exception as exc:
             logger.warning("[biocore] relationship impression failed: %s", exc)
 
-    async def _maybe_diary(self, event, core):
-        """L-T08: at most one bounded diary entry per cooldown (default OFF)."""
-        if not self._llm_allowed("diary") or not self._llm_v2_cooldown_ok("diary"):
-            return
+    # ------------------------------------------------------------------
+    # Her notebook (step 1-2): only she writes it, once a night.
+    # ------------------------------------------------------------------
+    def _notebook_due(self, now=None) -> bool:
+        if not self._llm_allowed("notebook"):
+            return False
+        now = time.time() if now is None else now
+        local = time.localtime(now)
         try:
-            digests = [d for d in (getattr(core, "daily_digests", []) or [])
-                       if isinstance(d, dict)]
-            if not digests:
-                return
-            digest = digests[-1]
-            allowed = [str(x) for x in (digest.get("event_ids") or []) if str(x)]
-            if not allowed:
-                return
-            titles = [str(e.get("title") or "")
-                      for e in self._visible_events(event, self._event_archive(10)) if isinstance(e, dict)]
-            parsed = await self._llm_v2_call(
-                "diary", interpretation.diary_prompt(digest, titles),
-                lambda raw: interpretation.parse_diary(raw, allowed_event_ids=allowed),
-                event)
-            if not parsed:
-                return
-            if self._job_stale():
-                return
-            diary = self.self_model.get("diary")
-            if not isinstance(diary, list):
-                diary = []
-            # ams-life: a diary entry is as private as the most private event it draws on.
-            _sources = [e for e in self._event_archive(80)
-                        if isinstance(e, dict) and str(e.get("id") or "") in allowed]
-            diary.append({"ts": time.time(), "date": str(digest.get("date") or ""),
-                          "text": parsed["diary"], "evidence": parsed["evidence"],
-                          "origin": discretion.merge([discretion.origin_of(e) for e in _sources]),
-                          "generated": True})
-            self.self_model["diary"] = diary[-30:]
-            self._save_self_model()
-            self._llm_v2_mark("diary")
-        except Exception as exc:
-            logger.warning("[biocore] diary failed: %s", exc)
+            hh, mm = [int(x) for x in str(getattr(self, "notebook_time", "23:30") or "23:30").split(":")[:2]]
+        except Exception:
+            hh, mm = 23, 30
+        if (local.tm_hour, local.tm_min) < (hh, mm):
+            return False
+        return str((self.self_model or {}).get("notebook_last_date") or "") != time.strftime("%Y-%m-%d", local)
+
+    def _notebook_materials(self, core, now=None) -> list:
+        """What she can look at tonight, each with an id and an origin: how her body went
+        today (her own) and today's events (as private or public as they are)."""
+        now = time.time() if now is None else now
+        local = time.localtime(now)
+        midnight = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1))
+        mats = []
+        trend = self._body_trend_text(core)
+        if trend:
+            mats.append({"id": "m1", "text": "身体：" + trend,
+                         "origin": discretion.make_origin(discretion.SELF), "names": [], "ref": "body"})
+        for e in reversed(self._event_archive(80)):
+            if not isinstance(e, dict) or float(e.get("ts", 0) or 0) < midnight:
+                continue
+            body = str(e.get("meaning_to_her") or e.get("reflection") or e.get("small_summary")
+                       or e.get("event") or "")
+            text = ("%s：%s" % (str(e.get("title") or "一件事"), body)).strip("：")
+            mats.append({"id": "m%d" % (len(mats) + 1), "text": "事件：" + text[:160],
+                         "origin": discretion.origin_of(e), "names": discretion.names_in(e),
+                         "ref": str(e.get("id") or "")})
+            if len(mats) >= 13:
+                break
+        return mats
+
+    @staticmethod
+    def _body_trend_text(core) -> str:
+        """Today's body in a sentence or two, from the day's running averages (no text kept)."""
+        acc = getattr(core, "_daily_accum", None) if core is not None else None
+        acc = acc if isinstance(acc, dict) else {}
+        n = int(acc.get("n", 0) or 0)
+        parts = []
+        if n <= 0:
+            parts.append("今天没什么人找她说话")
+        else:
+            v = float(acc.get("v", 0.0) or 0.0) / n
+            stress = float(acc.get("stress", 0.0) or 0.0) / n
+            parts.append("今天心情不错" if v >= 0.3 else ("今天心里有点沉" if v <= -0.2 else "今天心情平平"))
+            if stress >= 0.5:
+                parts.append("压力不小")
+        talked = float(getattr(core, "talked", 0.0) or 0.0) if core is not None else 0.0
+        if talked >= 0.5:
+            parts.append("说了不少话")
+        return "，".join(parts) + "。"
+
+    def _notebook_origin(self, text, uses, materials, old=None) -> tuple:
+        """The origin of one entry: the materials it says it used, plus any it did not name
+        but plainly draws on (shared character pairs); if it names none, all of tonight's.
+        Her own body alone keeps it hers; otherwise her own part does not widen it."""
+        by_id = {m["id"]: m for m in materials}
+        used = [by_id[x] for x in (uses or []) if x in by_id] if uses is not None else list(materials)
+        for m in materials:
+            if m not in used and BioCore._text_similarity(text, m["text"]) >= NOTEBOOK_OVERLAP:
+                used.append(m)
+        origins = [m["origin"] for m in used]
+        if isinstance(old, dict):
+            origins.append(discretion.origin_of(old))
+        names = sorted({n for m in used for n in (m.get("names") or [])}
+                       | set((old or {}).get("names") or []))
+        others = [o for o in origins if o.get("visibility") != discretion.SELF]
+        if not others:
+            return discretion.make_origin(discretion.SELF), names, [m["ref"] for m in used]
+        return discretion.merge(others), names, [m["ref"] for m in used]
+
+    async def _maybe_write_notebook(self, now=None) -> bool:
+        """Once a night (after notebook_time, local), at most one model call a day: the day
+        is marked before the call, so a failed call or a restart does not call again."""
+        if not self._notebook_due(now):
+            return False
+        now = time.time() if now is None else now
+        self.self_model["notebook_last_date"] = time.strftime("%Y-%m-%d", time.localtime(now))
+        self._save_self_model()
+        core = self._core(None)
+        entries = [x for x in (self.self_model.get("notebook") or []) if isinstance(x, dict)]
+        materials = self._notebook_materials(core, now)
+        persona = await self._persona_text(None)
+        changes = await self._llm_v2_call(
+            "notebook",
+            interpretation.notebook_prompt([x.get("text") for x in entries], materials,
+                                           NOTEBOOK_MAX, NOTEBOOK_CHARS, NOTEBOOK_EDITS),
+            lambda raw: interpretation.parse_notebook_changes(
+                raw, len(entries), [m["id"] for m in materials], NOTEBOOK_CHARS, NOTEBOOK_EDITS),
+            None, system_prompt=persona or None)
+        if not changes or self._job_stale():
+            return False
+        gone = set()
+        for change in changes:
+            if change["op"] == "delete":
+                gone.add(change["no"] - 1)
+            elif change["op"] == "edit":
+                old = entries[change["no"] - 1]
+                origin, names, refs = self._notebook_origin(change["text"], change["uses"], materials, old)
+                entries[change["no"] - 1] = dict(old, text=change["text"], ts=now, origin=origin,
+                                                 names=names, uses=refs)
+            elif len(entries) - len(gone) < NOTEBOOK_MAX:
+                origin, names, refs = self._notebook_origin(change["text"], change["uses"], materials)
+                entries.append({"id": _sha256("%s|%s" % (now, change["text"]))[:12], "text": change["text"],
+                                "ts": now, "origin": origin, "names": names, "uses": refs})
+        self.self_model["notebook"] = [x for i, x in enumerate(entries) if i not in gone][:NOTEBOOK_MAX]
+        self._save_self_model()
+        logger.info("[ams-life] notebook: %d change(s)", len(changes))
+        return True
 
     async def _maybe_relationship_narrative(self, event, core):
         """L-T12: manual/periodic bounded relationship narrative (default OFF)."""

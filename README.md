@@ -26,15 +26,16 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | --- | --- |
 | `main.py` | AstrBot 插件入口：插件类、`__init__`、请求/回复钩子、`/biocore` 指令 |
 | `common.py` | 公共部分：导入、数据目录、常量、工具函数 |
-| `body.py` | 身体状态（BioCore 类）：心情、压力、驱力、衰减；只有状态，不存任何原话 |
+| `body.py` `homeostasis.py` | 电子幽灵的身体：心情三轴、压力、想说话、好奇、无聊、想被看见、说多了、周围热闹不热闹；只有数字，不存任何原话 |
 | `mixin_phone.py` | 她的手机：每个群、每个私聊一个窗口，存这个窗口里所有人的消息和她的回复（都只留 24 小时，过期的定期从硬盘上删掉）、待办 |
 | `discretion.py` `mixin_discretion.py` | 出处和分寸表：什么能在哪说；按人、按消息真删 |
 | `mixin_memory.py` | 向量、记忆的存储、打分、召回、巩固 |
 | `mixin_events.py` | 事件档案：总结、值不值得记、去重、洞察 |
-| `mixin_people.py` | 自我描述、每个人的记录和关系 |
+| `mixin_people.py` | 她的本子（只由她自己写，每晚写一次，每条带出处）、每个人的记录和关系 |
 | `mixin_autonomy.py` | 私聊里的主动开口 |
 | `mixin_llm.py` `mixin_settings.py` `mixin_media.py` `mixin_pages.py` | 模型调用、设置、图片语音、面板 |
-| `interpretation.py` `homeostasis.py` `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
+| `interpretation.py` | 回复时给模型看的几行描述（她现在怎样、她想起来的、她的本子、主人定的规矩……；不带数字、QQ 号和“该怎么回”），各种提示词 |
+| `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
 | `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开） |
 | `tests/` | 离线测试，不连 AstrBot、不联网、不调用模型 |
 | `docs/` | 改造计划、上游原文档 |

@@ -22,80 +22,16 @@ def _one_line(text: str, limit: int = 160) -> str:
     return ""
 
 
-_ALLOWED = {"joy", "sadness", "anger", "fear", "loneliness", "neutral"}
-_ALLOWED_NEEDS = {"share", "space", "vent", "be_heard", "talk"}
-_ALLOWED_EXPRESSIONS = {"open", "normal", "short"}
-# The model may only emit these compact keys. Numeric deltas are derived by
-# this module; any delta supplied by the model is ignored (boundary rule).
-_ALLOWED_OUTPUT_KEYS = {"e", "emotion", "i", "intensity", "n", "need", "x", "expression"}
-_LABEL_DELTAS = {
-    "joy": (0.18, 0.06, 0.04, 0.05, 0.02),
-    "sadness": (-0.18, -0.04, -0.03, -0.02, -0.01),
-    "anger": (-0.16, 0.12, 0.08, -0.05, -0.02),
-    "fear": (-0.14, 0.12, -0.10, -0.03, -0.02),
-    "loneliness": (-0.12, -0.02, -0.03, -0.10, -0.02),
-    "neutral": (0.0, 0.0, 0.0, 0.0, 0.0),
-}
+# ams-life: the model is no longer asked for a state tag. If it writes one anyway
+# (<bc>…</bc> or <biocore>…</biocore>, closed or not) it is cut out of the reply and
+# what it says is not used: the body moves from what was said, not a self-report.
+_STATE_TAG = re.compile(r"<\s*(bc|biocore)\s*>.*?(<\s*/\s*\1\s*>|$)", re.S | re.I)
 
 
-def _with_label_deltas(meta: dict) -> dict:
-    """Map the compact model output (e/i/n/x) to validated state deltas.
-
-
-    The LLM never supplies numeric deltas. If a delta key is present it is
-    dropped instead of applied, so the model cannot write biological state
-    directly; only the label/strength mapping below may change v/a/d/social.
-    """
-    if not isinstance(meta, dict):
-        return {}
-    if any(k in meta for k in ("valence_delta", "arousal_delta", "dominance_delta",
-                               "social_delta", "trust_delta")):
-        return {}
-    out = {}
-    emo = str(meta.get("emotion") or meta.get("e") or "").strip()
-    if emo in _ALLOWED:
-        try:
-            inten = max(0.0, min(1.0, float(meta.get("intensity", meta.get("i", 0.65)))))
-        except Exception:
-            inten = 0.65
-        out["emotion"] = emo
-        out["intensity"] = round(inten, 3)
-        out["valence_delta"] = _LABEL_DELTAS[emo][0] * inten
-        out["arousal_delta"] = _LABEL_DELTAS[emo][1] * inten
-        out["dominance_delta"] = _LABEL_DELTAS[emo][2] * inten
-        out["social_delta"] = _LABEL_DELTAS[emo][3] * inten
-        out["trust_delta"] = _LABEL_DELTAS[emo][4] * inten
-    need = str(meta.get("n") or meta.get("need") or "").strip()
-    if need in _ALLOWED_NEEDS:
-        out["need"] = need
-    expression = str(meta.get("x") or meta.get("expression") or "").strip()
-    if expression in _ALLOWED_EXPRESSIONS:
-        out["expression"] = expression
-    return out
-
-
-def parse_response(raw: str):
-    """Parse LLM output and return (clean_text, validated_update|None).
-
-    This is the only place that interprets the hidden emotion tag. The model
-    may only emit compact label keys; numeric deltas in the tag are ignored.
-    """
+def strip_state_tags(raw: str) -> str:
     text = str(raw or "")
-    m = re.search(r"<bc>(.*?)</bc>", text, re.S | re.I)
-    if not m:
-        m = re.search(r"<biocore>(.*?)</biocore>", text, re.S | re.I)
-    if not m:
-        return text, None
-    clean = (text[:m.start()] + text[m.end():]).strip()
-    try:
-        data = json.loads(m.group(1).strip())
-    except Exception:
-        return clean, None
-    if not isinstance(data, dict):
-        return clean, None
-    allowed = {key: value for key, value in data.items() if key in _ALLOWED_OUTPUT_KEYS}
-    update = _with_label_deltas(allowed)
-    return clean, (update or None)
+    clean = _STATE_TAG.sub("", text)
+    return clean.strip() if clean != text else text
 
 
 def plan(core) -> str:
@@ -110,66 +46,6 @@ def plan(core) -> str:
     if need == "share":
         return "顺着分享接话"
     return "自然回应"
-
-
-def self_block(model: dict) -> str:
-    d = model or {}
-    parts = []
-    if d.get("who_am_i"):
-        parts.append("我是：" + str(d["who_am_i"]))
-    if d.get("boundaries"):
-        parts.append("边界：" + "；".join(str(x) for x in d["boundaries"][:5]))
-    if d.get("consistency"):
-        parts.append("一致性：" + "；".join(str(x) for x in d["consistency"][:5]))
-    if d.get("narrative"):
-        parts.append("最近：" + str(d["narrative"])[:500])
-    return "；".join(parts)
-
-
-def user_block(user: dict) -> str:
-    d = user or {}
-    if not d:
-        return ""
-    name = str(d.get("sender_name") or d.get("sender_id") or "").strip()
-    base = "%s；互动 %s；信任 %.2f" % (
-        name or "未知", int(d.get("interactions", 0) or 0),
-        float(d.get("trust", 0.5) or 0.5))
-    rel = d.get("relationship")
-    state = rel.get("state") if isinstance(rel, dict) else None
-    if isinstance(state, dict) and state:
-        base += "；关系 亲近%.2f 冲突%.2f 修复%.2f 可预测%.2f" % (
-            float(state.get("closeness", 0.5) or 0.5),
-            float(state.get("conflict", 0.5) or 0.5),
-            float(state.get("repair", 0.0) or 0.0),
-            float(state.get("predictability", 0.5) or 0.5))
-    repair_state = rel.get("repair_state") if isinstance(rel, dict) else None
-    if isinstance(repair_state, dict):
-        phase = str(repair_state.get("phase") or "stable")
-        if phase != "stable":
-            base += "；修复=" + phase[:16]
-    absence = d.get("absence") if isinstance(d.get("absence"), dict) else (
-        rel.get("absence") if isinstance(rel, dict) else None)
-    if isinstance(absence, dict):
-        bucket = str(absence.get("bucket") or "same_day")
-        if bucket != "same_day":
-            base += "；回归=" + bucket[:16]
-    trans = rel.get("transactive_map") if isinstance(rel, dict) else None
-    if isinstance(trans, dict) and trans:
-        topics = sorted(trans.items(), key=lambda item: (-int(item[1]), str(item[0])))[:3]
-        base += "；常谈 " + "、".join(str(k)[:12] for k, _ in topics)
-    we_items = rel.get("we_memory") if isinstance(rel, dict) else None
-    if isinstance(we_items, list) and we_items:
-        first = we_items[0] if isinstance(we_items[0], dict) else {}
-        we_text = str(first.get("text") or "").strip()[:24]
-        if we_text:
-            base += "；共同记忆：" + we_text
-    try:
-        commitment = float(rel.get("commitment", 0.0) or 0.0)
-    except Exception:
-        commitment = 0.0
-    if commitment >= 0.2:
-        base += "；承诺%.2f" % commitment
-    return base
 
 
 def memory_block(lines) -> str:
@@ -220,302 +96,193 @@ def insight_prompt(events) -> str:
             '{"insight":"从这些事件之间提炼出的一条长期模式洞察（跨事件，80字以内，不要复述事件）"}\n\n' + joined)
 
 
-def _brief_clean(text, limit=30):
-    value = str(text or "").strip()
-    value = value.lstrip("- ")
-    for prefix in ("用户：", "用户:", "你(已总结)：", "你："):
-        if value.startswith(prefix):
-            value = value[len(prefix):]
-    value = __import__("re").sub(r"\d+\.\d+", "", value)
-    value = __import__("re").sub(r"\s+", " ", value).strip("；;，。 ")
-    return value[:limit]
+def _line(text, limit=140) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip("；;，。 ")[:limit]
 
 
-def render_semantic(core, memory="", events="", user=None, continuity=None,
-                    memory_meta=None, open_loops=None) -> str:
-    """Prototype 60-150 char natural-language brief; no raw telemetry/field names."""
+def body_brief(core) -> str:
+    """Her state now in one or two sentences: what she is like, never what to do.
+
+    Mood (three axes), stress, energy ("有没有劲"), wanting to talk, curiosity,
+    boredom, having talked a lot and how lively the chats are. Wanting to be
+    seen is never written. No numbers, no names.
+    """
     if core is None:
         return ""
+
+    def num(name, default):
+        try:
+            return float(getattr(core, name, default))
+        except Exception:
+            return default
+    v, a, stress, energy = num("v", 0.0), num("a", 0.4), num("stress", 0.2), num("energy", 0.55)
+    social, boredom = num("social", 0.55), num("boredom", 0.0)
+    talked, ambient = num("talked", 0.0), num("ambient", 0.0)
+    try:
+        curiosity = float(((getattr(core, "homeostasis", None) or {}).get("drives") or {}).get("curiosity", 0.5))
+    except Exception:
+        curiosity = 0.5
+    first = []
+    if v <= -0.35:
+        first.append("心里有点沉")
+    elif v <= -0.12:
+        first.append("心里有点发紧")
+    elif v >= 0.40:
+        first.append("心情不错")
+    else:
+        first.append("心情平平")
+    if a >= 0.65:
+        first.append("有点兴奋")
+    if stress >= 0.60:
+        first.append("还带着点压力")
+    if energy <= 0.25:
+        first.append("不太起劲")
+    elif energy >= 0.60:
+        first.append("挺有劲")
+    second = []
+    if social >= 0.65:
+        second.append("挺想说话")
+    elif social <= 0.35:
+        second.append("不太想说话")
+    if curiosity >= 0.88:
+        second.append("对新鲜事挺好奇")
+    if boredom >= 0.60:
+        second.append("有点无聊")
+    if talked >= 0.80:
+        second.append("今天说得太多了")
+    elif talked >= 0.50:
+        second.append("今天已经说了不少话")
+    if ambient >= 0.60:
+        second.append("各处这会儿挺热闹")
+    elif ambient <= 0.05:
+        second.append("各处这会儿都挺安静")
+    out = "，".join(first) + "。"
+    if second:
+        out += "，".join(second) + "。"
+    return out
+
+
+def relation_brief(user, private_with_him=False) -> str:
+    """How she stands with the person she is answering: no name, no number."""
+    d = user if isinstance(user, dict) else {}
+    if not d:
+        return ""
+    rel = d.get("relationship") if isinstance(d.get("relationship"), dict) else {}
+    state = rel.get("state") if isinstance(rel.get("state"), dict) else {}
     parts = []
     try:
-        v = float(getattr(core, "v", 0.0) or 0.0)
-        stress = float(getattr(core, "stress", 0.2) or 0.2)
-        energy = float(getattr(core, "energy", 0.55) or 0.55)
-        social = float(getattr(core, "social", 0.5) or 0.5)
-        if v <= -0.35:
-            mood = "心里有点沉"
-        elif v <= -0.12:
-            mood = "心里有点发紧"
-        elif v >= 0.40:
-            mood = "心情不错"
-        else:
-            mood = "整体偏平静"
-        if energy <= 0.35:
-            body = "身体有点累"
-        elif stress >= 0.60:
-            body = "还带着点压力"
-        else:
-            body = "状态还算稳"
-        if social <= 0.35:
-            soc = "不太想说话"
-        elif social >= 0.65:
-            soc = "愿意靠近人"
-        else:
-            soc = "社交一般"
-        parts.append("%s，%s，%s" % (mood, body, soc))
+        n = int(d.get("interactions", 0) or 0)
     except Exception:
-        parts.append("现在整体偏平静，状态还算稳，社交一般")
-    # Relationship stance.
-    stance = "关系一般，先按平常方式接"
+        n = 0
     try:
-        rel = (user or {}).get("relationship") if isinstance(user, dict) else None
-        state = rel.get("state") if isinstance(rel, dict) else {}
-        repair = rel.get("repair_state") if isinstance(rel, dict) else {}
-        absence = (user or {}).get("absence") if isinstance(user, dict) else {}
-        if not isinstance(absence, dict) and isinstance(rel, dict):
-            absence = rel.get("absence") if isinstance(rel.get("absence"), dict) else {}
-        phase = str((repair or {}).get("phase") or "stable")
-        bucket = str((absence or {}).get("bucket") or "same_day")
-        trust = float((state or {}).get("trust", 0.5) or 0.5)
-        closeness = float((state or {}).get("closeness", 0.5) or 0.5)
-        conflict = float((state or {}).get("conflict", 0.0) or 0.0)
-        if phase != "stable":
-            stance = "关系还在修复中，先别急着讲道理"
-        elif bucket in ("long", "medium"):
-            stance = "很久没聊了，先从近况接上"
-        elif conflict >= 0.45:
-            stance = "关系有点紧，先轻轻接"
-        elif trust >= 0.60 and closeness >= 0.60:
-            stance = "关系挺稳，信任还在慢慢长"
-        elif trust >= 0.55:
-            stance = "关系还算稳，别太用力"
+        closeness = float(state.get("closeness", 0.5) or 0.5)
+        conflict = float(state.get("conflict", 0.0) or 0.0)
     except Exception:
-        pass
-    parts.append(stance)
-    # One high-confidence memory, else one recent event.
-    try:
-        conf = 0.0
-        if isinstance(memory_meta, dict):
-            conf = float(memory_meta.get("confidence", 0.0) or 0.0)
-        snippet = ""
-        if conf >= 0.60:
-            for line in str(memory or "").splitlines():
-                cleaned = _brief_clean(line, 26)
-                if cleaned:
-                    snippet = cleaned
-                    break
-            if snippet:
-                parts.append("记得：" + snippet)
-        if not snippet:
-            for line in str(events or "").splitlines():
-                cleaned = _brief_clean(line, 24)
-                if cleaned:
-                    parts.append("最近：" + cleaned)
-                    break
-    except Exception:
-        pass
-    # Continuity.
-    try:
-        if isinstance(continuity, dict):
-            summary = _brief_clean(continuity.get("summary"), 24)
-            if summary:
-                for _prefix in ("上次：", "上次:", "上次"):
-                    if summary.startswith(_prefix):
-                        summary = summary[len(_prefix):].lstrip("：:，, ")
-                        break
-                if summary:
-                    parts.append("上次：" + summary)
-    except Exception:
-        pass
-    parts.append("回复自然一点，别解释内部状态，也别报数值")
-    brief = "；".join(part for part in parts if part)
-    brief = __import__("re").sub(r"\s+", " ", brief).strip()
-    if len(brief) > 150:
-        cut = brief[:150]
-        if "；" in cut:
-            cut = cut[:cut.rfind("；")]
-        brief = cut.strip("； ")
-    if len(brief) < 60:
-        brief = (brief + "；像平常聊天那样接就好").strip("； ")
-    return brief[:150]
+        closeness, conflict = 0.5, 0.0
+    if closeness >= 0.65:
+        parts.append("挺亲近")
+    elif n >= 20:
+        parts.append("挺熟")
+    elif n >= 3:
+        parts.append("认识")
+    else:
+        parts.append("还不太熟")
+    repair = rel.get("repair_state") if isinstance(rel.get("repair_state"), dict) else {}
+    if str(repair.get("phase") or "stable") != "stable":
+        parts.append("还在和好的过程中")
+    elif conflict >= 0.45:
+        parts.append("最近有点别扭")
+    absence = d.get("absence") if isinstance(d.get("absence"), dict) else (
+        rel.get("absence") if isinstance(rel.get("absence"), dict) else {})
+    if str((absence or {}).get("bucket") or "same_day") in ("long", "medium"):
+        parts.append("很久没聊了")
+    # What they talk about is built from what was said where he last spoke, so it is
+    # only shown in his own private chat.
+    trans = rel.get("transactive_map") if isinstance(rel.get("transactive_map"), dict) else {}
+    if private_with_him and trans:
+        topics = sorted(trans.items(), key=lambda item: (-int(item[1]), str(item[0])))[:2]
+        parts.append("常聊" + "、".join(str(k)[:12] for k, _ in topics))
+    we_items = rel.get("we_memory") if isinstance(rel.get("we_memory"), list) else []
+    if we_items and isinstance(we_items[0], dict):
+        we_text = _line(we_items[0].get("text"), 24)
+        if we_text:
+            parts.append("一起记得：" + we_text)
+    return "，".join(parts)
 
 
-def semantic_brief(*args, **kwargs):
-    """Compatibility alias for the task-33 prototype name."""
-    return render_semantic(*args, **kwargs)
-
-
-def _return_contract(memory_meta) -> str:
-    """Shared [BC-Return]/[BC-Note] suffix for telemetry and semantic modes."""
+def _memory_lines(memory, memory_meta=None, answer_confidence=None) -> str:
+    lines = []
+    for raw in str(memory or "").splitlines():
+        text = _line(raw.strip().lstrip("- "), 140)
+        if text:
+            lines.append(text)
+        if len(lines) >= 3:
+            break
+    if not lines:
+        return ""
     mm = memory_meta if isinstance(memory_meta, dict) else {}
-    suffix = ("\n[BC-Return] 末尾只输出一个 <bc>{e,i}</bc>（可选 n/x）；"
-              "不解释、不输出任何数值 delta。")
+    out = "；".join(lines)
     try:
-        _count = int(mm.get("count", 0) or 0)
+        conf = answer_confidence if answer_confidence is not None else mm.get("answer_confidence")
+        unsure = bool(mm.get("abstain")) or (conf is not None and int(mm.get("count", 0) or 0) > 0
+                                             and float(conf) < 0.65)
     except Exception:
-        _count = 0
-    if _count > 0 and mm.get("abstain"):
-        suffix += "\n[BC-Note] 记忆置信低或来源不明：不要当确定事实，可自然说记不清。"
-    return suffix
+        unsure = bool(mm.get("abstain"))
+    if unsure:
+        out += "（这些记得不太准）"
+    return out
 
 
-def render_compact(core, memory="", events="", self_model=None, user=None,
-                   image="", kb="", speaker="", voice="", memory_meta=None,
-                   open_loops=None, open_loops_due=0, answer_confidence=None,
-                   strategy_hint="", continuity=None, prompt_mode="telemetry",
-                   memory_trace=None) -> str:
-    """Render biological state into the single compact block the LLM sees.
+def render_compact(core, memory="", events="", notebook=None, user=None,
+                   image="", kb="", voice="", memory_meta=None,
+                   open_loops=None, answer_confidence=None,
+                   continuity=None, owner_rules=None, private_with_him=False) -> str:
+    """The block the reply model sees with each message, one line per kind.
 
-    The interpretation layer owns this string; callers pass raw state/data and
-    never build prompt text themselves. Optional fields are rendered only when
-    present so the block stays short (prefix-cache friendly).
+    ams-life step 1-2: every line only describes (her state, how she stands with
+    the person, what she remembers, ...); nothing tells the model how to reply.
+    No numbers, no QQ numbers; the body line names nobody. Lines with nothing to
+    say are left out.
     """
-    if str(prompt_mode or "telemetry").lower() == "semantic":
-        try:
-            _sem = render_semantic(core, memory=memory, events=events, user=user,
-                                    continuity=continuity, memory_meta=memory_meta,
-                                    open_loops=open_loops)
-            if 40 <= len(_sem) <= 300:
-                return _sem + _return_contract(memory_meta)
-        except Exception:
-            pass
-    it = core.intent()
-    cp = ("[BC] v=%.2f a=%.2f d=%.2f s=%.2f t=%.2f e=%s c=%s n=%s plan=%s reg=%s" % (
-        float(core.v), float(core.a), float(core.d), float(core.social), float(core.trust),
-        it.get("emotion") or "neutral", it.get("compound") or "-",
-        it.get("need") or "talk", plan(core), it.get("regulation") or "none"))
-    try:
-        if float(getattr(core, "boredom", 0.0) or 0.0) >= 0.7:
-            cp += " bored"
-    except Exception:
-        pass
-    try:
-        _alert = float(getattr(core, "circadian_alertness", 0.5) or 0.5)
-        if _alert <= 0.33:
-            cp += " alert=low"
-        elif _alert >= 0.80:
-            cp += " alert=high"
-    except Exception:
-        pass
-    try:
-        if float(getattr(core, "allostatic_load", 0.0) or 0.0) >= 0.6:
-            cp += " load=high"
-    except Exception:
-        pass
-    try:
-        _h = getattr(core, "homeostasis", None)
-        if isinstance(_h, dict):
-            _ready = float(_h.get("readiness", 0.6) or 0.6)
-            if _ready <= 0.35:
-                cp += " ready=low"
-            elif _ready >= 0.75:
-                cp += " ready=high"
-            _intero = _h.get("interoception") if isinstance(_h.get("interoception"), dict) else {}
-            _ilabel = str(_intero.get("label") or "")
-            if _ilabel in ("low", "high"):
-                cp += " intero=" + _ilabel
-            _need = _h.get("need_pyramid") if isinstance(_h.get("need_pyramid"), dict) else {}
-            _dom = str(_need.get("dominant") or "")
-            if _dom:
-                cp += " need=" + _dom[:20]
-            _action = _h.get("action") if isinstance(_h.get("action"), dict) else {}
-            _amode = str(_action.get("mode") or "")
-            if _amode:
-                cp += " action=" + _amode[:16]
-    except Exception:
-        pass
-    try:
-        # ams-life: only this turn's own recall; never the body's shared last trace,
-        # which may come from another window. No recall this turn, no mtrace.
-        _trace = memory_trace
-        if isinstance(_trace, dict):
-            _tv = float(_trace.get("valence", 0.0) or 0.0)
-            if _tv >= 0.3:
-                cp += " mtrace=warm"
-            elif _tv <= -0.3:
-                cp += " mtrace=heavy"
-    except Exception:
-        pass
-    mb = memory_block(memory) if isinstance(memory, (list, tuple)) else str(memory or "")[:220]
-    eb = event_block(events) if isinstance(events, (list, tuple)) else str(events or "")[:220]
-    sb = self_block(self_model)
-    ub = user_block(user)
-    ib = image_block(image)
-    if mb:
-        cp += " | mem=" + mb
-    mm = memory_meta if isinstance(memory_meta, dict) else {}
-    _mm_count = int(mm.get("count", 0) or 0) if mm else 0
-    if _mm_count > 0:
-        cp += " | memn=%d memc=%.2f" % (
-            _mm_count,
-            float(mm.get("confidence", 0.0) or 0.0))
-        # Only surface the source when it is actually uncertain; direct input is
-        # assumed and does not need extra tokens every turn.
-        _msrc = str(mm.get("source", "unknown") or "unknown")[:12]
-        if _msrc in ("inferred", "unknown"):
-            cp += " memsrc=" + _msrc
-        if mm.get("abstain"):
-            cp += " mem=uncertain"
-        _ansc = answer_confidence
-        if _ansc is None:
-            _ansc = mm.get("answer_confidence")
-        if _ansc is not None:
-            try:
-                _aconf = max(0.0, min(1.0, float(_ansc)))
-                # High confidence is the default; only low values change behavior.
-                if _aconf < 0.65:
-                    cp += " ansc=%.2f" % _aconf
-            except Exception:
-                pass
-        _dests = mm.get("destinations")
-        if isinstance(_dests, dict) and len(_dests) >= 2:
-            cp += " memwho=" + ",".join("%s×%s" % (str(k)[:20], int(v)) for k, v in list(_dests.items())[:3])
-    # Prospective memory: open-loop count plus the nearest due item (bounded).
-    _loops = [x for x in (open_loops or []) if isinstance(x, dict)] if isinstance(open_loops, (list, tuple)) else []
-    _open_loops = [x for x in _loops if str(x.get("status") or "open") == "open"]
-    if _open_loops:
-        cp += " | loops=%d" % len(_open_loops)
-        try:
-            _due = int(open_loops_due or 0)
-        except Exception:
-            _due = 0
-        if _due:
-            cp += " due=%d" % _due
-        for _loop in _open_loops:
-            if str(_loop.get("due_hint") or "") in ("soon", "tomorrow"):
-                _text = str(_loop.get("text") or "").strip()[:40]
-                if _text:
-                    cp += " soon=" + _text
-                break
-    if eb:
-        cp += " | ev=" + eb
-    if sb:
-        cp += " | self=" + sb[:120]
-    if ub:
-        cp += " | u=" + ub[:80]
-    if ib:
-        cp += " | img=" + ib
-    if kb:
-        cp += " | kb=" + str(kb)[:140].replace("\n", "；")
-    if speaker:
-        cp += " | spk=" + str(speaker)[:60]
-    if voice:
-        cp += " | voice=" + str(voice)[:120]
-    if strategy_hint:
-        # L-T02..L-T12: one bounded strategy/cause/receipt token (never a
-        # second line; the interpretation layer owns the text).
-        cp += " | hint=" + _hint(strategy_hint, 120)
-    if continuity:
-        # A4 continuity opener: at most one bounded "last talk" fragment on
-        # the same [BC] line. No line is added and no empty placeholder is
-        # emitted when there is no history data.
-        _cont = continuity if isinstance(continuity, str) else continuity_block(continuity)
-        if _cont:
-            cp += " | cont=" + _hint(_cont, CONTINUITY_LIMIT)
-    # Minimal fallback instruction only; full format lives in the
-    # biocore-interpretation skill (loaded on demand) to save per-turn tokens.
-    cp += _return_contract(mm)
-    return cp
+    out = []
+    brief = body_brief(core)
+    if brief:
+        out.append("[她现在] " + brief)
+    rel = relation_brief(user, private_with_him)
+    if rel:
+        out.append("[她跟对方] " + rel)
+    mem = _memory_lines(memory, memory_meta, answer_confidence)
+    if mem:
+        out.append("[她想起来的] " + mem)
+    ev = "；".join(_line(x.strip().lstrip("- "), 120) for x in str(events or "").splitlines()[:2] if _line(x))
+    if ev:
+        out.append("[最近的事] " + ev)
+    cont = continuity if isinstance(continuity, dict) else {}
+    summary = _line(cont.get("summary"), CONTINUITY_SUMMARY_LIMIT)
+    for _prefix in ("上次：", "上次:", "上次"):
+        if summary.startswith(_prefix):
+            summary = summary[len(_prefix):].lstrip("：:，, ")
+            break
+    if summary:
+        out.append("[上次聊到] " + summary)
+    loops = [x for x in (open_loops or []) if isinstance(x, dict)
+             and str(x.get("status") or "open") == "open"] if isinstance(open_loops, (list, tuple)) else []
+    loop_text = "；".join(t for t in (_line(x.get("text"), 40) for x in loops[:2]) if t)
+    if loop_text:
+        out.append("[没做完的] " + loop_text)
+    if _line(image):
+        out.append("[图片里是] " + _line(image, 160))
+    if _line(voice):
+        out.append("[语音说的是] " + _line(voice, 120))
+    if _line(kb):
+        out.append("[资料] " + _line(str(kb).replace("\n", "；"), 140))
+    book = "；".join(t for t in (_line(x, 40) for x in (notebook or [])) if t)
+    if book:
+        out.append("[她的本子] " + book[:400])
+    rules = "；".join(t for t in (_line(x, 100) for x in (owner_rules or [])) if t)
+    if rules:
+        out.append("[主人定的规矩] " + rules)
+    return "\n".join(out)
 
 
 def event_ranking_prompt(texts) -> str:
@@ -1441,29 +1208,60 @@ def parse_tom_update(raw, allowed_refs=None) -> dict:
     }
 
 
-def diary_prompt(digest, event_titles=None) -> str:
-    data = _dict(digest)
-    titles = "\n".join("- " + _hint(x, 80) for x in (event_titles or [])[:6])
-    return ("根据今天的确定性摘要写一条日记，只输出 JSON：\n"
-            '{"diary":"≤120字，只能写摘要里出现过的事","evidence":["只能引用摘要/事件 id"]}\n'
-            "规则：不编造未出现的事件；不写用户隐私；只写她的第一人称记录。\n"
-            "日期=%s 主情绪=%s 互动=%s 事件=%s\n%s" % (
-                _hint(data.get("date") or "", 20),
-                _hint(data.get("dominant_emotion") or "neutral", 20),
-                _hint(data.get("interaction_count") or 0, 8),
-                _hint(",".join(str(x) for x in (data.get("event_ids") or [])[:6]), 160),
-                titles))
+def notebook_prompt(entries, materials, max_entries=20, max_chars=40, max_edits=3) -> str:
+    """Her notebook, at night: what is in it, today's material, and what she may change.
+    It is hers: nothing tells her what to think, only how to write the answer down."""
+    book = "\n".join("%d. %s" % (i + 1, _hint(x, max_chars)) for i, x in enumerate(entries or [])) or "（还是空的）"
+    mats = "\n".join("%s. %s" % (m.get("id"), _hint(m.get("text"), 160)) for m in (materials or [])) or "（今天没有）"
+    return ("这是你自己的本子，只有你自己写，也只有你自己看。现在是晚上，你可以看看今天的材料，"
+            "想想要不要改本子；写什么、不写什么都由你。\n"
+            "本子现在有这些条：\n%s\n今天的材料：\n%s\n"
+            "最多改 %d 处（加一条、改一条、删一条都算一处），每条不超过 %d 字，本子最多 %d 条。不想改就不改。\n"
+            "只输出 JSON："
+            '{"changes":[{"op":"add","text":"……","uses":["m1"]},{"op":"edit","no":1,"text":"……","uses":[]},'
+            '{"op":"delete","no":2}]}\n'
+            "uses 写这一条用到了哪些材料的编号。" % (book, mats, max_edits, max_chars, max_entries))
 
 
-def parse_diary(raw, allowed_event_ids=None) -> dict:
+def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_edits=3) -> list:
+    """At most `max_edits` valid changes; texts cut to `max_chars`; unknown numbers dropped.
+    A change without a valid `uses` list gets uses=None (the caller treats it as all)."""
     data = _extract_json_object(raw)
-    if not isinstance(data, dict):
-        return {}
-    text = _hint(data.get("diary") or "", 120)
-    refs = _evidence_refs(data.get("evidence"), allowed_event_ids)
-    if not text or not refs:
-        return {}
-    return {"diary": text, "evidence": refs}
+    if not isinstance(data, dict) or not isinstance(data.get("changes"), list):
+        return []
+    known = {str(x) for x in (material_ids or [])}
+    out = []
+    for item in data["changes"]:
+        if len(out) >= max_edits:
+            break
+        if not isinstance(item, dict):
+            continue
+        op = str(item.get("op") or "").strip().lower()
+        if op not in ("add", "edit", "delete"):
+            continue
+        change = {"op": op}
+        if op in ("edit", "delete"):
+            try:
+                no = int(item.get("no"))
+            except Exception:
+                continue
+            if not 1 <= no <= int(n_entries):
+                continue
+            change["no"] = no
+        if op in ("add", "edit"):
+            text = re.sub(r"\s+", " ", str(item.get("text") or "")).strip()[:max_chars]
+            if not text:
+                continue
+            change["text"] = text
+            uses = item.get("uses")
+            if isinstance(uses, list) and uses and all(str(x) in known for x in uses):
+                change["uses"] = [str(x) for x in uses]
+            elif isinstance(uses, list) and not uses:
+                change["uses"] = []
+            else:
+                change["uses"] = None
+        out.append(change)
+    return out
 
 
 def relationship_narrative_prompt(relationship) -> str:

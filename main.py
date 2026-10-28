@@ -65,6 +65,12 @@ except ImportError:
     from mixin_phone import PhoneMixin
 
 
+# ams-life step 1-2: body fields of older state files that are gone.
+_OLD_BODY_FIELDS = ("trust", "circadian_alertness", "user_trust_seeded", "user_trust_seed_delta",
+                    "reflection_tree")
+_OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabolic_cost")
+
+
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
 class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
     def __init__(self, context: Context, config=None):
@@ -76,10 +82,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self.summary_max_chars = max(0, int(self.config.get("summary_max_chars", 0) or 0))
         except Exception:
             self.summary_max_chars = 0
-        self.bc_prompt_mode = str(self.config.get("bc_prompt_mode", "telemetry") or "telemetry").strip().lower()
-        if self.bc_prompt_mode not in ("telemetry", "semantic"):
-            self.bc_prompt_mode = "telemetry"
         self.voice_transcription_enabled = bool(self.config.get("voice_transcription_enabled", True))
+        # ams-life step 1-2: when she writes her notebook (local time; switch: the
+        # "notebook" LLM function, off by default)
+        self.notebook_time = str(self.config.get("notebook_time", "23:30") or "23:30").strip()
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
         except Exception:
@@ -334,6 +340,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         try:
             self._migrate_state_files()
+            self._migrate_body_fields()
             self._migrate_memory_library()
         except Exception as exc:
             logger.warning("[ams-life] one-her migration failed: %s", exc)
@@ -406,6 +413,30 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             shutil.move(str(f), str(STATE_ARCHIVE_DIR / f.name))
         logger.info("[ams-life] one body: started from %s, archived %d per-session states", old[0].name, len(old))
 
+    def _migrate_body_fields(self) -> None:
+        """ams-life step 1-2: an electronic ghost's body. A state file written before it
+        still has the day-night rhythm, the global trust, the virtual body (energy,
+        hydration, warmth, fatigue), the need pyramid, interoception and the insight
+        tree; they are dropped. The old file is kept as her.before_body.json."""
+        if not HER_STATE_PATH.exists():
+            return
+        state = json.loads(HER_STATE_PATH.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            return
+        homeo = state.get("homeostasis") if isinstance(state.get("homeostasis"), dict) else {}
+        if not (any(k in state for k in _OLD_BODY_FIELDS) or any(k in homeo for k in _OLD_HOMEOSTASIS_FIELDS)):
+            return
+        STATE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+        kept = STATE_ARCHIVE_DIR / "her.before_body.json"
+        if not kept.exists():
+            shutil.copy2(str(HER_STATE_PATH), str(kept))
+        for k in _OLD_BODY_FIELDS:
+            state.pop(k, None)
+        if homeo:
+            state["homeostasis"] = homeostasis.normalize_state(homeo)
+        HER_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
+        logger.info("[ams-life] body: dropped the old physiology, global trust and insight tree")
+
     def _core(self, event=None) -> BioCore:
         # ams-life: one her. Every group and private chat shares this one body.
         key = "her"
@@ -466,27 +497,6 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self.cores[key] = core
         return self.cores[key]
 
-    def _seed_trust_from_user(self, event, core) -> None:
-        """G3: seed core.trust from the user record once per session core.
-
-        Runs only on the first turn after a core is (re)built in this process;
-        the core-side method caps the single-step delta at 0.05 and marks the
-        core as seeded, so later turns cannot oscillate. User doc is read-only.
-        """
-        if core is None or getattr(core, "_user_trust_seeded", False):
-            return
-        try:
-            path = self._user_path(event)
-            if not path.exists():
-                return
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                return
-            core.seed_trust_from_user(
-                data.get("trust", 0.5), TRUST_SEED_WEIGHT, TRUST_SEED_MAX_DELTA)
-        except Exception:
-            pass
-
     @filter.command("biocore")
     async def biocore_command(self, event: AstrMessageEvent):
         """Task-15: /biocore readiness read-only output."""
@@ -537,6 +547,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         try:
             self._begin_job()
             self._window_add_message(event)
+            self._listen_body(event)
             self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
         except Exception as exc:
             logger.warning("[ams-life] window store failed: %s", exc)
@@ -557,8 +568,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         self._continue_job()
         await self._ensure_profile(event)
         core = self._core(event)
+        # ams-life: she was called (woken), so she was seen; and how lively the chats are
         try:
-            self._seed_trust_from_user(event, core)
+            core.be_seen()
+            core.set_ambient(self._ambient_level())
         except Exception:
             pass
         # A4: capture open loops from *before* this turn so the continuity
@@ -583,7 +596,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 _query_vec = None
         if text:
-            core.observe(text, embedding=_query_vec)
+            # the trust in this person is passed in for this call only (no global trust)
+            core.observe(text, embedding=_query_vec,
+                         relationship=self._relationship_of(self._user_record(event)))
             # ams-life: open loops are matched, merged and closed in this window only.
             self._window_update_loops(event, text, core)
         _user_data = self._touch_user(event, core)
@@ -630,16 +645,6 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception:
             pass
         _events = self._event_context(event)
-        # L-T02..L-T12: one bounded strategy/cause/receipt token, plus optional
-        # proposal-only LLM refinements (each function default OFF).
-        _events_raw = self._visible_events(event, self._event_archive(9))
-        _strategy_hint = ""
-        try:
-            _strategy_hint = await self._maybe_llm_hints(
-                event, core, _user_data, _events_raw,
-                _memory_meta, text, cause_trace=_turn.get("cause_trace"))
-        except Exception as exc:
-            logger.warning("[biocore] strategy hint failed: %s", exc)
         try:
             await self._maybe_tom_probe(event, core, text, _user_data, _memory_meta,
                                         memory_entries=_turn.get("memory_entries"))
@@ -655,31 +660,24 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception as exc:
                 logger.warning("[biocore] kb retrieve failed: %s", exc)
         _base = str(getattr(req, "system_prompt", "") or "")
+        # ams-life step 1-2: descriptive lines only (no numbers, no QQ numbers, no "how
+        # to reply"); the strategy hints were instructions and are no longer asked for.
         _sid, _sname = self._speaker(event)
-        _speaker = (("%s（%s）" % (_sname or "未知", _sid)) if _sid else (_sname or ""))
-        _loops = self._window_loops(event)
         _compact = interpretation.render_compact(
             core,
             _mem.replace("[BioCore Memory]", "").strip(),
             _events.replace("[BioCore Events]", "").strip(),
-            _self_model,
+            self._notebook_for(event),
             self._user_view(event, _user_data),
             _img.replace("[BioCore Image]", "").strip(),
             _kb,
-            _speaker,
             _voice,
             memory_meta=_memory_meta,
-            open_loops=_loops,
-            open_loops_due=sum(
-                1 for _loop in _loops
-                if isinstance(_loop, dict)
-                and str(_loop.get("status") or "open") == "open"
-                and str(_loop.get("due_hint") or "") in ("soon", "tomorrow")),
+            open_loops=self._window_loops(event),
             answer_confidence=_memory_meta.get("answer_confidence"),
-            strategy_hint=_strategy_hint,
             continuity=_continuity,
-            prompt_mode=getattr(self, "bc_prompt_mode", "telemetry"),
-            memory_trace=_turn.get("memory_trace"),
+            owner_rules=self._owner_rules(),
+            private_with_him=bool(_sid) and self._here(event) == "private:" + str(_sid),
         ).strip()
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
@@ -697,21 +695,23 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         self._continue_job()
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
-        _clean, _meta = interpretation.parse_response(_reply)
-        if _meta:
-            core.apply_affect(_meta)
+        # ams-life: no state tag is asked for any more. If the model writes one anyway
+        # it is cut out (whether it parses or not) and what it says is not used.
+        _clean = interpretation.strip_state_tags(_reply)
+        if _clean != _reply:
             try:
                 response.completion_text = _clean
                 chain = getattr(response, "result_chain", None)
                 if chain is not None and getattr(chain, "chain", None):
                     for comp in chain.chain:
                         if hasattr(comp, "text"):
-                            comp.text = _clean
+                            comp.text = interpretation.strip_state_tags(str(comp.text or ""))
             except Exception:
                 pass
         _reply = _clean
         try:
-            core.record_reply(_reply, _meta)
+            core.observe_own(_reply)
+            core.record_reply(_reply)
         except Exception:
             pass
         try:
@@ -719,7 +719,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:
             logger.warning("[ams-life] window write failed: %s", exc)
         try:
-            homeostasis.metabolize_reply(core, _reply)
+            core.record_talk(_reply)
         except Exception:
             pass
         try:
@@ -737,7 +737,6 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # the per-function switch + cooldown, so default OFF means zero calls.
         try:
             asyncio.create_task(self._maybe_relationship_impression(event, core))
-            asyncio.create_task(self._maybe_diary(event, core))
             asyncio.create_task(self._maybe_relationship_narrative(event, core))
         except Exception:
             pass

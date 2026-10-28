@@ -73,15 +73,12 @@ class DiscretionMixin:
     # ------------------------------------------------------------------
     # Her self-description and the speaker's relationship record.
     # ------------------------------------------------------------------
-    def _self_model_for(self, event) -> dict:
-        """Self model as seen from here: the "recently" narrative only keeps lines allowed here.
-
-        Narrative text written before ams-life has no origin and is left out.
-        """
-        model = dict(self.self_model or {})
+    def _notebook_for(self, event) -> list:
+        """Her notebook as she may bring it up here: each entry by its origin (private ones
+        only in that private chat, others' public ones without names, her own anywhere)."""
         here = self._here(event)
         lines = []
-        for item in model.get("narrative_items") or []:
+        for item in (self.self_model or {}).get("notebook") or []:
             if not isinstance(item, dict):
                 continue
             v = discretion.verdict(discretion.origin_of(item), here)
@@ -92,8 +89,25 @@ class DiscretionMixin:
                 text = discretion.anonymize(text, discretion.origin_of(item)["people"] + list(item.get("names") or []))
             if text:
                 lines.append(text)
-        model["narrative"] = "；".join(lines)[:600]
+        return lines
+
+    def _self_model_for(self, event) -> dict:
+        """Self model as seen from here: "narrative" is her notebook, only the entries
+        allowed here (used for goal relevance)."""
+        model = dict(self.self_model or {})
+        model["narrative"] = "；".join(self._notebook_for(event))[:600]
         return model
+
+    def _owner_rules(self) -> list:
+        """The owner's rules, written in the panel; every chat's reply sees them."""
+        try:
+            if OWNER_RULES_PATH.exists():
+                data = json.loads(OWNER_RULES_PATH.read_text(encoding="utf-8"))
+                rules = data.get("rules") if isinstance(data, dict) else []
+                return [str(x)[:OWNER_RULES_CHARS] for x in (rules or []) if str(x or "").strip()][:OWNER_RULES_MAX]
+        except Exception as exc:
+            logger.warning("[ams-life] owner rules read failed: %s", exc)
+        return []
 
     def _user_view(self, event, user_data) -> dict:
         """The speaker's record as shown here: shared memories only in his own private chat.
@@ -118,7 +132,8 @@ class DiscretionMixin:
         """Delete every memory, event, note and phone line that came from `person`
         (or from one of `source_ids`), and his relationship record.
 
-        Returns counts per store. Files moved aside by the one-her migration
+        Returns counts per store (memories, events, insights, relationship, notes incl. her
+        notebook, phone). Files moved aside by the one-her migration
         (per-session legacy/archive folders) are not touched here. Every call
         is logged; the log length is the forget count (see _job_stale).
         """
@@ -129,7 +144,7 @@ class DiscretionMixin:
         if not isinstance(getattr(self, "_forget_log", None), list):
             self._forget_log = []
         self._forget_log.append((person, list(ids)))
-        counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0}
+        counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0, "insights": 0}
 
         def about(item):
             return discretion.is_about(discretion.origin_of(item), person, ids)
@@ -151,8 +166,8 @@ class DiscretionMixin:
         if counts["memories"] or person:
             self._write_library(lib)
 
-        # 2) the event archive and its per-place copies
-        paths = [EVENT_ARCHIVE_PATH]
+        # 2) the event archive and its per-place copies, and the insights drawn from events
+        paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
         if EVENT_SESSION_DIR.exists():
             paths.extend(sorted(EVENT_SESSION_DIR.glob("*/events.jsonl")))
         for path in paths:
@@ -175,6 +190,8 @@ class DiscretionMixin:
                 os.replace(str(tmp), str(path))
                 if path == EVENT_ARCHIVE_PATH:
                     counts["events"] += dropped
+                elif path == INSIGHT_ARCHIVE_PATH:
+                    counts["insights"] = dropped
 
         # 3) his relationship record
         if person:
@@ -186,7 +203,7 @@ class DiscretionMixin:
 
         # 4) her notes about him (narrative lines, diary, relationship narratives)
         changed = False
-        for key in ("narrative_items", "diary", "relationship_narratives"):
+        for key in ("narrative_items", "diary", "relationship_narratives", "notebook"):
             items = self.self_model.get(key)
             if not isinstance(items, list):
                 continue

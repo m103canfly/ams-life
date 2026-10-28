@@ -47,7 +47,7 @@ class AutonomyMixin:
         except Exception:
             return {}
 
-    def _autonomy_template(self, core) -> str:
+    def _autonomy_template(self, core, relationship=None) -> str:
         """Task-15: state-style deterministic proactive text (no summaries/LLM).
 
         Uses only need + current emotion + closeness band, so the send cannot
@@ -68,7 +68,7 @@ class AutonomyMixin:
                        "loneliness": "有点想人陪",
                        "neutral": "情绪平稳"}.get(emotion, "情绪平稳")
         try:
-            rel = getattr(core, "relationship_context", None) or {}
+            rel = relationship if isinstance(relationship, dict) else {}
             closeness = float((rel.get("state") or {}).get("closeness", 0.5) or 0.5)
         except Exception:
             closeness = 0.5
@@ -118,7 +118,7 @@ class AutonomyMixin:
             if sent_count >= AUTONOMY_DAILY_CAP:
                 return None, state
             max_chars = int(state.get("max_chars") or 120)
-            text = self._autonomy_template(core)[:max(1, max_chars)].strip()
+            text = self._autonomy_template(core, {"state": rel_state})[:max(1, max_chars)].strip()
             return (text or None), state
         except Exception:
             return None, {"enabled": False}
@@ -204,8 +204,14 @@ class AutonomyMixin:
                     break
                 try:
                     self._sweep_windows()
+                    self._core(None).set_ambient(self._ambient_level())
                 except Exception:
                     pass
+                try:
+                    self._begin_job()
+                    await self._maybe_write_notebook()
+                except Exception as exc:
+                    logger.warning("[ams-life] notebook failed: %s", exc)
                 if not (getattr(self, "proactive_autonomy", False)
                         or getattr(self, "autonomy_loop_enabled", False)):
                     continue

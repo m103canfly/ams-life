@@ -58,7 +58,6 @@ class SettingsMixin:
                 "llm_memory_candidates": bool(
                     getattr(self, "llm_memory_candidates", True)),
                 "we_memory_enabled": bool(getattr(self, "we_memory_enabled", False)),
-            "bc_prompt_mode": str(getattr(self, "bc_prompt_mode", "telemetry") or "telemetry"),
             "summary_max_chars": int(getattr(self, "summary_max_chars", 0) or 0),
             "llm_only_reply_summary": bool(
                     getattr(self, "llm_only_reply_summary", True)),

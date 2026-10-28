@@ -47,6 +47,25 @@ if CASE == 'migrate':
     os.utime(DATA / 'states' / 'default_FriendMessage_10001.json', (1000, 1000))
     os.utime(DATA / 'states' / 'default_GroupMessage_900001.json', (2000, 2000))  # the most recent one
 
+if CASE == 'old_body':
+    # her state and self model as written before step 1-2 (electronic-ghost body, her own heart)
+    (DATA / 'states').mkdir(parents=True)
+    (DATA / 'states' / 'her.json').write_text(json.dumps({
+        'v': 0.2, 'a': 0.5, 'trust': 0.81, 'circadian_alertness': 0.3, 'user_trust_seeded': True,
+        'user_trust_seed_delta': 0.01, 'boredom': 0.2,
+        'reflection_tree': {'roots': [{'ts': 1.0, 'insight': '被认真对待会安心', 'children': []}], 'count': 1},
+        'homeostasis': {'drives': {'energy': 0.7, 'social': 0.6, 'safety': 0.5, 'curiosity': 0.4},
+                        'body': {'energy': 0.7, 'hydration': 0.5, 'warmth': 0.6, 'fatigue': 0.3},
+                        'need_pyramid': {'dominant': 'belonging'}, 'interoception': {'label': 'low'},
+                        'last_metabolic_cost': 0.02, 'readiness': 0.5}}, ensure_ascii=False), 'utf-8')
+    (DATA / 'self_model.json').write_text(json.dumps({
+        'who_am_i': '一个会持续受聊天影响、但不会被单条消息完全定义的角色。',
+        'boundaries': ['不接受被当作没有感受的工具', '不会被一次互动改写全部立场', '主人写的一条边界'],
+        'consistency': ['情绪会变，但核心立场不因单次互动翻转'],
+        'narrative': '芒果在准备惊喜', 'narrative_items': [{'text': '芒果在准备惊喜', 'origin': {}}],
+        'diary': [{'text': '今天的日记'}], 'version': 3,
+        '_history': [{'who_am_i': 'x', 'narrative': '芒果在准备惊喜'}]}, ensure_ascii=False), 'utf-8')
+
 if CASE == 'migrate_her':
     # a one-body state written by the first step-1 code, before her phone existed
     (DATA / 'states').mkdir(parents=True)
@@ -120,7 +139,7 @@ def run():
     config = {}
     if CASE in ('forget', 'strong_event', 'consolidate', 'wait_event', 'wait_embed',
                 'wait_archive', 'wait_consolidate', 'turn_event', 'summary_origin',
-                'picture_event', 'picture_only'):  # summaries on, as in the golden 'full' run
+                'picture_event', 'picture_only', 'strong_no_narrative', 'prompt_shape'):  # summaries on, as in the golden 'full' run
         config = {'llm_only_reply_summary': False, 'memory_worthiness_enabled': False}
     plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
@@ -149,10 +168,10 @@ def run():
                        ('气死我了！！！他凭什么这样说我', '{"e":"anger","i":0.8}'),
                        ('真的受够了！！！气死了！！！', '{"e":"anger","i":0.9}'))
         for text, tag in group_lines:
-            t(20, text, '10002', '柠檬', A, reply='我陪着你<bc>%s</bc>' % tag)
+            t(20, text, '10002', '柠檬', A, reply='我陪着你，听着也好难过')
         # past the per-chat cooldown; her last six replies still include the two private ones
         group_lines += (('我还是好生气！！！凭什么啊！！！', '{"e":"anger","i":0.9}'),)
-        t(620, group_lines[-1][0], '10002', '柠檬', A, reply='我陪着你<bc>%s</bc>' % group_lines[-1][1])
+        t(620, group_lines[-1][0], '10002', '柠檬', A, reply='我陪着你，听着也好难过')
         out['private_texts'] = ['小爱，我在偷偷准备一个惊喜蛋糕给大家', '好呀，惊喜蛋糕我帮你保密',
                                 '蛋糕要做草莓味的', '草莓味的惊喜蛋糕听起来好甜']
         out['all_texts'] = out['private_texts'] + [x[0] for x in group_lines] + ['我陪着你']
@@ -413,6 +432,184 @@ def run():
         out['forgot'] = plugin._forget(source_ids=['m_star'])
         lib = json.loads(path.read_text('utf-8'))
         out['after'] = [e.get('text') for e in lib['entries']]
+    elif CASE == 'old_body':
+        # a state and a self model written before step 1-2 (see the top of this file)
+        plugin._core(None)
+        out['her'] = json.loads((DATA / 'states' / 'her.json').read_text('utf-8'))
+        out['kept_body'] = (DATA / 'states' / 'per_session_archive' / 'her.before_body.json').exists()
+        out['self_model'] = json.loads((DATA / 'self_model.json').read_text('utf-8'))
+        out['kept_self'] = json.loads((DATA / 'self_model.before_heart.json').read_text('utf-8'))
+        t(0, '小爱 早上好', '10002', '柠檬', A, reply='早呀')
+        out['her_after'] = json.loads((DATA / 'states' / 'her.json').read_text('utf-8'))
+        out['prompt'] = out['turns'][-1]['prompt']
+    elif CASE == 'prompt_shape':
+        # the reply prompt as the model sees it: a recalled memory, a loop, strong feelings
+        t(0, '小爱，记得提醒我明天交报告', '10002', '柠檬', A, reply='记下啦')
+        t(10, '我抽卡又歪了，好难过', '10003', '阿星', A, reply='抱抱，下次一定出')
+        t(10, '小爱 我好难过 想哭，抽卡又歪了', '10003', '阿星', A, reply='我陪着你，听着也好难过')
+        t(10, '小爱 在吗 我好难过', '10001', '芒果', reply='在呢')
+        out['group'] = out['turns'][2]['prompt']
+        out['private'] = out['turns'][3]['prompt']
+    elif CASE == 'reply_tags':
+        # the model writes a state tag although none is asked for
+        t(0, '小爱 早上好', '10002', '柠檬', A, reply='早呀')
+        core = plugin._core(None)
+        out['v0'] = core.v
+        replies = []
+        for raw in ('好呀<bc>{"e":"joy","i":1.0}</bc>', '好的<bc>{坏掉的', '<biocore>{"e":"anger"}</biocore>嗯嗯'):
+            event = harness.FakeEvent('小爱 好不好', sender='10002', name='柠檬', group=A)
+            resp = LLMResponse(raw)
+            loop.run_until_complete(plugin.on_llm_response(event, resp))
+            harness.drain(loop)
+            replies.append(resp.completion_text)
+        out['replies'] = replies
+        out['v1'] = core.v
+        out['window'] = [x['text'] for x in plugin._read_window('group:' + A)['recent']]
+        out['memories'] = [m['text'] for m in snapshot(plugin)['memories']]
+    elif CASE == 'heart':
+        import types
+        req = types.SimpleNamespace(method='GET', body={})
+
+        async def get_json(silent=True):
+            return req.body
+        req.get_json = get_json
+        sys.modules['quart'] = types.SimpleNamespace(request=req)
+        out['default'] = {k: plugin.self_model.get(k) for k in ('who_am_i', 'boundaries', 'consistency', 'notebook')}
+        req.method, req.body = 'POST', {'who_am_i': '我是被写好的', 'narrative': '替她写的'}
+        out['post_self'] = loop.run_until_complete(plugin.page_self_model())
+        out['after_post'] = {k: plugin.self_model.get(k) for k in ('who_am_i', 'narrative')}
+        req.body = {'rules': ['别在群里提我的工作', '长' * 150] + ['规矩%d' % i for i in range(12)]}
+        out['post_rules'] = loop.run_until_complete(plugin.page_owner_rules())
+        out['rules_file'] = json.loads((DATA / 'owner_rules.json').read_text('utf-8'))
+        t(0, '小爱 早上好', '10002', '柠檬', A)
+        t(10, '小爱 在吗', '10001', '芒果')
+        out['group'] = out['turns'][0]['prompt']
+        out['private'] = out['turns'][1]['prompt']
+    elif CASE == 'strong_no_narrative':
+        t(0, '小爱 我好难过 想哭', '10001', '芒果', reply='我陪着你，听着也好难过')
+        for delay, text in ((20, '今天被骂了 真的很委屈'), (20, '气死我了！！！他凭什么这样说我'),
+                            (30, '真的受够了！！！气死了！！！')):
+            t(delay, text, '10001', '芒果', reply='我陪着你，听着也好难过')
+        t(620, '我还是好生气！！！凭什么啊！！！', '10001', '芒果', reply='我陪着你，听着也好难过')
+        snap = snapshot(plugin)
+        out['events'] = [e['text'] for e in snap['events']]
+        out['raw_events'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
+                             if x.strip()] if (DATA / 'archives' / 'events.jsonl').exists() else []
+        out['self_model'] = json.loads((DATA / 'self_model.json').read_text('utf-8'))
+    elif CASE in ('notebook', 'notebook_full'):
+        plugin.llm_functions = {'notebook': {'enabled': True}}
+        plugin.notebook_time = '00:00'
+        plugin._begin_job()
+        A_PLACE, P_PLACE = 'group:' + A, 'private:10001'
+        plugin._append_event_archive({
+            'id': 'evt_cake', 'ts': clock.now, 'session': 'default:FriendMessage:10001',
+            'title': '偷偷准备惊喜蛋糕', 'event': '芒果在偷偷准备一个惊喜蛋糕给大家',
+            'meaning_to_her': '芒果在偷偷准备惊喜蛋糕', 'event_key': 'cake',
+            'origin': main.discretion.make_origin(P_PLACE, ['10001'], ['m_cake'])})
+        plugin._append_event_archive({
+            'id': 'evt_hike', 'ts': clock.now, 'session': 'default:GroupMessage:' + A,
+            'title': '周末去爬山', 'event': '柠檬说群里周末一起去爬山', 'meaning_to_her': '群里周末要去爬山',
+            'event_key': 'hike', 'origin': main.discretion.make_origin(A_PLACE, ['10002'], ['m_hike'])})
+        calls = []
+        answers = []
+
+        class NotebookModel:
+            async def text_chat(self, prompt='', system_prompt=None, **k):
+                calls.append({'prompt': prompt, 'system': system_prompt})
+                answer = answers.pop(0) if answers else '{}'
+                if isinstance(answer, Exception):
+                    raise answer
+                return harness.FakeResponse(answer)
+        real_provider = plugin._provider_for
+
+        async def provider(kind, event=None):
+            return NotebookModel() if kind == 'notebook' else await real_provider(kind, event)
+        plugin._provider_for = provider
+        out['materials'] = [{'id': m['id'], 'text': m['text'], 'origin': m['origin']}
+                            for m in plugin._notebook_materials(plugin._core(None))]
+        if CASE == 'notebook':
+            answers.append(json.dumps({'changes': [
+                {'op': 'add', 'text': '芒果在偷偷准备惊喜蛋糕，我要保密', 'uses': []},  # names none: overlap finds it
+                {'op': 'add', 'text': '今天心情平平', 'uses': ['m1']},
+                {'op': 'add', 'text': '周末大家要去爬山', 'uses': ['m3']},
+                {'op': 'add', 'text': '这一条超过了三处', 'uses': ['m1']},
+            ]}, ensure_ascii=False))
+            out['wrote'] = loop.run_until_complete(plugin._maybe_write_notebook())
+            out['again_same_night'] = loop.run_until_complete(plugin._maybe_write_notebook())
+            out['calls_first_night'] = len(calls)
+            out['notebook'] = [{'text': x['text'], 'origin': x['origin']} for x in plugin.self_model['notebook']]
+            t(0, '小爱 早上好', '10002', '柠檬', A)
+            t(10, '小爱 在吗', '10001', '芒果')
+            t(10, '小爱 晚上好', '10004', '桃子', B)
+            out['group_a'] = out['turns'][0]['prompt']
+            out['private'] = out['turns'][1]['prompt']
+            out['group_b'] = out['turns'][2]['prompt']
+            # a restart the same day does not call again; a failed call next day counts as that day's
+            plugin2 = main.BioCorePlugin(harness.FakeContext(), config=config)
+            plugin2.llm_functions = {'notebook': {'enabled': True}}
+            plugin2.notebook_time = '00:00'
+            plugin2._provider_for = provider
+            plugin2._ipv4_json = harness.fake_ipv4_json
+            out['restart_same_day'] = loop.run_until_complete(plugin2._maybe_write_notebook())
+            clock.advance(86400)
+            answers.append(RuntimeError('model down'))
+            out['next_day_failed'] = loop.run_until_complete(plugin2._maybe_write_notebook())
+            out['after_failure_same_day'] = loop.run_until_complete(plugin2._maybe_write_notebook())
+            out['calls_total'] = len(calls)
+            out['system_prompt'] = calls[0]['system']
+            out['forgot'] = plugin2._forget(person='10001')
+            out['notebook_after_forget'] = [x['text'] for x in plugin2.self_model['notebook']]
+        else:
+            plugin.self_model['notebook'] = [
+                {'id': 'n%d' % i, 'text': '旧的第%d条' % i, 'ts': 0, 'origin': main.discretion.make_origin('self')}
+                for i in range(20)]
+            answers.append(json.dumps({'changes': [
+                {'op': 'add', 'text': '本子满了这条加不进去', 'uses': ['m1']},
+                {'op': 'edit', 'no': 2, 'text': '改过的第二条' + '很长' * 30, 'uses': ['m2']},
+                {'op': 'delete', 'no': 3},
+            ]}, ensure_ascii=False))
+            loop.run_until_complete(plugin._maybe_write_notebook())
+            out['notebook'] = [{'text': x['text'], 'origin': x['origin']} for x in plugin.self_model['notebook']]
+    elif CASE == 'insight':
+        plugin.llm_functions = {'insight': {'enabled': True}}
+        plugin._begin_job()
+        events = [{'id': 'e%d' % i, 'ts': clock.now, 'title': '私下的事%d' % i, 'event': '芒果说的私事',
+                   'origin': main.discretion.make_origin('private:10001', ['10001'], ['m%d' % i])}
+                  for i in range(3)]
+        real_provider = plugin._provider_for
+
+        class InsightModel:
+            async def text_chat(self, prompt='', **k):
+                return harness.FakeResponse('{"insight":"被认真对待会安心"}')
+
+        async def provider(kind, event=None):
+            return InsightModel() if kind == 'insight' else await real_provider(kind, event)
+        plugin._provider_for = provider
+        out['made'] = loop.run_until_complete(plugin._generate_insight(None, plugin._core(None), events))
+        path = DATA / 'archives' / 'insights.jsonl'
+        out['insights'] = [json.loads(x) for x in path.read_text('utf-8').splitlines() if x.strip()]
+        out['her'] = plugin._core(None).snapshot()
+        out['forgot'] = plugin._forget(person='10001')
+        out['insights_after'] = [json.loads(x) for x in path.read_text('utf-8').splitlines() if x.strip()]
+    elif CASE in ('listen_off', 'listen_on'):
+        import mixin_phone
+        mixin_phone.LISTEN_MOVES_BODY = CASE == 'listen_on'
+        core = plugin._core(None)
+        core.seen_need, core.ambient = 0.9, 0.0
+        from astrbot.api.message_components import At, Plain
+        hear(plugin, loop, 0, '小爱 你看', '10002', '柠檬', A, parts=[At(qq='20002'), Plain('你看')])
+        out['seen_after_at'] = core.seen_need
+        for i in range(30):
+            hear(plugin, loop, 1, '闲聊%d' % i, '10005', '路人', A)
+        out['ambient'] = core.ambient
+        mixin_phone.LISTEN_MOVES_BODY = False
+    elif CASE in ('names_anon', 'names_nickname'):
+        import mixin_memory
+        mixin_memory.RECALL_NAMES = 'nickname' if CASE == 'names_nickname' else 'anon'
+        t(0, '小爱，我们周末去爬山吧', '10002', '柠檬', A)
+        t(10, '小爱，爬山我也去', '10003', '阿星', A)
+        t(10, '小爱，爬山要带水吗', '10002', '柠檬', A)
+        out['prompt'] = out['turns'][-1]['prompt']
     elif CASE == 'quote':
         # 芒果 quotes 柠檬's message; forgetting by message id finds each by its own id only
         first = t(0, '周末一起去爬山吧', '10002', '柠檬', A)
@@ -476,7 +673,7 @@ def run():
                                  (20, '今天被骂了 真的很委屈', '{"e":"sadness","i":0.85}'),
                                  (20, '气死我了！！！他凭什么这样说我', '{"e":"anger","i":0.8}'),
                                  (30, '真的受够了！！！气死了！！！', '{"e":"anger","i":0.9}')):
-            t(delay, text, '10001', '芒果', reply='我陪着你<bc>%s</bc>' % tag)
+            t(delay, text, '10001', '芒果', reply='我陪着你，听着也好难过')
         t(30, '小爱，我们群周末要去爬山', '10002', '柠檬', A)
         armed, fired = [False], []  # armed right before the wait under test
 
@@ -551,13 +748,23 @@ def run():
                                           (10, '小爱，唱歌要点几首', '10004', '桃子'),
                                           (10, '小爱，唱歌唱到几点', '10005', '路人')):
             t(delay, text, sender, name, B)
-        real_hints = plugin._maybe_llm_hints
+        real_tom = plugin._maybe_tom_probe
+        order = []
 
-        async def slow_hints(*a, **k):  # each request waits after its recall, the other one runs
+        async def slow_tom(event, *a, **k):  # each request waits after its recall, the other one runs
+            order.append(event.message_str)
             for _ in range(5):
                 await asyncio.sleep(0)
-            return await real_hints(*a, **k)
-        plugin._maybe_llm_hints = slow_hints
+            order.append(event.message_str)
+            return await real_tom(event, *a, **k)
+        plugin._maybe_tom_probe = slow_tom
+        real_render = main.interpretation.render_compact
+        metas = {}
+
+        def render(core, *a, **k):  # what each request hands its own prompt
+            metas[len(metas)] = dict(k.get('memory_meta') or {})
+            return real_render(core, *a, **k)
+        main.interpretation.render_compact = render
         clock.advance(30)
         ea = harness.FakeEvent('小爱，爬山的事定了吗', sender='10002', name='柠檬', group=A)
         eb = harness.FakeEvent('小爱，唱歌的事定了吗', sender='10004', name='桃子', group=B)
@@ -565,8 +772,13 @@ def run():
         rb = ProviderRequest(prompt=eb.message_str, system_prompt='你是小爱。')
         loop.run_until_complete(asyncio.gather(plugin.on_llm_request(ea, ra), plugin.on_llm_request(eb, rb)))
         harness.drain(loop)
+        main.interpretation.render_compact = real_render
         out['prompt_a'] = '\n'.join(p.get('text') for p in ra.extra_user_content_parts)
         out['prompt_b'] = '\n'.join(p.get('text') for p in rb.extra_user_content_parts)
+        out['interleaved'] = order[:2] == [ea.message_str, eb.message_str]
+        # the request that renders first is the one that started first (A)
+        out['who_a'] = list((metas.get(0, {}).get('destinations') or {}).keys())
+        out['who_b'] = list((metas.get(1, {}).get('destinations') or {}).keys())
     elif CASE == 'files':
         # window names the first phone code mapped to one file ("other_a_b.json")
         one, two = 'other:a:b', 'other:a_b'
@@ -595,10 +807,12 @@ def run():
         t(30, '小爱 惊喜蛋糕的事', '10004', '桃子', B)
     elif CASE == 'one_body':
         out['v_start'] = plugin._core(None).v
-        for i in range(4):
-            t(5, '太开心了！！！我终于抽到了！！！', '10002', '柠檬', A, reply='恭喜恭喜！' + JOY)
+        for text in ('太开心了！！！我终于抽到了！！！', '好耶！十连出金了', '笑死，运气也太好了吧', '真的好高兴啊',
+                     '谢谢小爱，你太可爱了', '喜欢喜欢，今天真开心'):
+            t(5, text, '10002', '柠檬', A, reply='恭喜恭喜！真为你开心')
         out['v_after_a'] = plugin._core(None).v
         t(0, '小爱 晚上好', '10004', '桃子', B)
+        out['v_b'] = plugin._core(None).v
         out['cores'] = list(plugin.cores)
     elif CASE == 'forget':
         t(0, '小爱，我在偷偷准备一个惊喜蛋糕给大家', '10001', '芒果')
@@ -608,7 +822,7 @@ def run():
                                  (20, '气死我了！！！他凭什么这样说我', '{"e":"anger","i":0.8}'),
                                  (30, '真的受够了！！！气死了！！！', '{"e":"anger","i":0.9}'),
                                  (620, '我还是好生气！！！凭什么啊！！！', '{"e":"anger","i":0.9}')):
-            t(delay, text, '10001', '芒果', reply='我陪着你<bc>%s</bc>' % tag)
+            t(delay, text, '10001', '芒果', reply='我陪着你，听着也好难过')
         t(60, '小爱 我今天也在群里', '10001', '芒果', A)
         lemon = t(30, '小爱，我们群周末要去爬山', '10002', '柠檬', A)
         t(30, '小爱，周末爬山带什么好', '10002', '柠檬', A)
