@@ -1,6 +1,6 @@
 # 她的脑子（可视化）
 
-面板里的一页：`pages/brain/`。把她的记忆、事件、认识的人、群和私聊窗口、本子画成一张会动的网，身体的几样画成中间的“核”。还能一轮一轮看她每次回话想起了什么。
+插件面板左边的“她的脑子”那一项（10-29 起；见下面“在面板里”），也还是单独的一页 `pages/brain/`。把她的记忆、事件、认识的人、群和私聊窗口、本子画成一张会动的网，身体的几样画成中间的“核”。还能一轮一轮看她每次回话想起了什么。
 
 - **只读**：页面只用 `bridge.apiGet` 读，没有任何写的路子。删东西回原来的面板。
 - **不出本机**：不从网上加载任何东西，也不往外发。
@@ -27,7 +27,7 @@
 - 星的名字（窗口、身体、想起的、没说的）；
 - 原来就有的筛选、搜索、抽屉、每轮回话那一排。
 
-**第二段（10-28）接上了真数据**：从 AstrBot 后台打开时，页面从面板的只读接口取她的数据（`mixin_brain.py` + `brain_graph.py`）。接口不通、或者直接用浏览器打开 `pages/brain/index.html`，就显示编造的示例（`pages/brain/sample.js`），顶上写明“示例数据（编造）”和原因。
+**第二段（10-28）接上了真数据**：从 AstrBot 后台打开时，页面从面板的只读接口取她的数据（`mixin_brain.py` + `brain_graph.py`）。接口不通、或者直接用浏览器打开 `pages/brain/index.html`，就显示编造的示例（`sample.js`，源文件在 `tools/brain/src/page/`），顶上写明“示例数据（编造）”和原因。
 
 ## 怎么看
 
@@ -70,9 +70,33 @@
 - `?lines=all`：打开“显示全部连线”；
 - `?debug=1`：布局状态写在顶栏的 `data-debug` 里。
 
+## 在面板里（10-29）
+
+主人要把星图放进面板，不要单独一页。做法：
+
+- **放两份，一模一样**：`build.mjs` 一次写两份，`pages/brain/`（单独那一页，留着）和 `pages/dashboard/brain/`（面板用）。两份都只由 `build.mjs` 生成，不手改；`index.html` 第二行写着“由 tools/brain/build.mjs 生成”。测试逐字节比两份（`licenses/` 也算）。
+  - 为什么放两份：AstrBot 发插件页面时，口令是按页面发的，每一页只能读自己文件夹里的文件。面板读不到 `../brain/`，只能读 `pages/dashboard/` 里面的。
+  - AstrBot 只把 `pages/` 下面一层的文件夹当成页面，`pages/dashboard/brain/` 不会多出一页。
+- **嵌法：srcdoc 的 iframe**（`pages/dashboard/brain_frame.js`）。
+  - 第一次点开“她的脑子”才建。页面的 HTML 由 `build.mjs` 写成 `panel-page.js`（`window.BioBrainPage`），里面加了 `<base href="brain/">`，脚本和样式照旧从 `brain/` 读文件。
+  - 不用 `src="brain/index.html"`：AstrBot 给页面发 `X-Frame-Options: SAMEORIGIN` 和 `frame-ancestors 'self'`，面板在 AstrBot 的沙箱里来源是 `null`，嵌在它里面的页面会被浏览器拒绝（在 Edge 里试过）。srcdoc 不是单独发的页面，不受这两条管。
+- **桥：面板转一手，只读**。
+  - AstrBot 的沙箱没有 `allow-same-origin`，面板和星图来源都是 `null`，互相碰不到对方的东西；AstrBot 的桥也不在星图里。
+  - 星图（`tools/brain/src/embed.js`）用 `postMessage` 问面板；面板用自己的桥问 AstrBot。
+  - 面板只转 `apiGet`，只转 `page/brain`、`page/brain/node`、`page/brain/search`；`query` 只放行 `part`、`snap`、`id`、`reveal`、`q`，值转成字符串，最多 200 字；同时最多 8 个请求。两边源码里都没有 `apiPost`，测试查。
+  - 两边都只认对方那一个窗口（`event.source`），消息也只发给那一个窗口。目标来源只能写 `"*"`，因为 `null` 来源写不出来。
+  - 面板 3 秒没回音（比如在静态预览里没有桥），星图照旧显示“示例数据（编造）”和原因。别的规矩一条不变：只读、内容点开才给、QQ 号再点一下才显示。
+- **切走就停**：切到别的项，面板告诉星图停下：不画、不转，布局的 Worker 也停（Galaxy View 的 Worker 加了一个 `pause`）。切回来接着画。浏览器标签藏起来时也停。
+- **大小**：点开后星图铺满右边那一块，高度跟着窗口走，面板本身不出滚动条。鼠标在星图上时，滚轮只缩放星图、拖动只转球；手机上一指拨、两指捏合也只管星图。
+- **全屏 / 铺满**：右上角的按钮先看浏览器许不许全屏。
+  - AstrBot 装面板的 iframe 没有 `allowfullscreen`，所以在 AstrBot 里按钮写“铺满”：星图盖满整个面板（藏起左边导航和顶栏），不是整个屏幕。
+  - 静态预览里能真全屏，按钮写“全屏”。
+  - 再按一次，或者按 Esc 退出。焦点在星图里时按 Esc，星图也会让面板退出。
+- **外壳**：`tests/panel_shell/` 是一个模拟 AstrBot 后台的外壳。它用跟 AstrBot 一样的沙箱 iframe 装面板，发一样的两个头，往页面里加一个假的桥，用编造的数据回话。`python tests/panel_shell/serve.py` 起一个只听 127.0.0.1 的服务；`tests/test_brain_panel.py` 用无界面的 Edge / Chrome 在里面走一遍。
+
 ## 打包
 
-页面用的是一个打好的文件 `pages/brain/brain.bundle.js`，提交在仓库里。
+页面用的是一个打好的文件 `brain.bundle.js`，跟页面一起写在 `pages/brain/` 和 `pages/dashboard/brain/`，提交在仓库里。页面本身（`index.html`、`brain.css`、`sample.js`）的源文件在 `tools/brain/src/page/`。
 
 重新打包：
 
@@ -84,7 +108,7 @@ node build.mjs
 
 - 只装三个包，版本都钉死：three 0.184.0、d3-force-3d 3.0.6（跟 Galaxy View 锁定的一样）、esbuild 0.25.5；
 - 不跑任何安装脚本；`node_modules` 不提交。
-- `build.mjs` 会把打进去的每个包的许可证复制到 `pages/brain/licenses/`。
+- `build.mjs` 会把打进去的每个包的许可证复制到 `pages/brain/licenses/`，再把整个文件夹照样写一份到 `pages/dashboard/brain/`。
 
 ## 数据格式 `ams-life.brain/1`
 

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!-- 由 tools/brain/build.mjs 生成，改 tools/brain/src/（page/index.html），不要手改这一份。 -->
+<!-- ams-life (AGPL-3.0); see NOTICE.md. Read-only brain map: nothing here can change her.
+     Drawing by Galaxy View (MIT, (c) 2026 Rick); brain.bundle.js is built by tools/brain/build.mjs, licenses in licenses/. -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light dark" />
+<title>她的脑子</title>
+<link rel="stylesheet" href="./brain.css" />
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="mark"></span><div><b>她的脑子</b><small>记忆 · 人 · 窗口 · 本子 · 身体</small></div></div>
+    <span class="badge" id="sourceBadge" hidden>示例数据（编造）</span>
+    <div class="top-right">
+      <span class="stat" id="statLine"></span>
+      <button class="btn" id="motionBtn" title="连线上的亮点和身体的核会动">动起来</button>
+      <button class="btn" id="fitBtn" title="也可以按 R">看全图</button>
+      <button class="btn" id="themeBtn">深色</button>
+      <button class="btn only-narrow" id="panelBtn">筛选</button>
+    </div>
+  </header>
+
+  <aside class="side" id="side">
+    <section>
+      <label class="lbl" for="q">搜</label>
+      <input id="q" type="search" placeholder="类别、窗口、编号，或记忆里的字" autocomplete="off" />
+      <ol class="hits" id="hits"></ol>
+    </section>
+    <section>
+      <div class="lbl">星</div>
+      <div id="kindBoxes" class="boxes"></div>
+    </section>
+    <section>
+      <div class="lbl">线</div>
+      <label class="toggle"><input type="checkbox" id="allLines" /> 显示全部连线 <span class="muted">（只给检查用）</span></label>
+      <p class="hint">平常星之间不连线。她想起来的时候、或者你点开一颗星的时候，才连那几条。</p>
+      <p class="hint" id="lineCount"></p>
+    </section>
+    <section>
+      <label class="lbl" for="winSel">窗口</label>
+      <select id="winSel"></select>
+      <div class="seg" id="visSeg">
+        <button data-vis="all" class="on">都看</button><button data-vis="public">只看公开</button><button data-vis="private">只看私下</button>
+      </div>
+    </section>
+    <section>
+      <div class="lbl">时间 <span id="timeText" class="muted"></span></div>
+      <div class="range"><span>从</span><input id="tFrom" type="range" min="0" max="24" step="1" /><span>天前</span></div>
+      <div class="range"><span>到</span><input id="tTo" type="range" min="0" max="24" step="1" /><span>天前</span></div>
+      <p class="hint">人和窗口不按时间筛。筛完星系会重新排一下。</p>
+    </section>
+    <section class="legend">
+      <div class="lbl">怎么看</div>
+      <div class="legend-wins" id="legendWins"></div>
+      <p>每个群是一团同色的星；私聊里听到的是淡紫的空心星。相关的星排在一起，但平常不连线。</p>
+      <p>星系中心那一圈会呼吸的光是她的身体，越大越亮，数值越高。</p>
+      <p>拖动转球，甩一下它会带着惯性转；滚轮或两指捏合缩放。点一颗星看它。</p>
+      <p>这一页只能看，不能改她。删东西请回原来的面板。</p>
+    </section>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div id="galaxy"></div>
+    <div id="labels"></div>
+    <div class="tip" id="tip" hidden></div>
+    <div class="loading" id="loading">正在铺开…</div>
+
+    <aside class="drawer" id="drawer" hidden>
+      <button class="x" id="drawerClose" title="关上 (Esc)">×</button>
+      <div class="d-kind" id="dKind"></div>
+      <h2 id="dTitle"></h2>
+      <dl id="dMeta"></dl>
+      <div class="d-body" id="dBody"></div>
+      <div id="dLinks"></div>
+    </aside>
+
+    <section class="turns" id="turns">
+      <div class="turns-head">
+        <b>每次回话想起了什么</b>
+        <span class="muted" id="turnHint">点一轮看她这次想起了谁。金色的是想起的，灰的是她知道、但在这里没说的。</span>
+        <span class="turns-nav"><button class="btn" id="turnPrev" title="上一轮 (←)">◀</button><button class="btn" id="turnNext" title="下一轮 (→)">▶</button><button class="btn" id="turnOff">不看了</button></span>
+      </div>
+      <ol class="turn-list" id="turnList"></ol>
+    </section>
+  </main>
+</div>
+<script src="./sample.js"></script>
+<script src="./brain.bundle.js"></script>
+</body>
+</html>

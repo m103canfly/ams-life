@@ -17,6 +17,7 @@ body{
   color:var(--ink);
   background:radial-gradient(ellipse at 50% 45%,var(--bg) 0%,var(--bg2) 100%);
   overflow:hidden;
+  overscroll-behavior:none;   /* the wheel zooms the map, never scrolls the panel around it */
 }
 button,input,select{font:inherit;color:inherit}
 .muted{color:var(--muted)}

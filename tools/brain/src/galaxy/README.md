@@ -28,6 +28,9 @@ Changes made here (everything else is unchanged):
   layout parameters and a per-node `side`, so the stars gather into a ball
   (`../ball.js`, `forceBall`) with private chats leaning to one side. With the
   parameters left out the layout is Galaxy View's as before.
+- `layout/forceWorker.ts`, `layout/WorkerForceLayout.ts`: a `pause` message, so
+  the worker stops ticking while the map is hidden in the panel and goes on when
+  it is shown again.
 
 `interactions/CameraDirector.ts` is kept for reference but no longer used: the
 brain map turns like a globe (`../globe.js`), which its orbit controls cannot.

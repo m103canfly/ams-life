@@ -22,10 +22,12 @@ import { elapsedFrameSeconds, frameDeltaSeconds } from './galaxy/timing/frameClo
 import { GlobeCamera } from './globe.js';
 import { ballRadius } from './ball.js';
 import { fetchGraph, sampleBadge } from './data.js';
+import { inPanel, panelBridge, runGate } from './embed.js';
 import { SHOW_ALL_DEFAULT, TURN, baseLinesVisible, lineMap, openedLines, turnFrame, turnSteps } from './lines.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
+const IN_PANEL = inPanel(document);   // shown inside the panel: data through it (embed.js)
 const DAY = 86400;
 
 // Galaxy View's default "galaxy" style (its settings.ts DEFAULT_SETTINGS).
@@ -67,6 +69,13 @@ let G = { nodes: [], links: [] }, idx = new Map(), adj = null, src = [];
 const posCache = new Map();
 let renderer = null, director = null, layout = null, graphRadius = 80, viewRadius = 300, tier = TIERS.high;
 let body = {}, liveBody = null;
+// Drawing (and the layout worker) stop while the panel shows something else or the
+// browser tab is hidden, and go on where they were when shown again (embed.js).
+const gate = runGate((on) => {
+	layout?.pause?.(!on);
+	if (on) { prev = null; if (layout && !layout.ticks) layoutStarted = performance.now(); tick(); }
+});
+const panel = IN_PANEL ? panelBridge(window, { run: (on) => gate.set('panel', on), theme: (d) => applyTheme(d) }) : null;
 const filter = { kinds: new Set(Object.keys(KIND)), win: '', vis: 'all', from: 24, to: 0 };
 let sel = -1, turn = -1, turnStart = 0, hits = null, hover = -1, coreSel = -1;
 let motion = true, dark = true, framed = false, settledOnce = false;
@@ -76,6 +85,7 @@ let overrides = new Map();
 
 // ------------------------------------------------------------------ data
 function findBridge() {
+	if (IN_PANEL) return panel;   // AstrBot's bridge is not in the panel's frame; the panel answers for it
 	let b = null;
 	try { b = window.AstrBotPluginView || window.AstrBotPluginPage || window.astrbotPluginView || null; } catch (e) { b = null; }
 	try { if (!b && window.parent && window.parent !== window) b = window.parent.AstrBotPluginView || window.parent.AstrBotPluginPage || null; } catch (e) { b = null; }
@@ -90,6 +100,7 @@ async function loadGraph() {
 	if (bridge) {
 		try {
 			const ctx0 = await Promise.race([bridge.ready(), new Promise((r) => setTimeout(() => r(null), 3000))]);
+			if (IN_PANEL && !ctx0) throw new Error('面板没回音');
 			if (!params.get('theme') && !storeGet('bio_theme') && ctx0) dark = !!ctx0.isDark;
 			const g = await fetchGraph((route, q) => bridge.apiGet(route, q));
 			source = 'live';
@@ -914,7 +925,9 @@ function wire() {
 	$('themeBtn').addEventListener('click', () => { const d = !dark; applyTheme(d); storeSet('bio_theme', d ? 'dark' : 'light'); });
 	$('panelBtn').addEventListener('click', () => $('side').classList.toggle('open'));
 	window.addEventListener('resize', resize);
+	document.addEventListener('visibilitychange', () => gate.set('page', document.visibilityState !== 'hidden'));
 	window.addEventListener('keydown', (ev) => {
+		if (ev.key === 'Escape' && panel) panel.exitFill();   // the keys come here while the map has the focus
 		if (ev.target && /INPUT|SELECT|TEXTAREA/.test(ev.target.tagName)) return;
 		if (ev.key === 'Escape') { if (turn >= 0) setTurn(-1); else select(-1); }
 		else if (ev.key === 'ArrowRight') $('turnNext').click();
@@ -969,9 +982,19 @@ function pickCore(px, py, w, h) {
 
 // ------------------------------------------------------------------ loop
 const debug = params.get('debug') === '1';
-let frames = 0;
+let frames = 0, drawn = 0;
 let prev = null;
+let queued = false;
+function tick() {
+	if (queued || !gate.running) return;
+	queued = true;
+	requestAnimationFrame((t) => { queued = false; frame(t); });
+}
+// For checks from outside (the panel shell, screenshots): is it drawing, how many frames so far.
+window.__brain = { get running() { return gate.running; }, get frames() { return drawn; } };
 function frame(now) {
+	if (!gate.running) { prev = null; return; }
+	drawn++;
 	const ad = elapsedFrameSeconds(now, prev), d = frameDeltaSeconds(now, prev);
 	prev = now;
 	workerWatchdog(now);
@@ -989,7 +1012,7 @@ function frame(now) {
 	renderer.render(d, ad);
 	updateLabels();
 	if (debug && (frames++ % 30 === 0)) $('statLine').dataset.debug = (layout instanceof WorkerForceLayout ? 'worker' : 'main') + ' ticks=' + layout.ticks + ' settled=' + layout.isSettled() + ' frames=' + frames;
-	requestAnimationFrame(frame);
+	tick();
 }
 
 async function boot() {
@@ -1024,7 +1047,7 @@ async function boot() {
 	if (params.get('sel')) selectId(params.get('sel'), true);
 	if (params.get('turn')) setTurn(Number(params.get('turn')) - 1);
 	if (params.get('q')) { $('q').value = params.get('q'); runSearch(); }
-	requestAnimationFrame(frame);
+	tick();
 }
 // AstrBot adds its bridge script at the end of the page, after this bundle: start once
 // the whole page is parsed, so the bridge is there to be found.

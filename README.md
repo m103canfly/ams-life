@@ -43,7 +43,7 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | `interpretation.py` | 回复时给模型看的几行描述（她现在怎样、她想起来的、她的本子、主人定的规矩……；不带数字、QQ 号和“该怎么回”），各种提示词 |
 | `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
 | `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开） |
-| `pages/brain/` `tools/brain/` | “她的脑子”：她的记忆画成一个能转的星球（只读；见 `docs/brain-viz.md`） |
+| `pages/brain/` `tools/brain/` | “她的脑子”：她的记忆画成一个能转的星球（只读；见 `docs/brain-viz.md`）。面板里也有这一项（`pages/dashboard/brain/` 是同一份，由 `tools/brain/build.mjs` 写，`brain_frame.js` 嵌进去） |
 | `tests/` | 离线测试，不连 AstrBot、不联网、不调用模型 |
 | `tools/` | 离线工具：导入旧数据、回放旧聊天记录、查漏；只写到仓库外的新文件夹 |
 | `docs/` | 改造计划、上游原文档 |
