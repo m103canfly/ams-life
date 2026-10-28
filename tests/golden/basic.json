@@ -14,6 +14,10 @@
      "enabled": true,
      "provider": "follow_llm"
     },
+    "group_impressions": {
+     "enabled": false,
+     "provider": "follow_llm"
+    },
     "humor_hint": {
      "enabled": false,
      "provider": "follow_llm"
@@ -6930,6 +6934,11 @@
       "enabled": true,
       "provider": "follow_llm"
      },
+     "group_impressions": {
+      "default_enabled": false,
+      "enabled": false,
+      "provider": "follow_llm"
+     },
      "humor_hint": {
       "default_enabled": false,
       "enabled": false,
@@ -7674,6 +7683,7 @@
    "events": [],
    "homeostasis": {},
    "hybrid_retrieval": true,
+   "impressions": [],
    "inject_intent": true,
    "insight_auto_enabled": false,
    "insights": [],
@@ -7768,6 +7778,11 @@
     "event_summary": {
      "default_enabled": true,
      "enabled": true,
+     "provider": "follow_llm"
+    },
+    "group_impressions": {
+     "default_enabled": false,
+     "enabled": false,
      "provider": "follow_llm"
     },
     "humor_hint": {
@@ -10478,7 +10493,8 @@
   "/astrbot_plugin_ams_life/page/event_summary",
   "/astrbot_plugin_ams_life/page/memory_point_feedback",
   "/astrbot_plugin_ams_life/page/memory/delete/<path:session>/<entry_id>",
-  "/astrbot_plugin_ams_life/page/forget/person"
+  "/astrbot_plugin_ams_life/page/forget/person",
+  "/astrbot_plugin_ams_life/page/impressions/delete"
  ],
  "turns": [
   {

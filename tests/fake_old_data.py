@@ -125,7 +125,9 @@ def build_old(root):
                    'active'),
                   ('group:' + G_BUSY, STAR, NAMES[STAR], '爱发猫图', '{}', '2026-10-04', '2026-10-26', T0, T0, 1,
                    'active')]),
-        ('alias', [('group:' + G_SMALL, PEACH, NAMES[PEACH], '["桃桃"]', T0)])])
+        ('alias', [('group:' + G_SMALL, PEACH, NAMES[PEACH], '["桃桃"]', T0),
+                   ('group:' + G_BUSY, STAR, NAMES[STAR], '["星星"]', T0),        # forgotten
+                   ('group:' + G_BUSY, MANGO, NAMES[MANGO], '["大佬"]', T0)])])   # how anyone is addressed
     return snow
 
 

@@ -273,10 +273,11 @@ class MemoryMixin:
             pass
         return {"entries": [], "rooms": {}}
 
-    def _write_library(self, lib) -> None:
+    def _write_library(self, lib) -> bool:
         """Write the whole library: nothing the forget registry rules out is kept; vectors
         go to the vector store (memories whose id is their own), and the vectors of
-        memories no longer in the library go with them."""
+        memories no longer in the library go with them. False: not written (the registry
+        could not be read)."""
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         lib["schema_version"] = MEMORY_SCHEMA_VERSION
         try:
@@ -284,7 +285,7 @@ class MemoryMixin:
         except forget_registry.Unreadable as exc:
             # never filter with a registry that cannot be read: nothing is written this time
             logger.warning("[ams-life] forget registry unreadable, library not written: %s", exc)
-            return
+            return False
         lib["entries"] = kept
         store = self._vector_store()
         out = dict(lib, entries=store.detach(lib["entries"]))
@@ -293,6 +294,7 @@ class MemoryMixin:
         os.replace(str(tmp), str(MEMORY_LIBRARY_PATH))
         store.keep_only(str(e["id"]) for e in lib["entries"] if isinstance(e, dict) and e.get("id"))
         self._known_memory_ids = {str(e.get("id") or "") for e in lib["entries"] if isinstance(e, dict)}
+        return True
 
     def _library_ids(self) -> set:
         """The ids in the library: read once, then kept up to date by _write_library."""

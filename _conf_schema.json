@@ -452,6 +452,21 @@
     "type": "int",
     "default": 1500
   },
+  "impressions_time": {
+    "description": "她更新群友印象的时间",
+    "hint": "每天本地时间到点以后，给每个群当天常说话的人更新印象（HH:MM，默认 23:15）。开关在面板的模型功能里（“群友印象”），默认关闭；每个群每天最多调 1 次模型，失败也算。",
+    "type": "string",
+    "default": "23:15"
+  },
+  "member_aliases": {
+    "description": "主人写的称呼",
+    "hint": "每行一个人：QQ号:称呼1,称呼2。比她自己从聊天里看出来的优先；别人用不了这里写给某人的称呼。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": []
+  },
   "notebook_time": {
     "description": "她写本子的时间",
     "hint": "每天本地时间到点以后写一次（HH:MM，默认 23:30）。开关在面板的模型功能里（“她的本子”），默认关闭；每天最多调 1 次模型，失败也算。",

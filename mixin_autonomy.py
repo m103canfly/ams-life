@@ -212,6 +212,11 @@ class AutonomyMixin:
                     await self._maybe_write_notebook()
                 except Exception as exc:
                     logger.warning("[ams-life] notebook failed: %s", exc)
+                try:
+                    self._begin_job()
+                    await self._maybe_update_impressions()
+                except Exception as exc:
+                    logger.warning("[ams-life] impressions failed: %s", exc)
                 if not (getattr(self, "proactive_autonomy", False)
                         or getattr(self, "autonomy_loop_enabled", False)):
                     continue

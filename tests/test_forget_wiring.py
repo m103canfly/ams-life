@@ -56,6 +56,7 @@ class OwnerDeletes(unittest.TestCase):
         self.assertEqual(counts['places'], ['group:900001', 'private:10001'])
         # what AstrBot keeps: his private conversation, his rows of the message history
         self.assertEqual(counts['astrbot'], {'conversations': 1, 'message_history': 2})
+        self.assertEqual(counts['archived_copies'], 0)                  # nothing was migrated here
         self.assertEqual(r['astrbot']['conversations'], ['default:FriendMessage:10001'])
         self.assertEqual(r['astrbot']['history_left'], ['10002', '10004'])
         # registered: what he says afterwards is not kept either
@@ -92,6 +93,8 @@ class OwnerDeletes(unittest.TestCase):
         self.assertEqual(r['user_10002']['interactions'], 7)
         self.assertEqual(r['events'].strip(), '')
         self.assertEqual(r['vector_ids'], [])                      # their vectors went with them
+        # the library copied before the vectors moved out still holds the old data: the panel says so
+        self.assertEqual(r['by_message']['data']['counts']['archived_copies'], 1)
 
 
 class Review(unittest.TestCase):
@@ -112,6 +115,11 @@ class Review(unittest.TestCase):
         self.assertEqual(r['user_10002'].get('destination_map'), {})   # this one did draw from him
         self.assertEqual(r['user_10002']['state'], {'trust': 0.5})
 
+    def test_latest_lines_and_evidence_count(self):
+        r = run_case('mention')
+        self.assertEqual(r['user_10011'].get('destination_map'), {})
+        self.assertEqual(r['user_10012'].get('social_world'), [])
+
     def test_old_rollback_and_restore_are_gone(self):
         r = run_case('old_endpoints')
         self.assertEqual((r['routes'], r['methods']), ([], []))
@@ -126,6 +134,35 @@ class Review(unittest.TestCase):
         r = run_case('migrate_many')
         self.assertEqual(r['ids'], [30, 30, True])
         self.assertLessEqual(r['reads_at_start'], 5)
+
+
+class ReviewOfPR10(unittest.TestCase):
+    """PR #9 re-review (fixed on PR #10): a delete whose library write failed says so; a whole
+    backup restored never brings back someone deleted."""
+
+    def test_a_delete_that_could_not_write_the_library_says_so(self):
+        r = run_case('forget_broken')
+        self.assertEqual(r['page']['status'], 'error')
+        self.assertIn('AstrBot 那边也还没删', r['page']['message'])
+        self.assertTrue(r['still_there'])
+        self.assertEqual(r['retry'], 'ok')
+        self.assertTrue(r['gone_after_retry'])
+
+    def test_restoring_a_backup_does_not_bring_anyone_back(self):
+        r = run_case('restore')
+        self.assertEqual(r['restore']['status'], 'ok', r['restore'])
+        self.assertEqual(r['restore']['data']['deleted_again'], {'people': 1, 'messages': 1})
+        self.assertFalse(r['guitar'])
+        self.assertFalse(r['hike'])
+        self.assertFalse(r['user_10001'])
+        self.assertFalse(r['phone_guitar'])
+        self.assertIn(['qq', '10001'], r['registry'])
+
+    def test_restoring_deletes_again_only_what_the_owner_deleted(self):
+        r = run_case('restore')
+        # 10003 is forgotten in group 1 only, 10004 opted back in: what the registry lets her keep stays
+        self.assertEqual(r['kept'], {'蛋糕': True, '下雨': True, '我回来啦': True})
+        self.assertEqual(r['users'], {'10002': True, '10003': True, '10004': True})
 
 
 class NoChatCommands(unittest.TestCase):

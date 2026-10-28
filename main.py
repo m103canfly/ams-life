@@ -44,6 +44,10 @@ try:
 except ImportError:
     from mixin_people import PeopleMixin
 try:
+    from .mixin_impressions import ImpressionsMixin
+except ImportError:
+    from mixin_impressions import ImpressionsMixin
+try:
     from .mixin_events import EventsMixin
 except ImportError:
     from mixin_events import EventsMixin
@@ -72,7 +76,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, EventsMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -86,6 +90,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # ams-life step 1-2: when she writes her notebook (local time; switch: the
         # "notebook" LLM function, off by default)
         self.notebook_time = str(self.config.get("notebook_time", "23:30") or "23:30").strip()
+        # ams-life step 1-3: when the group members she knows are updated (switch: the
+        # "group_impressions" LLM function, off by default); what they are called joins
+        # the names made anonymous elsewhere
+        self.impressions_time = str(self.config.get("impressions_time", "23:15") or "23:15").strip()
+        self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
         except Exception:
@@ -648,6 +657,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             continuity=_continuity,
             owner_rules=self._owner_rules(),
             private_with_him=bool(_sid) and self._here(event) == "private:" + str(_sid),
+            people=self._people_lines(event),
         ).strip()
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
