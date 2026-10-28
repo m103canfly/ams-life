@@ -34,7 +34,7 @@ if CASE in ('views', 'anon', 'anon_kept', 'card_here'):
         rec.update(name='星野', aliases=['阿一', '阿二', '阿三', '阿四'], updated='2026-10-03')
     store.save('group:' + G1, data)
 
-if CASE == 'material':
+if CASE in ('material', 'red', 'red_on'):
     clock.now = EVENING
 
 if CASE == 'nightly':
@@ -54,6 +54,9 @@ class Model(harness.FakeProvider):
         if '群里几位群友今天说的话' in str(prompt):
             Model.impressions_calls += 1
             self.last = str(prompt)
+            if CASE in ('red', 'red_on'):   # what a person is: held back only while the switch is on
+                return harness.FakeResponse(json.dumps({
+                    'P1': {'style': '性格开朗，说话很快', 'topics': ['靠谱攻略'], 'aliases': []}}, ensure_ascii=False))
             return harness.FakeResponse(json.dumps({
                 # P1 is 芒果, P2 is 柠檬 (most lines first, then by number); a name is kept only
                 # where others really called someone that: 柠柠 for her, nothing for him
@@ -68,6 +71,8 @@ ctx.provider = Model()
 config = {'member_aliases': ['10002:小柠']} if CASE in ('views', 'anon') else {}
 if CASE == 'material':
     config = {'member_aliases': ['10001:芒芒']}
+if CASE == 'red_on':
+    config = {'redline_filter': True}
 plugin = main.BioCorePlugin(ctx, config=config)
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
@@ -175,6 +180,17 @@ if CASE == 'material':
     prompt = getattr(ctx.provider, 'last', '')
     result['prompt_has'] = {w: w in prompt for w in ('大芒', '芒芒', '鹿说', '芒果', '柠檬')}
     result['lines'] = [ln for ln in prompt.splitlines() if ln.startswith('- ')]
+
+if CASE in ('red', 'red_on'):
+    # one line over a red line among a dozen: the switch decides whether the model sees it
+    for i in range(12):
+        turn('我工资好低 %d' % i if i == 0 else '今天抽卡又歪了 %d' % i, '10002', '柠檬', group=G1, advance=30)
+    plugin.llm_functions = dict(plugin.llm_functions or {}, group_impressions={'enabled': True, 'provider': 'follow_llm'})
+    loop.run_until_complete(plugin._maybe_update_impressions(now=EVENING + 3.5 * 3600))
+    result['seen'] = '工资' in getattr(ctx.provider, 'last', '')
+    result['counts'] = {k: v for k, v in plugin._red_line_census()['by_store'].items() if k in ('impressions', 'material')}
+    rec = plugin._impression_store().load('group:' + G1)['people']['10002']
+    result['written'] = {'style': rec.get('style'), 'topics': rec.get('topics')}
 
 for task in asyncio.all_tasks(loop):
     task.cancel()

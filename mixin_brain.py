@@ -182,9 +182,6 @@ class BrainMixin:
         except Exception as exc:
             raise forget_registry.Unreadable(str(exc)) from exc
 
-    def _brain_person_kept(self, qq, at=None) -> bool:
-        return self._may_keep([qq], "", at)
-
     def _brain_build(self, src, rows, key):
         """The build, in a worker thread: only what was read into memory, and a copy of the
         registry made here (SQLite lets hers be read only in the thread that opened it)."""

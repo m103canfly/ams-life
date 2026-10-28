@@ -81,7 +81,8 @@ class PeopleMixin:
             # ams-life: nothing the forget registry rules out stays in her notes; when the
             # registry cannot be read, nothing is written this time (nothing is dropped)
             try:
-                _kept = {_key: [x for x in self.self_model[_key] if self._origin_kept(x)]
+                _kept = {_key: [x for x in self.self_model[_key] if self._origin_kept(x) and not (
+                                     isinstance(x, dict) and self._red_line(x.get("text"), "notes"))]
                          for _key in ("notebook", "narrative_items", "diary", "relationship_narratives")
                          if isinstance(self.self_model.get(_key), list)}
             except forget_registry.Unreadable as exc:

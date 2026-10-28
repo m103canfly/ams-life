@@ -281,7 +281,17 @@ class MemoryMixin:
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         lib["schema_version"] = MEMORY_SCHEMA_VERSION
         try:
-            kept = [e for e in lib.get("entries") or [] if self._origin_kept(e)]
+            # new memories only (the library is not gone over again on every write): numbers
+            # out, and not kept over a red line while the switch is on
+            old_ids = self._library_ids() if MEMORY_LIBRARY_PATH.exists() else set()
+            new = [e for e in lib.get("entries") or [] if isinstance(e, dict) and str(e.get("id") or "") not in old_ids]
+            red = {id(e) for e in new if self._red_line(e.get("text"), "memory")}
+            kept = [e for e in lib.get("entries") or [] if self._origin_kept(e) and id(e) not in red]
+            if new:
+                scrub = self._scrubber()
+                for e in new:
+                    if isinstance(e.get("text"), str):
+                        e["text"] = scrub(e["text"])
         except forget_registry.Unreadable as exc:
             # never filter with a registry that cannot be read: nothing is written this time
             logger.warning("[ams-life] forget registry unreadable, library not written: %s", exc)

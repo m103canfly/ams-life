@@ -81,6 +81,12 @@ JUDGEMENT = re.compile(r"性格|人品|脾气|情商|智商|善良|自私|小气
                        r"|聪明|笨蛋|愚蠢|幼稚|成熟|渣男|渣女|有钱|很穷|漂亮|帅气|好看|丑|年纪|年龄|职业|工作是"
                        r"|学生|结婚|单身")
 DIGITS = re.compile(r"[0-9０-９]")
+
+
+def judged(text) -> str:
+    """'judgement' when `text` says what a person is (JUDGEMENT), else ''. The plugin's
+    red-line switch decides whether it is held back; on its own this module holds it back."""
+    return "judgement" if JUDGEMENT.search(str(text or "")) else ""
 LONG_NUMBER = re.compile(r"\d{5,}")
 PART = re.compile(r"\[(图片|表情|语音|视频|文件|聊天记录|戳一戳|卡片|分享|位置|音乐|骰子|猜拳|名片|消息)\]")
 HAN = re.compile(r"[一-鿿]+")
@@ -134,7 +140,7 @@ def _plain(text) -> str:
     return PART.sub("", str(text or ""))
 
 
-def pet_phrases(own_lines, other_lines=()) -> list:
+def pet_phrases(own_lines, other_lines=(), red=redline.hit) -> list:
     """2-4 Chinese characters he says on at least 3 lines, not everyday words, not over a
     red line, and that the others in the group do not say more than he does. At most 3."""
     def per_line(lines):
@@ -148,7 +154,7 @@ def pet_phrases(own_lines, other_lines=()) -> list:
         return count
     mine, theirs = per_line(own_lines), per_line(other_lines)
     ok = [(p, n) for p, n in mine.items()
-          if n >= 3 and p not in GENERIC and len(set(p)) > 1 and not redline.hit(p) and theirs.get(p, 0) <= n]
+          if n >= 3 and p not in GENERIC and len(set(p)) > 1 and not red(p) and theirs.get(p, 0) <= n]
     ok.sort(key=lambda x: (-x[1], -len(x[0]), x[0]))
     out = []
     for p, _n in ok:
@@ -160,7 +166,7 @@ def pet_phrases(own_lines, other_lines=()) -> list:
     return out
 
 
-def day_stats(own_lines, other_lines=()) -> dict:
+def day_stats(own_lines, other_lines=(), red=redline.hit) -> dict:
     texts = [str(ln.get("text") or "") for ln in own_lines]
     hours = Counter(time.localtime(float(ln.get("ts") or 0)).tm_hour for ln in own_lines)
     return {
@@ -168,7 +174,7 @@ def day_stats(own_lines, other_lines=()) -> dict:
         "avg_chars": round(sum(len(_plain(t)) for t in texts) / max(1, len(texts)), 1),
         "image_ratio": round(sum(1 for t in texts if "[图片]" in t) / max(1, len(texts)), 2),
         "hours": [h for h, _n in hours.most_common(2)],
-        "phrases": pet_phrases(own_lines, other_lines),
+        "phrases": pet_phrases(own_lines, other_lines, red),
     }
 
 
@@ -207,7 +213,7 @@ def addressed(lines, picked, day, self_id=""):
     return out[-ADDRESSED_LINES:]
 
 
-def material(picked, names=None, said_to=()) -> tuple:
+def material(picked, names=None, said_to=(), red=redline.hit) -> tuple:
     """(text for the model, {code: qq}). Each picked person a code P1, P2...; everyone else in
     the group the model only sees mentioned gets Q1, Q2... -- every name anyone in the group
     goes by (`names`, from group_names) and every @ becomes a code, long numbers '#', pictures
@@ -244,13 +250,13 @@ def material(picked, names=None, said_to=()) -> tuple:
         out.append("%s：今天说了 %d 句" % (code, p["count"]))
         for ln in p["lines"][-LINES_PER_PERSON:]:
             text = str(ln.get("text") or "")
-            if redline.hit(text):
+            if red(text):
                 continue
             out.append("- " + mask(text)[:LINE_CHARS])
     shown = []
     for ln in said_to or ():
         text = str(ln.get("text") or "")
-        if redline.hit(text):
+        if red(text):
             continue
         shown.append("- " + mask(text)[:LINE_CHARS])
     if shown:
@@ -270,33 +276,33 @@ PROMPT = """下面是一个群里几位群友今天说的话，每个人用代�
 """
 
 
-def prompt_for(picked, names=None, said_to=()) -> tuple:
-    text, codes = material(picked, names, said_to)
+def prompt_for(picked, names=None, said_to=(), red=redline.hit) -> tuple:
+    text, codes = material(picked, names, said_to, red)
     return PROMPT + text, codes
 
 
-def check_style(text) -> str:
+def check_style(text, red=redline.hit, judge=judged) -> str:
     """The style line if it may be kept, else ''."""
     t = str(text or "").strip().strip("。")
-    if not t or len(t) > STYLE_CHARS or DIGITS.search(t) or JUDGEMENT.search(t) or redline.hit(t):
+    if not t or len(t) > STYLE_CHARS or DIGITS.search(t) or judge(t) or red(t):
         return ""
     return t
 
 
-def check_topic(text) -> str:
+def check_topic(text, red=redline.hit, judge=judged) -> str:
     t = str(text or "").strip()
     lo, hi = TOPIC_CHARS
-    if not (lo <= len(t) <= hi) or DIGITS.search(t) or JUDGEMENT.search(t) or redline.hit(t) or MASKED.search(t):
+    if not (lo <= len(t) <= hi) or DIGITS.search(t) or judge(t) or red(t) or MASKED.search(t):
         return ""
     return t
 
 
-def check_alias(text) -> str:
+def check_alias(text, red=redline.hit, judge=judged) -> str:
     """2-6 Chinese characters or 2-10 plain letters/digits, not over a red line, not how
     anyone is addressed."""
     t = str(text or "").strip()
     ok = re.fullmatch(r"[一-鿿]{2,6}", t) or re.fullmatch(r"[A-Za-z0-9_]{2,10}", t)
-    return t if ok and t not in GENERIC_ALIASES and not redline.hit(t) and not JUDGEMENT.search(t) else ""
+    return t if ok and t not in GENERIC_ALIASES and not red(t) and not judge(t) else ""
 
 
 def verify_aliases(proposed, lines, cards, day) -> dict:
@@ -338,7 +344,7 @@ def verify_aliases(proposed, lines, cards, day) -> dict:
     return out
 
 
-def parse_answer(text, codes) -> dict:
+def parse_answer(text, codes, red=redline.hit, judge=judged) -> dict:
     """{qq: {"style", "topics"}} for every code whose answer passed; codes that failed are left out."""
     raw = str(text or "")
     start, end = raw.find("{"), raw.rfind("}")
@@ -351,9 +357,11 @@ def parse_answer(text, codes) -> dict:
         item = data.get(code) if isinstance(data, dict) else None
         if not isinstance(item, dict):
             continue
-        style = check_style(item.get("style"))
-        topics = [t for t in (check_topic(x) for x in (item.get("topics") or [])[:MAX_TOPICS * 2]) if t][:MAX_TOPICS]
-        aliases = [a for a in (check_alias(x) for x in (item.get("aliases") or [])[:MAX_ALIASES * 2]) if a][:MAX_ALIASES]
+        style = check_style(item.get("style"), red, judge)
+        topics = [t for t in (check_topic(x, red, judge) for x in (item.get("topics") or [])[:MAX_TOPICS * 2])
+                  if t][:MAX_TOPICS]
+        aliases = [a for a in (check_alias(x, red, judge) for x in (item.get("aliases") or [])[:MAX_ALIASES * 2])
+                   if a][:MAX_ALIASES]
         if style or topics or aliases:
             out[qq] = {"style": style, "topics": topics, "aliases": aliases}
     return out
@@ -480,18 +488,18 @@ class Store:
         return True
 
 
-def clean_phrases(phrases) -> list:
+def clean_phrases(phrases, red=redline.hit, judge=judged) -> list:
     """Pet phrases as they may be stored: 2-4 characters, no red line, no judgement, at most 3."""
     out = []
     for p in phrases or []:
         p = str(p or "").strip()
-        if 2 <= len(p) <= 4 and not redline.hit(p) and not JUDGEMENT.search(p) and not DIGITS.search(p) \
+        if 2 <= len(p) <= 4 and not red(p) and not judge(p) and not DIGITS.search(p) \
                 and p not in out:
             out.append(p)
     return out[:MAX_PHRASES]
 
 
-def add_day(rec, name, stats, day) -> None:
+def add_day(rec, name, stats, day, red=redline.hit, judge=judged) -> None:
     """Fold one day's counts into a record."""
     old = rec.get("stats") or {}
     if name:
@@ -503,17 +511,20 @@ def add_day(rec, name, stats, day) -> None:
         "avg_chars": stats.get("avg_chars", old.get("avg_chars", 0)),
         "image_ratio": stats.get("image_ratio", old.get("image_ratio", 0)),
         "hours": stats.get("hours") or old.get("hours") or [],
-        "phrases": clean_phrases(stats.get("phrases") or old.get("phrases") or []),
+        "phrases": clean_phrases(stats.get("phrases") or old.get("phrases") or [], red, judge),
     }
     rec["since"] = rec.get("since") or day
     rec["updated"] = day
 
 
-async def nightly(store, place, lines, ask, day, registry=None, self_id="", extra_names=None) -> dict:
+async def nightly(store, place, lines, ask, day, registry=None, self_id="", extra_names=None, red=redline.hit,
+                  judge=judged) -> dict:
     """One group, one night. `ask` is an async callable(prompt) -> answer text (the model).
     At most one call per group per day; marked as tried before the call. `extra_names`
     ({qq: names}): more names that become codes in what the model sees -- the owner's, and
-    those people go by elsewhere."""
+    those people go by elsewhere. `red`: text -> the red line it may not cross, or '' (the
+    plugin's switch; default: the red lines themselves); `judge` the same for a judgement of
+    a person in what is written down (default: judged)."""
     data = store.load(place)
     if data.get("tried") == day:
         return {"skipped": "tried today"}
@@ -525,19 +536,19 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="", extr
         others = [ln for ln in lines if str(ln.get("sender_id") or "") not in (p["qq"], str(self_id))
                   and ln.get("role") != "assistant" and _day(ln.get("ts")) == day]
         rec = data["people"].setdefault(p["qq"], _record(place, p["qq"]))
-        add_day(rec, p["name"], day_stats(p["lines"], others), day)
+        add_day(rec, p["name"], day_stats(p["lines"], others, red), day, red, judge)
         store.keep_names(p["qq"], [p["name"]])
     data["tried"] = day
     store.save(place, data)
     cards = group_names(lines, data["people"])
     for qq, ns in (extra_names or {}).items():
         cards.setdefault(str(qq), set()).update(str(n) for n in ns if n and not str(n).isdigit())
-    prompt, codes = prompt_for(picked, cards, addressed(lines, picked, day, self_id))
+    prompt, codes = prompt_for(picked, cards, addressed(lines, picked, day, self_id), red)
     try:
         answer = await ask(prompt)
     except Exception as exc:  # counted as the day's call all the same
         return {"called": 1, "picked": len(picked), "written": 0, "error": type(exc).__name__}
-    got = parse_answer(answer, codes)
+    got = parse_answer(answer, codes, red, judge)
     names_seen = verify_aliases({qq: item["aliases"] for qq, item in got.items() if item.get("aliases")},
                                 lines, {q: [n for n in ns if n] for q, ns in group_names(lines).items()}, day)
     data = store.load(place)

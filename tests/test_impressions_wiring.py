@@ -135,6 +135,19 @@ class Review(unittest.TestCase):
     def test_his_name_here_in_another_group(self):
         self.assertEqual(run_case('card_here')['other_group'], '[认识的人] 小柠檬（大家叫 柠柠）')
 
+    def test_red_lines_by_the_switch(self):
+        # counted afresh: the material (her group window) either way; what she wrote of him only
+        # when it was written (switch off)
+        self.assertEqual((run_case('red')['seen'], run_case('red')['counts']),
+                         (True, {'impressions': {'judgement': 2}, 'material': {'finance': 1}}))
+        self.assertEqual((run_case('red_on')['seen'], run_case('red_on')['counts']),
+                         (False, {'material': {'finance': 1}}))
+
+    def test_judgements_by_the_switch(self):
+        # what a person is ("性格开朗", "靠谱"): written down with the switch off (counted), not when on
+        self.assertEqual(run_case('red')['written'], {'style': '性格开朗，说话很快', 'topics': ['靠谱攻略']})
+        self.assertEqual(run_case('red_on')['written'], {'style': '', 'topics': []})
+
     def test_the_nightly_material_codes_every_name_she_knows(self):
         r = run_case('material')
         self.assertEqual(r['prompt_has'], {'大芒': False, '芒芒': False, '鹿说': False, '芒果': False, '柠檬': False})

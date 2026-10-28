@@ -9984,6 +9984,17 @@
     "social_baseline": 0.44,
     "stress_reactivity": 0.45
    },
+   "red_lines": {
+    "by_line": {
+     "hardship": 1
+    },
+    "by_store": {
+     "memory": {
+      "hardship": 1
+     }
+    },
+    "filter": false
+   },
    "relationships": [
     {
      "belief_state": {

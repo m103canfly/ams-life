@@ -7,7 +7,11 @@ plugin's data folder of the replay, and writes audit.json next to them. Exit cod
 passed, 1 = at least one failed. The report names places only by label (群1, 私聊1, ...) and
 never quotes a message.
 
-Checks (a "piece" is 8 characters in a row, letters and digits only, lower case):
+Checks (a "piece" is 8 characters in a row, letters and digits only, lower case, taken from one
+line of a message or a prompt, or from one text field of a data file -- never across two. An
+all-digit piece that is part of a known number (someone's, a group's, the registry's) is the
+qq check's; any other all-digit piece -- a phone number, a code -- counts like words. A reply
+prompt is checked with what AstrBot sends the model of the message, "asked", added to it):
 
 private      A reply prompt somewhere else holds a piece that only ever occurred in one private
              chat -- said by the other person or by her (her replies there, and what the old account
@@ -15,12 +19,14 @@ private      A reply prompt somewhere else holds a piece that only ever occurred
 names        A reply prompt (in a group or a private chat) holds the name of someone who never spoke
              there, and that name never occurred in that place's own messages before.
 qq           Any prompt -- a reply prompt or one for the model (summaries, ranking, the notebook,
-             impressions...) -- holds the QQ number of anyone in the log, the person asking too
-             (the owner: no QQ number in a prompt at all). The asker's own number in a reply prompt
+             impressions...) -- holds a number known to be someone's or some chat's: anyone in
+             the log, the person asking too (the owner: no QQ number in a prompt at all), the
+             old account itself, every group, and the forget registry's people and messages. The asker's own number in a reply prompt
              is also counted as a warning, so the report tells the two apart.
 forgotten    Anything of a person or message in the forget registry (what the old companion was
              asked to forget) -- QQ number, message id, a piece only they wrote -- in any prompt
-             (reply or model) or any file of the data folder. Their names are listed as warnings
+             (reply or model) or any file of the data folder but the plugin's copy of the registry
+             itself (it holds exactly those numbers, so that nothing of them is written again). Their names are listed as warnings
              (a name can be an ordinary word). Skipped when the replay let the old forgets in.
 canaries     Each made-up secret only where it may be: the private one only in its private chat;
              the group one elsewhere only without its speaker's name or number (the discretion table
@@ -48,7 +54,8 @@ LIMITS = [
     "paraphrase: only words in the same order are found; the same thing said another way is not",
     "fake model: summaries, the notebook and impressions are written by a fake model that copies or "
     "makes up text, so leaks through what a real model would rewrite are not tested by this run",
-    "nightly jobs (the notebook, impressions) are not run by the replay yet",
+    "nightly jobs: the notebook's is not run by the replay (off by default); impressions only with "
+    "--impressions, answered by the fake model",
     "private check: reply prompts only; prompts for the model are checked for QQ numbers and "
     "forgotten material, not for private words (their place is the turn that started them)",
 ]
@@ -63,10 +70,56 @@ def norm(text) -> str:
 
 
 def pieces(text) -> set:
+    """The pieces of one line."""
     t = norm(text)
     if len(t) < PIECE:
         return {t} if len(t) >= 6 else set()
     return {t[i:i + PIECE] for i in range(len(t) - PIECE + 1)}
+
+
+def number_pieces(numbers) -> set:
+    """The all-digit pieces that are part of these numbers (left to the qq check)."""
+    out = set()
+    for n in numbers:
+        out |= pieces(n)
+    return out
+
+
+def line_pieces(text) -> set:
+    """Pieces of every line, none across two lines."""
+    out = set()
+    for line in str(text or "").splitlines():
+        out |= pieces(line)
+    return out
+
+
+def _strings(obj):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield str(k)
+            yield from _strings(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _strings(v)
+    elif isinstance(obj, str):
+        yield obj
+
+
+def file_pieces(path, body) -> set:
+    """Pieces of a data file: field by field for JSON / JSON lines, line by line otherwise."""
+    docs = []
+    try:
+        docs = [json.loads(body)]
+    except ValueError:
+        try:
+            docs = [json.loads(x) for x in body.splitlines() if x.strip()]
+        except ValueError:
+            return line_pieces(body)
+    out = set()
+    for doc in docs:
+        for s in _strings(doc):
+            out |= line_pieces(s)
+    return out
 
 
 def number_pattern(numbers):
@@ -110,6 +163,9 @@ def audit(replay_dir, chat) -> dict:
     label = meta["labels"]
     canaries = json.loads((replay_dir / "canaries.json").read_text("utf-8"))
     prompts = [json.loads(line) for line in (replay_dir / "prompts.jsonl").read_text("utf-8").splitlines() if line]
+    for pr in prompts:  # the model sees what AstrBot sends of the message too
+        if pr.get("asked"):
+            pr["text"] = "%s\n%s" % (pr["text"], pr["asked"])
     log = load_log(chat)
     rows = [r for r in log if not r["sent"]]
     hers = [r for r in log if r["sent"]]  # her words: they belong to where she said them
@@ -132,7 +188,7 @@ def audit(replay_dir, chat) -> dict:
     gone_ids = {r["source_id"] for r in reg.rows() if r["kind"] == "source"}
     gone_pieces, kept_pieces, gone_names = set(), set(), set()
     for r in rows:
-        ps = pieces(r["message_content"])
+        ps = line_pieces(r["message_content"])
         for p in ps:
             piece_places[p].add(r["place"])
         known_qq.add(r["user_id"])
@@ -144,12 +200,17 @@ def audit(replay_dir, chat) -> dict:
         if r["user_id"] in gone_people and r["name"]:
             gone_names.add(r["name"])
     for r in hers:
-        for p in pieces(r["message_content"]):
+        for p in line_pieces(r["message_content"]):
             piece_places[p].add(r["place"])
-    gone_pieces -= kept_pieces  # only what nobody else also said
-    private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
-                    if len(pl) == 1 and next(iter(pl)).startswith("private:")}
+    # the old account itself, every group, the registry's people and messages count too
+    known_qq |= {str(r.get("self_id") or "") for r in log} | {str(r.get("group_id") or "") for r in log}
+    known_qq |= gone_people | gone_ids
     known_qq = {q for q in known_qq if len(q) >= 5 and q.isdigit()}
+    # digits of a known number are the qq check's; any other digits count like words
+    numbers_only = number_pieces(known_qq)
+    gone_pieces -= kept_pieces | numbers_only  # only what nobody else also said
+    private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
+                    if len(pl) == 1 and next(iter(pl)).startswith("private:") and p not in numbers_only}
     # a person's number is off limits only while he still may not be kept (a forget row read as a
     # cutoff lets what he says later back in, number and all)
     still_gone = {q for q in gone_people if reg.why_not(qq=q, at=float("inf"))}
@@ -170,7 +231,7 @@ def audit(replay_dir, chat) -> dict:
             i += 1
         place, text = pr["place"], pr["text"]
         where = {"prompt": n, "kind": pr["kind"], "place": lab(place)}
-        ps = pieces(text)
+        ps = line_pieces(text)
         # forgotten material: in every prompt
         if has(gone_numbers, text) or ps & gone_pieces:
             checks["forgotten"].fail(where)
@@ -223,10 +284,10 @@ def audit(replay_dir, chat) -> dict:
 
     # --- the data folder
     data = replay_dir / "data"
-    for path in sorted(p for p in data.rglob("*") if p.is_file()):
+    for path in sorted(p for p in data.rglob("*") if p.is_file() and p.name != forget_registry.FILE_NAME):
         body = path.read_text("utf-8", errors="replace")
         rel = path.relative_to(data).as_posix()
-        if has(gone_numbers, body) or pieces(body) & gone_pieces:
+        if has(gone_numbers, body) or file_pieces(path, body) & gone_pieces:
             checks["forgotten"].fail({"file": _label_path(rel, label)})
     for item, what in _items(data):
         origin = item.get("origin")

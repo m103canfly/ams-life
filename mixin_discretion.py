@@ -206,6 +206,244 @@ class DiscretionMixin:
                     logger.warning("[ams-life] name source failed: %s", exc)
         return sorted(out)
 
+    # ------------------------------------------------------------------
+    # No numbers in what she keeps; someone deleted is 某人
+    # ------------------------------------------------------------------
+    def _note_her(self, event) -> None:
+        """Her own number, as each message tells it (an @ of her becomes her name)."""
+        try:
+            sid = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+        except Exception:
+            sid = ""
+        if sid:
+            if not isinstance(getattr(self, "_her_ids", None), set):
+                self._her_ids = set()
+            self._her_ids.add(sid)
+
+    def _gone_people(self) -> set:
+        """People the forget registry rules out now (reread when it grows)."""
+        try:
+            reg = self._registry()
+            seq = reg.last_seq()
+            snap = getattr(self, "_gone_snap", None)
+            if not snap or snap[0] != seq:
+                snap = self._gone_snap = (seq, {p for p in reg.people() if reg.why_not(qq=p)})
+            return set(snap[1])
+        except Exception:
+            return set()
+
+    def _known_numbers(self) -> set:
+        """Every number she knows to be someone's or some chat's: her own, everyone who wrote
+        in a window or a memory, each chat's number, and the forget registry's people and
+        messages."""
+        nums = set(getattr(self, "_her_ids", None) or ())
+        nums |= set(self._names_index())
+        nums |= {p.split(":", 1)[1] for p in self._window_places() if ":" in p}
+        try:
+            gone_people, gone_ids = self._registry_sets()
+            nums |= set(gone_people) | set(gone_ids)
+        except Exception:
+            pass
+        return {n for n in nums if n.isdigit() and len(n) >= 5}
+
+    def _scrubber(self, event=None):
+        """_scrub with what it needs looked up once (for many texts at a time)."""
+        ats = []
+        if event is not None:
+            self._note_her(event)
+            try:  # the message's own @ parts: their numbers are known, their "@名字(号码)" exact
+                for comp in event.get_messages() or []:
+                    if type(comp).__name__ == "At":
+                        qq = str(getattr(comp, "qq", "") or "")
+                        if qq.isdigit():
+                            ats.append((str(getattr(comp, "name", "") or "").strip(), qq))
+            except Exception:
+                pass
+        gone, numbers = self._gone_people(), self._known_numbers() | {qq for _n, qq in ats}
+        her = set(getattr(self, "_her_ids", None) or ())
+        seen = getattr(self, "_gone_names", None)
+        if not isinstance(seen, dict):
+            seen = self._gone_names = {}
+        gone_names = {p: set(self._known_names([p])) for p in gone}
+
+        def scrub(text):
+            text = str(text or "")
+            if not text:
+                return text
+            for name, qq in discretion.at_names(text):
+                if qq in gone and name:
+                    seen.setdefault(qq, set()).add(name)
+            out = discretion.strip_numbers(text, numbers, her, HER_NAME, gone, ats)
+            if gone:
+                names = {n for p in gone for n in gone_names[p] | seen.get(p, set()) if not str(n).isdigit()}
+                out = discretion.anonymize(out, names, to=discretion.SOMEBODY)
+            return out
+        return scrub
+
+    def _scrub(self, text, event=None) -> str:
+        """What is kept of a text (her phone, memories, events): no number she knows of, an @
+        with the name only (her own name for an @ of her), and someone the registry rules
+        out -- by an @ or by a name she knows him by -- is 某人."""
+        return self._scrubber(event)(text) if str(text or "") else str(text or "")
+
+    # text fields of what she keeps (memories, phone lines, events, insights, notes,
+    # relationship records): numbers are taken out of these, never out of ids
+    _SCRUB_KEYS = {"text", "latest_text", "title", "key", "event", "small_summary", "big_summary",
+                   "meaning_to_her", "reflection", "summary", "insight", "lesson", "image_caption",
+                   "voice_text", "source_texts", "evidence", "narrative"}
+
+    def _scrub_tree(self, obj, scrub, key=None):
+        """`obj` with the text fields scrubbed (a new object; ids and numbers fields untouched)."""
+        if isinstance(obj, dict):
+            return {k: self._scrub_tree(v, scrub, k) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._scrub_tree(v, scrub, key) for v in obj]
+        if isinstance(obj, str) and key in self._SCRUB_KEYS:
+            return scrub(obj)
+        return obj
+
+    def _migrate_numbers(self) -> dict:
+        """Numbers kept before step 1-3-5 (an @ with a number, anyone's number in a text, a
+        deleted person's name) are taken out of the library, her phone, events and insights,
+        the relationship records and her notes. Each file that changes is copied into
+        MEMORY_ARCHIVE_DIR first (never deleted); nothing to change: nothing is written."""
+        scrub = self._scrubber()
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        folder = MEMORY_ARCHIVE_DIR / ("before-numbers-" + stamp)
+        counts = {}
+
+        def archive(path):
+            if path == MEMORY_LIBRARY_PATH:
+                dest = MEMORY_ARCHIVE_DIR / ("library.before-numbers-%s.json" % stamp)
+            else:
+                dest = folder / path.relative_to(DATA_DIR)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(path), str(dest))
+
+        def json_file(path, what):
+            try:
+                body = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                return
+            new = self._scrub_tree(body, scrub)
+            if new != body:
+                archive(path)
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(new, ensure_ascii=False, indent=None if path == MEMORY_LIBRARY_PATH else 1),
+                               encoding="utf-8")
+                atomic_file.replace(tmp, path)
+                counts[what] = counts.get(what, 0) + 1
+
+        if MEMORY_LIBRARY_PATH.exists():
+            json_file(MEMORY_LIBRARY_PATH, "library")
+        for path in sorted(PHONE_DIR.glob("*.json")) if PHONE_DIR.exists() else []:
+            json_file(path, "phone")
+        for path in sorted(USER_DIR.glob("*.json")) if USER_DIR.exists() else []:
+            json_file(path, "users")
+        paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
+        if EVENT_SESSION_DIR.exists():
+            paths.extend(sorted(EVENT_SESSION_DIR.glob("*/events.jsonl")))
+        for path in paths:
+            if not path.exists():
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            out = []
+            for line in lines:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    out.append(line)
+                    continue
+                out.append(json.dumps(self._scrub_tree(rec, scrub), ensure_ascii=False))
+            if out != lines:
+                archive(path)
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text("".join(x + "\n" for x in out), encoding="utf-8")
+                atomic_file.replace(tmp, path)
+                counts["events"] = counts.get("events", 0) + 1
+        if isinstance(getattr(self, "self_model", None), dict):
+            new = self._scrub_tree(self.self_model, scrub)
+            if new != self.self_model:
+                if SELF_MODEL_PATH.exists():
+                    archive(SELF_MODEL_PATH)
+                self.self_model = new
+                self._save_self_model()
+                counts["notes"] = 1
+        if counts:
+            logger.info("[ams-life] numbers taken out of what she keeps: %s files", counts)
+        return counts
+
+    def _red_line(self, text, what="") -> str:
+        """The red line (health, money, love life, family...) `text` crosses, when it must not
+        be kept for it: only while the switch redline_filter is on (off by default: nothing is
+        held back). Nothing is recorded of a hit; the panel counts what is kept now
+        (_red_line_census)."""
+        if not getattr(self, "redline_filter", False):
+            return ""
+        line = redline.hit(text)
+        if line:
+            logger.info("[ams-life] not kept (%s): red line %s", what, line)
+        return line
+
+    def _red_lines_for(self, what):
+        """_red_line as impressions.py takes it: text -> the line it may not cross, or ''."""
+        return lambda text: self._red_line(text, what)
+
+    def _sweep_red_lines(self) -> dict:
+        """With the switch on, at start: what was kept before that crosses a red line goes --
+        memories, events and insights, her notes. Each file that changes is copied into
+        MEMORY_ARCHIVE_DIR first, so turning the switch on loses nothing for good. Off: nothing."""
+        if not getattr(self, "redline_filter", False):
+            return {}
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        counts = {}
+
+        def archive(path, name):
+            dest = MEMORY_ARCHIVE_DIR / name if path == MEMORY_LIBRARY_PATH else \
+                MEMORY_ARCHIVE_DIR / ("before-redline-" + stamp) / path.relative_to(DATA_DIR)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(path), str(dest))
+
+        if MEMORY_LIBRARY_PATH.exists():
+            lib = self._read_library()
+            keep = [e for e in lib["entries"] if not (isinstance(e, dict) and redline.hit(e.get("text")))]
+            if len(keep) != len(lib["entries"]):
+                archive(MEMORY_LIBRARY_PATH, "library.before-redline-%s.json" % stamp)
+                counts["memory"] = len(lib["entries"]) - len(keep)
+                lib["entries"] = keep
+                self._write_library(lib)
+        for path, what in ((EVENT_ARCHIVE_PATH, "event"), (INSIGHT_ARCHIVE_PATH, "insight")):
+            if not path.exists():
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            kept = []
+            for line in lines:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    kept.append(line)
+                    continue
+                text = " ".join(str(rec.get(k) or "") for k in self._KEPT_TEXT_KEYS) if isinstance(rec, dict) else ""
+                if not redline.hit(text):
+                    kept.append(line)
+            if len(kept) != len(lines):
+                archive(path, "")
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
+                atomic_file.replace(tmp, path)
+                counts[what] = len(lines) - len(kept)
+        if isinstance(getattr(self, "self_model", None), dict):
+            dropped = sum(1 for key in ("notebook", "narrative_items", "diary", "relationship_narratives")
+                          for x in self.self_model.get(key) or [] if isinstance(x, dict) and redline.hit(x.get("text")))
+            if dropped:
+                if SELF_MODEL_PATH.exists():
+                    archive(SELF_MODEL_PATH, "")
+                self._save_self_model()  # its red-line check drops them
+                counts["notes"] = dropped
+        if counts:
+            logger.info("[ams-life] red lines on: taken out of what she kept (copies archived first): %s", counts)
+        return counts
+
     def _anonymized(self, text, names) -> str:
         """`text` without any name of the people in `names` (ids or names): each id brings
         every name that person is known by."""
