@@ -361,6 +361,8 @@ class DiscretionMixin:
 
         if MEMORY_LIBRARY_PATH.exists():
             json_file(MEMORY_LIBRARY_PATH, "library")
+            if counts.get("library"):   # its words changed under _write_library's cache: read them again
+                self._known_memory_ids = self._known_memory_texts = None
         for path in sorted(PHONE_DIR.glob("*.json")) if PHONE_DIR.exists() else []:
             json_file(path, "phone")
         for path in sorted(USER_DIR.glob("*.json")) if USER_DIR.exists() else []:
@@ -416,7 +418,7 @@ class DiscretionMixin:
 
     def _sweep_red_lines(self) -> dict:
         """With the switch on, at start: what was kept before that crosses a red line goes --
-        memories, events and insights, her notes. Each file that changes is copied into
+        memories, events (the archive and each place's copy) and insights, her notes. Each file that changes is copied into
         MEMORY_ARCHIVE_DIR first, so turning the switch on loses nothing for good. Off: nothing."""
         if not getattr(self, "redline_filter", False):
             return {}
@@ -437,7 +439,10 @@ class DiscretionMixin:
                 counts["memory"] = len(lib["entries"]) - len(keep)
                 lib["entries"] = keep
                 self._write_library(lib)
-        for path, what in ((EVENT_ARCHIVE_PATH, "event"), (INSIGHT_ARCHIVE_PATH, "insight")):
+        stores = [(EVENT_ARCHIVE_PATH, "event"), (INSIGHT_ARCHIVE_PATH, "insight")]
+        if EVENT_SESSION_DIR.exists():   # each place's copy of its events, as _scrub_stores goes over them
+            stores += [(p, "event_copy") for p in sorted(EVENT_SESSION_DIR.glob("*/events.jsonl"))]
+        for path, what in stores:
             if not path.exists():
                 continue
             lines = path.read_text(encoding="utf-8").splitlines()
@@ -456,7 +461,7 @@ class DiscretionMixin:
                 tmp = path.with_suffix(".tmp")
                 tmp.write_text("".join(x + "\n" for x in kept), encoding="utf-8")
                 atomic_file.replace(tmp, path)
-                counts[what] = len(lines) - len(kept)
+                counts[what] = counts.get(what, 0) + len(lines) - len(kept)
         if isinstance(getattr(self, "self_model", None), dict):
             dropped = sum(1 for key in ("notebook", "narrative_items", "diary", "relationship_narratives")
                           for x in self.self_model.get(key) or [] if isinstance(x, dict) and redline.hit(x.get("text")))

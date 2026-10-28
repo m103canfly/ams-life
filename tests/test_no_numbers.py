@@ -93,6 +93,13 @@ class WhatSheKeeps(unittest.TestCase):
         self.assertEqual(r['page_after_delete'], {'filter': False, 'by_line': {}, 'by_store': {}})
         self.assertNotIn('redline_counts.json', r['files'])
 
+    def test_the_panel_counts_her_phone_without_writing_it(self):
+        # opening the panel writes nothing: an expired line stays on disk until her own sweep
+        # takes it, and is not counted
+        r = run_case('census_expired')
+        self.assertTrue(r['unchanged'])
+        self.assertEqual(r['page']['by_store'], {'material': {'health': 1}})
+
     def test_red_lines_are_not_kept_when_the_switch_is_on(self):
         r = run_case('redline_on')
         self.assertEqual(r['library'], ['小爱 我周末想去海边看日落'])
@@ -109,6 +116,11 @@ class WhatSheKeeps(unittest.TestCase):
         self.assertEqual(on['library'], ['小爱 我周末想和 @桃子 去海边看日落 我号 [号码]'])
         self.assertFalse(LONG.search(json.dumps(off['library'] + on['library'])))
 
+    def test_a_delete_rewrite_is_not_taken_for_changed_words(self):
+        r = run_case('after_delete')
+        self.assertIn('小爱 某人明天要来玩', r['library'])                 # rewritten by the delete
+        self.assertEqual(r['scrubbed_again'], 0)                          # and not gone over again
+
     def test_turning_the_switch_on_archives_first(self):
         r = run_case('sweep')
         self.assertEqual(r['library'], ['小爱 我周末想去海边看日落'])
@@ -117,6 +129,15 @@ class WhatSheKeeps(unittest.TestCase):
         off = run_case('sweep_off')
         self.assertEqual(off['library'], ['小爱 我最近失眠好严重', '小爱 我周末想去海边看日落'])
         self.assertEqual(off['archived'], 0)
+
+    def test_turning_the_switch_on_sweeps_each_places_events_too(self):
+        r = run_case('sweep')
+        both = ('archives/events.jsonl', 'archives/sessions/made-up-place/events.jsonl')
+        self.assertEqual(r['events'], {rel: ['e2'] for rel in both})          # the archive and the place's copy
+        self.assertEqual(r['events_archived'], sorted(both))                    # each archived first
+        off = run_case('sweep_off')
+        self.assertEqual(off['events'], {rel: ['e1', 'e2'] for rel in both})
+        self.assertEqual(off['events_archived'], [])
 
 
 class OldNumbers(unittest.TestCase):
