@@ -36,6 +36,15 @@ if CASE in ('sweep', 'sweep_off'):
          'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['s2'], 'visibility': 'public'}}]}
     (DATA / 'memory').mkdir(parents=True, exist_ok=True)
     (DATA / 'memory' / 'library.json').write_text(json.dumps(lib, ensure_ascii=False), 'utf-8')
+    # and two events, in the archive and in that place's copy
+    events = ''.join(json.dumps(x, ensure_ascii=False) + '\n' for x in (
+        {'id': 'e1', 'title': '失眠', 'event': '柠檬说最近失眠好严重', 'ts': clock.now,
+         'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['s1'], 'visibility': 'public'}},
+        {'id': 'e2', 'title': '看日落', 'event': '柠檬周末想去海边看日落', 'ts': clock.now,
+         'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['s2'], 'visibility': 'public'}}))
+    for rel in ('archives/events.jsonl', 'archives/sessions/made-up-place/events.jsonl'):
+        (DATA / rel).parent.mkdir(parents=True, exist_ok=True)
+        (DATA / rel).write_text(events, 'utf-8')
 
 ctx = harness.FakeContext()
 plugin = main.BioCorePlugin(ctx, config={'redline_filter': True} if CASE in ('redline_on', 'sweep', 'changed_on') else {})
@@ -118,6 +127,21 @@ if CASE in ('redline', 'redline_on'):
     result['page_after_delete'] = loop.run_until_complete(plugin.page_status())['data']['red_lines']
     result['files'] = sorted(p.name for p in DATA.iterdir())
 
+if CASE == 'after_delete':
+    # the owner deletes someone others talked about: the library is rewritten (某人) behind
+    # _write_library's cache; the next write must not take those memories for changed ones
+    turn([Plain(text='小爱 我是桃子')], '小爱 我是桃子', '10004', '桃子', reply='你好呀')
+    turn([Plain(text='小爱 桃子明天要来玩')], '小爱 桃子明天要来玩', '10002', '柠檬', reply='好呀')
+    turn([Plain(text='小爱 我周末想去海边看日落')], '小爱 我周末想去海边看日落', '10002', '柠檬', reply='好呀')
+    plugin._write_library(plugin._read_library())
+    result['deleted'] = loop.run_until_complete(plugin.page_forget_person('10004'))['data']
+    calls = []
+    real = plugin._scrubber
+    plugin._scrubber = lambda *a, **k: calls.append(1) or real(*a, **k)
+    plugin._write_library(plugin._read_library())
+    result['scrubbed_again'] = len(calls)
+    result['library'] = library()
+
 if CASE in ('changed', 'changed_on'):
     # memories already kept whose words are changed afterwards (merged, tidied up)
     turn([Plain(text='小爱 我周末想去海边看日落')], '小爱 我周末想去海边看日落', '10002', '柠檬', reply='好呀')
@@ -131,12 +155,30 @@ if CASE in ('changed', 'changed_on'):
     plugin._write_library(lib)
     result['library'] = library()
 
+if CASE == 'census_expired':
+    # her phone of a group: one line over a red line, expired; one over a red line, fresh
+    path = plugin._window_file('group:' + G1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = {'role': 'user', 'sender_id': '10002', 'sender_name': '柠檬',
+            'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': [], 'visibility': 'public'}}
+    path.write_text(json.dumps({'place': 'group:' + G1, 'recent': [
+        dict(line, ts=clock.now - 3 * 86400, text='小爱 我上个月失眠好严重'),
+        dict(line, ts=clock.now - 60, text='小爱 我最近失眠好严重')], 'open_loops': []}, ensure_ascii=False), 'utf-8')
+    before = path.read_bytes()
+    result['page'] = loop.run_until_complete(plugin.page_status())['data']['red_lines']
+    result['unchanged'] = path.read_bytes() == before
+
 if CASE in ('sweep', 'sweep_off'):
     result['library'] = library()
     archive = DATA / 'memory' / 'archive'
     copies = sorted(archive.glob('library.before-redline-*.json')) if archive.exists() else []
     result['archived'] = len(copies)
     result['copy'] = [e['text'] for e in json.loads(copies[0].read_text('utf-8'))['entries']] if copies else []
+    result['events'] = {rel: [json.loads(x)['id'] for x in (DATA / rel).read_text('utf-8').splitlines() if x]
+                        for rel in ('archives/events.jsonl', 'archives/sessions/made-up-place/events.jsonl')}
+    result['events_archived'] = sorted(
+        p.relative_to(archive).as_posix().split('/', 1)[1] for p in archive.glob('before-redline-*/**/*.jsonl')
+    ) if archive.exists() else []
 
 if CASE == 'migrate':
     # kept before this change: numbers in the library, her phone and a relationship record

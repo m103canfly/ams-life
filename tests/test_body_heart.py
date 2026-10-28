@@ -363,6 +363,12 @@ class Notebook(unittest.TestCase):
         self.assertEqual(len(texts[1]), 40)
         self.assertTrue(all(len(t) <= 40 for t in texts))
 
+    def test_what_she_writes_is_scrubbed_when_kept(self):
+        r = run_case('notebook_scrub')
+        new = [x for x in r['saved'] if '爬山' in x]
+        self.assertEqual(new, ['某人说柠檬 [号码] 也想去爬山'])
+        self.assertEqual(r['notebook'], r['saved'])
+
     def test_forgetting_reaches_her_notebook(self):
         r = run_case('notebook')
         self.assertEqual(r['forgot']['notes'], 2)

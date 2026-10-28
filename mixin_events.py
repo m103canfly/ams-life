@@ -1412,6 +1412,12 @@ class EventsMixin:
         Only runs when the opt-in auto switch is ON *and* the insight LLM
         switch is ON. There is no silent deterministic fallback: with either
         switch off nothing is written in the background.
+
+        ams-life: not ready to be switched on. It takes the newest 6 events of the
+        one archive, whichever window each came from, and gives them to the model
+        together, so a private chat's event can end up in an insight next to a
+        group's. Before insight_auto_enabled is turned on, this must take the
+        events of one window at a time (and the insight keep the origins of its events).
         """
         if not bool(getattr(self, "insight_auto_enabled", False)):
             return False
@@ -1453,6 +1459,9 @@ class EventsMixin:
 
         LLM-only: when the insight switch is off this returns False and writes
         nothing (no silent deterministic note in the background).
+
+        ams-life: `events` are handed over as they are, from every window at
+        once (see _maybe_archive_insight); this does not sort them by window.
         """
         try:
             events = [e for e in (events or []) if isinstance(e, dict)]
