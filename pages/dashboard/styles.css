@@ -859,3 +859,12 @@ body.brain-view .statusbar{margin-top:8px;padding-top:6px}
 .brain-frame{display:block;width:100%;height:100%;border:0}
 body.brain-filled #view-brain{position:fixed;inset:0;z-index:50;padding:8px;background:var(--bg)}
 @media(max-width:900px){body.brain-view .shell{grid-template-rows:auto minmax(0,1fr)}body.brain-view .main{height:auto}}
+
+/* ams-life: "她记住了什么" (memories.js) */
+.mem-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.mem-filters select,.mem-filters input{height:30px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font:12px Bahnschrift,"Segoe UI",sans-serif;padding:0 8px}
+.mem-filters input[type=search]{width:160px}
+.mem-badge{margin-bottom:10px;color:var(--amber)}
+.mem-text{font-size:13px;line-height:1.6;white-space:normal;word-break:break-word;margin-top:6px}
+.mem-row-actions{display:flex;gap:8px;align-items:center;margin-top:8px}
+#memMore{margin-top:12px}

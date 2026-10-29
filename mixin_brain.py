@@ -11,6 +11,8 @@
   (on Windows a file held open for reading cannot be replaced, so a read in
   another thread could make her lose a write); only the build, from what was
   read and a copy of the registry, runs in a worker thread.
+- page/memories, page/memories/number: the same snapshot as a list ("她记住了什么",
+  memory_list.py), read only; numbers hidden, the words as kept one row at a time.
 - Every reply's recall is noted, ids only, the last brain_graph.TURNS_MAX
   turns, after the same checks as any other write (the forget registry, the
   forget count). The owner's deletes take it out of there too (_forget), and a
@@ -23,9 +25,10 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import brain_graph
+    from . import brain_graph, memory_list
 except ImportError:
     import brain_graph
+    import memory_list
 
 BRAIN_TURNS_PATH = DATA_DIR / "brain_turns.json"
 BRAIN_CACHE_SECONDS = 30   # one build serves the parts, the stars opened and the searches meanwhile
@@ -288,3 +291,37 @@ class BrainMixin:
             return {"status": "ok", "data": {"ids": brain_graph.search(snap, _arg(args, "q"))}}
         except Exception as exc:
             return {"status": "error", "message": _failed(exc, "搜索结果"), "data": {"ids": []}}
+
+    # ------------------------------------------------------------------
+    # "她记住了什么": the same snapshot as a list (memory_list.py), read only
+    # ------------------------------------------------------------------
+    async def page_memories(self, args=None):
+        """One page of what she keeps, newest first: ?kind=memory|event|note|impression
+        &place=<place id>&vis=public|private|self&from=&to=(YYYY-MM-DD)&q=<words>&after=<token>
+        &limit=<at most 50>. Long numbers hidden; the places for the filter come along."""
+        args = self._page_args(args)
+        try:
+            snap = await self._brain_snapshot()
+            all_rows = memory_list.rows(snap, getattr(snap, "impressions", None), brain_graph.PageIds(self._brain_key()))
+            kind = _arg(args, "kind")
+            selected = memory_list.select(all_rows, kind if kind in memory_list.KINDS else "", _arg(args, "place"),
+                                          _arg(args, "vis") if _arg(args, "vis") in memory_list.VIS else "",
+                                          _arg(args, "from"), _arg(args, "to"), _arg(args, "q"))
+            out = memory_list.page(selected, _arg(args, "after"), _arg(args, "limit") or memory_list.PAGE_MAX)
+            out["places"] = memory_list.places(snap)
+            return {"status": "ok", "data": out}
+        except Exception as exc:
+            return {"status": "error", "message": _failed(exc, "数据"), "data": {"items": [], "next": ""}}
+
+    async def page_memories_number(self, args=None):
+        """?id=<row id>: that one row's words as kept, numbers and all (the second click)."""
+        args = self._page_args(args)
+        try:
+            snap = await self._brain_snapshot()
+            all_rows = memory_list.rows(snap, getattr(snap, "impressions", None), brain_graph.PageIds(self._brain_key()))
+            d = memory_list.number(all_rows, _arg(args, "id"))
+        except Exception as exc:
+            return {"status": "error", "message": _failed(exc, "内容"), "data": {}}
+        if d is None:
+            return {"status": "error", "message": "没有这一条了（也许刚被删掉）", "data": {}}
+        return {"status": "ok", "data": d}

@@ -353,6 +353,11 @@ class PagesMixin:
                          "one star of the map, when the owner opens it (read-only)")
                 register("/astrbot_plugin_ams_life/page/brain/search", self.page_brain_search, ["GET"],
                          "the stars whose words match (ids only, read-only)")
+                # ams-life: "她记住了什么", the same snapshot as a list (memory_list.py), read only
+                register("/astrbot_plugin_ams_life/page/memories", self.page_memories, ["GET"],
+                         "what she keeps, page by page, numbers hidden (read-only)")
+                register("/astrbot_plugin_ams_life/page/memories/number", self.page_memories_number, ["GET"],
+                         "one row's words as kept, when the owner asks (read-only)")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
 
