@@ -221,6 +221,50 @@ def run():
         harness.drain(loop)
         out['kept_after_gone'] = len(lib.rows)
         out['looks_after_gone'] = len(ctx.provider.looks)
+    elif CASE == 'page':
+        # the owner's page: list, one picture, add (a picture only), delete; nobody's number shown
+        lib.add(png(3, 3, 7), now - 86400 * 2, source='self', from_qq='10001', from_where='group:' + A,
+                look={'caption': '一只在笑的猫', 'emotion': '开心', 'scene': '夸人'})
+        lib.add(png(3, 3, 9), now - 86400, source='self', from_qq='10002', from_where='private:10002',
+                look={'caption': '一只在哭的狗', 'emotion': '难过', 'scene': '安慰'})
+        lib.add(png(3, 3, 5), now - 86400 * 28, source='old', look={'caption': '旧的猫'})
+
+        def go(coro):
+            return loop.run_until_complete(coro)
+        first = go(plugin.page_stickers({'sort': 'saved'}))['data']
+        out['list'] = [(x['caption'], x['from'], x['owner'], x['days_left']) for x in first['items']]
+        out['list_text'] = json.dumps(first, ensure_ascii=False)
+        out['counts'] = first['counts']
+        out['sources'] = first['sources']
+        out['soon'] = [x['caption'] for x in go(plugin.page_stickers({'sort': 'soon'}))['data']['items']]
+        out['only_sad'] = [x['caption'] for x in go(plugin.page_stickers({'emotion': '难过'}))['data']['items']]
+        sid = first['items'][0]['id']
+        img = go(plugin.page_sticker_image({'id': sid}))
+        out['image'] = (img['status'], img['data']['url'][:22])
+        out['image_missing'] = go(plugin.page_sticker_image({'id': '../index.json'}))['status']
+        import base64
+        b64 = base64.b64encode(png(8, 8, 1)).decode()
+        out['add'] = go(plugin.page_sticker_add({'picture': 'data:image/png;base64,' + b64, 'note': '主人的小猫'}))['status']
+        out['add_html'] = go(plugin.page_sticker_add({'picture': base64.b64encode(b'<html><script>x</script></html>').decode()}))
+        out['add_svg_named_png'] = go(plugin.page_sticker_add({'picture': 'data:image/png;base64,' +
+                                                               base64.b64encode(b'<svg onload=1></svg>').decode()}))['status']
+        out['add_big'] = go(plugin.page_sticker_add({'picture': 'A' * (8 * 1024 * 1024)}))['status']
+        out['add_huge_side'] = go(plugin.page_sticker_add({'picture': base64.b64encode(png(5000, 1, 1)).decode()}))['status']
+        owner_row = next(r for r in lib.rows.values() if r['source'] == 'owner')
+        out['owner_row'] = (owner_row['caption'], owner_row['from_qq'], owner_row['from_where'])
+        # the owner's gift: never swept, not counted; she sweeps a year later, it stays
+        lib.sweep(now + 86400 * 365)
+        out['after_sweep'] = sorted(r['caption'] for r in lib.rows.values())
+        gift = next(sid for sid, r in lib.rows.items() if r['source'] == 'owner')
+        out['delete_gift'] = go(plugin.page_sticker_delete({'id': gift}))['status']
+        out['delete_again'] = go(plugin.page_sticker_delete({'id': gift}))['status']
+        out['left'] = sorted(r['caption'] for r in lib.rows.values())
+        # deleted on the page: its fingerprint alone is remembered; she does not keep it again
+        out['dropped_file'] = json.loads((DATA / 'stickers' / 'dropped.json').read_text('utf-8'))
+        out['gift_id'] = gift
+        again = stickers.Library(DATA / 'stickers')
+        out['keep_again'] = list(again.add(png(8, 8, 1), now, source='self', from_qq='10001'))
+        out['owner_again'] = go(plugin.page_sticker_add({'picture': b64}))['status']
     elif CASE == 'forget':
         cache = {'k1': stickers.cache_entry('https://gchat.qpic.cn/m.png', {'caption': '芒果的图'}, '10001', 'group:' + A, now),
                  'k2': stickers.cache_entry('https://gchat.qpic.cn/l.png', {'caption': '柠檬的图'}, '10002', 'group:' + A, now)}
