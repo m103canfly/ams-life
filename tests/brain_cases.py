@@ -1,4 +1,4 @@
-"""Scripted runs for the brain map's data (pages/brain, mixin_brain.py); prints a JSON result.
+"""Scripted runs for the brain map's data (pages/starmap, mixin_brain.py); prints a JSON result.
 
 Run in a fresh interpreter (test_brain_data does this):
     PYTHONHASHSEED=0 python tests/brain_cases.py <empty data dir> <out.json> <case>
