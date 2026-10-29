@@ -1,10 +1,12 @@
 {
   "pages": {
     "dashboard": { "title": "ams-life panel" },
-    "starmap": { "title": "Her brain map (own page)" }
+    "starmap": { "title": "Her brain map (own page)" },
+    "stickers": { "title": "Her stickers" }
   },
   "views": {
     "dashboard": { "title": "ams-life panel" },
-    "starmap": { "title": "Her brain map (own page)" }
+    "starmap": { "title": "Her brain map (own page)" },
+    "stickers": { "title": "Her stickers" }
   }
 }

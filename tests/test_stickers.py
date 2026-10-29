@@ -8,6 +8,8 @@ import json
 import struct
 import sys
 import tempfile
+import re
+import shutil
 import unittest
 from pathlib import Path
 
@@ -168,11 +170,18 @@ class InAReply(unittest.TestCase):
         self.assertEqual(stickers.pick_candidates(self.ROWS, NOW, valence=-0.9, k=1), ['b'])
 
     def test_only_one_that_was_offered(self):
-        self.assertEqual(stickers.pick_from_reply('好呀[表情:2]', ['a', 'd']), ('好呀', 'd'))
-        self.assertEqual(stickers.pick_from_reply('好呀[表情：9]', ['a', 'd']), ('好呀', ''))
-        self.assertEqual(stickers.pick_from_reply('好呀[表情:c]', ['a', 'd']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包:2]', ['a', 'd']), ('好呀', 'd'))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包：9]', ['a', 'd']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包:c]', ['a', 'd']), ('好呀', ''))
+        # any [表情包...] mark goes out, whatever is in it; only an offered number is sent
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包：一只 猫]', ['a1']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包 2]', ['a', 'd']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包：2 ]', ['a', 'd']), ('好呀', 'd'))
+        self.assertEqual(stickers.pick_from_reply('[表情包]好呀[表情包:]', ['a']), ('好呀', ''))
+        # a QQ face ([表情:名字], 甲) is not a sticker and stays as it is
+        self.assertEqual(stickers.pick_from_reply('好呀[表情:微笑][表情:2]', ['a', 'd']), ('好呀[表情:微笑][表情:2]', ''))
         self.assertEqual(stickers.pick_from_reply('好呀', ['a']), ('好呀', ''))
-        self.assertEqual(stickers.phone_line({'caption': '一只在笑的猫' * 3}), '[表情：一只在笑的猫一只在笑的猫]')
+        self.assertEqual(stickers.phone_line({'caption': '一只在笑的猫' * 3}), '[表情包：一只在笑的猫一只在笑的猫]')
 
 
 class SendingOne(unittest.TestCase):
@@ -260,6 +269,61 @@ class TheImport(unittest.TestCase):
             for bad in (Path(tmp) / 'astrbot' / 'data' / 'x', HERE / 'nope', out):
                 with self.assertRaises(_guard.Refused):
                     import_stickers.stage(src, bad, now=NOW)
+
+
+
+class PageLogic(unittest.TestCase):
+    def test_places_numbered_by_when_first_seen(self):
+        rows = {'a': {'from_where': 'group:5', 'saved_at': 20}, 'b': {'from_where': 'group:3', 'saved_at': 10},
+                'c': {'from_where': 'private:7', 'saved_at': 30}, 'd': {'from_where': 'old', 'saved_at': 1}}
+        self.assertEqual(stickers.place_labels(rows), {'group:3': '群1', 'group:5': '群2', 'private:7': '私聊1'})
+
+    def test_pages_of_forty(self):
+        rows = {'s%02d' % i: {'caption': str(i), 'saved_at': i, 'last_used': i, 'source': 'self'} for i in range(45)}
+        first = stickers.listing(rows, 100)
+        self.assertEqual((len(first['items']), first['next']), (40, 40))
+        second = stickers.listing(rows, 100, after=40)
+        self.assertEqual((len(second['items']), second['next']), (5, None))
+
+    def test_upload_decoding(self):
+        import base64
+        self.assertEqual(stickers.decode_upload(''), (b'', 'empty'))
+        self.assertEqual(stickers.decode_upload('不是base64'), (b'', 'not base64'))
+        self.assertEqual(stickers.decode_upload(base64.b64encode(b'GIF87a').decode())[1], 'size unreadable')
+
+
+
+class OwnerDeleted(unittest.TestCase):
+    """What the owner deleted on the page is never kept again, unless he adds it himself (item 32)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='ams-life-dropped-'))
+        self.lib = stickers.Library(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_deleted_once_not_kept_again_the_owner_may(self):
+        pic = png()
+        sid, _ = self.lib.add(pic, 100, source='self', from_qq='10001', from_where='group:900001')
+        self.lib.remove(sid)
+        self.assertTrue(self.lib.drop(sid))
+        self.assertEqual(self.lib.add(pic, 200, source='self', from_qq='10002'), ('', '主人删过'))
+        self.assertEqual(self.lib.add(pic, 200, source='old'), ('', '主人删过'))
+        again = stickers.Library(self.tmp)                 # remembered on disk
+        self.assertEqual(again.add(pic, 300, source='self'), ('', '主人删过'))
+        self.assertEqual(again.add(pic, 300, source='owner', note='还是要')[0], sid)   # the owner adds it again
+        self.assertNotIn(sid, again.dropped)
+        self.assertEqual(again.add(pic, 400, source='self')[0], sid)
+
+    def test_only_fingerprints_at_most_the_newest(self):
+        self.assertFalse(self.lib.drop('../index.json'))
+        for i in range(stickers.DROPPED_MAX + 3):
+            self.lib.drop('%064x' % i)
+        saved = json.loads((self.tmp / 'dropped.json').read_text('utf-8'))
+        self.assertEqual(len(saved), stickers.DROPPED_MAX)
+        self.assertEqual(saved[0], '%064x' % 3)                  # the oldest went
+        self.assertTrue(all(re.fullmatch(r'[0-9a-f]{64}', x) for x in saved))
 
 
 if __name__ == '__main__':
