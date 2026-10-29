@@ -135,7 +135,10 @@ def check(reply, forbidden, allowed="", common=(), reply_vec=None, leak=LEAK_COS
         if item.get("private") and hint:
             why.append("hint")
         own = pieces(item.get("text")) - ok
-        if said & own:
+        original = norm(item.get("text"))
+        exact_group_private = (item.get("group_private") and len(original) >= PIECE
+                               and original in norm(reply))
+        if said & own or exact_group_private:
             why.append("piece")
         if reply_vec is not None and item.get("vec"):
             c = cosine(reply_vec, item["vec"])

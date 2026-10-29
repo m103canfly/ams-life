@@ -107,7 +107,8 @@ class Split(unittest.TestCase):
         # her camera and her voice, as the owner wired them in on 10-30: +9 (SelfieMixin:
         # _media_settings, _media_count, _media_bump, _media_wanted, _post_json, _post_selfie,
         # _make_selfie, _make_voice, _media_after_reply)
-        self.assertEqual(len(methods), 399)
+        # keep-in-group: _narrow_group_sources and _forbid_group_private
+        self.assertEqual(len(methods), 401)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

@@ -541,10 +541,18 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="", extr
     if not picked:
         return {"skipped": "nobody"}
     picked_qq = {p["qq"] for p in picked}
+    # The model can use one person's private words in another's impression.
+    # Public material leaves the existing origin unchanged.
+    material_lines = [ln for ln in lines if isinstance(ln, dict) and _day(ln.get("ts")) == day]
+    material_origins = [discretion.origin_of(ln, place) for ln in material_lines
+                        if discretion.origin_of(ln, place)["where"].startswith("group:")
+                        and discretion.origin_of(ln, place)["visibility"] == discretion.PRIVATE]
     for p in picked:
         others = [ln for ln in lines if str(ln.get("sender_id") or "") not in (p["qq"], str(self_id))
                   and ln.get("role") != "assistant" and _day(ln.get("ts")) == day]
         rec = data["people"].setdefault(p["qq"], _record(place, p["qq"]))
+        if material_origins:
+            rec["origin"] = discretion.merge([discretion.origin_of(rec, place)] + material_origins)
         add_day(rec, p["name"], day_stats(p["lines"], others, red), day, red, judge)
         store.keep_names(p["qq"], [p["name"]])
     data["tried"] = day
@@ -571,7 +579,8 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="", extr
         rec["topics"] = item["topics"] or rec.get("topics", [])
         if names_seen.get(qq):
             merged = list(dict.fromkeys(list(rec.get("aliases") or []) + names_seen[qq]))
-            store.keep_names(qq, merged)
+            if discretion.origin_of(rec, place)["visibility"] != discretion.PRIVATE:
+                store.keep_names(qq, merged)
             rec["aliases"] = merged[-MAX_ALIASES:]
         rec["updated"] = day
     store.save(place, data)
@@ -596,6 +605,8 @@ def view(rec, rec_place, here, present_here=False, private_text="") -> dict:
             "style": rec.get("style", ""), "topics": list(rec.get("topics") or [])}
     if here == str(rec_place):
         return full
+    if discretion.origin_of(rec, rec_place)["visibility"] == discretion.PRIVATE:
+        return None
     if here.startswith("group:"):
         return {"name": full["name"], "aliases": full["aliases"]} if present_here else None
     if here == "private:" + str(rec.get("qq") or ""):

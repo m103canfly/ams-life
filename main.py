@@ -762,17 +762,20 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 parts.append({"type": "text", "text": _compact, "_no_save": True})
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
-        if _global:
-            # step 2: what may be said here, for the last look at the reply (send_check)
-            self._note_allowed(event, req, _compact)
+        # The last look also protects group-private messages with global_memory off.
+        self._note_allowed(event, req, _compact)
 
     @filter.on_agent_done()
     async def on_agent_done(self, event: AstrMessageEvent, run_context, response: LLMResponse):
         """Step 2 (global_memory): AstrBot saves this turn after this hook (4.29.3,
         internal.py _save_to_history, from run_context.messages): make it hold what was sent
         -- the words said once more, not the first ones -- and none of the model's thinking."""
-        if self.enabled and getattr(self, "global_memory", False):
-            self._settle_history(event, run_context)
+        if self.enabled:
+            note = self._check_note(event)
+            group_private = any(str(x.get("id") or "").startswith("group-private:")
+                                for x in note.get("forbidden") or [])
+            if getattr(self, "global_memory", False) or group_private:
+                self._settle_history(event, run_context)
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
@@ -807,7 +810,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._check_note(event).update(sent="", outcome="silent")
             self._stop(event)
             return
-        if getattr(self, "global_memory", False) and _reply.strip():
+        if _reply.strip():
             # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
             # If the look itself fails, the reply is held back as if it leaked.
             try:

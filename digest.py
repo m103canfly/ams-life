@@ -185,10 +185,12 @@ def sources(item, codes, shown, day_all) -> tuple:
     if not item["who_ok"] or not item["lines_ok"]:
         people |= set(speakers(day_all))
     ids = [str(ln.get("msg_id")) for ln in used if ln.get("msg_id")]
-    for ln in used:   # her own lines: whom she answered there, and what
-        if ln.get("role") == "assistant" and isinstance(ln.get("origin"), dict):
-            people |= set(_people(ln["origin"]))
-            ids += [str(s) for s in ln["origin"].get("source_ids") or [] if str(s or "")]
+    for ln in used:
+        origin = ln.get("origin") if isinstance(ln.get("origin"), dict) else {}
+        if origin and (ln.get("role") == "assistant" or (str(origin.get("where") or "").startswith("group:")
+                                                         and origin.get("visibility") == "private")):
+            people |= set(_people(origin))
+            ids += [str(s) for s in origin.get("source_ids") or [] if str(s or "")]
     return sorted(people), list(dict.fromkeys(ids))
 
 

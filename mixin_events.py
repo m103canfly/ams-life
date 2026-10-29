@@ -2443,7 +2443,8 @@ class EventsMixin:
                 return
             last_map[key] = now
             origin = discretion.merge(origins)
-            origin = discretion.make_origin(self._here(event), origin["people"], origin["source_ids"])
+            origin = discretion.make_origin(self._here(event), origin["people"], origin["source_ids"],
+                                            origin["visibility"])
             await self._archive_strong_event(event, core, texts, str(text or texts[-1])[:160], origin=origin)
         except Exception as exc:
             logger.warning("[biocore] request-path strong event failed: %s", exc)
