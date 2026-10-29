@@ -104,7 +104,10 @@ class Split(unittest.TestCase):
         # _familiarity, _note_tie, _window_state, _save_attention, _last_reply_here, _why_called,
         # _decide, _stop, _score, _ask_for_reply, _note_sent, _chain_of, _send_rest, _shape_reply,
         # _spend_for_panel)
-        self.assertEqual(len(methods), 390)
+        # her camera and her voice, as the owner wired them in on 10-30: +9 (SelfieMixin:
+        # _media_settings, _media_count, _media_bump, _media_wanted, _post_json, _post_selfie,
+        # _make_selfie, _make_voice, _media_after_reply)
+        self.assertEqual(len(methods), 399)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
