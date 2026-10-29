@@ -75,6 +75,8 @@
              css: "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")" };
   };
   const isDark = () => document.documentElement.dataset.theme === "dark";
+  // her look (look.css): the signal line takes the page's accent colour, "r,g,b"
+  const accentRgb = () => (getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb") || "").trim() || "214,83,143";
   // task-42/44: pure orbit math lives in orb_math.js so evals can run it in
   // node (world units, R applied once). The inline copy below is the same
   // formula if that script is missing.
@@ -655,15 +657,16 @@
     vals.forEach((v, i) => { if (i === 0) sig.moveTo(X(i), Y(v)); else sig.lineTo(X(i), Y(v)); });
     sig.lineTo(SW - RIGHT, zero); sig.lineTo(LEFT, zero); sig.closePath();
     const fill = sig.createLinearGradient(0, TOP, 0, BOT);
-    fill.addColorStop(0, "rgba(255,107,0,.16)");
-    fill.addColorStop(.5, "rgba(255,107,0,.04)");
-    fill.addColorStop(1, "rgba(255,107,0,0)");
+    const _ac = accentRgb();
+    fill.addColorStop(0, "rgba(" + _ac + ",.16)");
+    fill.addColorStop(.5, "rgba(" + _ac + ",.04)");
+    fill.addColorStop(1, "rgba(" + _ac + ",0)");
     sig.fillStyle = fill; sig.fill();
 
     const grad = sig.createLinearGradient(LEFT, 0, SW - RIGHT, 0);
-    grad.addColorStop(0, "#ff6b00"); grad.addColorStop(.6, "#e99a3c"); grad.addColorStop(1, "#b85c40");
+    grad.addColorStop(0, "rgba(" + _ac + ",1)"); grad.addColorStop(.6, "rgba(" + _ac + ",.8)"); grad.addColorStop(1, "rgba(" + _ac + ",.6)");
     sig.save();
-    sig.shadowColor = "rgba(255,107,0,.34)"; sig.shadowBlur = 6;
+    sig.shadowColor = "rgba(" + _ac + ",.34)"; sig.shadowBlur = 6;
     sig.beginPath();
     vals.forEach((v, i) => { if (i === 0) sig.moveTo(X(i), Y(v)); else sig.lineTo(X(i), Y(v)); });
     sig.strokeStyle = grad; sig.lineWidth = 2.1; sig.lineJoin = "round"; sig.lineCap = "round";
@@ -672,7 +675,7 @@
     // current point
     const lv = vals[vals.length - 1];
     sig.beginPath(); sig.arc(X(n - 1), Y(lv), 2.4, 0, Math.PI * 2);
-    sig.fillStyle = "#ff6b00"; sig.fill();
+    sig.fillStyle = "rgba(" + _ac + ",1)"; sig.fill();
   }
 
   function ring(orbit, ry, rx, front, centerY) {

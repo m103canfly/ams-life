@@ -32,6 +32,8 @@ EDGE_KINDS = {'link', 'origin', 'about', 'impression'}
 # The only URLs in the bundle are strings inside three.js that are never fetched:
 # the XHTML namespace for createElementNS and a paper cited in a shader comment.
 INERT_URLS = {'http://www.w3.org/1999/xhtml', 'https://jcgt.org/published/0007/04/01/'}
+# The page's "about" line names where her source is, as words: never a link, never loaded.
+SOURCE_URL = 'https://github.com/m103canfly/ams-life'
 
 
 class StaysLocal(unittest.TestCase):
@@ -42,7 +44,7 @@ class StaysLocal(unittest.TestCase):
                         'importScripts', '@import', 'import('):
                 self.assertFalse(bad in text, f'{f.name} contains {bad!r}')
             urls = set(re.findall(r'''https?://[^\s"'`)<>]+''', text))
-            allowed = INERT_URLS if f.name == 'brain.bundle.js' else set()
+            allowed = INERT_URLS if f.name == 'brain.bundle.js' else {SOURCE_URL} if f.name in ('index.html', 'panel-page.js') else set()
             self.assertLessEqual(urls, allowed, f.name)
 
     def test_page_only_loads_its_own_files(self):
