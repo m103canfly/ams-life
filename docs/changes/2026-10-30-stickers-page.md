@@ -28,6 +28,16 @@ so the sidebar still opens the panel; the console can open it straight away at
 - Not here: a link from the panel to this page (how AstrBot routes between a plugin's pages from inside one is not
   checked yet), and the console's button (the console's card).
 
+The owner's board, items 32 and 33 (both "照推荐"; `审核-PR43.md`):
+
+- **32, what the owner deleted is not kept again**: deleting one on the page remembers its fingerprint (sha256) in
+  `stickers/dropped.json` -- the fingerprint alone: no picture, nobody, no place; at most 5000, the oldest go first.
+  She does not keep it again, nor does an import (`Library.add` answers "主人删过"); the owner adding it himself
+  takes it, and takes it off the list. (An import goes into a new folder that has no list: the list only works in
+  her data folder, so an import is done before anything is deleted there, as at the first install.)
+- **33, the page in the panel's look**: it already uses #37's colours (月白, the same glass, no glow); a test now
+  compares the page's colour variables with `look.css`, light and dark, and finds no `text-shadow`.
+
 ## Files
 
 - `pages/stickers/index.html`, `pages/stickers/stickers.css`, `pages/stickers/stickers.js` (new)

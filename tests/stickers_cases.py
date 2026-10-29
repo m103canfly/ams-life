@@ -259,6 +259,12 @@ def run():
         out['delete_gift'] = go(plugin.page_sticker_delete({'id': gift}))['status']
         out['delete_again'] = go(plugin.page_sticker_delete({'id': gift}))['status']
         out['left'] = sorted(r['caption'] for r in lib.rows.values())
+        # deleted on the page: its fingerprint alone is remembered; she does not keep it again
+        out['dropped_file'] = json.loads((DATA / 'stickers' / 'dropped.json').read_text('utf-8'))
+        out['gift_id'] = gift
+        again = stickers.Library(DATA / 'stickers')
+        out['keep_again'] = list(again.add(png(8, 8, 1), now, source='self', from_qq='10001'))
+        out['owner_again'] = go(plugin.page_sticker_add({'picture': b64}))['status']
     elif CASE == 'forget':
         cache = {'k1': stickers.cache_entry('https://gchat.qpic.cn/m.png', {'caption': '芒果的图'}, '10001', 'group:' + A, now),
                  'k2': stickers.cache_entry('https://gchat.qpic.cn/l.png', {'caption': '柠檬的图'}, '10002', 'group:' + A, now)}

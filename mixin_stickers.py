@@ -17,7 +17,8 @@ Off unless stickers_enabled (and looking at pictures, image_caption, is on).
 - deleting a person deletes what he sent and the looks at his pictures;
 - the owner's page of her stickers (pages/stickers): one page of them (page/stickers), one picture
   (page/stickers/image), delete one (page/stickers/delete, the owner's own gifts too; nothing goes
-  into the forget registry), add some (page/stickers/add: pictures only, by their first bytes, each
+  into the forget registry; its fingerprint is remembered and it is never kept again unless the owner
+  adds it himself), add some (page/stickers/add: pictures only, by their first bytes, each
   under a new name; marked "主人给的": never swept, not counted in the 300; labelled by the owner's line,
   else by one look when looking at pictures is on, else "主人给的").
 """
@@ -338,7 +339,10 @@ class StickersMixin:
         b = await self._page_body(body)
         sid = str(b.get("id") or "").strip()
         async with self._sticker_lock():
-            gone = self._sticker_lib().remove(sid)
+            lib = self._sticker_lib()
+            gone = lib.remove(sid)
+            if gone:
+                lib.drop(sid)   # never kept again unless the owner adds it himself (item 32)
         if not gone:
             return {"status": "error", "message": "没有这一张了", "data": {}}
         logger.info("[ams-life] stickers: the owner deleted %s", sid[:10])

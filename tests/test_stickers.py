@@ -8,6 +8,8 @@ import json
 import struct
 import sys
 import tempfile
+import re
+import shutil
 import unittest
 from pathlib import Path
 
@@ -288,6 +290,40 @@ class PageLogic(unittest.TestCase):
         self.assertEqual(stickers.decode_upload(''), (b'', 'empty'))
         self.assertEqual(stickers.decode_upload('不是base64'), (b'', 'not base64'))
         self.assertEqual(stickers.decode_upload(base64.b64encode(b'GIF87a').decode())[1], 'size unreadable')
+
+
+
+class OwnerDeleted(unittest.TestCase):
+    """What the owner deleted on the page is never kept again, unless he adds it himself (item 32)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='ams-life-dropped-'))
+        self.lib = stickers.Library(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_deleted_once_not_kept_again_the_owner_may(self):
+        pic = png()
+        sid, _ = self.lib.add(pic, 100, source='self', from_qq='10001', from_where='group:900001')
+        self.lib.remove(sid)
+        self.assertTrue(self.lib.drop(sid))
+        self.assertEqual(self.lib.add(pic, 200, source='self', from_qq='10002'), ('', '主人删过'))
+        self.assertEqual(self.lib.add(pic, 200, source='old'), ('', '主人删过'))
+        again = stickers.Library(self.tmp)                 # remembered on disk
+        self.assertEqual(again.add(pic, 300, source='self'), ('', '主人删过'))
+        self.assertEqual(again.add(pic, 300, source='owner', note='还是要')[0], sid)   # the owner adds it again
+        self.assertNotIn(sid, again.dropped)
+        self.assertEqual(again.add(pic, 400, source='self')[0], sid)
+
+    def test_only_fingerprints_at_most_the_newest(self):
+        self.assertFalse(self.lib.drop('../index.json'))
+        for i in range(stickers.DROPPED_MAX + 3):
+            self.lib.drop('%064x' % i)
+        saved = json.loads((self.tmp / 'dropped.json').read_text('utf-8'))
+        self.assertEqual(len(saved), stickers.DROPPED_MAX)
+        self.assertEqual(saved[0], '%064x' % 3)                  # the oldest went
+        self.assertTrue(all(re.fullmatch(r'[0-9a-f]{64}', x) for x in saved))
 
 
 if __name__ == '__main__':

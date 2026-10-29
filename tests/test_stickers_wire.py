@@ -138,6 +138,32 @@ class OwnersPage(unittest.TestCase):
         self.assertEqual((r['delete_gift'], r['delete_again']), ('ok', 'error'))
         self.assertEqual(r['left'], [])
 
+    def test_deleted_on_the_page_never_kept_again_unless_the_owner_adds_it(self):
+        r = run_case('page')
+        self.assertEqual(r['dropped_file'], [r['gift_id']])           # a fingerprint, nothing else
+        self.assertEqual(r['keep_again'], ['', '主人删过'])
+        self.assertEqual(r['owner_again'], 'ok')
+
+
+class PageLook(unittest.TestCase):
+    """The page in the panel's look (#37): 月白 on clear glass, no glow around words (item 33)."""
+
+    def test_the_panels_colours_and_no_glow(self):
+        import re
+        pages = HERE.parent / 'pages'
+        page = (pages / 'stickers' / 'stickers.css').read_text('utf-8')
+        look = (pages / 'dashboard' / 'look.css').read_text('utf-8')
+        self.assertNotIn('text-shadow', page)
+
+        def values(css, theme):
+            block = re.search((r':root\{(.*?)\}' if theme == 'light' else r'\[data-theme="dark"\]\{(.*?)\}'), css, re.S).group(1)
+            return dict(re.findall(r'(--[\w-]+):\s*([^;]+);', block))
+        for theme in ('light', 'dark'):
+            mine, panel = values(page, theme), values(look, theme)
+            for key in ('--bg', '--bg2', '--ink', '--text', '--muted', '--faint', '--accent', '--accent2',
+                        '--accent-strong', '--glass-thin', '--glass-thick', '--glass-pop'):
+                self.assertEqual(mine.get(key), panel.get(key), (theme, key))
+
 
 class Forgotten(unittest.TestCase):
     def test_deleting_a_person_deletes_what_he_sent(self):
