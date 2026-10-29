@@ -142,6 +142,8 @@ class SendCheckMixin:
             logger.warning("[ams-life] send check: asking once more failed: %s", exc)
             return None
         self._count_check("redo_calls")
+        if getattr(self, "self_decide", False):
+            self._note_spend("redo", resp)
         usage = getattr(resp, "usage", None)
         if usage is not None:
             self._count_check("redo_tokens", int(getattr(usage, "total", 0) or 0))

@@ -34,3 +34,7 @@ class Record(_Comp):
 
 class At(_Comp):
     pass
+
+
+class Face(_Comp):
+    pass
