@@ -282,12 +282,34 @@ class PagesMixin:
         if not base_url:
             return {"status": "error", "message": "no api base"}
         url = self._models_url(base_url)
+        def _system_proxies_for(target):
+            # ams-life: AstrBot 启动时会设 no_proxy 环境变量，而 Python 的
+            # getproxies() 会把 no_proxy 也当成一项代理，于是以为“没有代理”，
+            # 不再去读 Windows 的代理设置，外部请求就变成直连（超时）。
+            # 这里直接读 Windows 系统代理；本机地址一律不走代理。
+            try:
+                from urllib.parse import urlsplit
+                host = (urlsplit(target).hostname or "").lower()
+            except Exception:
+                host = ""
+            if host in ("127.0.0.1", "localhost", "::1"):
+                return {}
+            try:
+                getter = getattr(urllib.request, "getproxies_registry", None)
+                if getter is None:
+                    return {}
+                return getter() or {}
+            except Exception:
+                return {}
+
         def do_request():
             headers = {"Accept": "application/json"}
             if api_key:
                 headers["Authorization"] = "Bearer " + api_key
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            _proxies = _system_proxies_for(url)
+            _opener = urllib.request.build_opener(urllib.request.ProxyHandler(_proxies))
+            with _opener.open(req, timeout=20) as resp:
                 return json.loads(resp.read().decode("utf-8", "replace"))
         try:
             payload = await asyncio.to_thread(do_request)

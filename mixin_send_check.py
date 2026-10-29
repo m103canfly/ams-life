@@ -10,7 +10,8 @@ and nothing of it is kept. on_agent_done (_settle_history) then makes the conver
 AstrBot saves hold what was sent: the last assistant message becomes exactly that, without
 the model's thinking, and the event's copy of the thinking is cleared.
 
-Only ids and counts are logged; the counts per day (states/send_check.json) are for the panel.
+Only reason codes, exception types and counts are logged; the counts per day
+(states/send_check.json) are for the panel.
 """
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ class SendCheckMixin:
                 pass
         return note
 
-    def _forbid(self, event, iid, text="", people=(), vec=None) -> None:
+    def _forbid(self, event, iid, text="", people=(), vec=None, private=True) -> None:
         """Something labelled "这里不能讲" in this reply's prompt: its words, and the names of
         who said it / was in it (not of whoever is talking to her or here)."""
         if event is None:
@@ -53,11 +54,11 @@ class SendCheckMixin:
         names = [n for n in self._known_names([p for p in people if str(p) not in keep_out])
                  if n and not n.isdigit()]
         self._check_note(event)["forbidden"].append(
-            {"id": str(iid), "text": str(text or ""), "names": names, "vec": vec or None})
+            {"id": str(iid), "text": str(text or ""), "private": private, "names": names, "vec": vec or None})
 
     def _forbid_names(self, event, iid, people=()) -> None:
         """Something labelled "不点名": only the names of the people in it."""
-        self._forbid(event, iid, "", people)
+        self._forbid(event, iid, "", people, private=False)
 
     def _note_allowed(self, event, req, compact) -> None:
         """What this reply's prompt holds that may be said here: the block without the items
@@ -113,7 +114,7 @@ class SendCheckMixin:
                         cache[item["id"]] = await self._embed_text(item["text"]) or []
                     item["vec"] = cache[item["id"]] or None
         except Exception as exc:
-            logger.warning("[ams-life] send check: no vectors (%s); pieces and names only", exc)
+            logger.warning("[ams-life] send check: no vectors (%s); local checks only", type(exc).__name__)
         return send_check.check(reply, forbidden, note.get("allowed", ""), self._common_pieces(), vec)
 
     async def _redo_reply(self, event):
@@ -134,14 +135,14 @@ class SendCheckMixin:
         if compact and compact in str(system or ""):
             compact = ""   # the block went into the system prompt (no user parts): not twice
         prompt = "\n\n".join(x for x in (compact, str(getattr(req, "prompt", "") or ""), send_check.REDO_NOTE) if x)
+        self._count_check("redo_calls")
         try:
             resp = await provider.text_chat(prompt=prompt, contexts=list(getattr(req, "contexts", None) or []),
                                             system_prompt=system,
                                             image_urls=list(getattr(req, "image_urls", None) or []))
         except Exception as exc:
-            logger.warning("[ams-life] send check: asking once more failed: %s", exc)
+            logger.warning("[ams-life] send check: asking once more failed: %s", type(exc).__name__)
             return None
-        self._count_check("redo_calls")
         if getattr(self, "self_decide", False):
             self._note_spend("redo", resp)
         usage = getattr(resp, "usage", None)
@@ -152,37 +153,36 @@ class SendCheckMixin:
 
     async def _look_at_reply(self, event, response, reply) -> str:
         """The reply as it may be sent: as it is, said once more, or "" (nothing is sent: the
-        event is stopped, so AstrBot neither sends nor saves it). Logs only ids."""
+        event is stopped, so AstrBot neither sends nor saves it). Logs only reason codes."""
         result = await self._check_reply(event, reply)
         self._check_note(event)["top"] = result["top"]   # the highest cosine (for the replay)
         if result["close"]:
             self._count_check("close")
-            logger.info("[ams-life] send check: close (%s)",
-                        ", ".join("%s %.2f" % (i, c) for i, c in result["close"]))
+            logger.info("[ams-life] send check: close (%d)", len(result["close"]))
         if not result["leak"]:
             self._check_note(event).update(sent=reply, outcome="sent")
             return reply
-        ids = ", ".join(result["ids"])
+        reasons = ",".join(sorted({why for reasons in result["why"].values() for why in reasons}))
         again = await self._redo_reply(event)
         if again:
             second = await self._check_reply(event, again)
             if not second["leak"]:
                 self._count_check("redone")
-                logger.info("[ams-life] send check: redone (%s)", ids)
+                logger.info("[ams-life] send check: redone (%s)", reasons)
                 self._set_reply(response, again)
                 self._check_note(event).update(sent=again, outcome="redone")
                 return again
-            ids = ", ".join(dict.fromkeys(result["ids"] + second["ids"]))
         self._count_check("held")
-        logger.info("[ams-life] send check: held back (%s)", ids)
+        logger.info("[ams-life] send check: held back (%s)", reasons)
         self._check_note(event).update(sent="", outcome="held")
         try:
             event.stop_event()
         except Exception:
             pass
+        self._set_reply(response, "")
         return ""
 
-    def _check_failed(self, event, exc) -> str:
+    def _check_failed(self, event, exc, response) -> str:
         """The look itself failed: held back as if it leaked (not sent, nothing kept)."""
         self._count_check("failed")
         logger.warning("[ams-life] send check: failed (%s), held back", type(exc).__name__)
@@ -191,6 +191,7 @@ class SendCheckMixin:
             event.stop_event()
         except Exception:
             pass
+        self._set_reply(response, "")
         return ""
 
     @staticmethod
@@ -241,7 +242,7 @@ class SendCheckMixin:
             elif sent is not None and isinstance(content, str):
                 last.content = sent
         except Exception as exc:
-            logger.warning("[ams-life] send check: history not settled: %s", exc)
+            logger.warning("[ams-life] send check: history not settled: %s", type(exc).__name__)
 
     # ------------------------------------------------------------------
     # counts per day, for the panel (numbers only)
@@ -261,7 +262,7 @@ class SendCheckMixin:
             tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
             atomic_file.replace(tmp, SEND_CHECK_PATH)
         except Exception as exc:
-            logger.warning("[ams-life] send check count failed: %s", exc)
+            logger.warning("[ams-life] send check count failed: %s", type(exc).__name__)
 
     def _check_counts_today(self) -> dict:
         try:
