@@ -155,7 +155,8 @@ class DiscretionMixin:
 
     def _names_index(self) -> dict:
         """person id -> the nicknames and group cards seen with it: from every chat window
-        and the memory library once, then kept up as messages come (_note_name)."""
+        and the memory library once, then kept up as messages come (_note_name). Someone
+        only @'d (who never wrote) is in it too, by the "@名字(号码)" kept in the words."""
         idx = getattr(self, "_name_index", None)
         if isinstance(idx, dict):
             return idx
@@ -163,10 +164,12 @@ class DiscretionMixin:
         for place in self._window_places():
             for x in self._read_window(place)["recent"]:
                 self._note_name(x.get("sender_id"), x.get("sender_name"))
+                self._note_ats(x.get("text"))
         for e in self._read_library()["entries"]:
             if not isinstance(e, dict):
                 continue
             self._note_name(e.get("sender_id"), e.get("sender_name"))
+            self._note_ats(e.get("text"))
             prov = e.get("provenance") if isinstance(e.get("provenance"), dict) else {}
             for src in [prov] + [s for s in (prov.get("sources") or []) if isinstance(s, dict)]:
                 self._note_name(src.get("sender_id"), src.get("sender_name"))
@@ -178,6 +181,19 @@ class DiscretionMixin:
         if not person or not name or not isinstance(idx, dict):
             return
         idx.setdefault(person, set()).add(name)
+
+    def _note_at(self, person, name="") -> None:
+        """Someone @'d: his number is known (_known_numbers) even with no name and no message."""
+        person = str(person or "").strip()
+        idx = self._names_index()
+        if not person.isdigit() or person in (getattr(self, "_her_ids", None) or ()):
+            return
+        idx.setdefault(person, set())
+        self._note_name(person, name)
+
+    def _note_ats(self, text) -> None:
+        for name, qq in discretion.at_names(text):
+            self._note_at(qq, name)
 
     def _known_names(self, people) -> list:
         """Every name these people are known by: the ids themselves, the nicknames and

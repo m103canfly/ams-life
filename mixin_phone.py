@@ -167,6 +167,8 @@ class PhoneMixin:
                     qq, name = str(getattr(comp, "qq", "") or ""), str(getattr(comp, "name", "") or "").strip()
                     if qq in gone and name:
                         self.__dict__.setdefault("_gone_names", {}).setdefault(qq, set()).add(name)
+                    elif qq and qq not in her:
+                        self._note_at(qq, name)   # someone @'d who may never write: his number is known
                     parts.append("@" + (HER_NAME if qq in her else discretion.SOMEBODY if qq in gone
                                         else "%s(%s)" % (name, qq) if qq else name or discretion.SOMEBODY))
                 elif kind == "AtAll":

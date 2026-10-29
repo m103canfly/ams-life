@@ -269,6 +269,34 @@ class Replay(unittest.TestCase):
             self.assertEqual(checks['numbers']['fails'], 1)                      # FISH never spoke there
             self.assertEqual(checks['numbers']['warnings'], {'asker_own_number': 1})
 
+    def test_someone_only_atted_is_a_person(self):
+        # review of PR #20: a number @'d in the small group (he never writes) is his; said there by
+        # the @, so fine there, a failure in the busy group; and an @ in a group makes a number
+        # he once typed in a private chat no longer that chat's alone
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            with closing(sqlite3.connect(str(chat))) as db:
+                for n, (who, group, raw, text, typ) in enumerate((
+                        (fake.MANGO, None, '10066', '10066', 'private'),
+                        (fake.FISH, fake.G_SMALL, '[CQ:at,qq=10066] 一起玩', '@阿默 一起玩', 'group'))):
+                    db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, "
+                               "sub_type, post_type, raw_message, message_content, sender_info, timestamp, direction, "
+                               "connection_id, processed, created_at) VALUES (?, ?, ?, ?, ?, ?, 'normal', 'message', "
+                               "?, ?, '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                               (9980 + n, str(9980 + n), fake.BOT, who, group, typ, raw, text, int(fake.T0 + 480 + n)))
+                db.commit()
+            ok = self.plant(tmp, [('reply', 'group:' + fake.G_SMALL, '她记得 @阿默(10066) 要一起玩')])
+            checks = audit_replay.audit(ok, chat)['checks']
+            self.assertTrue(checks['numbers']['pass'])
+            self.assertTrue(checks['private']['pass'])
+            bad = self.plant(Path(tmp) / 'bad', [('reply', 'group:' + fake.G_BUSY, '她记得 @阿默(10066) 要一起玩')])
+            numbers = audit_replay.audit(bad, chat)['checks']['numbers']
+            self.assertEqual(numbers['fails'], 1)
+            self.assertEqual(numbers['examples'][0]['number'], 'person')
+
     def test_a_card_that_is_an_ordinary_word(self):
         # group cards in the small group: an everyday word, a word on this computer's list, a name
         import sqlite3

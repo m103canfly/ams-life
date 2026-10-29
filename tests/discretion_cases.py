@@ -669,6 +669,22 @@ def run():
         out['b'] = t(60, '小爱，我们群周末要去爬山 我的号是 群号 隔壁群 你听说了吗', '10004', '桃子', B)
         out['same'] = t(30, '小爱 爬山的事你还记得吗', '10002', '柠檬', A)
         out['kept'] = [e['text'] for e in plugin._read_library(vectors=False)['entries']]
+    elif CASE == 'silent_at':
+        # someone who never writes, only @'d in group A: elsewhere neither his number nor his name
+        from astrbot.api.message_components import At, Plain
+        out['a'] = t(0, '@小爱bot(20002) @阿默(10066) 周末一起去爬山吗', '10004', '桃子', A, reply='好呀',
+                     parts=[At(qq='20002', name='小爱bot'), Plain(' '), At(qq='10066', name='阿默'),
+                            Plain(' 周末一起去爬山吗')])
+        out['known'] = sorted(plugin._known_numbers())
+        plugin._begin_job()
+        plugin._append_event_archive({
+            'id': 'hike', 'ts': clock.now, 'session': 'default:GroupMessage:' + A, 'title': '周末爬山',
+            'event': '桃子约 10066 周末一起去爬山', 'event_key': 'hike',
+            'origin': main.discretion.make_origin('group:' + A, ['10004'], ['m_hike'])})
+        out['b'] = t(60, '小爱 周末一起去爬山吗 你听说了吗', '10001', '芒果', B)
+        out['kept'] = [e['text'] for e in plugin._read_library(vectors=False)['entries']]
+        plugin._name_index = None   # as after a restart: the index is built again from what she keeps
+        out['known_after_restart'] = sorted(plugin._known_numbers())
     elif CASE == 'names_everywhere':
         # 阿星 goes by another group card in group B; a thing said openly in both comes up
         # in a third group: every name he goes by is taken out

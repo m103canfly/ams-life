@@ -85,7 +85,9 @@ class Split(unittest.TestCase):
         # what happened today in each window: +6 (mixin_digest); review of PR #15: +2
         # (_gone_names_in: names of people the owner deleted; _save_night_marks), then +1
         # (_scrub_stores: what others said of him, 某人 everywhere as soon as he is deleted)
-        self.assertEqual(len(methods), 335)
+        # numbers kept (10-29): the scrub methods renamed, none more; review of PR #20: +2
+        # (_note_at, _note_ats: someone only @'d is known by his number)
+        self.assertEqual(len(methods), 337)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

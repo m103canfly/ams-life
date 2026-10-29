@@ -221,14 +221,12 @@ def drop_gone(text, gone=(), her=(), her_name="", numbers=(), ats=()) -> str:
 
 def hide_numbers(text, numbers) -> str:
     """What was said in one place, brought up in another without names (anon): people's
-    numbers go with their names -- an @ of one of `numbers` keeps the name only ("@名字",
-    which anonymize then takes), a bare "@号码" is "@某人", and each of `numbers` becomes NUMBER."""
+    numbers go with their names -- every @ ("@名字(号码)", "@(号码)", "@号码": the number in
+    an @ is always someone's, known to her or not) is "@有人", and each of `numbers` becomes
+    NUMBER."""
     nums = {str(n) for n in numbers if len(str(n)) >= 5 and str(n).isdigit()}
-    out = str(text or "")
-    if not nums:
-        return out
-    out = _AT_NAMED.sub(lambda m: "@" + (m.group(1).strip() or SOMEBODY) if m.group(2) in nums else m.group(0), out)
-    out = _AT_NUMBER.sub(lambda m: "@" + SOMEBODY if m.group(1) in nums else m.group(0), out)
+    out = _AT_NAMED.sub("@" + SOMEONE, str(text or ""))
+    out = _AT_NUMBER.sub("@" + SOMEONE, out)
     return _whole_numbers(out, nums)
 
 

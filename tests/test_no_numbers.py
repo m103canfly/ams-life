@@ -53,9 +53,10 @@ class DropGone(unittest.TestCase):
         h = discretion.hide_numbers
         known = ['10002', '10004', '900001']
         self.assertEqual(h(' @桃子(10004) 加我 10002，群 900001，隔壁群 900077', known),
-                         ' @桃子 加我 [号码]，群 [号码]，隔壁群 900077')   # a group she is not in: not known
-        self.assertEqual(h('@10004 来', known), '@某人 来')
-        self.assertEqual(h('@路人(10099) 来', known), '@路人(10099) 来')
+                         ' @有人 加我 [号码]，群 [号码]，隔壁群 900077')   # a group she is not in: not known
+        self.assertEqual(h('@10004 来', known), '@有人 来')
+        # an @ is always someone: his number and name go, known to her or not
+        self.assertEqual(h('@路人(10099) 来 @(10098) 也来', known), '@有人 来 @有人 也来')
         self.assertEqual(h('分数 1100020', known), '分数 1100020')
 
     def test_anonymize_to(self):

@@ -26,9 +26,10 @@ names        A reply prompt (in a group or a private chat) holds the name of som
              is an ordinary word (everyday_words, and --ordinary-names: a list kept on this
              computer, never in the repository) is counted as a warning, not a failure.
 numbers      Any prompt -- a reply prompt or one for the model -- but the notebook's night holds a
-             number said nowhere there before: a person's (anyone in the log, the registry's
-             people, the old account itself) when he never spoke there either; a group's (every
-             group in the log) anywhere but in that group. The asker's own number in a reply
+             number said nowhere there before: a person's (anyone in the log, anyone @'d in it,
+             the registry's people, the old account itself) when he never spoke there either; a
+             group's (every group in the log) anywhere but in that group. An @ of someone in a
+             place counts as his number said there. The asker's own number in a reply
              prompt is counted as a warning only. Numbers are kept (the owner, 10-29); where they
              may go is what this checks, the way the names check does for names.
 forgotten    Anything of a person or message in the forget registry (what the old companion was
@@ -179,6 +180,12 @@ class Check:
 
 
 NUMBERS = re.compile(r"(?<![0-9.])[0-9]{5,}(?![0-9])")
+AT_CQ = re.compile(r"\[CQ:at,qq=([0-9]{5,})")
+
+
+def ats_of(row) -> list:
+    """The numbers a message @'s, as the log keeps them ([CQ:at,qq=...] in raw_message)."""
+    return AT_CQ.findall(str(row.get("raw_message") or ""))
 
 
 def notebook_night(pr) -> bool:
@@ -218,6 +225,7 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
 
     # --- who said what where
     piece_places = defaultdict(set)
+    code_places = defaultdict(set)
     names_by_place = defaultdict(set)
     speakers = defaultdict(set)
     people_numbers = set()
@@ -229,6 +237,11 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         for p in ps:
             piece_places[p].add(r["place"])
         people_numbers.add(r["user_id"])
+        for q in ats_of(r):   # someone @'d is a person, whether he ever wrote or not
+            people_numbers.add(q)
+            for p in pieces(q):
+                piece_places[p].add(r["place"])   # an @ of him there: his number was said there
+            code_places[q].add(r["place"])
         if r["name"]:
             names_by_place[r["place"]].add(r["name"])
         speakers[r["place"]].add(r["user_id"])
@@ -242,7 +255,7 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         if r.get("self_id"):
             speakers[r["place"]].add(str(r["self_id"]))   # she speaks where she said something
     # short codes: a private message that is only 5-7 digits; where else those digits were said, whole
-    code_places, private_codes = defaultdict(set), {}
+    private_codes = {}
     for r in rows + hers:
         text = str(r["message_content"] or "")
         for c in CODE.findall(text):
@@ -277,8 +290,8 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     said = sorted(rows + hers, key=lambda r: r["ts"])
     i = 0
     for n, pr in enumerate(order):
-        while i < len(said) and said[i]["ts"] <= pr["ts"]:
-            seen_text[said[i]["place"]] += "\n" + str(said[i]["message_content"] or "")
+        while i < len(said) and said[i]["ts"] <= pr["ts"]:   # an @ there: that number said there
+            seen_text[said[i]["place"]] += "\n" + " ".join([str(said[i]["message_content"] or "")] + ats_of(said[i]))
             i += 1
         place, text = pr["place"], pr["text"]
         where = {"prompt": n, "kind": pr["kind"], "place": lab(place)}

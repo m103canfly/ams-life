@@ -147,6 +147,25 @@ class NumbersGoWithNames(unittest.TestCase):
             self.assertIn('900077', ln)
 
 
+class SomeoneOnlyAtted(unittest.TestCase):
+    """Review of PR #20: someone @'d who never writes is a person too."""
+
+    def test_his_number_and_name_stay_in_that_group(self):
+        r = run_case('silent_at')
+        self.assertIn('@阿默(10066) 周末一起去爬山吗', ' '.join(r['kept']))   # kept as AstrBot wrote it
+        self.assertIn('10066', r['known'])
+        self.assertIn('10066', r['known_after_restart'])
+
+    def test_elsewhere_neither_his_number_nor_his_name(self):
+        r = run_case('silent_at')
+        b = r['b']['prompt']
+        self.assertIn('GroupMessage:900002', r['b']['session'])
+        self.assertTrue([ln for ln in b.splitlines() if '（别处）' in ln and '爬山' in ln], b)
+        self.assertTrue([ln for ln in b.splitlines() if ln.startswith('[最近的事]') and '[号码]' in ln], b)
+        for word in ('10066', '阿默', '桃子', '10004'):
+            self.assertNotIn(word, b)
+
+
 class SaidInTheGroupToo(unittest.TestCase):
     """No exception any more: what he told her in private stays in that private chat,
     even after he says nearly the same thing in a group himself."""

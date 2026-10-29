@@ -1678,12 +1678,14 @@ class MemoryMixin:
                     continue
                 _foreign.append((_escore, _verdict, _entry))
             _foreign.sort(key=lambda item: item[0], reverse=True)
+            _numbers = None   # the numbers she knows, looked up once for these lines
             for _escore, _verdict, _entry in _foreign[:2]:
                 # said elsewhere: never "对方" (that would tell who), and without names when anon
                 _who = self._recall_who(_entry, "", anon=_verdict == discretion.ANON)
                 _line = "%s：%s" % (_who, str(_entry.get("text") or "").strip().replace("\n", " ")[:200])
                 if _verdict == discretion.ANON:
-                    _line = self._anonymized(_line, discretion.names_in(_entry))
+                    _numbers = self._known_numbers() if _numbers is None else _numbers
+                    _line = self._anonymized(_line, discretion.names_in(_entry), _numbers)
                 _foreign_lines.append("- （别处）" + _line)
                 _known_texts.add(str(_entry.get("text") or "").strip())
                 _foreign_ids.append(str(_entry.get("id") or ""))
