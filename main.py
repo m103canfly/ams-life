@@ -537,8 +537,14 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
     async def on_message(self, event: AstrMessageEvent):
         """ams-life: her phone. Every message that reaches the plugin goes into its own
         chat window, whether it wakes her or not. Store only: no model, no vector
-        service, no reply, no body change; the event is never stopped or changed.
+        service, no reply, no body change; the event is never changed, and stopped only
+        for a sender on ignore_senders (the owner, 10-29: e.g. the old companion): then
+        nothing at all is done with it, and AstrBot calls no model for it.
         (AstrBot stops an event whose handler raises, so nothing may escape here.)"""
+        if self._ignored_sender(event):
+            logger.info("[ams-life] a message from a sender on ignore_senders: not answered, not kept")
+            event.stop_event()
+            return
         if not self.enabled:
             return
         try:
@@ -559,6 +565,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
 
     @filter.on_llm_request()
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
+        if self._ignored_sender(event):   # on_message stopped it already; should it get this far
+            event.stop_event()
+            return
         if not self.enabled or not self.inject_intent:
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
@@ -706,6 +715,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
+        if self._ignored_sender(event):   # nothing of an answer to him is kept
+            event.stop_event()
+            return
         if not self.enabled:
             return
         self._continue_job()

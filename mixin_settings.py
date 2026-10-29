@@ -172,6 +172,17 @@ class SettingsMixin:
             pass
         return []
 
+    def _ignored_sender(self, event) -> bool:
+        """Is the sender on the setting ignore_senders (one QQ number a line; the owner's,
+        e.g. another bot)? What such a sender says is neither answered nor kept."""
+        raw = (getattr(self, "config", None) or {}).get("ignore_senders") or []
+        listed = {str(x).strip() for x in (raw if isinstance(raw, (list, tuple)) else str(raw).splitlines())}
+        listed = {x for x in listed if x.isdigit()}
+        if not listed:
+            return False
+        sid, _name = self._speaker(event)
+        return str(sid or "") in listed
+
     def _speaker(self, event):
         """Return the current sender's (id, display name) if available."""
         sid = ""
