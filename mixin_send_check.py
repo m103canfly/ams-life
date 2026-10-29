@@ -152,12 +152,13 @@ class SendCheckMixin:
         """The reply as it may be sent: as it is, said once more, or "" (nothing is sent: the
         event is stopped, so AstrBot neither sends nor saves it). Logs only ids."""
         result = await self._check_reply(event, reply)
+        self._check_note(event)["top"] = result["top"]   # the highest cosine (for the replay)
         if result["close"]:
             self._count_check("close")
             logger.info("[ams-life] send check: close (%s)",
                         ", ".join("%s %.2f" % (i, c) for i, c in result["close"]))
         if not result["leak"]:
-            self._check_note(event)["sent"] = reply
+            self._check_note(event).update(sent=reply, outcome="sent")
             return reply
         ids = ", ".join(result["ids"])
         again = await self._redo_reply(event)
@@ -167,12 +168,12 @@ class SendCheckMixin:
                 self._count_check("redone")
                 logger.info("[ams-life] send check: redone (%s)", ids)
                 self._set_reply(response, again)
-                self._check_note(event)["sent"] = again
+                self._check_note(event).update(sent=again, outcome="redone")
                 return again
             ids = ", ".join(dict.fromkeys(result["ids"] + second["ids"]))
         self._count_check("held")
         logger.info("[ams-life] send check: held back (%s)", ids)
-        self._check_note(event)["sent"] = ""
+        self._check_note(event).update(sent="", outcome="held")
         try:
             event.stop_event()
         except Exception:
@@ -183,7 +184,7 @@ class SendCheckMixin:
         """The look itself failed: held back as if it leaked (not sent, nothing kept)."""
         self._count_check("failed")
         logger.warning("[ams-life] send check: failed (%s), held back", type(exc).__name__)
-        self._check_note(event)["sent"] = ""
+        self._check_note(event).update(sent="", outcome="failed")
         try:
             event.stop_event()
         except Exception:

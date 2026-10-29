@@ -451,6 +451,72 @@ class GlobalReplay(unittest.TestCase):
         self.assertTrue(any('[她的分寸]' in p['text'] for p in prompts if p['kind'] == 'reply'))
 
 
+class ThirdReplay(unittest.TestCase):
+    """Step 2, the third replay's tools on the made-up log: her replies by the (fake) model,
+    the probes, each reply's outcome, and the audit of what was sent."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        tmp = Path(cls.tmp.name)
+        fake.build_old(tmp / 'old')
+        import_old.build(tmp / 'old', tmp / 'bundle')
+        cls.chat = fake.build_chat(tmp / 'chat.db')
+        cls.out = tmp / 'replay'
+        run_replay(cls.chat, tmp / 'bundle' / 'forget_registry.sqlite3', cls.out,
+                   '--global-memory', '--model-replies', '--probes')
+        cls.replies = [json.loads(x) for x in (cls.out / 'replies.jsonl').read_text('utf-8').splitlines() if x]
+        cls.result = audit_replay.audit(cls.out, cls.chat)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_every_request_has_an_outcome(self):
+        meta = json.loads((self.out / 'replay.json').read_text('utf-8'))
+        self.assertTrue(meta['model_replies'] and meta['probes'])
+        self.assertEqual(len(self.replies), meta['stats']['requests'])
+        self.assertTrue(all(r['outcome'] in ('sent', 'redone', 'held', 'empty') for r in self.replies))
+        kinds = {r['probe'] for r in self.replies if r['probe']}
+        self.assertEqual(kinds, {'straight', 'round', 'game', 'summary', 'straight_private', 'owner_own_chat',
+                                 'owner_in_group'})
+
+    def test_the_fake_model_said_the_secret_and_the_send_check_caught_it(self):
+        secret = '蓝鲸三号'
+        own = next(c['place'] for c in json.loads((self.out / 'canaries.json').read_text('utf-8'))['rows']
+                   if secret in c['message_content'])
+        elsewhere = [r for r in self.replies if r['place'] != own]
+        self.assertTrue(any(r['outcome'] == 'redone' for r in elsewhere))
+        self.assertFalse(any(secret in r['sent'] for r in elsewhere))
+        # in his own chat she may say it
+        self.assertTrue(any(secret in r['sent'] for r in self.replies if r['probe'] == 'owner_own_chat'))
+
+    def test_said_once_more_is_what_the_send_check_did(self):
+        # every "redone" is one second try of the send check (not words that changed otherwise)
+        stats = json.loads((self.out / 'replay.json').read_text('utf-8'))['stats']
+        self.assertEqual(stats.get('model_calls_fake_redo', 0), stats.get('replies_redone', 0))
+        self.assertGreater(stats.get('replies_redone', 0), 0)
+
+    def test_the_audit_passes_and_counts(self):
+        self.assertTrue(self.result['pass'], json.dumps(self.result['checks'], ensure_ascii=False)[:2000])
+        s = self.result['sent_summary']
+        self.assertGreater(s['outcomes'].get('probe_redone', 0), 0)
+        self.assertEqual(s['normal_held'], 0)
+        self.assertIn('normal_redone_share', s)
+
+    def test_the_audit_catches_a_secret_that_was_sent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / 'bad'
+            shutil.copytree(self.out, bad)
+            with open(bad / 'replies.jsonl', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({'ts': fake.T0 + 9999, 'place': 'group:' + fake.G_BUSY, 'who': fake.PEACH,
+                                    'canary': False, 'probe': '', 'outcome': 'sent', 'sent': '他的暗号是蓝鲸三号',
+                                    'top': 0.2}, ensure_ascii=False) + '\n')
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertFalse(checks['sent']['pass'])
+            self.assertEqual(checks['sent']['examples'][-1]['leak'], 'private_secret')
+
+
 class AstrBotMessage(unittest.TestCase):
     """What the replay hands the plugin: a QQ message as AstrBot 4.29.3 makes it."""
 
