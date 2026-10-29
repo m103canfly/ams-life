@@ -618,7 +618,7 @@
     });
     sig.setLineDash([]);
     sig.fillStyle = "rgba(80,75,65,.46)";
-    sig.font = "9px Bahnschrift, Segoe UI, sans-serif";
+    sig.font = "12px Bahnschrift, Segoe UI, sans-serif";   // 10-29: no text under 12px
     sig.textBaseline = "middle";
     sig.fillText("+1", 8, TOP);
     sig.fillText("0", 8, zero);
@@ -957,7 +957,7 @@
         ctx.beginPath(); ctx.arc(q.x, q.y, r * 2.4, 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(" + col + ",.55)"; ctx.lineWidth = .8; ctx.stroke();
         ctx.globalAlpha = .55;
-        ctx.font = "8px ui-monospace, monospace";
+        ctx.font = "12px ui-monospace, monospace";
         ctx.fillStyle = isDark() ? "rgba(230,225,215,.75)" : "rgba(70,66,58,.75)";
         ctx.fillText(q.n.k.toUpperCase(), q.x + r + 3, q.y - r - 2);
         ctx.restore();
@@ -1019,7 +1019,7 @@
         }
         ctx.globalAlpha = .55;
         ctx.fillStyle = isDark() ? "rgba(225,220,205,.9)" : "rgba(96,88,74,.9)";
-        ctx.font = "9px ui-monospace, monospace";
+        ctx.font = "12px ui-monospace, monospace";
         ctx.fillText("档案 +" + _memExtra, CX + beltR + 4, cy - beltR * .28);
         ctx.restore();
       } else if (!_memEvents.length) {
@@ -1660,7 +1660,7 @@
     if (_previewMode) {
       ctx.save();
       ctx.globalAlpha = .85;
-      ctx.font = "9px ui-monospace, monospace";
+      ctx.font = "12px ui-monospace, monospace";
       ctx.fillStyle = isDark() ? "rgba(235,190,110,.95)" : "rgba(170,110,30,.95)";
       ctx.fillText("PREVIEW · 演示事件（非真实档案）", 14, 20);
       ctx.restore();
