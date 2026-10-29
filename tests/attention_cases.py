@@ -110,6 +110,9 @@ def run():
             return 0.9
         plugin._score = high
         out['high'] = one(Event('那个游戏出新角色了', sender='10002', name='柠檬'))
+    elif CASE == 'named':
+        out['named'] = one(Event('小爱，周末去哪玩', sender='10002', name='柠檬'))
+        out['not_a_call'] = one(Event('看到她我心里小爱乱撞', sender='10002', name='柠檬'))
     elif CASE == 'continue':
         one(Event('小爱 在吗', wake=True))
         plugin._window_add_reply(Event('小爱 在吗', wake=True), '在呀')
@@ -138,12 +141,15 @@ def run():
         mixin_attention.SPEND_PATH.write_text(json.dumps({day: {'reply': 10.0}}), 'utf-8')
         out['hard_owner_private'] = one(Event('小爱 你好', sender='10009', name='主人', group=None, wake=True))
     elif CASE == 'replies':
-        def reply(text, usage=None):
+        def reply(text, usage=None, chain=False):
             event = Event('小爱 周末去哪玩', wake=True)
             req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
             loop.run_until_complete(plugin.on_message(event))
             loop.run_until_complete(plugin.on_llm_request(event, req))
             resp = LLMResponse(text)
+            if chain:   # as DeepSeek's answers come back (openai_source.py 875): with a chain
+                from astrbot.api.event import MessageChain
+                resp = LLMResponse(text, MessageChain().message(text))
             resp.usage = usage
             loop.run_until_complete(plugin.on_llm_response(event, resp))
             harness.drain(loop)
@@ -160,6 +166,8 @@ def run():
         out['silent'] = reply('【不说】', Usage(1000, 0, 200))
         out['multi'] = reply('周末去爬山吧\n【下一条】\n记得带水[表情:微笑]\n【下一条】\n[表情:赞]', Usage(2000, 1000, 500))
         out['face_first'] = reply('[表情:呲牙]', None)
+        out['with_chain'] = reply('第一句\n【下一条】\n第二句', None, chain=True)
+        out['silent_inside'] = reply('嗯【不说】', None)
         out['sent'] = sent
         win = next(iter((DATA / 'phone').glob('group_*.json')))
         out['phone'] = [x.get('text') for x in json.loads(win.read_text('utf-8'))['recent'] if x.get('role') == 'assistant']

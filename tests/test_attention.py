@@ -43,6 +43,15 @@ class Called(unittest.TestCase):
         self.assertEqual(at.called(False, False, '10001', now=now), '')
 
 
+class HerName(unittest.TestCase):
+    def test_her_name_as_a_call(self):
+        for t in ('小爱，在吗', '小爱 你看这个', '好吧 小爱', '小爱你好', '小爱', '爱弥斯？', '@小爱 来'):
+            self.assertTrue(at.names_her(t), t)
+        for t in ('小爱乱撞', '看到她我心里小爱乱撞', '可爱的小爱乱跑', '我爱弥斯特', ''):
+            self.assertFalse(at.names_her(t), t)
+        self.assertTrue(at.names_her('阿爱，在吗', ['阿爱']))
+
+
 class Night(unittest.TestCase):
     def test_night_hours(self):
         def at_hour(h, m=0):
@@ -129,6 +138,8 @@ class WhatSheSends(unittest.TestCase):
 
     def test_split_at_most_five(self):
         self.assertEqual(at.split('一\n【下一条】\n二'), ['一', '二'])
+        self.assertEqual(at.split('嗯【不说】'), ['嗯'])                 # 【不说】 inside is never sent
+        self.assertEqual(at.split('一\n【下一条】\n【不说】'), ['一'])
         seven = '【下一条】'.join(str(i) for i in range(7))
         parts = at.split(seven)
         self.assertEqual(len(parts), 5)
@@ -168,6 +179,11 @@ class InThePlugin(unittest.TestCase):
         self.assertEqual((r['low']['stopped'], r['low']['requests']), (False, []))
         self.assertEqual(len(r['high']['requests']), 1)
 
+    def test_her_name_calls_her(self):
+        r = run_case('named')
+        self.assertEqual(len(r['named']['requests']), 1)          # not AstrBot's wake: the plugin asks
+        self.assertEqual(r['not_a_call']['requests'], [])
+
     def test_taking_up_what_she_said_calls_her(self):
         r = run_case('continue')
         self.assertEqual(len(r['his']['requests']), 1)
@@ -196,11 +212,18 @@ class InThePlugin(unittest.TestCase):
         self.assertTrue(r['silent']['stopped'])                     # 【不说】: nothing sent
         self.assertTrue(r['multi']['prompt_has_choices'])
         self.assertEqual(r['multi']['text'], '周末去爬山吧')            # the first by AstrBot
+        self.assertEqual(r['multi']['chain'], [['Plain', '周末去爬山吧']])   # only the first
         self.assertEqual(r['sent'], [{'umo': 'default:GroupMessage:900001', 'chain': [['Plain', '记得带水'], ['Face', 14]]},
-                                     {'umo': 'default:GroupMessage:900001', 'chain': [['Face', 76]]}])
+                                     {'umo': 'default:GroupMessage:900001', 'chain': [['Face', 76]]},
+                                     {'umo': 'default:GroupMessage:900001', 'chain': [['Plain', '第二句']]}])
         self.assertEqual(r['face_first']['chain'], [['Face', 13]])   # a face alone as the first
+        # DeepSeek's answer comes with a chain: AstrBot sends the chain, so it must hold the first
+        # message only (else the whole reply went out first, then the rest again)
+        self.assertEqual(r['with_chain']['chain'], [['Plain', '第一句']])
+        self.assertEqual(r['with_chain']['text'], '第一句')
+        self.assertEqual(r['silent_inside']['chain'], [['Plain', '嗯']])
         # kept: what she said (nothing of 【不说】)
-        self.assertEqual(r['phone'], ['周末去爬山吧\n记得带水[表情:微笑]\n[表情:赞]', '[表情:呲牙]'])
+        self.assertEqual(r['phone'], ['周末去爬山吧\n记得带水[表情:微笑]\n[表情:赞]', '[表情:呲牙]', '第一句\n第二句', '嗯'])
         # every reply's cost (the fake usage: 2.2 / 0.05 / 8.7 yuan a million)
         self.assertAlmostEqual(r['spend'][next(iter(r['spend']))]['reply'], 0.01274, places=5)
         self.assertEqual(r['panel']['state'], 'ok')

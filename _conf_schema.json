@@ -476,6 +476,15 @@
     "type": "bool",
     "default": false
   },
+  "her_names": {
+    "description": "叫她的名字",
+    "hint": "群里有人这样叫她，就算叫到她（句首、或者在空格标点后面，后面跟着标点、空格、“你”或者话完了；“小爱乱撞”不算）。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": ["小爱", "爱弥斯"]
+  },
   "attention_level": {
     "description": "没叫她时开口的门槛",
     "hint": "less（少说）、normal（适中）、more（多说）。回放“只判断不调模型”出了三档的数以后，主人挑一档。",

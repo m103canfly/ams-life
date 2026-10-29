@@ -90,7 +90,11 @@ class AttentionMixin:
         prices = dict(DEFAULT_PRICES)
         for k in prices:
             prices[k] = num("price_" + k, prices[k])
-        return {"level": str(cfg.get("attention_level", "normal") or "normal"),
+        names = cfg.get("her_names")
+        if isinstance(names, str):
+            names = [x for x in re.split(r"[\s,，、]+", names) if x]
+        return {"names": [str(x) for x in (names or attention.HER_NAMES) if str(x).strip()],
+                "level": str(cfg.get("attention_level", "normal") or "normal"),
                 "owner": str(cfg.get("owner_qq", "") or "").strip(),
                 "hard": num("day_budget_yuan", 10.0), "soft": num("day_budget_soft_yuan", 8.0),
                 "prices": prices, "group_hour_max": int(num("group_hour_max", attention.GROUP_HOUR_MAX)),
@@ -185,7 +189,8 @@ class AttentionMixin:
         here = self._here(event)
         sid = str(self._speaker(event)[0] or "")
         ts, to = self._last_reply_here(here)
-        return attention.called(self._addresses_her(event), here.startswith("private:"), sid, ts, to)
+        named = attention.names_her(getattr(event, "message_str", ""), self._attention_cfg()["names"])
+        return attention.called(self._addresses_her(event) or named, here.startswith("private:"), sid, ts, to)
 
     # ------------------------------------------------------------------
     # the decision
@@ -335,14 +340,10 @@ class AttentionMixin:
             return reply
         first = parts[0]
         try:
-            if any(kind == "face" for kind, _v in attention.pieces(first)):
-                response.completion_text = ""
-                response.result_chain = self._chain_of(first)
-            else:
-                response.completion_text = first
-                chain = getattr(response, "result_chain", None)
-                if chain is not None and getattr(chain, "chain", None):
-                    response.result_chain = None
+            # a chain of the first message only: AstrBot sends the chain when there is one, and
+            # reads the words from it (provider/entities.py 447-462; DeepSeek's answers come with a
+            # chain, openai_source.py 875) -- setting the words alone would leave the whole reply
+            response.result_chain = self._chain_of(first)
         except Exception as exc:
             logger.warning("[ams-life] the reply was not shaped: %s", exc)
             return reply

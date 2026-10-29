@@ -39,6 +39,10 @@ FACES = {"惊讶": 0, "撇嘴": 1, "色": 2, "发呆": 3, "得意": 4, "流泪":
          "可爱": 21, "白眼": 22, "疑问": 32, "嘘": 33, "晕": 34, "再见": 39, "爱心": 66, "赞": 76,
          "鼓掌": 99, "坏笑": 101, "委屈": 106}
 _FACE = re.compile(r"\[表情[:：]([^\]\s]{1,6})\]")
+HER_NAMES = ("小爱", "爱弥斯")
+# her name as a call: at the start or after a space or a stop, and followed by a stop, a space,
+# "你" or the end -- "小爱乱撞" is no call
+_STOPS = r"\s，,。.！!？?：:、~～"
 
 # what she is told she may pick (one line of the reply block; it describes, it does not order)
 CHOICES_NOTE = ("你可以自己挑怎么回：不想回就只写%s；可以只回一个QQ小表情（写成[表情:名字]，名字有：%s）；"
@@ -60,6 +64,16 @@ def called(addresses_her, private, sender, last_reply_ts=0.0, last_reply_to=(), 
             str(x) for x in (last_reply_to or ())}:
         return "continue"
     return ""
+
+
+def names_her(text, names=HER_NAMES) -> bool:
+    """Someone calls her by name ("小爱，在吗" / "小爱 你看" / "...吧 小爱")."""
+    text = str(text or "")
+    for name in names or ():
+        name = str(name or "").strip()
+        if name and re.search(r"(?:^|[%s@])%s(?=[%s]|你|$)" % (_STOPS, re.escape(name), _STOPS), text):
+            return True
+    return False
 
 
 # ------------------------------------------------------------------
@@ -183,8 +197,8 @@ def silent(text) -> bool:
 
 def split(text, most=MAX_MESSAGES) -> list:
     """The messages she wrote, split at 【下一条】; what is beyond `most` goes into the last."""
-    parts = [p.strip() for p in str(text or "").split(NEXT)]
-    parts = [p for p in parts if p and p != SILENT]
+    parts = [p.replace(SILENT, "").strip() for p in str(text or "").split(NEXT)]
+    parts = [p for p in parts if p]
     if len(parts) > most:
         parts = parts[:most - 1] + ["\n".join(parts[most - 1:])]
     return parts
