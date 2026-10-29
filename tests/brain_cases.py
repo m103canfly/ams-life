@@ -206,6 +206,42 @@ if CASE == 'frames':
     ev = [n for n in g['data']['nodes'] if n['kind'] == 'event']
     result['details'] = [node(n['id'])['data']['text'] for n in ev]
 
+if CASE == 'memories':
+    # "她记住了什么": the same snapshot as a list (memory_list.py)
+    import time as _time
+    turn('小爱 我的游戏号是 12345678 记得加我', '10002', '柠檬', group=G1, reply='好呀', msg_id='m-number')
+    on_disk = files()
+
+    def mem(**args):
+        return run(plugin.page_memories(args))
+    first = mem()
+    result['first'] = first
+    result['places'] = first['data']['places']
+    # every page of three, joined
+    pages, after = [], ''
+    while True:
+        d = mem(limit='3', after=after)['data']
+        pages.append([r['id'] for r in d['items']])
+        after = d['next']
+        if not after or len(pages) > 50:
+            break
+    result['pages'] = pages
+    result['by_kind'] = {k: [r['text'] for r in mem(kind=k)['data']['items']] for k in ('memory', 'event', 'note', 'impression')}
+    result['private'] = [r['vis'] for r in mem(vis='private')['data']['items']]
+    g1 = next(p['id'] for p in first['data']['places'] if p['label'] == '群1')
+    result['in_g1'] = sorted({r['where'] for r in mem(place=g1)['data']['items']})
+    result['q'] = [r['text'] for r in mem(q='爬山')['data']['items']]
+    result['q_number'] = len(mem(q='12345678')['data']['items'])
+    today = _time.strftime('%Y-%m-%d', _time.localtime(clock.now))
+    result['today'] = len(mem(**{'from': today, 'to': today})['data']['items'])
+    result['long_ago'] = len(mem(**{'from': '2001-01-01', 'to': '2001-01-02'})['data']['items'])
+    numbered = [r for r in first['data']['items'] if r['has_number']]
+    result['numbered'] = numbered
+    result['number'] = run(plugin.page_memories_number({'id': numbered[0]['id']})) if numbered else None
+    result['number_missing'] = run(plugin.page_memories_number({'id': 'm:0000000000'}))
+    result['changed_on_disk'] = sorted(k for k in set(on_disk) | set(files()) if on_disk.get(k) != files().get(k))
+    result['routes'] = [r for r in ctx.web_routes if '/page/memories' in r]
+
 if CASE == 'paging':
     brain_graph.PART_NODES, brain_graph.PART_EDGES = 4, 5
     whole = graph()
@@ -258,6 +294,8 @@ if CASE == 'registry_broken':
     result['page'] = run(plugin.page_brain({}))
     result['node'] = run(plugin.page_brain_node({'id': 'x'}))
     result['search'] = run(plugin.page_brain_search({'q': '吉他'}))
+    result['memories'] = run(plugin.page_memories({}))
+    result['memories_number'] = run(plugin.page_memories_number({'id': 'x'}))
     n_before = len(turns_file())
     turn('小爱 吉他练得怎么样', '10002', '柠檬', group=G1, reply='还在练呢', msg_id='m-later')
     result['turns_noted_while_broken'] = len(turns_file()) - n_before
@@ -279,6 +317,7 @@ if CASE == 'errors':
     result['page'] = run(plugin.page_brain({}))
     result['node'] = run(plugin.page_brain_node({'id': 'x'}))
     result['search'] = run(plugin.page_brain_search({'q': 'x'}))
+    result['memories'] = run(plugin.page_memories({}))
 
 if CASE == 'threads':
     # files are read on the event loop's thread (where she writes them); only the build runs elsewhere
@@ -297,6 +336,11 @@ if CASE == 'threads':
     result['status'] = run(plugin.page_brain({}))['status']
     result['read_on_loop'] = seen.get('read') == threading.get_ident()
     result['built_elsewhere'] = seen.get('build') not in (None, threading.get_ident())
+    seen.clear()
+    plugin._brain_cache = None
+    result['memories_status'] = run(plugin.page_memories({}))['status']
+    result['memories_read_on_loop'] = seen.get('read') == threading.get_ident()
+    result['memories_built_elsewhere'] = seen.get('build') not in (None, threading.get_ident())
 
 if CASE == 'stale':
     # something is deleted between the message coming in and the turn being noted: not noted

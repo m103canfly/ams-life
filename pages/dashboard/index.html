@@ -14,6 +14,7 @@
     <nav class="nav">
       <button class="nav-item active" data-view="overview"><span class="ni-icon">◉</span><span>情绪概览</span></button>
       <button class="nav-item" data-view="brain"><span class="ni-icon">✦</span><span>她的脑子</span></button>
+      <button class="nav-item" data-view="memories"><span class="ni-icon">☰</span><span>她记住了什么</span></button>
       <button class="nav-item" data-view="intent"><span class="ni-icon">↗</span><span>表达意图</span></button>
       <button class="nav-item" data-view="persona"><span class="ni-icon">◐</span><span>人格自我</span></button>
       <button class="nav-item" data-view="sessions"><span class="ni-icon">▤</span><span>活动会话</span></button>
@@ -145,6 +146,22 @@
     <section class="view" id="view-brain">
       <div class="brain-bar"><span class="hint">她的记忆画成一个能转的星球。只读：这里改不了她。</span><button type="button" class="btn" id="brainFill">铺满</button></div>
       <div class="brain-box" id="brainBox"></div>
+    </section>
+    <!-- ams-life: "她记住了什么", what she keeps as a list (page/memories); memories.js -->
+    <section class="view" id="view-memories">
+      <div class="section-title"><div><div class="eyebrow">WHAT SHE KEEPS</div><h2>她记住了什么</h2></div><span class="hint">只读；号码先藏着，点“显示号码”才给</span></div>
+      <div class="mem-badge hint" id="memBadge" hidden></div>
+      <div class="mem-filters">
+        <select id="memKind"><option value="">四样都看</option><option value="memory">记忆</option><option value="event">事件</option><option value="note">本子</option><option value="impression">群友印象</option></select>
+        <select id="memPlace"><option value="">哪儿都看</option></select>
+        <select id="memVis"><option value="">公开私下都看</option><option value="public">只看公开</option><option value="private">只看私下</option><option value="self">只看她自己的</option></select>
+        <input type="date" id="memFrom" title="从哪天" /><input type="date" id="memTo" title="到哪天" />
+        <input type="search" id="memQ" placeholder="搜字" />
+        <button type="button" class="btn" id="memGo">筛</button>
+        <span class="hint" id="memState"></span>
+      </div>
+      <div id="memList"></div>
+      <button type="button" class="btn" id="memMore" hidden>再多看一页</button>
     </section>
     <section class="view" id="view-intent">
       <div class="section-title"><div><div class="eyebrow">TRANSLATION</div><h2>表达意图</h2></div><span class="hint">只看倾向，不生成台词</span></div>
@@ -591,6 +608,6 @@
     <footer class="statusbar"><span>BioCore is a tendency layer, not a script.</span><span id="footTime"></span></footer>
   </main>
 </div>
-<script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script>
+<script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script>
 <script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261027-0215"></script><script src="./orb.js?v=20261027-0215"></script>
 </body></html>

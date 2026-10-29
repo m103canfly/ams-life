@@ -187,16 +187,84 @@ class RegistryUnreadable(unittest.TestCase):
         self.assertEqual(r['page_rows']['status'], 'error')
         self.assertNotIn('nodes', r['page_rows']['data'])
         self.assertEqual(r['page_after'], 'ok')
+        # the list too: nothing, and the one short reason
+        for key in ('memories', 'memories_number'):
+            self.assertEqual(r[key]['status'], 'error', key)
+            self.assertIn('遗忘登记读不出来', r[key]['message'])
+        self.assertEqual(r['memories']['data']['items'], [])
 
 
 class Errors(unittest.TestCase):
     def test_only_a_short_reason(self):
         r = run_case('errors')
-        for key in ('page', 'node', 'search'):
+        for key in ('page', 'node', 'search', 'memories'):
             self.assertEqual(r[key]['status'], 'error', key)
             self.assertNotIn('made-up-folder', r[key]['message'], key)
             self.assertNotIn('x.json', r[key]['message'], key)
             self.assertIn('日志', r[key]['message'], key)
+
+
+class Memories(unittest.TestCase):
+    """"她记住了什么" (page/memories, memory_list.py): the map's snapshot as a list, read only."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.r = run_case('memories')
+        cls.items = cls.r['first']['data']['items']
+
+    def test_four_kinds_newest_first(self):
+        kinds = {k: len(v) for k, v in self.r['by_kind'].items()}
+        self.assertEqual(kinds, {'memory': 14, 'event': 1, 'note': 2, 'impression': 2})
+        self.assertEqual(self.r['first']['data']['total'], 19)
+        ts = [i['ts'] for i in self.items]
+        self.assertEqual(ts, sorted(ts, reverse=True))
+        self.assertEqual(self.r['routes'], ['/astrbot_plugin_ams_life/page/memories',
+                                            '/astrbot_plugin_ams_life/page/memories/number'])
+
+    def test_where_when_who_and_where_it_may_be_said(self):
+        by_text = {i['text']: i for i in self.items}
+        note = by_text['芒果好像在准备惊喜']
+        self.assertEqual((note['kind'], note['where'], note['vis'], note['who']), ('note', '私聊1', 'private', ['芒果']))
+        self.assertEqual(note['may'], '私下：只在那个私聊里')
+        own = by_text['想多听听大家在聊什么']
+        self.assertEqual((own['where'], own['vis'], own['who']), ('她自己', 'self', []))
+        imp = by_text['叫“芒果”；说话：爱分享；常聊：爬山']
+        self.assertEqual((imp['kind'], imp['where'], imp['vis']), ('impression', '群1', 'public'))
+        self.assertTrue(all(i['date'] for i in self.items))
+        self.assertEqual([p['label'] for p in self.r['places']], ['群1', '群2', '私聊1'])
+        self.assertTrue(all(set(i) == {'id', 'kind', 'kind_name', 'place', 'where', 'ts', 'date', 'vis', 'may', 'who',
+                                       'text', 'has_number', 'entry'} for i in self.items))   # not the whole record
+
+    def test_what_the_registry_rules_out_never_appears(self):
+        text = json.dumps(self.r['first'], ensure_ascii=False)
+        for word in ('阿星', '下雨', '总是半夜出现', '话不多'):   # forgotten; impression stopped
+            self.assertNotIn(word, text)
+        for number in ('10001', '10002', '10003', '10004', '900001', '900002'):
+            self.assertNotIn(number, text)
+
+    def test_pages_and_filters(self):
+        pages = self.r['pages']
+        self.assertEqual([len(p) for p in pages], [3, 3, 3, 3, 3, 3, 1])
+        joined = [i for p in pages for i in p]
+        self.assertEqual(joined, [i['id'] for i in self.items])                  # every row once, in order
+        self.assertEqual(set(self.r['private']), {'private'})
+        self.assertEqual(len(self.r['private']), 5)
+        self.assertEqual(self.r['in_g1'], ['群1'])
+        self.assertTrue(self.r['q'] and all('爬山' in t for t in self.r['q']))
+        self.assertEqual(self.r['today'], 17)                                    # the impressions are dated by day
+        self.assertEqual(self.r['long_ago'], 0)
+
+    def test_numbers_hidden_until_asked(self):
+        [row] = self.r['numbered']
+        self.assertEqual(row['text'], '小爱 我的游戏号是 [号码] 记得加我')
+        self.assertNotIn('12345678', json.dumps(self.r['first'], ensure_ascii=False))
+        self.assertEqual(self.r['q_number'], 0)                                  # not found by the hidden number
+        self.assertEqual(self.r['number'], {'status': 'ok', 'data': {'id': row['id'], 'text': '小爱 我的游戏号是 12345678 记得加我'}})
+        self.assertEqual(self.r['number_missing']['status'], 'error')
+
+    def test_only_memories_can_be_deleted_and_nothing_written(self):
+        self.assertTrue(all(bool(i['entry']) == (i['kind'] == 'memory') for i in self.items))
+        self.assertEqual(self.r['changed_on_disk'], [])
 
 
 class Threads(unittest.TestCase):
@@ -205,6 +273,9 @@ class Threads(unittest.TestCase):
         self.assertEqual(r['status'], 'ok')
         self.assertTrue(r['read_on_loop'])
         self.assertTrue(r['built_elsewhere'])
+        self.assertEqual(r['memories_status'], 'ok')
+        self.assertTrue(r['memories_read_on_loop'])
+        self.assertTrue(r['memories_built_elsewhere'])
 
 
 class Parts(unittest.TestCase):
