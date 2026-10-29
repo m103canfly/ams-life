@@ -549,8 +549,8 @@ class LLMMixin:
             gone = set()
             for change in changes:
                 mark = {"private_mark": change.get("private")}
-                # what she writes is kept like the rest: no number she knows, someone deleted is 某人
-                text = self._scrub(change.get("text")) if change["op"] != "delete" else ""
+                # what she writes is kept like the rest: someone deleted is 某人
+                text = self._without_gone(change.get("text")) if change["op"] != "delete" else ""
                 uses = [refs[x] for x in (change.get("uses") or []) if x in refs]
                 if change["op"] in ("edit", "delete"):
                     i, may = shown[change["no"] - 1]

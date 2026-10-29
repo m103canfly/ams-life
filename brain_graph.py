@@ -8,8 +8,10 @@ and lines, read only.
   hash, so the same person gets the same id while the key lasts), labels are
   "群1 / 私聊1 / 人1" and categories.
 - detail(): what one star holds, only when the owner opens it; a QQ number only
-  on a second click (reveal_qq).
-- search(): the ids whose words match, never the words.
+  on a second click (reveal_qq). What she keeps keeps its numbers (the owner,
+  10-29): in the words shown every long number is [号码], so a group's number is
+  never shown and a person's only on that second click.
+- search(): the ids whose words match, never the words (nor found by a number).
 - Whatever the forget registry rules out never appears: `keep` is asked about
   every item and every person, and when it raises (the registry cannot be read)
   build() raises too and nothing is returned.
@@ -24,6 +26,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -47,6 +50,14 @@ _EMOTION = {"joy": "开心", "happy": "开心", "happiness": "开心", "exciteme
             "curiosity": "好奇", "surprise": "惊讶", "sadness": "难过", "sad": "难过", "loneliness": "寂寞",
             "anger": "生气", "frustration": "烦", "fear": "害怕", "anxiety": "担心", "worry": "担心",
             "shame": "不好意思", "guilt": "愧疚", "disgust": "讨厌", "boredom": "无聊", "confusion": "困惑"}
+
+
+_LONG_NUMBER = re.compile(r"\d{5,}")
+
+
+def _words(text) -> str:
+    """Her words as the page shows them: no long number (QQ numbers, group numbers)."""
+    return _LONG_NUMBER.sub(discretion.NUMBER, str(text or ""))
 
 
 def _num(x, default=0.0) -> float:
@@ -371,17 +382,18 @@ def detail(snap, pid, impressions=None, reveal_qq=False):
         if who:
             lines.append(["跟谁有关", who])
         if kind == "memory":
-            text = str(item.get("text") or "")
+            text = _words(item.get("text"))
             lines.append(["记下的时间", _date(item.get("ts"))])
             if int(_num(item.get("recall_count"))):
                 lines.append(["想起过", "%d 次" % int(_num(item.get("recall_count")))])
             return {"title": info["cat"] + "的记忆", "text": text[:DETAIL_TEXT_MAX], "lines": lines}
         if kind == "event":
-            text = "\n".join(str(item.get(k) or "") for k in ("title", "small_summary", "event") if item.get(k))
+            text = _words("\n".join(str(item.get(k) or "") for k in ("title", "small_summary", "event")
+                                     if item.get(k)))
             lines.append(["什么时候", _date(item.get("ts"))])
             return {"title": "事件 · " + info["cat"], "text": text[:DETAIL_TEXT_MAX], "lines": lines}
         lines.append(["写于", _date(item.get("ts"))])
-        return {"title": "本子 · " + info["cat"], "text": str(item.get("text") or "")[:DETAIL_TEXT_MAX], "lines": lines}
+        return {"title": "本子 · " + info["cat"], "text": _words(item.get("text"))[:DETAIL_TEXT_MAX], "lines": lines}
     if kind == "window":
         n = snap.index["_counts"].get(raw, 0)
         if info["sub"] == "private":
@@ -424,7 +436,8 @@ def search(snap, q, impressions=None) -> list:
         kind, raw, info = entry
         if kind in ("memory", "event", "note"):
             item = info["item"]
-            hay = " ".join(str(item.get(k) or "") for k in ("text", "title", "event", "small_summary", "big_summary"))
+            hay = _words(" ".join(str(item.get(k) or "")
+                                  for k in ("text", "title", "event", "small_summary", "big_summary")))
         elif kind == "person":
             hay = " ".join(snap.index["_names"].get(raw) or [])
         else:

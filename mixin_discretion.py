@@ -155,7 +155,8 @@ class DiscretionMixin:
 
     def _names_index(self) -> dict:
         """person id -> the nicknames and group cards seen with it: from every chat window
-        and the memory library once, then kept up as messages come (_note_name)."""
+        and the memory library once, then kept up as messages come (_note_name). Someone
+        only @'d (who never wrote) is in it too, by the "@名字(号码)" kept in the words."""
         idx = getattr(self, "_name_index", None)
         if isinstance(idx, dict):
             return idx
@@ -163,10 +164,12 @@ class DiscretionMixin:
         for place in self._window_places():
             for x in self._read_window(place)["recent"]:
                 self._note_name(x.get("sender_id"), x.get("sender_name"))
+                self._note_ats(x.get("text"))
         for e in self._read_library()["entries"]:
             if not isinstance(e, dict):
                 continue
             self._note_name(e.get("sender_id"), e.get("sender_name"))
+            self._note_ats(e.get("text"))
             prov = e.get("provenance") if isinstance(e.get("provenance"), dict) else {}
             for src in [prov] + [s for s in (prov.get("sources") or []) if isinstance(s, dict)]:
                 self._note_name(src.get("sender_id"), src.get("sender_name"))
@@ -178,6 +181,19 @@ class DiscretionMixin:
         if not person or not name or not isinstance(idx, dict):
             return
         idx.setdefault(person, set()).add(name)
+
+    def _note_at(self, person, name="") -> None:
+        """Someone @'d: his number is known (_known_numbers) even with no name and no message."""
+        person = str(person or "").strip()
+        idx = self._names_index()
+        if not person.isdigit() or person in (getattr(self, "_her_ids", None) or ()):
+            return
+        idx.setdefault(person, set())
+        self._note_name(person, name)
+
+    def _note_ats(self, text) -> None:
+        for name, qq in discretion.at_names(text):
+            self._note_at(qq, name)
 
     def _known_names(self, people) -> list:
         """Every name these people are known by: the ids themselves, the nicknames and
@@ -207,7 +223,8 @@ class DiscretionMixin:
         return sorted(out)
 
     # ------------------------------------------------------------------
-    # No numbers in what she keeps; someone deleted is 某人
+    # What she keeps: as it was said, numbers too (the owner, 10-29); only
+    # someone deleted is taken out (某人)
     # ------------------------------------------------------------------
     def _note_her(self, event) -> None:
         """Her own number, as each message tells it (an @ of her becomes her name)."""
@@ -245,7 +262,10 @@ class DiscretionMixin:
     def _known_numbers(self) -> set:
         """Every number she knows to be someone's or some chat's: her own, everyone who wrote
         in a window or a memory, each chat's number, and the forget registry's people and
-        messages."""
+        messages. What was said in one place loses these with its names when it comes up in
+        another (_anonymized): people's numbers, and the numbers of the groups she is in --
+        the owner wants a group's number kept out of other groups "as far as possible" (10-29):
+        a group she is not in she cannot tell from any other number, so its number stays."""
         nums = set(getattr(self, "_her_ids", None) or ())
         nums |= set(self._names_index())
         nums |= {p.split(":", 1)[1] for p in self._window_places() if ":" in p}
@@ -256,8 +276,8 @@ class DiscretionMixin:
             pass
         return {n for n in nums if n.isdigit() and len(n) >= 5}
 
-    def _scrubber(self, event=None):
-        """_scrub with what it needs looked up once (for many texts at a time)."""
+    def _gone_remover(self, event=None):
+        """_without_gone with what it needs looked up once (for many texts at a time)."""
         ats = []
         if event is not None:
             self._note_her(event)
@@ -269,7 +289,11 @@ class DiscretionMixin:
                             ats.append((str(getattr(comp, "name", "") or "").strip(), qq))
             except Exception:
                 pass
-        gone, numbers = self._gone_people(), self._known_numbers() | {qq for _n, qq in ats}
+        gone = self._gone_people()
+        try:   # a deleted person's number, and the ids of messages the registry rules out
+            numbers = gone | set(self._registry_sets()[1])
+        except Exception:
+            numbers = set(gone)
         her = set(getattr(self, "_her_ids", None) or ())
         seen = getattr(self, "_gone_names", None)
         if not isinstance(seen, dict):
@@ -283,7 +307,7 @@ class DiscretionMixin:
             for name, qq in discretion.at_names(text):
                 if qq in gone and name:
                     seen.setdefault(qq, set()).add(name)
-            out = discretion.strip_numbers(text, numbers, her, HER_NAME, gone, ats)
+            out = discretion.drop_gone(text, gone, her, HER_NAME, numbers, ats)
             hits = self._gone_names_in(text)   # names of people the owner deleted
             for name, qq in hits.items():
                 seen.setdefault(qq, set()).add(name)
@@ -295,51 +319,53 @@ class DiscretionMixin:
             return out
         return scrub
 
-    def _scrub(self, text, event=None) -> str:
-        """What is kept of a text (her phone, memories, events): no number she knows of, an @
-        with the name only (her own name for an @ of her), and someone the registry rules
-        out -- by an @ or by a name she knows him by -- is 某人."""
-        return self._scrubber(event)(text) if str(text or "") else str(text or "")
+    def _without_gone(self, text, event=None) -> str:
+        """What is kept of a text (her phone, memories, events): as it was said -- an @ as
+        "@名字(号码)", QQ numbers and group numbers too -- but an @ of her is her own name, and
+        someone the registry rules out -- by an @, his number or a name she knows him by -- is
+        某人 (his number, and a forgotten message's id, [号码])."""
+        return self._gone_remover(event)(text) if str(text or "") else str(text or "")
 
     # text fields of what she keeps (memories, phone lines, events, insights, notes,
-    # relationship records): numbers are taken out of these, never out of ids
-    _SCRUB_KEYS = {"text", "latest_text", "title", "key", "event", "small_summary", "big_summary",
+    # relationship records): someone deleted is taken out of these, never out of ids
+    _GONE_TEXT_KEYS = {"text", "latest_text", "title", "key", "event", "small_summary", "big_summary",
                    "meaning_to_her", "reflection", "summary", "insight", "lesson", "image_caption",
                    "voice_text", "source_texts", "evidence", "narrative", "event_key", "merged_event_keys"}
 
-    def _scrub_tree(self, obj, scrub, key=None):
-        """`obj` with the text fields scrubbed (a new object; ids and numbers fields untouched)."""
+    def _without_gone_tree(self, obj, scrub, key=None):
+        """`obj` with someone deleted taken out of its text fields (a new object; ids untouched)."""
         if isinstance(obj, dict):
-            return {k: self._scrub_tree(v, scrub, k) for k, v in obj.items()}
+            return {k: self._without_gone_tree(v, scrub, k) for k, v in obj.items()}
         if isinstance(obj, list):
-            return [self._scrub_tree(v, scrub, key) for v in obj]
-        if isinstance(obj, str) and key in self._SCRUB_KEYS:
+            return [self._without_gone_tree(v, scrub, key) for v in obj]
+        if isinstance(obj, str) and key in self._GONE_TEXT_KEYS:
             return scrub(obj)
         return obj
 
-    def _migrate_numbers(self) -> dict:
-        """At start: numbers kept before step 1-3-5 (an @ with a number, anyone's number in a
-        text, a deleted person's name) are taken out of everything she keeps (_scrub_stores);
-        each file that changes is copied into MEMORY_ARCHIVE_DIR first (never deleted)."""
-        return self._scrub_stores(keep_copies=True)
+    def _remove_gone_at_start(self) -> dict:
+        """At start: someone the registry rules out (by an @, his number, a name she knows him
+        by) is taken out of everything she keeps (_remove_gone_everywhere); each file that
+        changes is copied into MEMORY_ARCHIVE_DIR first (never deleted). Numbers taken out
+        before 10-29 ([号码]) stay taken out: nothing is put back."""
+        return self._remove_gone_everywhere(keep_copies=True)
 
-    def _scrub_stores(self, keep_copies=False) -> dict:
-        """Everything she keeps scrubbed again (_scrub: no number she knows of, someone deleted
-        is 某人): the library, her phone, events (and each place's copy) and insights, the
-        relationship records and her notes; nothing to change: nothing is written. With
-        keep_copies each file that changes is copied into MEMORY_ARCHIVE_DIR first (at start);
-        without (the owner has just deleted someone) nothing is copied: a copy would keep his
-        name. Returns how many files changed, by store."""
-        scrub = self._scrubber()
+    def _remove_gone_everywhere(self, keep_copies=False) -> dict:
+        """Everything she keeps gone over again (_without_gone: someone deleted is 某人): the
+        library, her phone, events (and each place's copy) and insights, the relationship
+        records and her notes; nothing to change: nothing is written. With keep_copies each
+        file that changes is copied into MEMORY_ARCHIVE_DIR first (at start); without (the
+        owner has just deleted someone) nothing is copied: a copy would keep his name.
+        Returns how many files changed, by store."""
+        scrub = self._gone_remover()
         stamp = time.strftime("%Y%m%d-%H%M%S")
-        folder = MEMORY_ARCHIVE_DIR / ("before-numbers-" + stamp)
+        folder = MEMORY_ARCHIVE_DIR / ("before-forget-" + stamp)
         counts = {}
 
         def archive(path):
             if not keep_copies:
                 return
             if path == MEMORY_LIBRARY_PATH:
-                dest = MEMORY_ARCHIVE_DIR / ("library.before-numbers-%s.json" % stamp)
+                dest = MEMORY_ARCHIVE_DIR / ("library.before-forget-%s.json" % stamp)
             else:
                 dest = folder / path.relative_to(DATA_DIR)
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -350,7 +376,7 @@ class DiscretionMixin:
                 body = json.loads(path.read_text(encoding="utf-8"))
             except Exception:
                 return
-            new = self._scrub_tree(body, scrub)
+            new = self._without_gone_tree(body, scrub)
             if new != body:
                 archive(path)
                 tmp = path.with_suffix(".tmp")
@@ -381,7 +407,7 @@ class DiscretionMixin:
                 except Exception:
                     out.append(line)
                     continue
-                out.append(json.dumps(self._scrub_tree(rec, scrub), ensure_ascii=False))
+                out.append(json.dumps(self._without_gone_tree(rec, scrub), ensure_ascii=False))
             if out != lines:
                 archive(path)
                 tmp = path.with_suffix(".tmp")
@@ -389,7 +415,7 @@ class DiscretionMixin:
                 atomic_file.replace(tmp, path)
                 counts["events"] = counts.get("events", 0) + 1
         if isinstance(getattr(self, "self_model", None), dict):
-            new = self._scrub_tree(self.self_model, scrub)
+            new = self._without_gone_tree(self.self_model, scrub)
             if new != self.self_model:
                 if SELF_MODEL_PATH.exists():
                     archive(SELF_MODEL_PATH)
@@ -397,7 +423,7 @@ class DiscretionMixin:
                 self._save_self_model()
                 counts["notes"] = 1
         if counts:
-            logger.info("[ams-life] numbers taken out of what she keeps: %s files", counts)
+            logger.info("[ams-life] someone deleted taken out of what she keeps: %s files", counts)
         return counts
 
     def _red_line(self, text, what="") -> str:
@@ -440,7 +466,7 @@ class DiscretionMixin:
                 lib["entries"] = keep
                 self._write_library(lib)
         stores = [(EVENT_ARCHIVE_PATH, "event"), (INSIGHT_ARCHIVE_PATH, "insight")]
-        if EVENT_SESSION_DIR.exists():   # each place's copy of its events, as _scrub_stores goes over them
+        if EVENT_SESSION_DIR.exists():   # each place's copy of its events, as _remove_gone_everywhere goes over them
             stores += [(p, "event_copy") for p in sorted(EVENT_SESSION_DIR.glob("*/events.jsonl"))]
         for path, what in stores:
             if not path.exists():
@@ -474,10 +500,12 @@ class DiscretionMixin:
             logger.info("[ams-life] red lines on: taken out of what she kept (copies archived first): %s", counts)
         return counts
 
-    def _anonymized(self, text, names) -> str:
+    def _anonymized(self, text, names, numbers=None) -> str:
         """`text` without any name of the people in `names` (ids or names): each id brings
-        every name that person is known by."""
-        return discretion.anonymize(text, self._known_names(names))
+        every name that person is known by; and without the numbers she knows (people's,
+        the groups she is in: _known_numbers), which would tell who as well as a name."""
+        numbers = self._known_numbers() if numbers is None else numbers
+        return discretion.anonymize(discretion.hide_numbers(text, numbers), self._known_names(names))
 
     # ------------------------------------------------------------------
     # Events (the one global archive; each record carries its origin).
@@ -486,6 +514,7 @@ class DiscretionMixin:
         """Events that may be brought up here; ones from elsewhere lose who said what."""
         here = self._here(event)
         out = []
+        numbers = None
         for ev in events or []:
             if not isinstance(ev, dict):
                 continue
@@ -494,10 +523,11 @@ class DiscretionMixin:
                 continue
             if v == discretion.ANON:
                 names = self._known_names(discretion.names_in(ev))
+                numbers = self._known_numbers() if numbers is None else numbers
                 ev = dict(ev)
                 for key in _EVENT_TEXT_FIELDS:
                     if ev.get(key):
-                        ev[key] = discretion.anonymize(ev[key], names)
+                        ev[key] = discretion.anonymize(discretion.hide_numbers(ev[key], numbers), names)
             out.append(ev)
         return out
 
@@ -509,6 +539,7 @@ class DiscretionMixin:
         only in that private chat, others' public ones without names, her own anywhere)."""
         here = self._here(event)
         lines = []
+        numbers = None
         for item in (self.self_model or {}).get("notebook") or []:
             if not isinstance(item, dict):
                 continue
@@ -517,7 +548,9 @@ class DiscretionMixin:
                 continue
             text = str(item.get("text") or "")
             if v == discretion.ANON:
-                text = self._anonymized(text, discretion.origin_of(item)["people"] + list(item.get("names") or []))
+                numbers = self._known_numbers() if numbers is None else numbers
+                text = self._anonymized(text, discretion.origin_of(item)["people"] + list(item.get("names") or []),
+                                        numbers)
             if text:
                 lines.append(text)
         return lines
@@ -906,7 +939,7 @@ class DiscretionMixin:
         counts = self._forget(person=person)
         # what others said of him, wherever she keeps it: 某人, now (not at the next restart,
         # and with no copy made first)
-        counts["named"] = self._scrub_stores(keep_copies=False)
+        counts["named"] = self._remove_gone_everywhere(keep_copies=False)
         return counts
 
     def _owner_forget_memory(self, entry_id) -> dict:

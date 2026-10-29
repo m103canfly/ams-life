@@ -93,6 +93,22 @@ class TheGraph(unittest.TestCase):
         self.assertEqual(r['search'], [])                      # nor found by them
         self.assertIn('芒果', r['people'])                      # others keep their names
 
+    def test_numbers_kept_in_her_words_are_not_shown(self):
+        # what she keeps keeps its numbers (the owner, 10-29); the page as before: a QQ number
+        # only on a second click, a group's number never
+        r = run_case('numbers_in_words')
+        self.assertTrue([t for t in r['kept'] if '10002' in t and '900001' in t])
+        said = [d for d in r['details'] if '我的号是' in d['text']]
+        self.assertEqual([d['text'] for d in said], ['小爱 我的号是 [号码] 我们群号是 [号码] 周末去爬山'])
+        for d in r['details']:
+            self.assertNotIn('10002', json.dumps(d, ensure_ascii=False))
+            self.assertNotIn('900001', json.dumps(d, ensure_ascii=False))
+        self.assertNotIn('10002', r['text'])
+        self.assertEqual(r['search']['10002'], [])                 # nor found by them
+        self.assertEqual(r['search']['900001'], [])
+        self.assertEqual(len(r['search']['我的号是']), 1)
+        self.assertEqual(r['qq'], {'qq': '10002'})
+
     def test_search_gives_ids_only(self):
         r = run_case('graph')
         self.assertEqual(len(r['search']['吉他']), 1)

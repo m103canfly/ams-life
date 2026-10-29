@@ -1,4 +1,4 @@
-"""Scripted runs for the no-numbers tests (step 1-3-5); prints a JSON result.
+"""Scripted runs for the numbers tests (step 1-3-5; numbers kept since 10-29); prints a JSON result.
 
 Run in a fresh interpreter (test_no_numbers does this):
     PYTHONHASHSEED=0 python tests/numbers_cases.py <empty data dir> <out.json> <case>
@@ -109,6 +109,22 @@ if CASE == 'at':
          '明天叫上 @Tom Lee(10077) 一起去爬山', '10002', '柠檬', reply='好呀')
     turn([At(qq=HER, name='小爱bot'), Plain(text=' 记得提醒 '), At(qq='10078', name='小明（学生）'),
           Plain(text=' 周五交作业')], '记得提醒 @小明（学生）(10078) 周五交作业', '10002', '柠檬', reply='好的')
+    # his own number, a group number and an @: all kept
+    turn([Plain(text='小爱 我的号是 10002，我们群号是 900001 '), At(qq='10004', name='桃子'), Plain(text=' 周末见')],
+         '小爱 我的号是 10002，我们群号是 900001 @桃子(10004) 周末见', '10002', '柠檬', reply='好呀')
+    # someone deleted, by his number and by an @
+    turn([Plain(text='阿星的号是 10003 '), At(qq='10003', name='阿星'), Plain(text=' 你在吗')],
+         '阿星的号是 10003 @阿星(10003) 你在吗', '10002', '柠檬', reply='嗯')
+    # an event as she writes it down (a strong one, or the night's note)
+    plugin._append_event_archive({
+        'id': 'ev1', 'ts': clock.now, 'session': 'default:GroupMessage:' + G1, 'title': '柠檬 10002 约周末',
+        'event': '柠檬（10002）在群 900001 约 @桃子(10004) 周末见', 'event_key': '柠檬约周末',
+        'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['ev1'], 'visibility': 'public'}})
+    result['event'] = [{'title': e['title'], 'event': e['event']} for e in plugin._event_archive(10, read_only=True)
+                       if e.get('id') == 'ev1'][0]
+    result['files_with_his_number'] = sorted(
+        p.relative_to(DATA).as_posix() for p in DATA.rglob('*') if p.is_file()
+        and p.name != forget_registry.FILE_NAME and '10003' in p.read_text('utf-8', errors='replace'))
     result['phone'] = phone()
     result['library'] = library()
     result['loops'] = [x.get('text') for x in plugin._read_window('group:' + G1).get('open_loops') or []]
@@ -136,8 +152,8 @@ if CASE == 'after_delete':
     plugin._write_library(plugin._read_library())
     result['deleted'] = loop.run_until_complete(plugin.page_forget_person('10004'))['data']
     calls = []
-    real = plugin._scrubber
-    plugin._scrubber = lambda *a, **k: calls.append(1) or real(*a, **k)
+    real = plugin._gone_remover
+    plugin._gone_remover = lambda *a, **k: calls.append(1) or real(*a, **k)
     plugin._write_library(plugin._read_library())
     result['scrubbed_again'] = len(calls)
     result['library'] = library()
@@ -149,7 +165,7 @@ if CASE in ('changed', 'changed_on'):
     lib = plugin._read_library()
     for e in lib['entries']:
         if '海边' in e['text']:
-            e['text'] = '小爱 我周末想和 @桃子(10004) 去海边看日落 我号 10002'
+            e['text'] = '小爱 我周末想和 @桃子(10004) @阿星(10003) 去海边看日落 我号 10002'
         elif '今晚' in e['text']:
             e['text'] = '小爱 我最近失眠好严重 每天都睡不着'
     plugin._write_library(lib)
@@ -199,11 +215,11 @@ if CASE == 'migrate':
     (DATA / 'users').mkdir(exist_ok=True)
     (DATA / 'users' / '10002.json').write_text(json.dumps({
         'sender_id': '10002', 'sender_name': '柠檬', 'relationship': {'destination_map': {
-            '10004': {'sender_id': '10004', 'count': 1, 'latest_text': '@桃子(10004) 明天见'}}}},
+            '10004': {'sender_id': '10004', 'count': 1, 'latest_text': '@桃子(10004) 明天见 阿星也来'}}}},
         ensure_ascii=False), 'utf-8')
     plugin._name_index = None
-    result['counts'] = plugin._migrate_numbers()
-    result['again'] = plugin._migrate_numbers()
+    result['counts'] = plugin._remove_gone_at_start()
+    result['again'] = plugin._remove_gone_at_start()
     result['phone'] = phone()
     result['library'] = library()
     rel = json.loads((DATA / 'users' / '10002.json').read_text('utf-8'))['relationship']

@@ -88,13 +88,13 @@ class Replay(unittest.TestCase):
             busy = 'group:' + fake.G_BUSY
             with open(bad / 'prompts.jsonl', 'a', encoding='utf-8') as f:
                 for text in ('她记得：' + fake.PRIVATE_SECRET, '她记得蓝鲸三号', '她记得我家猫今天把杯子打碎了',
-                             '提到 ' + fake.LEMON, '小鱼说想去旅游'):
+                             '提到 ' + fake.FISH, '小鱼说想去旅游'):
                     f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9000, 'place': busy, 'text': text},
                                        ensure_ascii=False) + '\n')
             with open(bad / 'data' / 'leftover.json', 'w', encoding='utf-8') as f:
                 f.write('{"who": "%s"}' % fake.STAR)
             checks = audit_replay.audit(bad, self.chat)['checks']
-            for name in ('private', 'canaries', 'forgotten', 'qq', 'names'):
+            for name in ('private', 'canaries', 'forgotten', 'numbers', 'names'):
                 self.assertFalse(checks[name]['pass'], name)
             self.assertEqual(checks['forgotten']['fails'], 2)    # the cat in a prompt, his number in a file
 
@@ -102,9 +102,10 @@ class Replay(unittest.TestCase):
         bad = Path(tmp) / 'bad'
         shutil.copytree(self.out, bad)
         with open(bad / 'prompts.jsonl', 'a', encoding='utf-8') as f:
-            for kind, place, text in prompts:
-                f.write(json.dumps({'kind': kind, 'ts': fake.T0 + 9000, 'place': place, 'text': text},
-                                   ensure_ascii=False) + '\n')
+            for p in prompts:
+                kind, place, text = p[:3]
+                f.write(json.dumps(dict({'kind': kind, 'ts': fake.T0 + 9000, 'place': place, 'text': text},
+                                        **(p[3] if len(p) > 3 else {})), ensure_ascii=False) + '\n')
         return bad
 
     def test_her_own_private_words_count_as_private(self):
@@ -117,18 +118,47 @@ class Replay(unittest.TestCase):
 
     def test_names_in_private_prompts_and_numbers_in_every_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
+            # PEACH spoke in the busy group: his number there is fine; FISH never did
             bad = self.plant(tmp, [('reply', 'private:' + fake.MANGO, '小鱼说想去旅游'),
-                                   ('model', 'group:' + fake.G_BUSY, '整理：' + fake.PEACH + ' 说了什么')])
+                                   ('model', 'group:' + fake.G_BUSY, '整理：' + fake.PEACH + ' 说了什么'),
+                                   ('model', 'group:' + fake.G_BUSY, '整理：' + fake.FISH + ' 说了什么')])
             checks = audit_replay.audit(bad, self.chat)['checks']
             self.assertTrue(any(e['place'] == '私聊1' for e in checks['names']['examples']))
-            self.assertEqual(checks['qq']['fails'], 1)
-            self.assertEqual(checks['qq']['examples'][0]['kind'], 'model')
+            self.assertEqual(checks['numbers']['fails'], 1)
+            self.assertEqual(checks['numbers']['examples'][0]['kind'], 'model')
+            self.assertEqual(checks['numbers']['examples'][0]['number'], 'person')
 
     def test_numbers_of_the_old_account_and_the_groups_count(self):
         with tempfile.TemporaryDirectory() as tmp:
+            # her own number where she spoke, a group's in that group: fine; elsewhere: each a failure
             bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得 @某人(%s) 说过' % fake.BOT),
+                                   ('reply', 'group:' + fake.G_TEST, '她记得 @某人(%s) 说过' % fake.BOT),
+                                   ('model', 'group:' + fake.G_SMALL, '群 %s 的事' % fake.G_SMALL),
                                    ('model', 'group:' + fake.G_BUSY, '群 %s 的事' % fake.G_SMALL)])
-            self.assertEqual(audit_replay.audit(bad, self.chat)['checks']['qq']['fails'], 2)
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertEqual(checks['numbers']['fails'], 2)
+            self.assertEqual(sorted(e['number'] for e in checks['numbers']['examples']), ['group', 'person'])
+
+    def test_a_number_said_in_that_place_before_is_fine(self):
+        # numbers are kept (the owner, 10-29): one said there before may come up there again
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            with closing(sqlite3.connect(str(chat))) as db:
+                db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
+                           "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
+                           "processed, created_at) VALUES (9995, '9995', ?, ?, ?, 'group', 'normal', 'message', "
+                           "?, ?, '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                           (fake.BOT, fake.MANGO, fake.G_BUSY, '小鱼的号是 ' + fake.FISH, '小鱼的号是 ' + fake.FISH,
+                            int(fake.T0 + 150)))
+                db.commit()
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得小鱼的号 ' + fake.FISH),
+                                   ('reply', 'group:' + fake.G_BUSY, '她记得阿星的号 ' + fake.STAR)])
+            checks = audit_replay.audit(bad, chat)['checks']
+            self.assertTrue(checks['numbers']['pass'])
+            self.assertFalse(checks['forgotten']['pass'])   # someone deleted: never, said there or not
 
     def test_pieces_never_across_two_lines_or_two_fields(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -159,7 +189,7 @@ class Replay(unittest.TestCase):
                 db.commit()
             bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得有人的号码是13812345678')])
             self.assertFalse(audit_replay.audit(bad, chat)['checks']['private']['pass'])
-        # digits of a known number stay the qq check's
+        # digits of a known number: the forgotten check's own (the numbers check takes whole numbers)
         self.assertEqual(audit_replay.number_pieces(['9876543210']), {'98765432', '87654321', '76543210'})
 
     def test_a_quote_of_the_forgotten_is_fed_in_and_not_kept(self):
@@ -207,7 +237,7 @@ class Replay(unittest.TestCase):
                            "processed, created_at) VALUES (9998, '9998', ?, ?, NULL, 'private', 'friend', 'message', "
                            "'482913', '482913', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
                            (fake.BOT, fake.MANGO, int(fake.T0 + 100)))
-                # and one that is part of a known number (a group's): the qq check's, not a code
+                # and one that is part of a known number (a group's): a code all the same (numbers are kept)
                 db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
                            "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
                            "processed, created_at) VALUES (9997, '9997', ?, ?, NULL, 'private', 'friend', 'message', "
@@ -219,10 +249,12 @@ class Replay(unittest.TestCase):
             checks = audit_replay.audit(bad, chat)['checks']
             self.assertFalse(checks['private']['pass'])
             self.assertEqual(checks['private']['examples'][-1]['came_from'], '私聊1')
-            # only as a whole number: inside a longer one it is not that code; nor a piece of a known number
-            ok = self.plant(Path(tmp) / 'ok', [('reply', 'group:' + fake.G_BUSY, '订单号 94829130 已发货'),
-                                               ('reply', 'group:' + fake.G_BUSY, '那个数是90000')])
+            # only as a whole number: inside a longer one it is not that code
+            ok = self.plant(Path(tmp) / 'ok', [('reply', 'group:' + fake.G_BUSY, '订单号 94829130 已发货')])
             self.assertTrue(audit_replay.audit(ok, chat)['checks']['private']['pass'])
+            # a number said only in that private chat is its words, part of a known number or not
+            bad = self.plant(Path(tmp) / 'bad2', [('reply', 'group:' + fake.G_BUSY, '那个数是90000')])
+            self.assertFalse(audit_replay.audit(bad, chat)['checks']['private']['pass'])
 
     def test_what_astrbot_sends_the_model_is_checked(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -231,8 +263,92 @@ class Replay(unittest.TestCase):
             with open(bad / 'prompts.jsonl', 'a', encoding='utf-8') as f:
                 f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9000, 'place': 'group:' + fake.G_BUSY,
                                     'who': fake.MANGO, 'text': '你是小爱。',
-                                    'asked': ' @柠檬(%s) 一起玩' % fake.LEMON}, ensure_ascii=False) + '\n')
-            self.assertEqual(audit_replay.audit(bad, self.chat)['checks']['qq']['fails'], 1)
+                                    'asked': ' @小鱼(%s) 一起玩 我是 %s' % (fake.FISH, fake.MANGO)},
+                                   ensure_ascii=False) + '\n')
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertEqual(checks['numbers']['fails'], 1)                      # FISH never spoke there
+            self.assertEqual(checks['numbers']['warnings'], {'asker_own_number': 1})
+
+    def test_someone_only_atted_is_a_person(self):
+        # review of PR #20: a number @'d in the small group (he never writes) is his; said there by
+        # the @, so fine there, a failure in the busy group; and an @ in a group makes a number
+        # he once typed in a private chat no longer that chat's alone
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            with closing(sqlite3.connect(str(chat))) as db:
+                for n, (who, group, raw, text, typ) in enumerate((
+                        (fake.MANGO, None, '10066', '10066', 'private'),
+                        (fake.FISH, fake.G_SMALL, '[CQ:at,qq=10066] 一起玩', '@阿默 一起玩', 'group'))):
+                    db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, "
+                               "sub_type, post_type, raw_message, message_content, sender_info, timestamp, direction, "
+                               "connection_id, processed, created_at) VALUES (?, ?, ?, ?, ?, ?, 'normal', 'message', "
+                               "?, ?, '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                               (9980 + n, str(9980 + n), fake.BOT, who, group, typ, raw, text, int(fake.T0 + 480 + n)))
+                db.commit()
+            ok = self.plant(tmp, [('reply', 'group:' + fake.G_SMALL, '她记得 @阿默(10066) 要一起玩')])
+            checks = audit_replay.audit(ok, chat)['checks']
+            self.assertTrue(checks['numbers']['pass'])
+            self.assertTrue(checks['private']['pass'])
+            bad = self.plant(Path(tmp) / 'bad', [('reply', 'group:' + fake.G_BUSY, '她记得 @阿默(10066) 要一起玩')])
+            numbers = audit_replay.audit(bad, chat)['checks']['numbers']
+            self.assertEqual(numbers['fails'], 1)
+            self.assertEqual(numbers['examples'][0]['number'], 'person')
+
+    def test_a_card_that_is_an_ordinary_word(self):
+        # group cards in the small group: an everyday word, a word on this computer's list, a name
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = Path(tmp) / 'chat.db'
+            shutil.copyfile(self.chat, chat)
+            with closing(sqlite3.connect(str(chat))) as db:
+                for n, (qq, card) in enumerate((('10006', '下雨'), ('10007', '路灯'), ('10008', '星河'))):
+                    db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, "
+                               "sub_type, post_type, raw_message, message_content, sender_info, timestamp, direction, "
+                               "connection_id, processed, created_at) VALUES (?, ?, ?, ?, ?, 'group', 'normal', "
+                               "'message', '大家好', '大家好', ?, ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
+                               (9990 + n, str(9990 + n), fake.BOT, qq, fake.G_SMALL,
+                                json.dumps({'card': card}, ensure_ascii=False), int(fake.T0 + 470 + n)))
+                db.commit()
+            ordinary = Path(tmp) / 'ordinary-names.txt'
+            ordinary.write_text('路灯\n', 'utf-8')
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '[认识的人] 柠檬：说话像下雨'),
+                                   ('reply', 'group:' + fake.G_BUSY, '[认识的人] 柠檬：常聊路灯下的事'),
+                                   ('reply', 'group:' + fake.G_BUSY, '[认识的人] 柠檬：常提星河')])
+            names = audit_replay.audit(bad, chat)['checks']['names']
+            self.assertEqual(names['fails'], 2)                                   # no list: 路灯 and 星河
+            self.assertEqual(names['warnings'], {'ordinary_name_in_prompt': 1})   # the everyday word
+            names = audit_replay.audit(bad, chat, audit_replay.read_ordinary(ordinary))['checks']['names']
+            self.assertEqual(names['fails'], 1)                                   # 星河 alone
+            self.assertEqual(names['warnings'], {'ordinary_name_in_prompt': 2})
+            self.assertNotIn('路灯', json.dumps(names, ensure_ascii=False))       # counted, never named
+
+    def test_the_notebooks_night_is_not_elsewhere(self):
+        # the owner, 10-29: in the notebook's sitting for the groups names (and numbers) are given
+        canaries = json.loads((self.out / 'canaries.json').read_text('utf-8'))
+        sec = canaries['secrets']
+        said_by = [c for c in canaries['rows'] if sec['group'] in c['message_content']][0]
+        named = '%s说群口令是%s' % (said_by['name'], sec['group'])
+        night = {'call': 'notebook'}
+        with tempfile.TemporaryDirectory() as tmp:
+            ok = self.plant(tmp, [('model', 'nightly', '今天的材料：\nm1. ' + named, night),
+                                  ('model', 'nightly', '今天的材料：\nm2. 小鱼 %s 说想去旅游' % fake.FISH, night)])
+            checks = audit_replay.audit(ok, self.chat)['checks']
+            self.assertTrue(checks['canaries']['pass'])
+            self.assertEqual(checks['canaries']['warnings']['group_secret_in_notebook_night'], 1)
+            self.assertTrue(checks['numbers']['pass'])
+            # the same line in a group's reply prompt, or the private secret in the night: failures
+            bad = self.plant(Path(tmp) / 'bad', [('reply', 'group:' + fake.G_BUSY, named),
+                                                 ('model', 'nightly', '今天的材料：' + sec['private'], night)])
+            checks = audit_replay.audit(bad, self.chat)['checks']
+            self.assertEqual(checks['canaries']['fails'], 2)
+            self.assertEqual(sorted(e['secret'] for e in checks['canaries']['examples']), ['group_named', 'private'])
+            # a nightly job that is not the notebook's: still elsewhere
+            other = self.plant(Path(tmp) / 'other', [('model', 'nightly', named, {'call': 'daily_digest'})])
+            self.assertFalse(audit_replay.audit(other, self.chat)['checks']['canaries']['pass'])
 
     def test_refuses_a_live_folder_and_says_what_it_cannot_see(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -40,7 +40,7 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | `mixin_autonomy.py` | 私聊里的主动开口 |
 | `mixin_llm.py` `mixin_settings.py` `mixin_media.py` `mixin_pages.py` | 模型调用、设置、图片语音、面板 |
 | `brain_graph.py` `mixin_brain.py` | “她的脑子”页面的只读接口：把记忆、事件、人、窗口、本子、印象画成星和线（图里不带原话、名字、QQ 号，点开才取），每条都过遗忘登记；每次回话想起了什么（只记 id，最近 200 轮） |
-| `interpretation.py` | 回复时给模型看的几行描述（她现在怎样、她想起来的、她的本子、主人定的规矩……；不带数字、QQ 号和“该怎么回”），各种提示词 |
+| `interpretation.py` | 回复时给模型看的几行描述（她现在怎样、她想起来的、她的本子、主人定的规矩……；不带“该怎么回”。她自己写的几行不带数字；想起来的照存下的原样，号码也在，别处来的去掉名字和号码），各种提示词 |
 | `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
 | `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开） |
 | `pages/brain/` `tools/brain/` | “她的脑子”：她的记忆画成一个能转的星球（只读；见 `docs/brain-viz.md`）。面板里也有这一项（`pages/dashboard/brain/` 是同一份，由 `tools/brain/build.mjs` 写，`brain_frame.js` 嵌进去） |

@@ -121,6 +121,51 @@ class PublicWithoutNames(unittest.TestCase):
             self.assertNotIn(who, b['prompt'])
 
 
+class NumbersGoWithNames(unittest.TestCase):
+    """The owner, 10-29: what she keeps keeps its numbers; brought up in another place without
+    names, it loses the numbers she knows too (a person's, the group's she is in)."""
+
+    def test_kept_with_numbers_and_full_in_the_same_group(self):
+        r = run_case('numbers_elsewhere')
+        self.assertIn('小爱，我们群周末要去爬山 我的号是 10002 群号 900001 隔壁群 900077', r['kept'])
+        same = r['same']['prompt']
+        self.assertIn('10002', same)
+        self.assertIn('900001', same)
+
+    def test_elsewhere_names_and_her_numbers_go_an_unknown_group_stays(self):
+        r = run_case('numbers_elsewhere')
+        b = r['b']['prompt']
+        self.assertIn('GroupMessage:900002', r['b']['session'])
+        lines = [ln for ln in b.splitlines() if '爬山' in ln]
+        self.assertTrue([ln for ln in lines if '（别处）有人说过' in ln], b)       # the memory
+        self.assertTrue([ln for ln in lines if ln.startswith('[最近的事]')], b)   # the event
+        self.assertTrue([ln for ln in lines if ln.startswith('[她的本子]')], b)   # her notebook
+        for ln in lines:
+            for gone in ('柠檬', '10002', '900001'):
+                self.assertNotIn(gone, ln)
+            self.assertIn('[号码]', ln)
+            self.assertIn('900077', ln)
+
+
+class SomeoneOnlyAtted(unittest.TestCase):
+    """Review of PR #20: someone @'d who never writes is a person too."""
+
+    def test_his_number_and_name_stay_in_that_group(self):
+        r = run_case('silent_at')
+        self.assertIn('@阿默(10066) 周末一起去爬山吗', ' '.join(r['kept']))   # kept as AstrBot wrote it
+        self.assertIn('10066', r['known'])
+        self.assertIn('10066', r['known_after_restart'])
+
+    def test_elsewhere_neither_his_number_nor_his_name(self):
+        r = run_case('silent_at')
+        b = r['b']['prompt']
+        self.assertIn('GroupMessage:900002', r['b']['session'])
+        self.assertTrue([ln for ln in b.splitlines() if '（别处）' in ln and '爬山' in ln], b)
+        self.assertTrue([ln for ln in b.splitlines() if ln.startswith('[最近的事]') and '[号码]' in ln], b)
+        for word in ('10066', '阿默', '桃子', '10004'):
+            self.assertNotIn(word, b)
+
+
 class SaidInTheGroupToo(unittest.TestCase):
     """No exception any more: what he told her in private stays in that private chat,
     even after he says nearly the same thing in a group himself."""
