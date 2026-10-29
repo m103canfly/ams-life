@@ -97,8 +97,8 @@ class Split(unittest.TestCase):
         # the last look before sending (step 2, 己, second part): +13 (on_agent_done, and
         # SendCheckMixin: _check_note, _forbid, _forbid_names, _note_allowed, _common_pieces,
         # _check_reply, _redo_reply, _look_at_reply, _set_reply, _settle_history, _count_check,
-        # _check_counts_today)
-        self.assertEqual(len(methods), 367)
+        # _check_counts_today); review of PR #33: +1 (_check_failed: the look itself failed, held back)
+        self.assertEqual(len(methods), 368)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

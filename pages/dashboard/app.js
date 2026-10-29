@@ -1174,7 +1174,8 @@
     if(send){
       send.hidden=!sc;
       if(sc) send.textContent="今天发出前检查：重说 "+Number(sc.redone||0)+" 次，没发 "+Number(sc.held||0)+
-        " 次，可疑（没挡）"+Number(sc.close||0)+" 次。";
+        " 次，可疑（没挡）"+Number(sc.close||0)+" 次"+
+        (Number(sc.failed||0)?"，检查出错没发 "+Number(sc.failed)+" 次":"")+"。";
     }
   }
   function renderImpressions(){

@@ -65,7 +65,10 @@ class SendCheckMixin:
         for asking once more."""
         note = self._check_note(event)
         keep = [s for s in _SEGMENT.split(str(compact or "")) if "这里不能讲" not in s]
-        parts = [str(getattr(req, "prompt", "") or ""), str(getattr(req, "system_prompt", "") or "")]
+        system = str(getattr(req, "system_prompt", "") or "")
+        if compact:   # with no user parts the block is in the system prompt: only its "keep" counts
+            system = system.replace(str(compact), "")
+        parts = [str(getattr(req, "prompt", "") or ""), system]
         for msg in getattr(req, "contexts", None) or []:
             content = msg.get("content") if isinstance(msg, dict) else None
             if isinstance(content, str):
@@ -126,11 +129,15 @@ class SendCheckMixin:
             provider = None
         if provider is None:
             return None
-        prompt = "\n\n".join(x for x in (note.get("compact", ""), str(getattr(req, "prompt", "") or ""),
-                                         send_check.REDO_NOTE) if x)
+        system = getattr(req, "system_prompt", None)
+        compact = note.get("compact", "")
+        if compact and compact in str(system or ""):
+            compact = ""   # the block went into the system prompt (no user parts): not twice
+        prompt = "\n\n".join(x for x in (compact, str(getattr(req, "prompt", "") or ""), send_check.REDO_NOTE) if x)
         try:
             resp = await provider.text_chat(prompt=prompt, contexts=list(getattr(req, "contexts", None) or []),
-                                            system_prompt=getattr(req, "system_prompt", None))
+                                            system_prompt=system,
+                                            image_urls=list(getattr(req, "image_urls", None) or []))
         except Exception as exc:
             logger.warning("[ams-life] send check: asking once more failed: %s", exc)
             return None
@@ -165,6 +172,17 @@ class SendCheckMixin:
             ids = ", ".join(dict.fromkeys(result["ids"] + second["ids"]))
         self._count_check("held")
         logger.info("[ams-life] send check: held back (%s)", ids)
+        self._check_note(event)["sent"] = ""
+        try:
+            event.stop_event()
+        except Exception:
+            pass
+        return ""
+
+    def _check_failed(self, event, exc) -> str:
+        """The look itself failed: held back as if it leaked (not sent, nothing kept)."""
+        self._count_check("failed")
+        logger.warning("[ams-life] send check: failed (%s), held back", type(exc).__name__)
         self._check_note(event)["sent"] = ""
         try:
             event.stop_event()
@@ -248,4 +266,4 @@ class SendCheckMixin:
             today = (data or {}).get(time.strftime("%Y-%m-%d")) or {}
         except Exception:
             today = {}
-        return {k: int(today.get(k, 0) or 0) for k in ("redone", "held", "close", "redo_calls")}
+        return {k: int(today.get(k, 0) or 0) for k in ("redone", "held", "close", "failed", "redo_calls")}

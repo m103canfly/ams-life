@@ -770,8 +770,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 pass
         _reply = _clean
         if getattr(self, "global_memory", False) and _reply.strip():
-            # step 2: the last look before it is sent; "" = nothing is sent and nothing kept
-            _reply = await self._look_at_reply(event, response, _reply)
+            # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
+            # If the look itself fails, the reply is held back as if it leaked.
+            try:
+                _reply = await self._look_at_reply(event, response, _reply)
+            except Exception as exc:
+                _reply = self._check_failed(event, exc)
             if not _reply:
                 return
         try:

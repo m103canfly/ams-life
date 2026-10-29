@@ -86,6 +86,8 @@ def turn(plugin, loop, delay, text, sender, name, group, reply):
     clock.advance(delay)
     event = Event(text, sender=sender, name=name, group=group)
     req = ProviderRequest(prompt=text, system_prompt='你是小爱。')
+    if CASE == 'system_road':   # no user parts: the block goes into the system prompt
+        req.extra_user_content_parts = None
     loop.run_until_complete(plugin.on_message(event))
     loop.run_until_complete(plugin.on_llm_request(event, req))
     harness.drain(loop)
@@ -95,7 +97,9 @@ def turn(plugin, loop, delay, text, sender, name, group, reply):
     rc = RunContext(text, reply)
     loop.run_until_complete(plugin.on_agent_done(event, rc, resp))
     last = rc.messages[-1].content
-    return {'sent': '' if event.stopped else resp.completion_text, 'stopped': event.stopped,
+    note = getattr(event, '_ams_check', None) or {}
+    return {'forbidden': [x['id'] for x in note.get('forbidden') or []], 'system': req.system_prompt,
+            'sent': '' if event.stopped else resp.completion_text, 'stopped': event.stopped,
             'history': [p.dump() for p in last] if isinstance(last, list) else last,
             'reasoning': event.extras.get('_llm_reasoning_content')}
 
@@ -112,7 +116,8 @@ def kept():
 
 
 def run():
-    again = {'redo': '周末一起去爬山吧', 'hold': '那我就直说了，暗号是蓝鲸三号'}.get(CASE, '不会用到')
+    again = {'redo': '周末一起去爬山吧', 'system_road': '周末一起去爬山吧',
+             'hold': '那我就直说了，暗号是蓝鲸三号'}.get(CASE, '不会用到')
     reply = {'fine': '周末去爬山记得带水', 'own_chat': '记得呀，你的暗号是蓝鲸三号'}.get(CASE, LEAK)
     ctx = harness.FakeContext()
     ctx.provider = Model(again)
@@ -122,6 +127,10 @@ def run():
     asyncio.set_event_loop(loop)
     out = {}
     turn(plugin, loop, 0, SECRET, '10001', '芒果', None, '好，我记住啦')
+    if CASE == 'fails':   # from the group turn on, the look itself breaks
+        async def broken(event, reply):
+            raise RuntimeError('the look itself broke')
+        plugin._check_reply = broken
     if CASE == 'own_chat':
         out['private'] = turn(plugin, loop, 30, '小爱 你还记得我的暗号吗', '10001', '芒果', None, reply)
     else:

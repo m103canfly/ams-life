@@ -18,6 +18,10 @@ NO = [{'id': 'memory:m1', 'text': SECRET, 'names': ['芒果'], 'vec': [1.0, 0.0,
 _CACHE = {}
 
 
+def send_check_note():
+    return sc.REDO_NOTE
+
+
 def run_case(case):
     if case not in _CACHE:
         with tempfile.TemporaryDirectory() as tmp:
@@ -130,6 +134,20 @@ class InThePlugin(unittest.TestCase):
         r = run_case('own_chat')
         self.assertEqual(r['private']['sent'], '记得呀，你的暗号是蓝鲸三号')
         self.assertFalse(r['private']['stopped'])
+
+    def test_the_look_failing_sends_nothing(self):
+        r = run_case('fails')
+        g = r['group']
+        self.assertTrue(g['stopped'])
+        self.assertEqual(r['counts']['failed'], 1)
+        self.assertIn('send check: failed (RuntimeError), held back', '\n'.join(r['log']))
+        self.assertNotIn('蓝鲸三号', json.dumps(r['kept'], ensure_ascii=False))
+
+    def test_asked_once_more_with_the_block_once(self):
+        r = run_case('system_road')
+        self.assertEqual(r['group']['sent'], '周末一起去爬山吧')
+        self.assertEqual(r['redo_prompt'].count('[她现在]'), 0)   # it is in the system prompt already
+        self.assertIn(send_check_note(), r['redo_prompt'])
 
     def test_switch_off_nothing_changes(self):
         r = run_case('off')
