@@ -172,6 +172,33 @@ class SettingsMixin:
             pass
         return []
 
+    def _reply_tools_off(self, req) -> list:
+        """No tools in her reply (the owner, 10-29): AstrBot puts tools of its own into every
+        reply's request (future_task, send_message_to_user: core/astr_main_agent.py, added after
+        the persona's tool list, with no switch for the second); all are taken out but those on
+        the setting allowed_tools (one name a line, empty by default). AstrBot adds none after
+        on_llm_request, and sends the model no tools for an empty set (None). Returns the names
+        taken out; each time, one log line names them (no content)."""
+        tools = getattr(req, "func_tool", None)
+        if not tools:
+            return []
+        try:
+            names = [str(n) for n in tools.names()]
+        except Exception:
+            names = [str(getattr(t, "name", "")) for t in getattr(tools, "tools", None) or []]
+        raw = (getattr(self, "config", None) or {}).get("allowed_tools") or []
+        allowed = {str(x).strip() for x in (raw if isinstance(raw, (list, tuple)) else str(raw).splitlines())}
+        gone = [n for n in names if n not in allowed]
+        if not gone:
+            return []
+        if len(gone) == len(names):
+            req.func_tool = None
+        else:
+            for n in gone:
+                tools.remove_tool(n)
+        logger.info("[ams-life] tools taken out of the reply: %s", ", ".join(gone))
+        return gone
+
     def _ignored_sender(self, event) -> bool:
         """Is the sender on the setting ignore_senders (one QQ number a line; the owner's,
         e.g. another bot)? What such a sender says is neither answered nor kept."""

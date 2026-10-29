@@ -568,6 +568,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if self._ignored_sender(event):   # on_message stopped it already; should it get this far
             event.stop_event()
             return
+        try:   # no tools in her reply, whatever else is on (the owner, 10-29)
+            self._reply_tools_off(req)
+        except Exception as exc:
+            logger.warning("[ams-life] reply tools could not be taken out: %s", exc)
         if not self.enabled or not self.inject_intent:
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
