@@ -33,6 +33,9 @@ look and before its results are saved. At most three eligible looks are attempte
 per opening, the daily hard limit is checked before each, and failed attempts are
 not retried within the queue's lifetime. Cache identity is the URL hash while the
 cache entry remains; a different URL for the same image can cost another look.
+Each queued picture holds the vision lock for one look. A reply waiting for the
+lock takes priority; the unattempted pictures stay queued for the next opening,
+subject to the same expiry, capacity and forgetting rules.
 An individual call may cross the daily limit and failed calls may incur provider
 charges that are unavailable in the response. Vision usage is recorded even when
 `self_decide` is off.
@@ -50,6 +53,7 @@ Files: `_conf_schema.json`, `main.py`, `mixin_group_browse.py`, `mixin_autonomy.
 `tools/sim_open_groups.py`, and corresponding offline tests. The discretion change
 is one call on its existing shared deletion path. Candidate notes are checked for
 five turns using AstrBot's existing non-saved-part harness. No unrelated changes
-are intended. Goldens were not changed; the switch-off change can alter traces that
+are intended, except that `_spending` now records vision use even when `self_decide`
+is off. Goldens were not changed; the switch-off change can alter traces that
 include uncalled stickers, and vision spending can change a trace with vision on
-and `self_decide` off. Python tests were not run in this sandbox.
+and `self_decide` off.

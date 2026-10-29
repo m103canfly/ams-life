@@ -12,6 +12,7 @@ sys.path.insert(0, str(HERE))
 # Reuse the suite's prepared stubs and clock without replacing its global time.time.
 from test_body_heart import CLOCK as _CLOCK  # noqa: E402,F401
 import mixin_group_browse as groups  # noqa: E402
+import mixin_media  # noqa: E402
 
 
 def event(source='m1', sender='10001', group='900001', refs=(), wake=False):
@@ -158,6 +159,83 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         self.assertEqual(self.p.looks, [ref(0), ref(1), ref(2)])
+
+    async def test_reply_image_interrupts_batch_after_first_and_requeues_remaining(self):
+        class ReplyDummy(mixin_media.MediaMixin, Dummy):
+            async def _image_context_locked(self, event):
+                self.order.append('reply')
+                self.reply_started.set()
+                return 'reply image'
+
+        self.p = ReplyDummy()
+        self.p.order = []
+        self.p.reply_started = asyncio.Event()
+        first_started, first_done = asyncio.Event(), asyncio.Event()
+        second_done = asyncio.Event()
+
+        async def look(provider, url, ev):
+            self.p.looks.append(url)
+            self.p.order.append(url)
+            if url == ref(0):
+                first_started.set()
+                await first_done.wait()
+            elif url == ref(1):
+                await second_done.wait()
+            return 'picture', {'caption': 'picture'}
+
+        self.p._look_once = look
+        self.add(event('old', refs=[ref(n) for n in range(3)]))
+        browse = asyncio.create_task(self.p._group_look('group:900001', self.p._group_open('group:900001')))
+        reply = None
+        try:
+            await asyncio.wait_for(first_started.wait(), 1)
+            reply = asyncio.create_task(self.p._image_context(event('reply', wake=True)))
+            await asyncio.sleep(0)
+            self.assertEqual(self.p._group_reply_vision_active, 1)
+            first_done.set()
+            await asyncio.wait_for(self.p.reply_started.wait(), 1)
+            self.assertEqual(await reply, 'reply image')
+            await asyncio.wait_for(browse, 1)
+            self.assertEqual(self.p.order, [ref(0), 'reply'])
+            queue = self.p._group_state()['group:900001']['queue']
+            self.assertEqual([x[0] for x in queue], [ref(1), ref(2)])
+            second_done.set()
+            await self.p._group_look('group:900001', self.p._group_open('group:900001'))
+            self.assertEqual(self.p.looks, [ref(0), ref(1), ref(2)])
+        finally:
+            first_done.set()
+            second_done.set()
+            if reply is not None:
+                await asyncio.gather(reply, return_exceptions=True)
+            await asyncio.gather(browse, return_exceptions=True)
+
+    async def test_cancelled_reply_does_not_leave_priority_flag_set(self):
+        class ReplyDummy(mixin_media.MediaMixin, Dummy):
+            async def _image_context_locked(self, event):
+                return ''
+
+        self.p = ReplyDummy()
+        async with self.p._group_image_lock():
+            reply = asyncio.create_task(self.p._image_context(event('reply', wake=True)))
+            await asyncio.sleep(0)
+            self.assertEqual(self.p._group_reply_vision_active, 1)
+            reply.cancel()
+            await asyncio.gather(reply, return_exceptions=True)
+            self.assertEqual(self.p._group_reply_vision_active, 0)
+
+    async def test_deferred_pictures_still_obey_forgetting_and_expiry(self):
+        self.add(event('old', sender='10001', refs=[ref(1)]))
+        self.add(event('other', sender='10002', refs=[ref(2)]))
+        self.p._group_reply_vision_active = 1
+        await self.p._group_look('group:900001', self.p._group_open('group:900001'))
+        self.p._group_reply_vision_active = 0
+        self.p._group_forget_queue('10001')
+        queue = self.p._group_state()['group:900001']['queue']
+        self.assertEqual([x[0] for x in queue], [ref(2)])
+        row = queue[0]
+        queue[0] = (row[0], row[1] - 3601, row[2], row[3])
+        await self.p._group_look('group:900001', self.p._group_open('group:900001'))
+        self.assertEqual(self.p.looks, [])
 
     async def test_queue_limit_and_switch_clears(self):
         self.add(event(refs=[ref(n) for n in range(101)]))

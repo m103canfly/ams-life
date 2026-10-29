@@ -112,8 +112,7 @@ class GroupBrowseMixin:
         now = time.time()
         self._group_prune(now)
         group = self._group_state().setdefault(here, {})
-        last = float(group.get('opened', 0) or 0)
-        rows = [x for x in group.pop('queue', []) if last <= x[1] <= now
+        rows = [x for x in group.pop('queue', []) if x[1] <= now
                 and 0 <= now - x[1] <= 3600 and (not current_id or x[3] != current_id)]
         group.update(opened=now, unread=0, people={})
         group.pop('first_unread', None)
@@ -202,12 +201,19 @@ class GroupBrowseMixin:
         return lock
 
     async def _group_look(self, here, batch):
+        paused = False
         try:
-            await self._group_look_pending(here, batch)
+            paused = await self._group_look_pending(here, batch)
         finally:
             rows = batch[0]
-            pending = self._group_state().get(here, {}).get('pending', [])
+            group = self._group_state().get(here, {})
+            pending = group.get('pending', [])
             pending[:] = [item for item in pending if item is not rows]
+            if (paused and getattr(self, 'browse_groups_enabled', False)
+                    and (self._forget_count(), getattr(self, '_group_switch_epoch', 0)) == batch[1]):
+                now = time.time()
+                remaining = [x for x in rows if 0 <= now - x[1] <= 3600]
+                group['queue'] = sorted(remaining + group.get('queue', []), key=lambda x: x[1])[-100:]
             rows.clear()
 
     async def _group_look_pending(self, here, batch):
@@ -217,17 +223,24 @@ class GroupBrowseMixin:
         if not self._llm_allowed('image_caption'):
             return
         self._begin_job()
-        async with self._group_image_lock():
-            attempted = getattr(self, '_group_failed_refs', None)
-            if attempted is None:
-                attempted = self._group_failed_refs = {}
-            now = time.time()
-            attempted = self._group_failed_refs = {k: v for k, v in attempted.items() if now - v <= 3600}
-            cache = self._load_image_cache()
-            count = 0
-            for ref, stamp, sender, source in rows:
-                if count >= 3 or not getattr(self, 'browse_groups_enabled', False):
+        count = 0
+        while rows and count < 3 and getattr(self, 'browse_groups_enabled', False):
+            if getattr(self, '_group_reply_vision_active', 0):
+                return True
+            keep = None
+            async with self._group_image_lock():
+                if getattr(self, '_group_reply_vision_active', 0):
+                    return True
+                if not rows:
                     break
+                ref, stamp, sender, source = rows.pop(0)
+                attempted = getattr(self, '_group_failed_refs', None)
+                if attempted is None:
+                    attempted = self._group_failed_refs = {}
+                now = time.time()
+                for old in [k for k, v in attempted.items() if now - v > 3600]:
+                    attempted.pop(old, None)
+                cache = self._load_image_cache()
                 key = _sha256(ref)
                 if key in cache or key in attempted or not (0 <= time.time() - stamp <= 3600):
                     continue
@@ -255,6 +268,12 @@ class GroupBrowseMixin:
                     cache[key] = stickers.cache_entry(ref, look, sender, here, time.time())
                     self._save_image_cache(cache)
                     attempted.pop(key, None)
-                    await self._maybe_keep(event, ref, look)
+                    keep = (event, ref, look)
                 except Exception as exc:
                     logger.warning('[ams-life] group sticker look failed (%s)', type(exc).__name__)
+            if keep is not None:
+                try:
+                    await self._maybe_keep(*keep)
+                except Exception as exc:
+                    logger.warning('[ams-life] group sticker keep failed (%s)', type(exc).__name__)
+        return False

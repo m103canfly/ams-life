@@ -218,8 +218,12 @@ class MediaMixin:
             return ""
 
     async def _image_context(self, event) -> str:
-        async with self._group_image_lock():
-            return await self._image_context_locked(event)
+        self._group_reply_vision_active = getattr(self, '_group_reply_vision_active', 0) + 1
+        try:
+            async with self._group_image_lock():
+                return await self._image_context_locked(event)
+        finally:
+            self._group_reply_vision_active -= 1
 
     async def _image_context_locked(self, event) -> str:
         refs = self._image_refs(event)

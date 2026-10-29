@@ -837,10 +837,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
-        await self._group_reply_response(event, response)
+        await self._reply_response(event, response)
         self._group_reply_after(event)
 
-    async def _group_reply_response(self, event: AstrMessageEvent, response: LLMResponse):
+    async def _reply_response(self, event: AstrMessageEvent, response: LLMResponse):
         if self._ignored_sender(event):   # nothing of an answer to him is kept
             event.stop_event()
             return
