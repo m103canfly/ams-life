@@ -1851,11 +1851,19 @@ class MemoryMixin:
             text = str(entry.get("text") or "").strip()
             if text in known:
                 continue
+            origin = discretion.origin_of(entry)
+            people = list(origin["people"]) + [str(entry.get("sender_id") or "")]
             if lab["may"] == discretion.NO:
                 if n_no >= ELSEWHERE_PRIVATE_MAX:
                     continue
                 n_no += 1
                 held.append((score, str(entry.get("id") or "")))
+                # the last look before sending (send_check): its words and who it is about
+                self._forbid(event, "memory:" + str(entry.get("id") or ""), text, people, entry.get("vector"))
+            elif lab["may"] == discretion.ANON:
+                self._forbid_names(event, "memory:" + str(entry.get("id") or ""), people)
+            if lab.get("asked") == discretion.NO and isinstance(entry.get("asked_in"), dict):
+                self._forbid_names(event, "asked:" + str(entry.get("id") or ""), entry["asked_in"].get("people") or [])
             tag = discretion.tag(lab, "memory", self._recall_role(entry), self._sayer_name(entry),
                                  self._partner_name(discretion.origin_of(entry)))
             lines.append("- %s%s" % (tag, text.replace("\n", " ")[:200]))
