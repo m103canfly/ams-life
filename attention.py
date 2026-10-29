@@ -1,0 +1,211 @@
+# -*- coding: utf-8 -*-
+# ams-life (AGPL-3.0); see NOTICE.md.
+"""Step 2 (甲, setting self_decide): she decides herself whether to answer. Pure functions:
+no I/O, no model, no AstrBot. The plugin keeps the state (mixin_attention.py).
+
+- Called (the owner, 10-29): an @ of her, a quote of her, her name; every message of a private
+  chat; and someone taking up what she just said (she spoke in this window a moment ago, to him).
+  Called: the model is always asked (unless the two safety nets or the night say no).
+- Not called (groups only): the plugin scores the last message of a stretch (topic, people she
+  knows, how much she said here lately, a quarrel, how long she has been quiet here) and asks the
+  model only over the threshold of the level the owner picks (less / normal / more).
+- Night (01:00-08:25 by default): called once she does not answer; called NIGHT_WAKE_CALLS times
+  within NIGHT_WAKE_MINUTES she is woken, and answers until nobody called her for
+  NIGHT_SLEEP_AGAIN_MINUTES. Never speaks up herself at night.
+- Two safety nets, no fixed limits otherwise: about 30 messages an hour in one group; money a
+  day (10 yuan; near it only the owner's private chat; over it nothing).
+- What she sends is hers to pick (the owner, 10-29: 6): 【不说】 (nothing), a QQ face, a short line,
+  or a real answer; several messages split by 【下一条】 (at most MAX_MESSAGES, the owner's 27).
+"""
+from __future__ import annotations
+
+import math
+import re
+import time
+
+LEVELS = {"less": 0.55, "normal": 0.45, "more": 0.35}   # thresholds of the three levels
+CONTINUE_SECONDS = 180          # someone takes up what she said: within 3 minutes
+NIGHT_WAKE_CALLS = 3
+NIGHT_WAKE_MINUTES = 10
+NIGHT_SLEEP_AGAIN_MINUTES = 20
+GROUP_HOUR_MAX = 30
+MAX_MESSAGES = 5
+SILENT = "【不说】"
+NEXT = "【下一条】"
+
+# QQ's own small faces she may use, by name (the ids are QQ's: to be checked after install)
+FACES = {"惊讶": 0, "撇嘴": 1, "色": 2, "发呆": 3, "得意": 4, "流泪": 5, "害羞": 6, "睡": 8, "大哭": 9,
+         "尴尬": 10, "发怒": 11, "调皮": 12, "呲牙": 13, "微笑": 14, "难过": 15, "酷": 16, "偷笑": 20,
+         "可爱": 21, "白眼": 22, "疑问": 32, "嘘": 33, "晕": 34, "再见": 39, "爱心": 66, "赞": 76,
+         "鼓掌": 99, "坏笑": 101, "委屈": 106}
+_FACE = re.compile(r"\[表情[:：]([^\]\s]{1,6})\]")
+
+# what she is told she may pick (one line of the reply block; it describes, it does not order)
+CHOICES_NOTE = ("你可以自己挑怎么回：不想回就只写%s；可以只回一个QQ小表情（写成[表情:名字]，名字有：%s）；"
+                "可以一句短的；也可以正经回一段。想分几条发，就在两条之间单独写一行%s，最多%d条。"
+                % (SILENT, "、".join(FACES), NEXT, MAX_MESSAGES))
+
+
+# ------------------------------------------------------------------
+# called or not
+# ------------------------------------------------------------------
+def called(addresses_her, private, sender, last_reply_ts=0.0, last_reply_to=(), now=None) -> str:
+    """Why she is called ("at" / "private" / "continue"), or "" when she is not."""
+    now = time.time() if now is None else now
+    if private:
+        return "private"
+    if addresses_her:
+        return "at"
+    if last_reply_ts and now - float(last_reply_ts) <= CONTINUE_SECONDS and str(sender) in {
+            str(x) for x in (last_reply_to or ())}:
+        return "continue"
+    return ""
+
+
+# ------------------------------------------------------------------
+# night
+# ------------------------------------------------------------------
+def _minutes(hhmm) -> int:
+    h, _, m = str(hhmm).partition(":")
+    return int(h) * 60 + int(m or 0)
+
+
+def is_night(now=None, start="01:00", end="08:25") -> bool:
+    t = time.localtime(time.time() if now is None else now)
+    m, a, b = t.tm_hour * 60 + t.tm_min, _minutes(start), _minutes(end)
+    return a <= m < b if a <= b else (m >= a or m < b)
+
+
+def night_gate(calls, now, awake_until=0.0, wake_calls=NIGHT_WAKE_CALLS, wake_minutes=NIGHT_WAKE_MINUTES,
+               sleep_again=NIGHT_SLEEP_AGAIN_MINUTES) -> tuple:
+    """At night: (answer?, woken just now?, awake until). `calls`: the times she was called
+    at night lately (this one included). Awake, every call keeps her awake a while more."""
+    now = float(now)
+    if awake_until and now < float(awake_until):
+        return True, False, now + sleep_again * 60
+    recent = [t for t in calls if now - float(t) <= wake_minutes * 60]
+    if len(recent) >= wake_calls:
+        return True, True, now + sleep_again * 60
+    return False, False, 0.0
+
+
+# ------------------------------------------------------------------
+# people she knows (the owner, 10-29: by the dealings; he himself the closest)
+# ------------------------------------------------------------------
+def familiarity(tie, now=None, owner=False) -> float:
+    """0..1 from the dealings with someone: days they talked (the last 30 weigh most), times he
+    called her, a private chat. The owner is always 1."""
+    if owner:
+        return 1.0
+    now = time.time() if now is None else now
+    tie = tie if isinstance(tie, dict) else {}
+    today = int(now // 86400)
+    days = [int(d) for d in tie.get("days") or [] if str(d).lstrip("-").isdigit()]
+    recent = sum(1 for d in days if today - d < 30)
+    older = sum(1 for d in days if 30 <= today - d < 90)
+    calls = sum(int(n) for d, n in (tie.get("calls") or {}).items()
+                if str(d).lstrip("-").isdigit() and today - int(d) < 30)
+    x = 0.12 * recent + 0.04 * older + 0.04 * min(calls, 50)
+    f = 1.0 - math.exp(-x) + (0.15 if tie.get("private") else 0.0)
+    return round(max(0.0, min(1.0, f)), 3)
+
+
+def note_tie(tie, now=None, called_her=False, private=False) -> dict:
+    """The dealings, one more message: the day, a call of her, a private chat. Kept small."""
+    now = time.time() if now is None else now
+    tie = dict(tie) if isinstance(tie, dict) else {}
+    day = int(now // 86400)
+    days = [int(d) for d in tie.get("days") or [] if str(d).lstrip("-").isdigit() and day - int(d) < 90]
+    if day not in days:
+        days.append(day)
+    tie["days"] = sorted(days)[-90:]
+    calls = {k: int(v) for k, v in (tie.get("calls") or {}).items() if str(k).lstrip("-").isdigit()
+             and day - int(k) < 30}
+    if called_her:
+        calls[str(day)] = calls.get(str(day), 0) + 1
+    tie["calls"] = calls
+    tie["private"] = bool(tie.get("private")) or bool(private)
+    tie["last"] = now
+    return tie
+
+
+# ------------------------------------------------------------------
+# not called: a score and a threshold
+# ------------------------------------------------------------------
+def score(topic=0.0, known=0.0, her_recent=0, quarrel=False, quiet_minutes=0.0) -> float:
+    """How much the last message of a stretch draws her in (no model). topic: how close it is to
+    what she keeps (cosine, 0..1); known: the most familiar of who spoke (0..1); her_recent: her
+    lines here in the last 10 minutes; quarrel: people are fighting; quiet_minutes: since she
+    last spoke here."""
+    s = 0.45 * max(0.0, min(1.0, float(topic))) + 0.25 * max(0.0, min(1.0, float(known)))
+    s += 0.15 * min(1.0, max(0.0, float(quiet_minutes)) / 120.0)
+    s -= 0.20 * min(1.0, max(0, int(her_recent)) / 3.0)
+    if quarrel:
+        s -= 0.20
+    return round(s, 4)
+
+
+def threshold(level="normal") -> float:
+    return LEVELS.get(str(level or "normal"), LEVELS["normal"])
+
+
+# ------------------------------------------------------------------
+# the two safety nets
+# ------------------------------------------------------------------
+def hour_ok(sent_times, now=None, most=GROUP_HOUR_MAX) -> bool:
+    """Fewer than `most` messages of hers in this group in the last hour."""
+    now = time.time() if now is None else now
+    return sum(1 for t in sent_times or () if now - float(t) < 3600) < int(most)
+
+
+def cost(usage, prices) -> float:
+    """Yuan of one model call. usage: {input_miss, input_hit, output} tokens; prices: yuan a
+    million tokens for each."""
+    u, p = usage or {}, prices or {}
+    return round(sum(float(u.get(k, 0) or 0) * float(p.get(k, 0) or 0) for k in ("input_miss", "input_hit", "output"))
+                 / 1e6, 6)
+
+
+def budget(spent, soft=8.0, hard=10.0) -> str:
+    """"ok", "soft" (only the owner's private chat), "hard" (nothing at all)."""
+    spent = float(spent or 0)
+    return "hard" if spent >= float(hard) else "soft" if spent >= float(soft) else "ok"
+
+
+# ------------------------------------------------------------------
+# what she sends
+# ------------------------------------------------------------------
+def silent(text) -> bool:
+    """She chose to say nothing: the reply is 【不说】 alone (or nothing at all)."""
+    t = str(text or "").strip()
+    return not t or t.replace(SILENT, "").strip() == "" and SILENT in t
+
+
+def split(text, most=MAX_MESSAGES) -> list:
+    """The messages she wrote, split at 【下一条】; what is beyond `most` goes into the last."""
+    parts = [p.strip() for p in str(text or "").split(NEXT)]
+    parts = [p for p in parts if p and p != SILENT]
+    if len(parts) > most:
+        parts = parts[:most - 1] + ["\n".join(parts[most - 1:])]
+    return parts
+
+
+def pieces(text) -> list:
+    """One message as ("text", words) and ("face", id) in order; an unknown face name stays text."""
+    out, at = [], 0
+    for m in _FACE.finditer(str(text or "")):
+        if m.group(1) not in FACES:
+            continue
+        if m.start() > at and str(text)[at:m.start()].strip():
+            out.append(("text", str(text)[at:m.start()].strip()))
+        out.append(("face", FACES[m.group(1)]))
+        at = m.end()
+    rest = str(text or "")[at:].strip()
+    if rest:
+        out.append(("text", rest))
+    return out
+
+
+def typing_seconds(text) -> float:
+    """A pause before the next message, as if typing it: 1 to 3 seconds by its length."""
+    return round(min(3.0, 1.0 + len(str(text or "")) / 30.0), 2)

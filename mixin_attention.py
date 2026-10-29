@@ -1,0 +1,360 @@
+# -*- coding: utf-8 -*-
+# ams-life (AGPL-3.0); see NOTICE.md.
+"""Step 2 (甲, setting self_decide, off by default): she decides herself whether to answer
+(attention.py has the rules as pure functions).
+
+on_message_decide (main.py, after on_message has kept the message in her phone):
+1. called? (an @, a quote, her name, a private chat, someone taking up what she just said);
+2. at night, called once she sleeps on; called again and again she is woken;
+3. wait a few seconds: when more comes into this window meanwhile, this one is not judged
+   (it is kept all the same: on_message ran first); the last one carries "called" on;
+4. the two safety nets: about 30 of hers an hour in a group; the money of the day;
+5. called: AstrBot answers as before, or -- the last message did not wake AstrBot -- the plugin
+   asks for a reply (request_llm, in the conversation, so with her persona and the history);
+   not called (groups): a score over the threshold of the level asks for a reply too.
+
+on_llm_response: what she picked: 【不说】 (nothing sent, nothing kept), QQ faces, several messages
+(【下一条】; the first sent by AstrBot, the rest by the plugin to the same chat, a pause between).
+Every model call's cost goes into states/spend.json (numbers only).
+"""
+from __future__ import annotations
+
+try:
+    from .common import *  # noqa: F401,F403
+except ImportError:
+    from common import *  # noqa: F401,F403
+
+try:
+    from . import attention
+except ImportError:
+    import attention
+
+ATTENTION_PATH = STATE_DIR / "attention.json"
+TIES_PATH = STATE_DIR / "ties.json"
+SPEND_PATH = STATE_DIR / "spend.json"
+WAIT_SECONDS = {"group": 6.0, "called": 2.0, "private": 3.0}
+# yuan a million tokens (deepseek-flash, the price page's numbers of 10-29 at its peak hours, at
+# 7.2 yuan a dollar; set in the config, checked again on install)
+DEFAULT_PRICES = {"input_miss": 2.2, "input_hit": 0.05, "output": 8.7}
+
+
+def _read_json(path, default):
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
+        return data if isinstance(data, type(default)) else default
+    except Exception:
+        return default
+
+
+def _write_json(path, data) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_file.replace(tmp, path)
+
+
+class _Spending:
+    """A provider whose answers are counted into the day's spending (step 2, the money of the day).
+    Everything else is the provider's own."""
+
+    def __init__(self, plugin, kind, provider):
+        self._plugin, self._kind, self._provider = plugin, str(kind or "other"), provider
+
+    def __getattr__(self, name):
+        return getattr(self._provider, name)
+
+    async def text_chat(self, *args, **kwargs):
+        resp = await self._provider.text_chat(*args, **kwargs)
+        self._plugin._note_spend(self._kind, resp)
+        return resp
+
+
+class AttentionMixin:
+    def _spending(self, kind, provider):
+        """With self_decide, every model call the plugin makes itself is counted (else as it was)."""
+        if provider is None or not getattr(self, "self_decide", False) or isinstance(provider, _Spending):
+            return provider
+        return _Spending(self, kind, provider)
+
+    # ------------------------------------------------------------------
+    # settings
+    # ------------------------------------------------------------------
+    def _attention_cfg(self) -> dict:
+        cfg = getattr(self, "config", None) or {}
+
+        def num(key, default):
+            try:
+                return float(cfg.get(key, default))
+            except (TypeError, ValueError):
+                return float(default)
+        prices = dict(DEFAULT_PRICES)
+        for k in prices:
+            prices[k] = num("price_" + k, prices[k])
+        return {"level": str(cfg.get("attention_level", "normal") or "normal"),
+                "owner": str(cfg.get("owner_qq", "") or "").strip(),
+                "hard": num("day_budget_yuan", 10.0), "soft": num("day_budget_soft_yuan", 8.0),
+                "prices": prices, "group_hour_max": int(num("group_hour_max", attention.GROUP_HOUR_MAX)),
+                "night_start": str(cfg.get("night_start", "01:00") or "01:00"),
+                "night_end": str(cfg.get("night_end", "08:25") or "08:25")}
+
+    # ------------------------------------------------------------------
+    # the money of the day (numbers only)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _usage_of(resp) -> dict:
+        """Tokens of one answer: DeepSeek's own cache numbers when the raw answer has them, else
+        AstrBot's; with neither, every input token counts as not cached (more, not less)."""
+        raw = getattr(getattr(resp, "raw_completion", None), "usage", None)
+        hit = getattr(raw, "prompt_cache_hit_tokens", None) if raw is not None else None
+        miss = getattr(raw, "prompt_cache_miss_tokens", None) if raw is not None else None
+        if isinstance(hit, int) and isinstance(miss, int):
+            return {"input_hit": hit, "input_miss": miss, "output": int(getattr(raw, "completion_tokens", 0) or 0)}
+        u = getattr(resp, "usage", None)
+        if u is None:
+            return {}
+        return {"input_hit": int(getattr(u, "input_cached", 0) or 0),
+                "input_miss": int(getattr(u, "input_other", 0) or 0), "output": int(getattr(u, "output", 0) or 0)}
+
+    def _note_spend(self, kind, resp) -> float:
+        """Add one model call to the day's spending (yuan, by kind). Never fails the call."""
+        try:
+            yuan = attention.cost(self._usage_of(resp), self._attention_cfg()["prices"])
+            data = _read_json(SPEND_PATH, {})
+            day = data.setdefault(time.strftime("%Y-%m-%d"), {})
+            day[str(kind)] = round(float(day.get(str(kind), 0) or 0) + yuan, 6)
+            day["calls"] = int(day.get("calls", 0) or 0) + 1
+            for old in sorted(data)[:-30]:
+                data.pop(old, None)
+            _write_json(SPEND_PATH, data)
+            return yuan
+        except Exception as exc:
+            logger.warning("[ams-life] spending not noted: %s", exc)
+            return 0.0
+
+    def _spent_today(self) -> float:
+        day = _read_json(SPEND_PATH, {}).get(time.strftime("%Y-%m-%d")) or {}
+        return round(sum(float(v or 0) for k, v in day.items() if k != "calls"), 4)
+
+    # ------------------------------------------------------------------
+    # who she knows (the owner, 10-29: by the dealings; he himself the closest)
+    # ------------------------------------------------------------------
+    def _familiarity(self, person) -> float:
+        person = str(person or "")
+        owner = self._attention_cfg()["owner"]
+        return attention.familiarity(_read_json(TIES_PATH, {}).get(person), owner=bool(owner) and person == owner)
+
+    def _note_tie(self, person, called_her=False, private=False) -> None:
+        person = str(person or "")
+        if not person:
+            return
+        try:
+            ties = _read_json(TIES_PATH, {})
+            ties[person] = attention.note_tie(ties.get(person), called_her=called_her, private=private)
+            _write_json(TIES_PATH, ties)
+        except Exception as exc:
+            logger.warning("[ams-life] dealings not noted: %s", exc)
+
+    # ------------------------------------------------------------------
+    # each window's state: the stretch waited on, night calls, her messages of the hour
+    # ------------------------------------------------------------------
+    def _window_state(self, here) -> dict:
+        data = getattr(self, "_attention_state", None)
+        if not isinstance(data, dict):
+            data = self._attention_state = _read_json(ATTENTION_PATH, {})
+        return data.setdefault(here, {})
+
+    def _save_attention(self) -> None:
+        data = getattr(self, "_attention_state", None)
+        if isinstance(data, dict):
+            keep = {}
+            for here, st in data.items():
+                keep[here] = {k: v for k, v in st.items() if k in ("night_calls", "awake_until", "sent")}
+            try:
+                _write_json(ATTENTION_PATH, keep)
+            except Exception as exc:
+                logger.warning("[ams-life] attention state not saved: %s", exc)
+
+    def _last_reply_here(self, here) -> tuple:
+        """When she last spoke in this window, and to whom (her reply's origin people)."""
+        for x in reversed(self._read_window(here)["recent"]):
+            if x.get("role") == "assistant":
+                return float(x.get("ts", 0) or 0), list((x.get("origin") or {}).get("people") or [])
+        return 0.0, []
+
+    def _why_called(self, event) -> str:
+        here = self._here(event)
+        sid = str(self._speaker(event)[0] or "")
+        ts, to = self._last_reply_here(here)
+        return attention.called(self._addresses_her(event), here.startswith("private:"), sid, ts, to)
+
+    # ------------------------------------------------------------------
+    # the decision
+    # ------------------------------------------------------------------
+    async def _decide(self, event):
+        """None (nothing for the plugin to do: AstrBot answers, or nobody does) or a request
+        for a reply (request_llm). Stops the event when she does not answer it."""
+        cfg = self._attention_cfg()
+        here = self._here(event)
+        sid = str(self._speaker(event)[0] or "")
+        private = here.startswith("private:")
+        why = self._why_called(event)
+        self._note_tie(sid, called_her=bool(why), private=private)
+        st = self._window_state(here)
+        now = time.time()
+        night = attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        if night:
+            if not why:
+                return None   # at night she never speaks up herself
+            calls = [t for t in st.get("night_calls") or [] if now - float(t) < 3600] + [now]
+            st["night_calls"] = calls
+            answer, woken, until = attention.night_gate(calls, now, st.get("awake_until", 0.0))
+            st["awake_until"] = until
+            self._save_attention()
+            if woken:
+                self._woken_at = now   # (乙: woken up, a bit cross)
+            if not answer:
+                self._stop(event)
+                return None
+        # wait a few seconds: only the last message of a stretch is judged
+        st["seq"] = int(st.get("seq", 0) or 0) + 1
+        st["called"] = st.get("called") or why
+        mine = st["seq"]
+        await asyncio.sleep(WAIT_SECONDS["private" if private else "called" if why else "group"])
+        if st.get("seq") != mine:
+            self._stop(event)   # more came meanwhile; that one decides (kept all the same)
+            return None
+        why = st.pop("called", "") or why
+        # the two safety nets
+        state = attention.budget(self._spent_today(), cfg["soft"], cfg["hard"])
+        if state == "hard" or (state == "soft" and not (private and cfg["owner"] and sid == cfg["owner"])):
+            logger.info("[ams-life] attention: the money of the day (%s), not answered", state)
+            self._stop(event)
+            return None
+        if not private and not attention.hour_ok(st.get("sent") or [], now, cfg["group_hour_max"]):
+            logger.info("[ams-life] attention: %d of hers in this group this hour, not answered", cfg["group_hour_max"])
+            self._stop(event)
+            return None
+        if why:
+            if getattr(event, "is_at_or_wake_command", False):
+                return None   # AstrBot answers it as before
+            return await self._ask_for_reply(event)
+        if night or private:
+            return None
+        s = await self._score(event)
+        if s >= attention.threshold(cfg["level"]):
+            logger.info("[ams-life] attention: not called, %.2f over the threshold: asked", s)
+            return await self._ask_for_reply(event)
+        return None
+
+    @staticmethod
+    def _stop(event) -> None:
+        try:
+            event.stop_event()
+        except Exception:
+            pass
+
+    async def _score(self, event) -> float:
+        """attention.score of this message (no model; the local vectors only)."""
+        here = self._here(event)
+        now = time.time()
+        recent = [x for x in self._read_window(here)["recent"] if now - float(x.get("ts", 0) or 0) <= 600]
+        speakers = {str(x.get("sender_id") or "") for x in recent if x.get("role") != "assistant"}
+        known = max([self._familiarity(p) for p in speakers if p] or [0.0])
+        her = sum(1 for x in recent if x.get("role") == "assistant")
+        last, _to = self._last_reply_here(here)
+        quiet = (now - last) / 60.0 if last else 600.0
+        text = str(getattr(event, "message_str", "") or "")
+        topic, quarrel = 0.0, False
+        try:
+            vec = await self._embed_text(text) if text.strip() else None
+            if vec:
+                entries = [e for e in self._read_library().get("entries") or [] if isinstance(e, dict)
+                           and not e.get("deleted") and e.get("vector")][-400:]
+                topic = max([self._cosine(vec, e["vector"]) for e in entries] or [0.0])
+        except Exception:
+            topic = 0.0
+        try:
+            v_d, a_d, _d, _s, hits = self._core(None)._lexicon_deltas(text)
+            quarrel = bool(hits) and v_d < -0.15 and a_d > 0.05
+        except Exception:
+            quarrel = False
+        return attention.score(topic, known, her, quarrel, quiet)
+
+    async def _ask_for_reply(self, event):
+        """A request for a reply to this message, in its conversation (her persona, the history,
+        and saved back), as AstrBot answers a message that woke it."""
+        conv = None
+        try:
+            mgr = self.context.conversation_manager
+            umo = str(getattr(event, "unified_msg_origin", "") or "")
+            cid = await mgr.get_curr_conversation_id(umo)
+            if not cid:
+                cid = await mgr.new_conversation(umo, platform_id=event.get_platform_id())
+            conv = await mgr.get_conversation(umo, cid)
+        except Exception as exc:
+            logger.warning("[ams-life] attention: no conversation for the reply (%s)", type(exc).__name__)
+        return event.request_llm(prompt=str(getattr(event, "message_str", "") or ""), conversation=conv)
+
+    # ------------------------------------------------------------------
+    # what she sends
+    # ------------------------------------------------------------------
+    def _note_sent(self, event, n=1) -> None:
+        here = self._here(event)
+        if not here.startswith("group:"):
+            return
+        st = self._window_state(here)
+        now = time.time()
+        st["sent"] = [t for t in st.get("sent") or [] if now - float(t) < 3600] + [now] * int(n)
+        self._save_attention()
+
+    @staticmethod
+    def _chain_of(text):
+        """One message as a chain: words and QQ faces (attention.pieces)."""
+        from astrbot.api.event import MessageChain
+        from astrbot.api.message_components import Face, Plain
+        chain = []
+        for kind, value in attention.pieces(text):
+            chain.append(Face(id=value) if kind == "face" else Plain(value))
+        return MessageChain(chain)
+
+    async def _send_rest(self, umo, parts) -> None:
+        """The second message on, to the same chat, a pause before each (as if typing)."""
+        for part in parts:
+            await asyncio.sleep(attention.typing_seconds(part))
+            try:
+                await self.context.send_message(umo, self._chain_of(part))
+            except Exception as exc:
+                logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
+                return
+
+    def _shape_reply(self, event, response, reply) -> str:
+        """Her reply as she picked it: the first message for AstrBot (words and faces), the rest
+        sent after it. Returns what she said, as it is kept (the messages, one a line)."""
+        parts = attention.split(reply)
+        if not parts:
+            return reply
+        first = parts[0]
+        try:
+            if any(kind == "face" for kind, _v in attention.pieces(first)):
+                response.completion_text = ""
+                response.result_chain = self._chain_of(first)
+            else:
+                response.completion_text = first
+                chain = getattr(response, "result_chain", None)
+                if chain is not None and getattr(chain, "chain", None):
+                    response.result_chain = None
+        except Exception as exc:
+            logger.warning("[ams-life] the reply was not shaped: %s", exc)
+            return reply
+        if len(parts) > 1:
+            umo = str(getattr(event, "unified_msg_origin", "") or "")
+            asyncio.create_task(self._send_rest(umo, parts[1:]))
+        self._note_sent(event, len(parts))
+        return "\n".join(parts)
+
+    def _spend_for_panel(self) -> dict:
+        cfg = self._attention_cfg()
+        spent = self._spent_today()
+        return {"spent": spent, "left": round(max(0.0, cfg["hard"] - spent), 4), "soft": cfg["soft"],
+                "hard": cfg["hard"], "state": attention.budget(spent, cfg["soft"], cfg["hard"]),
+                "level": cfg["level"]}

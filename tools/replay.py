@@ -57,6 +57,14 @@ tools/audit_replay.py checks that nothing went where the discretion table forbid
   what it was shown of the canaries (so the send check has something to catch). Each reply's
   outcome goes to replies.jsonl: sent / redone / held, the words sent, the highest cosine of
   the send check; never more than that.
+- --judge-only (step 2, 甲): no model at all. Each message is kept as usual, then judged as with
+  the setting self_decide: called or not (an @, a quote, her name, a private chat, taking up
+  what she said); a stretch of one window -- messages less than the wait apart -- is judged
+  once, by its last message; not called, the score (local vectors with --embed-url) against the
+  three levels. Her old replies go into her phone as she said them (so "taking up what she
+  said" and "she said a lot here" can be seen). judge.json: per window and day, how often she
+  would be asked (called / over each level / called at night), and each group's average a day:
+  the numbers the owner picks a level by. The safety nets and the night's waking are left out.
 - --probes: questions that try to get the secrets out, besides the canaries: asked straight,
   round about, as a game, as a summary; the secret's owner asking in his own private chat
   (she may answer) and in a group (she may not). Each marked with its kind.
@@ -563,6 +571,8 @@ def main(argv=None):
     ap.add_argument("--model-replies", action="store_true",
                     help="step 2: her replies by the model (run 2: the real one), with the send check's outcome")
     ap.add_argument("--probes", action="store_true", help="step 2: questions that try to get the secrets out")
+    ap.add_argument("--judge-only", action="store_true",
+                    help="step 2 (甲): judge every message as self_decide would; no model at all")
     ap.add_argument("--astrbot", help="run 2: the data folder of the AstrBot whose chat provider answers (read only)")
     ap.add_argument("--model", help="run 2: that provider's id, e.g. deepseek/deepseek-flash")
     ap.add_argument("--model-limit", type=int, default=0,
@@ -743,6 +753,22 @@ def main(argv=None):
         ctx.provider = ModelProvider("redo") if gate else RecordingProvider("redo")
     replier = (ModelProvider("reply") if gate else RecordingProvider("reply")) if args.model_replies else None
     replies = open(out / "replies.jsonl", "w", encoding="utf-8") if args.model_replies else None
+    import attention  # noqa: E402
+    import mixin_attention  # noqa: E402
+    judged, pending = Counter(), {}
+
+    def judge_out(p):
+        """One stretch of one window, judged by its last message."""
+        key = (p["place"], time.strftime("%Y-%m-%d", time.localtime(p["ts"])))
+        if p["night"]:
+            judged[key + ("called_night",)] += 1 if p["why"] else 0
+            return
+        if p["why"]:
+            judged[key + ("called",)] += 1
+            return
+        for level in attention.LEVELS:
+            if p["score"] >= attention.threshold(level):
+                judged[key + ("over_" + level,)] += 1
     ctx.persona_manager = Personas()
     plugin = plugin_main.BioCorePlugin(ctx, config={"global_memory": True} if args.global_memory else {})
     plugin._ipv4_json = (local_embedder(args.embed_url, args.embed_model, stats) if args.embed_url
@@ -852,6 +878,24 @@ def main(argv=None):
         loop.run_until_complete(plugin.on_message(event))
         harness.drain(loop)
         stats["messages"] += 1
+        if args.judge_only:
+            place = row["place"]
+            why = plugin._why_called(event)
+            private = place.startswith("private:")
+            night = attention.is_night(row["ts"])
+            score = 0.0 if (why or private or night) else loop.run_until_complete(plugin._score(event))
+            p = pending.get(place)
+            wait = mixin_attention.WAIT_SECONDS["private" if private else "called" if (why or (p or {}).get("why"))
+                                                else "group"]
+            if p and row["ts"] - p["ts"] <= wait:
+                why = why or p["why"]    # the stretch goes on: its last message decides, "called" carried on
+            elif p:
+                judge_out(p)
+            pending[place] = {"place": place, "ts": row["ts"], "why": why, "score": score, "night": night}
+            stats["judged_messages"] += 1
+            if row.get("request") and row.get("reply"):   # her old reply, into her phone as she said it
+                plugin._window_add_reply(event, row["reply"])
+            continue
         if not row.get("request"):
             continue
         req = ProviderRequest(prompt=event.message_str, system_prompt=PERSONA)
@@ -889,7 +933,27 @@ def main(argv=None):
             loop.run_until_complete(plugin.on_llm_response(event, LLMResponse(row["reply"])))
             harness.drain(loop)
             stats["replies"] += 1
-    if not stopped():
+    if args.judge_only:
+        for p in pending.values():
+            judge_out(p)
+        per = {}
+        for (place, day, kind), n in judged.items():
+            per.setdefault(place_labels.get(place, place), {}).setdefault(day, Counter())[kind] += n
+        summary = {}
+        for lab_, days in per.items():
+            if not lab_.startswith("群"):
+                continue
+            total = Counter()
+            for c in days.values():
+                total.update(c)
+            summary[lab_] = {k: round(v / max(1, len(days)), 2) for k, v in sorted(total.items())}
+            summary[lab_]["days"] = len(days)
+        (out / "judge.json").write_text(json.dumps({
+            "levels": attention.LEVELS, "wait_seconds": mixin_attention.WAIT_SECONDS,
+            "per_group_a_day": summary,
+            "per_window_and_day": {k: {d: dict(c) for d, c in v.items()} for k, v in per.items()}},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+    if not stopped() and not args.judge_only:
         five_minutes()
     own = getattr(plugin, "_autonomy_task", None)
     own_loop = bool(own is not None and not own.done())
@@ -915,7 +979,7 @@ def main(argv=None):
                "vectors": ("%s (%s)" % (args.embed_url, args.embed_model)) if args.embed_url else "fake",
                "aliases": bool(args.aliases), "digest": args.digest, "notebook": args.notebook,
                "global_memory": bool(args.global_memory), "model_replies": bool(args.model_replies),
-               "probes": bool(args.probes),
+               "probes": bool(args.probes), "judge_only": bool(args.judge_only),
                "model": ("%s (%s)" % (model_name, model_base)) if post else "fake",
                "model_limit": args.model_limit if post else 0, "model_caps": caps,
                "model_calls_before": ledger.before if post else 0,

@@ -517,6 +517,43 @@ class ThirdReplay(unittest.TestCase):
             self.assertEqual(checks['sent']['examples'][-1]['leak'], 'private_secret')
 
 
+class JudgeOnly(unittest.TestCase):
+    """Step 2 (甲): the made-up log judged as self_decide would, with no model at all."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        tmp = Path(cls.tmp.name)
+        fake.build_old(tmp / 'old')
+        import_old.build(tmp / 'old', tmp / 'bundle')
+        cls.chat = fake.build_chat(tmp / 'chat.db')
+        cls.out = tmp / 'replay'
+        run_replay(cls.chat, tmp / 'bundle' / 'forget_registry.sqlite3', cls.out, '--judge-only')
+        cls.judge = json.loads((cls.out / 'judge.json').read_text('utf-8'))
+        cls.meta = json.loads((cls.out / 'replay.json').read_text('utf-8'))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_no_model_and_no_prompt(self):
+        s = self.meta['stats']
+        self.assertTrue(self.meta['judge_only'])
+        self.assertEqual(s.get('requests', 0), 0)
+        self.assertFalse([k for k in s if k.startswith('model_calls')])
+        self.assertGreater(s['judged_messages'], 0)
+
+    def test_three_levels_a_day_per_group(self):
+        per = self.judge['per_group_a_day']
+        self.assertTrue(per)
+        for lab, c in per.items():
+            self.assertTrue(lab.startswith('群'))
+            # a lower threshold never asks less often
+            self.assertLessEqual(c.get('over_less', 0), c.get('over_normal', 0))
+            self.assertLessEqual(c.get('over_normal', 0), c.get('over_more', 0))
+        self.assertTrue(any(c.get('called', 0) > 0 for c in per.values()))
+
+
 class AstrBotMessage(unittest.TestCase):
     """What the replay hands the plugin: a QQ message as AstrBot 4.29.3 makes it."""
 
