@@ -341,6 +341,7 @@
           ]);
         }catch(e){ ctx=null; }
         if(!themeInitialized) chooseTheme(ctx&&ctx.isDark);
+        if(window.BioLook) window.BioLook.loadPictures(bridge);   // her avatar and art, when the owner put them in (look.js)
         const raw=await Promise.race([
           bridge.apiGet("page/status",{}),
           new Promise((_,reject)=>setTimeout(()=>reject(new Error("页面桥 8 秒无响应，可能不是在 AstrBot 插件视图 iframe 内打开")),8000))
@@ -363,17 +364,17 @@
       const _raw = String(e&&e.message||e);
       let _friendly = _raw;
       if (_raw === "direct-open") {
-        _friendly = "当前是直接打开插件页（没有 AstrBot 父窗口）。请从 AstrBot WebUI → 插件 → BioCore → 插件可视化视图 进入。";
+        _friendly = "当前是直接打开插件页（没有 AstrBot 父窗口）。请从 AstrBot WebUI → 插件 → ams-life → 插件可视化视图 进入。";
       } else if (/401|403|未经授权|未授权|Token 无效|Token 过期|Unauthorized/i.test(_raw)) {
         _friendly = "AstrBot 登录状态已失效（API 401/403）。请重新登录 AstrBot 后台，再进入插件视图。";
       } else if (/页面桥.*无响应/.test(_raw)) {
         _friendly = "页面桥没有响应：请从 AstrBot WebUI 的插件视图打开（直接开链接不行），并确认 AstrBot 正在运行。";
       } else if (/empty status/.test(_raw)) {
-        _friendly = "已连上 AstrBot，但 page/status 返回为空；请确认 BioCore 插件已启用。";
+        _friendly = "已连上 AstrBot，但 page/status 返回为空；请确认 ams-life 插件已启用。";
       }
       $("linkState").textContent="离线"; $("topStatus").textContent="离线";
       $("statusDot").style.background="var(--red)";
-      $("heroTitle").textContent="连接不上 BioCore";
+      $("heroTitle").textContent="连接不上小爱";
       $("heroSub").textContent = _friendly + (_friendly === _raw ? "" : "（原始：" + _raw.slice(0, 120) + "）");
       checkOrbAlive();
     }
@@ -1672,7 +1673,7 @@
     renderAutonomyPanel(s, core.key);
     renderLearningPanel(s);
     renderChainLinks();
-    $("pluginBadge").textContent=data.enabled?"BioCore · ON":"BioCore · OFF";
+    $("pluginBadge").textContent=data.enabled?"ams-life · 开着":"ams-life · 关着";
     $("heroTitle").textContent=L(it.emotion)+" · "+L(it.intent);
     $("heroSub").textContent=it.need==="be_heard"?"现在更像是想被听见，不急着解决问题。":it.need==="space"?"现在更像是需要一点空间，不想被追问。":it.need==="share"?"现在更像是想分享，语气可以轻一点。":it.need==="vent"?"现在更像是想吐槽，先接住，不用讲道理。":"现在像是普通聊天，接不接都可以。";
     $("tagRow").innerHTML=[["emotion",it.emotion],["compound",it.compound],["spectrum",it.spectrum&&it.spectrum[0]?it.spectrum[0].name:""],["intent",it.intent],["tone",it.tone],["distance",it.distance],["expression",it.expression]].filter(x=>x[1]).map(x=>'<span class="chip">'+esc(x[0])+" · "+esc(x[1])+"</span>").join("");
@@ -2130,7 +2131,7 @@
       const blob = new Blob([bytes], { type: payload.mime || "application/zip" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = payload.filename || "biocore_core_backup.zip";
+      a.href = url; a.download = payload.filename || "ams-life_backup.zip";
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       if (st) st.textContent = "下载已开始 · " + (payload.filename || "");
@@ -2383,8 +2384,8 @@
       if(t.classList.contains('active')) activate(null); else activate(name);
     }));
   }
-  const BIO_VERSION = "v1.2.99";
-  setTimeout(() => { const _sv = $("sideVersion"); if (_sv) _sv.textContent = BIO_VERSION + " · tendency layer"; }, 0);
+  const BIO_VERSION = "v0.1.0";   // ams-life's own (metadata.yaml), what the update check compares with
+  setTimeout(() => { const _sv = $("sideVersion"); if (_sv) _sv.textContent = "ams-life " + BIO_VERSION; }, 0);
   const BIO_REPO_SLUG = "m103canfly/ams-life";
   const GITEE_KEY = "bio_gitee_repo";
   let giteeRepo = String(storeGet(GITEE_KEY, "") || "").trim();
