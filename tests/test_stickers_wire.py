@@ -30,6 +30,14 @@ def run_case(case):
 
 
 class Offered(unittest.TestCase):
+    def test_offers_are_not_saved_in_five_turns(self):
+        turns = run_case('history')['turns']
+        self.assertEqual(len(turns), 5)
+        for turn in turns:
+            self.assertTrue(turn['offer_in_prompt'])
+            self.assertIn('[她的表情包]', str(turn['model_parts']))
+            self.assertNotIn('[她的表情包]', str(turn['kept_parts']))
+
     def test_a_few_offered_she_names_one_it_goes_as_a_sticker(self):
         r = run_case('reply')
         n = r['named']
@@ -87,8 +95,20 @@ class Offered(unittest.TestCase):
 
 
 class Looked(unittest.TestCase):
-    def test_qq_stickers_in_passing_one_look_each_kept_by_the_program(self):
+    def test_called_reply_opens_queue_without_waiting(self):
+        r = run_case('called_open')
+        self.assertEqual(r['before'], 0)
+        self.assertEqual(r['after'], 3)
+
+    def test_scored_reply_opens_queue_without_waiting(self):
+        r = run_case('scored_open')
+        self.assertTrue(r['asked'])
+        self.assertEqual(r['before'], 0)
+        self.assertEqual(r['after'], 3)
+
+    def test_qq_stickers_wait_for_open_then_are_kept_by_the_program(self):
         r = run_case('look')
+        self.assertEqual(r['looks_before_open'], 0)
         self.assertEqual(len(r['looks']), 3)                          # at most three a message
         self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png'])   # only the one she keeps
         self.assertEqual(r['kept'], [['一只在笑的猫', '10001', 'group:900001', 'self']])
@@ -100,6 +120,7 @@ class Looked(unittest.TestCase):
 
     def test_someone_deleted_is_not_looked_at(self):
         r = run_case('look')
+        self.assertFalse(r['queue_has_deleted'])
         self.assertEqual(r['kept_after_gone'], 1)
         self.assertEqual(r['looks_after_gone'], 3)
 

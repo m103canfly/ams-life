@@ -218,6 +218,10 @@ class MediaMixin:
             return ""
 
     async def _image_context(self, event) -> str:
+        async with self._group_image_lock():
+            return await self._image_context_locked(event)
+
+    async def _image_context_locked(self, event) -> str:
         refs = self._image_refs(event)
         stickers_on = bool(getattr(self, "_stickers_on", None) and self._stickers_on())
         if stickers_on:

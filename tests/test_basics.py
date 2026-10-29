@@ -28,6 +28,10 @@ class Identity(unittest.TestCase):
         self.assertTrue(ctx.web_routes)
         self.assertTrue(all(r.startswith('/astrbot_plugin_ams_life/page/') for r in ctx.web_routes), ctx.web_routes)
 
+    def test_group_browsing_defaults_off(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={})
+        self.assertFalse(plugin.browse_groups_enabled)
+
     def test_metadata(self):
         text = (ROOT / 'metadata.yaml').read_text('utf-8')
         self.assertIn('name: astrbot_plugin_ams_life', text)
@@ -119,7 +123,9 @@ class Split(unittest.TestCase):
         # _may_go_out: only the addresses given, nothing private goes out)
         # mood (step 2, 乙): +2 (hearing what she was not asked about, the night's end)
         # Mood review: +2 (a reply is answered once; note a successfully sent medium).
-        self.assertEqual(len(methods), 438)
+        # Group browsing adds 13 mixin methods and one property, a reply wrapper and an image helper;
+        # the immediate sticker look is removed.
+        self.assertEqual(len(methods), 453)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

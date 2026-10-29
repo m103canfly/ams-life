@@ -224,6 +224,10 @@ class AutonomyMixin:
                     await self._maybe_update_impressions()
                 except Exception as exc:
                     logger.warning("[ams-life] impressions failed: %s", exc)
+                try:
+                    await self._group_browse_tick()
+                except Exception as exc:
+                    logger.warning("[ams-life] group browse failed (%s)", type(exc).__name__)
                 if not (getattr(self, "proactive_autonomy", False)
                         or getattr(self, "autonomy_loop_enabled", False)):
                     continue
