@@ -89,7 +89,8 @@ class Split(unittest.TestCase):
         # (_note_at, _note_ats: someone only @'d is known by his number)
         # senders she ignores (the owner, 10-29): +1 (_ignored_sender)
         # what she keeps as a list (panel, 10-29): +2 (page_memories, page_memories_number)
-        self.assertEqual(len(methods), 340)
+        # no tools in her reply (the owner, 10-29): +1 (_reply_tools_off)
+        self.assertEqual(len(methods), 341)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

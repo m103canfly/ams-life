@@ -12,6 +12,7 @@ repository is the unmodified upstream snapshot; every later change is in the git
 
 | Date | Change |
 | --- | --- |
+| 2026-10-29 | No tools in her reply (the owner's decision): AstrBot adds tools of its own to every reply's request (`future_task`, `send_message_to_user`, after the persona's tool list, the second with no switch); `on_llm_request` takes them all out but those on the new setting `allowed_tools` (empty by default), and logs the names taken out. |
 | 2026-10-29 | Recall from elsewhere no longer hides what was said elsewhere in the very words of this turn's message: the memory this turn just kept is not counted as "already known here" (`_memory_recall`). Words this place had before still hide the same words from elsewhere; the discretion table is unchanged. |
 | 2026-10-29 | The brain map's own page moved from `pages/brain/` to `pages/starmap/`: AstrBot 4.29.3 sorts a plugin's pages by folder name and its sidebar opens only the first, so the panel (`pages/dashboard/`) comes first again. Page titles in `.astrbot-plugin/i18n/` (zh-CN, en-US). The routes `page/brain...` and the panel's copy are unchanged. |
 | 2026-10-29 | The panel view "她记住了什么" (`pages/dashboard/memories.js`): what she keeps as a list, from the brain map's snapshot (`memory_list.py`; routes `page/memories`, `page/memories/number` in `mixin_brain.py`): memories, events, notebook, impressions, newest first, paged, filtered; numbers hidden until asked; read only but for deleting a memory through the existing route, after a confirm. |
