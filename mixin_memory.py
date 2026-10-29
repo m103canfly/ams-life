@@ -1364,6 +1364,7 @@ class MemoryMixin:
         if duplicate is None and _update_target is not None:
             duplicate = _update_target
             _explicit_update = True
+        _this_turn_id = ""   # ams-life: the memory this turn's message just became, if new
         if duplicate is not None:
             _entry_age = max(0.0, (now - float(duplicate.get("ts", now) or now)) / 86400.0)
             duplicate["ts"] = now
@@ -1468,6 +1469,7 @@ class MemoryMixin:
                           "last_used": now, "next_review_ts": now + 86400, "review_count": 0}
             self._apply_memory_encoding(_new_entry, core, now, text)
             entries.append(_new_entry)
+            _this_turn_id = str(_new_entry["id"])
             memory_meta.append_write_log(doc, op="ADD", entry_id=_new_entry["id"],
                                          reason="new", ts=now)
             self._trim_memory(doc, core)
@@ -1653,8 +1655,11 @@ class MemoryMixin:
         _foreign_lines = []
         _foreign_ids, _held = [], []   # ams-life: for the brain map (ids only)
         try:
+            # what this place already knew -- not the message of this turn, just kept above:
+            # the same words said elsewhere (his own, in a group) must still come back here
             _known_texts = {str(e.get("text") or "") for e in entries
-                            if isinstance(e, dict) and not e.get("deleted")}
+                            if isinstance(e, dict) and not e.get("deleted")
+                            and not (_this_turn_id and str(e.get("id") or "") == _this_turn_id)}
             _foreign = []
             for _where, _entry in self._cross_session_memory_entries(event):
                 _etext = str(_entry.get("text") or "").strip()
