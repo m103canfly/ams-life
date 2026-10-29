@@ -109,6 +109,10 @@ class TheGraph(unittest.TestCase):
         self.assertEqual(len(r['search']['我的号是']), 1)
         self.assertEqual(r['qq'], {'qq': '10002'})
 
+    def test_frames_round_names_are_shown_as_kept(self):
+        r = run_case('frames')
+        self.assertTrue([t for t in r['details'] if '「柠檬」约「芒果」' in t], r['details'])
+
     def test_search_gives_ids_only(self):
         r = run_case('graph')
         self.assertEqual(len(r['search']['吉他']), 1)

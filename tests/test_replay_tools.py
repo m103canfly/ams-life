@@ -297,6 +297,16 @@ class Replay(unittest.TestCase):
             self.assertEqual(numbers['fails'], 1)
             self.assertEqual(numbers['examples'][0]['number'], 'person')
 
+    def test_frames_left_in_a_reply_prompt_are_counted(self):
+        # the reply model sees names without frames: any left is counted (not a failure)
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '[最近的事] 「柠檬」约「芒果」打副本'),
+                                   ('model', 'nightly', '「柠檬」约「芒果」打副本', {'call': 'daily_digest'})])
+            names = audit_replay.audit(bad, self.chat)['checks']['names']
+            self.assertTrue(names['pass'])
+            self.assertEqual(names['warnings'], {'framed_name_in_reply_prompt': 2})
+        self.assertNotIn('warnings', audit_replay.audit(self.out, self.chat)['checks']['names'])
+
     def test_a_card_that_is_an_ordinary_word(self):
         # group cards in the small group: an everyday word, a word on this computer's list, a name
         import sqlite3

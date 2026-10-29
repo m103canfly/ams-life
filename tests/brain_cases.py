@@ -195,6 +195,17 @@ if CASE == 'numbers_in_words':
     lemon = [p for p in g['data']['nodes'] if p['kind'] == 'person' and node(p['id'])['data']['title'] == '柠檬']
     result['qq'] = node(lemon[0]['id'], 'qq')['data'] if lemon else None
 
+if CASE == 'frames':
+    # what she keeps keeps the frames round names (the owner, 10-29): so does the page
+    turn('小爱 周末爬山吗', '10002', '柠檬', group=G1, reply='好呀', msg_id='m-fr')
+    plugin._append_event_archive({
+        'id': 'fr', 'ts': clock.now, 'session': 'default:GroupMessage:' + G1, 'title': '「柠檬」约「芒果」爬山',
+        'event': '「柠檬」约「芒果」周末爬山', 'event_key': 'fr',
+        'origin': main.discretion.make_origin('group:' + G1, ['10002'], ['m-fr'])})
+    g = graph()
+    ev = [n for n in g['data']['nodes'] if n['kind'] == 'event']
+    result['details'] = [node(n['id'])['data']['text'] for n in ev]
+
 if CASE == 'paging':
     brain_graph.PART_NODES, brain_graph.PART_EDGES = 4, 5
     whole = graph()

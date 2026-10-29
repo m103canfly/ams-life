@@ -31,8 +31,9 @@ import re
 import time
 
 try:
-    from . import impressions, redline
+    from . import discretion, impressions, redline
 except ImportError:
+    import discretion
     import impressions
     import redline
 
@@ -161,8 +162,13 @@ def parse_answer(text, codes, n_lines, red=redline.hit, judge=impressions.judged
 
 
 def named(text, codes, names) -> str:
-    """The codes in what the model wrote back to the names (`names`: {qq: name})."""
-    return CODE.sub(lambda m: names.get(codes.get(m.group(0), ""), "") or "某人", str(text or ""))
+    """The codes in what the model wrote back to the names (`names`: {qq: name}), each framed
+    「」 (discretion.frame: a card that is an ordinary word reads as a name); a code with no
+    name is 某人, not framed."""
+    def name(m):
+        n = names.get(codes.get(m.group(0), ""), "")
+        return discretion.frame(n) if n else "某人"
+    return CODE.sub(name, str(text or ""))
 
 
 def sources(item, codes, shown, day_all) -> tuple:

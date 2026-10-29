@@ -161,12 +161,31 @@ def _english_name(name):
     return re.compile(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(name))
 
 
+def frame(name) -> str:
+    """A name the plugin writes back into a sentence, framed so it reads as a name (the
+    owner, 10-29): "「柠檬」约「阿星」". Ordinary-word cards stand out that way."""
+    return "「%s」" % name
+
+
+# a frame round a name: one pair, nothing in it that a name would not hold (no space, no
+# punctuation) -- a quote someone typed with 「」 around a sentence is left alone
+_FRAMED = re.compile(r"「([^「」\s，。！？、,.!?…:：；;“”\"'‘’（）()\[\]【】<>《》]{1,24})」")
+
+
+def unframe(text) -> str:
+    """The reply prompt's words: the frames round names taken off ("「柠檬」" -> "柠檬"), so
+    that she does not take to writing them in a chat. What she keeps keeps them."""
+    return _FRAMED.sub(lambda m: m.group(1), str(text or ""))
+
+
 def anonymize(text, names, to=SOMEONE) -> str:
-    """Replace the names and QQ numbers of the people involved with "有人" (or `to`)."""
+    """Replace the names and QQ numbers of the people involved with "有人" (or `to`); a
+    framed name ("「阿星」") goes with its frame."""
     out = str(text or "")
     for name in sorted({str(n).strip() for n in (names or []) if str(n or "").strip()}, key=len, reverse=True):
         if name in _NOT_PEOPLE:
             continue
+        out = out.replace(frame(name), to)
         if plain_word(name):
             out = _one_char_name(name).sub(lambda m: ("@" if m.group(0).startswith("@") else "") + to, out)
             continue

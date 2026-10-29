@@ -142,7 +142,7 @@ class Answer(unittest.TestCase):
         # a code in the text counts as someone it is about
         in_text = dict(named_lines, what='P1约了P2', who=['P1'])
         self.assertEqual(digest.sources(in_text, codes, shown, kept)[0], ['10001', '10002'])
-        self.assertEqual(digest.named('P1约了P2和Q1', codes, {'10002': '柠檬', '10001': '芒果'}), '柠檬约了芒果和某人')
+        self.assertEqual(digest.named('P1约了P2和Q1', codes, {'10002': '柠檬', '10001': '芒果'}), '「柠檬」约了「芒果」和某人')   # framed (the owner, 10-29); 某人 not
 
 
 def ev(title, where, people=(), digest_kind=True, importance=0.5, ts=0.0, what=''):
@@ -205,36 +205,36 @@ class Nightly(unittest.TestCase):
 
     def test_origins(self):
         evs = {e['title']: e for e in run_case('nightly')['events']}
-        self.assertEqual(sorted(evs), sorted(['柠檬约周末打副本', '有人在聊抽卡', '桃子说了蓝莓计划', '芒果说了件事']))
-        one = evs['柠檬约周末打副本']
-        self.assertEqual(one['event'], '柠檬约大家周末一起打副本，芒果说要来')
+        self.assertEqual(sorted(evs), sorted(['「柠檬」约周末打副本', '有人在聊抽卡', '「桃子」说了蓝莓计划', '「芒果」说了件事']))
+        one = evs['「柠檬」约周末打副本']
+        self.assertEqual(one['event'], '「柠檬」约大家周末一起打副本，「芒果」说要来')
         self.assertEqual(one['origin'], {'where': 'group:900001', 'people': ['10001', '10002'],
                                          'source_ids': ['g1', 'g2'], 'visibility': 'public'})
         # no lines named / a wrong one: the whole day (but nothing ruled out)
-        for title in ('有人在聊抽卡', '芒果说了件事'):
+        for title in ('有人在聊抽卡', '「芒果」说了件事'):
             self.assertEqual(evs[title]['origin'], {'where': 'group:900001', 'people': ['10001', '10002'],
                                                     'source_ids': ['g1', 'g2', 'g3', 'g4'], 'visibility': 'public'})
-        self.assertEqual(evs['桃子说了蓝莓计划']['origin'], {'where': 'private:10004', 'people': ['10004'],
+        self.assertEqual(evs['「桃子」说了蓝莓计划']['origin'], {'where': 'private:10004', 'people': ['10004'],
                                                         'source_ids': ['p1'], 'visibility': 'private'})
 
     def test_private_stays_there(self):
         seen = run_case('nightly')['seen']
         self.assertNotIn('蓝莓', ''.join(seen['group']) + ''.join(seen['g2']))
-        self.assertIn('桃子说了蓝莓计划', seen['private'])
-        self.assertIn('柠檬约周末打副本', seen['group'])
-        self.assertIn('有人约周末打副本', seen['g2'])       # another group: without names
+        self.assertIn('「桃子」说了蓝莓计划', seen['private'])
+        self.assertIn('「柠檬」约周末打副本', seen['group'])
+        self.assertIn('有人约周末打副本', seen['g2'])       # another group: without names (nor their frames)
         self.assertNotIn('柠檬', ''.join(seen['g2']))
 
     def test_her_notebook_uses_them(self):
         nb = run_case('nightly')['notebook']
-        self.assertIn('事件：柠檬约周末打副本：柠檬约大家周末一起打副本，芒果说要来', nb['group'])
+        self.assertIn('事件：「柠檬」约周末打副本：「柠檬」约大家周末一起打副本，「芒果」说要来', nb['group'])
         self.assertNotIn('蓝莓', ''.join(nb['group']))
-        self.assertIn('事件：桃子说了蓝莓计划：桃子跟她说起蓝莓计划的安排', nb['private'])
+        self.assertIn('事件：「桃子」说了蓝莓计划：「桃子」跟她说起蓝莓计划的安排', nb['private'])
 
     def test_deleted_with_the_message_and_the_person(self):
         r = run_case('nightly')
         self.assertEqual(r['forget_message']['events'], 3)   # every group event holds that message
-        self.assertEqual(r['after_message'], ['桃子说了蓝莓计划'])
+        self.assertEqual(r['after_message'], ['「桃子」说了蓝莓计划'])
         self.assertEqual(r['after_person'], [])
 
     def test_her_notebook_fairly_between_windows(self):
@@ -276,7 +276,7 @@ class Nightly(unittest.TestCase):
         self.assertIn('2 P1：周末打副本 某人来不来', r['prompt'])
         # what names him is not kept; the rest is
         self.assertEqual(r['night'], {'group:900001': {'called': 1, 'written': 1}})
-        self.assertEqual(r['events'], ['芒果说好呀'])
+        self.assertEqual(r['events'], ['「芒果」说好呀'])
         self.assertFalse(r['registry_has_name'])                   # only hashes of his names
 
     def test_a_deleted_persons_name_everywhere_at_once(self):
@@ -296,6 +296,12 @@ class Nightly(unittest.TestCase):
         self.assertNotIn('阿星', r['prompt_after_restart'])
         self.assertEqual((r['after_restart'], r['archives']), ([], []))
 
+    def test_a_framed_name_goes_with_its_frame(self):
+        # the owner, 10-29: names she writes back are framed; deleting him takes the frame too
+        r = run_case('everywhere')
+        self.assertEqual(r['framed_at_once'], [['某人约「柠檬」打副本', '「柠檬」答应了某人']])
+        self.assertEqual(r['framed_somebody'], [])
+
     def test_a_name_that_is_an_everyday_word(self):
         r = run_case('everyday')
         # only where it plainly means him: after an @, or as the one who says something
@@ -311,7 +317,7 @@ class Nightly(unittest.TestCase):
     def test_and_with_a_restored_backup(self):
         r = run_case('restore')
         self.assertEqual(len(r['before']), 4)
-        self.assertEqual(r['after'], ['桃子说了蓝莓计划'])
+        self.assertEqual(r['after'], ['「桃子」说了蓝莓计划'])
 
 
 if __name__ == '__main__':
