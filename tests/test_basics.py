@@ -118,7 +118,8 @@ class Split(unittest.TestCase):
         # _browse_after_reply, _browse_for_panel); review of PR #39: +3 (_browse_urls, _message_words,
         # _may_go_out: only the addresses given, nothing private goes out)
         # her phone tools replace the keyword media helpers: +9 overall
-        self.assertEqual(len(methods), 443)
+        # Search results and successful reads keep their titles for the phone: +1.
+        self.assertEqual(len(methods), 444)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

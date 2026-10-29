@@ -15,10 +15,11 @@ from pathlib import Path
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts
+    from . import tts, browse
 except ImportError:
     from common import *  # noqa: F401,F403
     import tts
+    import browse
 
 SELFIE_DIR = DATA_DIR / "selfie"
 REF_DIR = SELFIE_DIR / "refs"
@@ -108,7 +109,7 @@ class SelfieMixin:
             tools.append(FunctionTool(name="take_photo", description=PHOTO_GUIDE + context,
                 parameters={"type": "object", "properties": {"kind": {"type": "string", "enum": ["selfie", "snap"]},
                 "what": {"type": "string", "description": "拍什么、在哪、光线，60字以内"}}, "required": ["kind", "what"]}, handler=self._tool_take_photo))
-        if cfg.get("screenshot_enabled", False):
+        if cfg.get("screenshot_enabled", False) and self._browse_on():
             tools.append(FunctionTool(name="share_screenshot", description=SCREEN_GUIDE + context,
                 parameters={"type": "object", "properties": {"url": {"type": "string"}, "caption": {"type": "string"}},
                 "required": ["url", "caption"]}, handler=self._tool_share_screenshot))
@@ -116,6 +117,8 @@ class SelfieMixin:
             tools.append(FunctionTool(name="say_aloud", description=VOICE_GUIDE + context,
                 parameters={"type": "object", "properties": {"text": {"type": "string", "description": "要说的一句话，100字以内"}},
                 "required": ["text"]}, handler=self._tool_say_aloud))
+        if not tools:
+            return
         existing = getattr(req, "func_tool", None)
         if existing is None:
             req.func_tool = ToolSet(tools)
@@ -142,8 +145,8 @@ class SelfieMixin:
         return "排上了"
 
     def _phone_seen_pages(self, event):
-        """Browser integration will provide pages actually seen this turn or today."""
-        return {}
+        """Only successful searches and reads in this reply, not merely allowed URLs."""
+        return self._browse_seen_pages(event) if self._browse_on() else {}
 
     async def _tool_share_screenshot(self, event, url="", caption=""):
         queue = self._phone_queue(event)
@@ -227,6 +230,16 @@ class SelfieMixin:
         return SELFIE_DIR / ("ams-phone-" + kind + "-" + time.strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex + ext)
 
     async def _make_photo(self, kind, what):
+        names = self._browse_names()
+        what = browse.clean_query(what, names=names)
+        for name in names:
+            name = str(name or "").strip()
+            if len(name) == 1:
+                what = what.replace(name, " ")
+        what = re.sub(r"\s+", " ", what).strip()
+        if not what:
+            logger.info("[ams-life] phone photo cancelled: empty description")
+            return None
         pending = getattr(self, "_phone_photo_pending", 0)
         if pending >= PHOTO_WAITING + 1:
             logger.info("[ams-life] phone photo queue full")

@@ -40,6 +40,7 @@ class ToolSet:
 
 import main  # noqa: E402
 import mixin_selfie as phone  # noqa: E402
+import mixin_browse  # noqa: E402
 from astrbot.api.message_components import Image, Record  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
@@ -71,6 +72,13 @@ class Phone(phone.SelfieMixin):
         self.api_config = {'image': {'base_url': 'https://image.invalid/v1'},
                            'tts': {'base_url': 'https://voice.invalid/v1'}}
         self._check_reply = AsyncMock(return_value={'leak': False})
+        self.browse_enabled = True
+
+    def _browse_on(self):
+        return self.enabled and self.browse_enabled
+
+    def _browse_names(self):
+        return []
 
     def _speaker(self, event):
         return ('10005', '小甲')
@@ -160,6 +168,51 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.event.sent[0].get_plain_text(), '虚构网页\nhttps://example.invalid/page\n看看')
         self.assertEqual(self.p._phone_counts()['screenshot'], 1)
 
+    async def test_screenshot_tool_absent_when_browser_off(self):
+        self.p.browse_enabled = False
+        req = ProviderRequest()
+        self.p._give_phone_tools(req, self.event)
+        self.assertNotIn('share_screenshot', req.func_tool.names())
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={'screenshot_enabled': True})
+        req = ProviderRequest()
+        plugin._give_phone_tools(req, self.event)
+        self.assertFalse(hasattr(req, 'func_tool'))
+
+    async def test_screenshot_only_search_results_and_successfully_read_pages_this_turn(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={'browse_enabled': True, 'screenshot_enabled': True})
+        ledger = types.SimpleNamespace(money_left=lambda: True, add=lambda **kw: None)
+        plugin._browse_ledger = lambda: ledger
+        plugin._browse_names = lambda: []
+        search_url = 'https://example.org/search-result'
+        read_url = 'https://example.org/read-page'
+        search = types.SimpleNamespace(call=AsyncMock(return_value=json.dumps({'results': [
+            {'title': '搜索标题', 'url': search_url, 'snippet': '虚构摘要'}]}, ensure_ascii=False)))
+        read = types.SimpleNamespace(call=AsyncMock(return_value='URL: ' + read_url + '\nTitle: 阅读标题\nContent: 虚构内容'))
+        plugin._builtin_web_tool = lambda kind: search if kind == 'search' else read
+        plugin._browse_urls(self.event).add(read_url)
+        self.assertEqual(await plugin._tool_share_screenshot(self.event, read_url, '看看'), '只能分享看过的网页')
+        await plugin._tool_search(self.event, query='猫咖')
+        self.assertEqual(await plugin._tool_share_screenshot(self.event, search_url + 'x', '看看'), '只能分享看过的网页')
+        self.assertEqual(await plugin._tool_share_screenshot(self.event, search_url, '看看'), '排上了')
+        self.assertEqual(self.event._ams_phone_queue['screenshot'][1], '搜索标题')
+        self.event._ams_phone_queue.clear()
+        with patch.object(mixin_browse, 'resolve_host', return_value=[]):
+            await plugin._tool_read(self.event, url=read_url)
+        self.assertEqual(await plugin._tool_share_screenshot(self.event, read_url, '看看'), '排上了')
+        self.assertEqual(self.event._ams_phone_queue['screenshot'][1], '阅读标题')
+        other = Event()
+        self.assertEqual(await plugin._tool_share_screenshot(other, search_url, '看看'), '只能分享看过的网页')
+
+    async def test_failed_read_does_not_allow_screenshot(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={'browse_enabled': True, 'screenshot_enabled': True})
+        plugin._browse_ledger = lambda: types.SimpleNamespace(money_left=lambda: True, add=lambda **kw: None)
+        plugin._builtin_web_tool = lambda kind: types.SimpleNamespace(call=AsyncMock(return_value='Error: fake failure'))
+        url = 'https://example.org/failed'
+        plugin._browse_urls(self.event).add(url)
+        with patch.object(mixin_browse, 'resolve_host', return_value=[]):
+            await plugin._tool_read(self.event, url=url)
+        self.assertEqual(await plugin._tool_share_screenshot(self.event, url, '看看'), '只能分享看过的网页')
+
     async def test_phone_check_blocks_private_photo_voice_and_caption_before_services(self):
         self.p._check_reply.side_effect = lambda event, text: {'leak': '私事' in text}
         self.p._make_photo = AsyncMock()
@@ -213,6 +266,30 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(args[0].endswith('/images/generations'))
         self.assertNotIn('image', args[1])
         self.assertEqual(args[1]['size'], '1080x1440')
+
+    async def test_photo_prompt_removes_known_names_and_numbers_before_service(self):
+        self.p._browse_names = lambda: ['小甲', '小别名', '乙']
+        raw = json.dumps({'data': [{'b64_json': 'cG5n'}]}).encode()
+        self.p._post_json = AsyncMock(return_value=(raw, 'application/json'))
+        await self.p._media_after_reply(self.event, {'photo': ('snap', '小甲和小别名和乙在窗边看天空 900001')})
+        prompt = self.p._post_json.await_args.args[1]['prompt']
+        for forbidden in ('小甲', '小别名', '乙', '900001'):
+            self.assertNotIn(forbidden, prompt)
+        self.assertIn('窗边看天空', prompt)
+        phone.REF_DIR.mkdir(parents=True)
+        (phone.REF_DIR / 'her_base.png').write_bytes(b'fake png')
+        self.p._post_selfie = AsyncMock(return_value=raw)
+        await self.p._make_photo('selfie', '小甲和小别名和乙在窗边看天空 900001')
+        edit_prompt = self.p._post_selfie.await_args.args[1]
+        for forbidden in ('小甲', '小别名', '乙', '900001'):
+            self.assertNotIn(forbidden, edit_prompt)
+        self.assertIn('窗边看天空', edit_prompt)
+
+    async def test_photo_description_empty_after_cleaning_calls_no_service(self):
+        self.p._browse_names = lambda: ['小甲']
+        self.p._post_json = AsyncMock()
+        self.assertIsNone(await self.p._make_photo('snap', '小甲 900001'))
+        self.p._post_json.assert_not_awaited()
 
     async def test_missing_reference_blocks_only_selfie(self):
         raw = json.dumps({'data': [{'b64_json': 'cG5n'}]}).encode()
