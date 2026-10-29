@@ -322,8 +322,9 @@ class AttentionMixin:
             chain.append(Face(id=value) if kind == "face" else Plain(value))
         return MessageChain(chain)
 
-    async def _send_rest(self, umo, parts) -> None:
-        """The second message on, to the same chat, a pause before each (as if typing)."""
+    async def _send_rest(self, umo, parts, then=None) -> None:
+        """The second message on, to the same chat, a pause before each (as if typing); then
+        `then` (a coroutine function: her sticker, step 2 丙), a pause before it too."""
         for part in parts:
             await asyncio.sleep(attention.typing_seconds(part))
             try:
@@ -331,8 +332,19 @@ class AttentionMixin:
             except Exception as exc:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
                 return
+        if then is not None:
+            await self._after_words(then)
 
-    def _shape_reply(self, event, response, reply) -> str:
+    @staticmethod
+    async def _after_words(then) -> None:
+        """A short pause, then `then()` (her sticker after her words)."""
+        await asyncio.sleep(attention.typing_seconds(""))
+        try:
+            await then()
+        except Exception as exc:
+            logger.warning("[ams-life] the sticker was not sent: %s", type(exc).__name__)
+
+    def _shape_reply(self, event, response, reply, then=None) -> str:
         """Her reply as she picked it: the first message for AstrBot (words and faces), the rest
         sent after it. Returns what she said, as it is kept (the messages, one a line)."""
         parts = attention.split(reply)
@@ -347,9 +359,9 @@ class AttentionMixin:
         except Exception as exc:
             logger.warning("[ams-life] the reply was not shaped: %s", exc)
             return reply
-        if len(parts) > 1:
+        if len(parts) > 1 or then is not None:
             umo = str(getattr(event, "unified_msg_origin", "") or "")
-            asyncio.create_task(self._send_rest(umo, parts[1:]))
+            asyncio.create_task(self._send_rest(umo, parts[1:], then))
         self._note_sent(event, len(parts))
         return "\n".join(parts)
 
