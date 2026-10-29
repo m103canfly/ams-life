@@ -1,7 +1,8 @@
 """The plugin's pages as AstrBot 4.29.3 lists them (dashboard/services/plugin_page_service.py,
 discover_plugin_pages): every folder under pages/ with an index.html is a page, sorted by its
 name in lower case, and the sidebar links only to the first. That must be the panel
-("dashboard"); the brain map's own page is "starmap" so it sorts after it.
+("dashboard"); the brain map's own page is "starmap" so it sorts after it, and her stickers'
+"stickers" after that (the console opens it straight away).
 
 Page titles come from .astrbot-plugin/i18n/<locale>.json ("pages.<name>.title", and the
 newer "views.<name>.title"). The sidebar's one entry for the plugin takes the first page's
@@ -25,8 +26,8 @@ class PluginPages(unittest.TestCase):
     def test_the_panel_comes_first(self):
         self.assertEqual(pages()[0], 'dashboard')
 
-    def test_the_two_pages(self):
-        self.assertEqual(pages(), ['dashboard', 'starmap'])
+    def test_the_pages(self):
+        self.assertEqual(pages(), ['dashboard', 'starmap', 'stickers'])
 
     def test_titles(self):
         files = sorted(I18N.glob('*.json'))
@@ -42,6 +43,7 @@ class PluginPages(unittest.TestCase):
         zh = json.loads((I18N / 'zh-CN.json').read_text(encoding='utf-8'))
         self.assertEqual(zh['pages']['dashboard']['title'], 'ams-life 面板')
         self.assertEqual(zh['pages']['starmap']['title'], '她的脑子（单独一页）')
+        self.assertEqual(zh['pages']['stickers']['title'], '她的表情包')
 
 
 if __name__ == '__main__':

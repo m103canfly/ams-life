@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<!-- ams-life (AGPL-3.0); see NOTICE.md. "她的表情包": the owner sees her stickers, deletes one, adds some.
+     Her pictures come from the plugin through AstrBot's page bridge (read with the owner's login); none is in
+     this repository. Opened without AstrBot, it shows made-up drawings so that the page can be looked at. -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light dark" />
+<title>她的表情包</title>
+<link rel="stylesheet" href="./stickers.css?v=20261030-1" />
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>她的表情包</b><small>小爱自己存的、旧小爱的、你给的</small></div></div>
+    <p class="counts" id="counts">加载中…</p>
+    <div class="top-actions">
+      <span class="badge" id="previewBadge" hidden>示例（编造的图）：没有连上 AstrBot</span>
+      <button type="button" class="btn" id="themeBtn">深色</button>
+    </div>
+  </header>
+
+  <section class="bar" aria-label="筛选和排序">
+    <label>排序 <select id="sort">
+      <option value="saved">最近存的</option><option value="used">最近用的</option>
+      <option value="most">用得最多</option><option value="soon">快过期的</option></select></label>
+    <label>情绪 <select id="emotion"><option value="">全部</option></select></label>
+    <label>场合 <select id="scene"><option value="">全部</option></select></label>
+    <label>来源 <select id="source"><option value="">全部</option></select></label>
+    <span class="grow"></span>
+    <input id="note" class="note" maxlength="60" placeholder="给要加的图写一句（可以不写）" />
+    <label class="btn primary" for="files">加表情包</label>
+    <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden />
+  </section>
+  <p class="state" id="state" role="status"></p>
+
+  <main class="grid" id="grid" aria-label="她的表情包"></main>
+  <div class="more" id="more"></div>
+  <p class="empty" id="empty" hidden>还没有表情包。她看到喜欢的会自己存；你也可以点“加表情包”。</p>
+
+  <footer class="foot">她存的表情包 30 天不用就会删，最多 300 张；你加的不会自动删，也不算在 300 张里。删掉的不能恢复。</footer>
+</div>
+
+<dialog class="detail" id="detail">
+  <div class="detail-body">
+    <div class="detail-pic"><img id="detailImg" alt="" /></div>
+    <div class="detail-info">
+      <h2 id="detailCaption"></h2>
+      <dl>
+        <dt>情绪</dt><dd id="detailEmotion"></dd>
+        <dt>场合</dt><dd id="detailScene"></dd>
+        <dt>她为什么存</dt><dd id="detailWhy"></dd>
+        <dt>从哪来</dt><dd id="detailFrom"></dd>
+        <dt>存了多久</dt><dd id="detailAge"></dd>
+        <dt>上次用</dt><dd id="detailUsed"></dd>
+        <dt>用了几次</dt><dd id="detailUses"></dd>
+        <dt>还剩</dt><dd id="detailLeft"></dd>
+      </dl>
+      <div class="detail-actions">
+        <button type="button" class="btn danger" id="deleteBtn">删掉这张</button>
+        <button type="button" class="btn" id="closeBtn">关闭</button>
+      </div>
+      <p class="state" id="detailState" role="status"></p>
+    </div>
+  </div>
+</dialog>
+<script src="./stickers.js?v=20261030-1"></script>
+</body>
+</html>
