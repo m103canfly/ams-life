@@ -83,6 +83,12 @@ try:
 except ImportError:
     from mixin_attention import AttentionMixin
     import attention
+try:
+    from .mixin_stickers import StickersMixin
+    from . import stickers
+except ImportError:
+    from mixin_stickers import StickersMixin
+    import stickers
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -92,7 +98,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, StickersMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -122,6 +128,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (甲): she decides herself whether to answer (off by default; off, AstrBot decides
         # as before: an @ of her, "/", every private message)
         self.self_decide = bool(self.config.get("self_decide", False))
+        # step 2 (丙): her stickers -- she keeps the ones she likes and sends them (off by default;
+        # looking at pictures, image_caption, has to be on too)
+        self.stickers_enabled = bool(self.config.get("stickers_enabled", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
@@ -569,6 +578,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._window_add_message(event)
             self._listen_body(event)
             self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
+            self._sticker_in_passing(event)  # step 2 (丙): a QQ sticker she was not called for, a look of its own
         except Exception as exc:
             logger.warning("[ams-life] window store failed: %s", exc)
 
@@ -742,6 +752,15 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
+        if self._stickers_on():
+            # step 2 (丙): a few of her stickers to pick from (none is sent unless she names it)
+            try:
+                _offer = await self._sticker_offer(event, core, _query_vec)
+            except Exception as exc:
+                _offer = ""
+                logger.warning("[ams-life] stickers: none offered (%s)", type(exc).__name__)
+            if _offer:
+                _compact = (_compact + "\n" + _offer).strip()
         if _global:
             # step 2: no QQ number and no group number reaches the model (the owner, 10-29: 31)
             _compact = self._for_model(_compact, event)
@@ -767,7 +786,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         """Step 2 (global_memory): AstrBot saves this turn after this hook (4.29.3,
         internal.py _save_to_history, from run_context.messages): make it hold what was sent
         -- the words said once more, not the first ones -- and none of the model's thinking."""
-        if self.enabled and getattr(self, "global_memory", False):
+        if self.enabled and (getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False)):
             self._settle_history(event, run_context)
 
     @filter.on_llm_response()
@@ -797,7 +816,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 pass
         _reply = _clean
-        if getattr(self, "self_decide", False) and attention.silent(_reply):
+        _sticker = ""
+        if self._stickers_on():
+            # step 2 (丙): the sticker she named ([表情包:n], only an offered one), sent after her words
+            _reply, _sticker = self._sticker_named(event, response, _reply)
+        if getattr(self, "self_decide", False) and attention.silent(_reply) \
+                and not (_sticker and attention.SILENT not in _reply):   # a sticker alone is not silence
             # step 2 (甲): she chose to say nothing (【不说】): nothing is sent, nothing kept
             logger.info("[ams-life] attention: she said nothing")
             self._check_note(event).update(sent="", outcome="silent")
@@ -812,9 +836,30 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 _reply = self._check_failed(event, exc)
             if not _reply:
                 return
-        if getattr(self, "self_decide", False):
-            # step 2 (甲): her messages as she wrote them -- QQ faces, several messages
-            _reply = self._shape_reply(event, response, _reply)
+            if self._stickers_on():   # said once more: a mark in the new words is taken out too
+                _reply, _again = self._sticker_named(event, response, _reply)
+                _sticker = _sticker or _again
+                self._check_note(event)["sent"] = _reply
+        if _sticker and not await self._sticker_cleared(event, _sticker):
+            _sticker = ""
+        _then = self._sticker_after(event, _sticker) if _sticker else None
+        if _then is not None and not _reply.strip():
+            # a sticker and no words: AstrBot sends nothing, the plugin sends the sticker
+            self._stop(event)
+            asyncio.create_task(self._after_words(_then))
+        elif _then is not None and not getattr(self, "self_decide", False):
+            asyncio.create_task(self._after_words(_then))
+        if getattr(self, "self_decide", False) and _reply.strip():
+            # step 2 (甲): her messages as she wrote them -- QQ faces, several messages; a sticker last
+            _reply = self._shape_reply(event, response, _reply, then=_then)
+        if _sticker:
+            # kept in her phone and AstrBot's history as what was sent
+            _reply = (_reply + "\n" + stickers.phone_line(self._sticker_lib().rows.get(_sticker))).strip()
+            self._check_note(event)["sent"] = _reply
+            try:
+                setattr(event, "_ams_sticker_sent", True)
+            except Exception:
+                pass
         try:
             core.observe_own(_reply)
             core.record_reply(_reply)

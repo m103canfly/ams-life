@@ -168,11 +168,13 @@ class InAReply(unittest.TestCase):
         self.assertEqual(stickers.pick_candidates(self.ROWS, NOW, valence=-0.9, k=1), ['b'])
 
     def test_only_one_that_was_offered(self):
-        self.assertEqual(stickers.pick_from_reply('好呀[表情:2]', ['a', 'd']), ('好呀', 'd'))
-        self.assertEqual(stickers.pick_from_reply('好呀[表情：9]', ['a', 'd']), ('好呀', ''))
-        self.assertEqual(stickers.pick_from_reply('好呀[表情:c]', ['a', 'd']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包:2]', ['a', 'd']), ('好呀', 'd'))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包：9]', ['a', 'd']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包:c]', ['a', 'd']), ('好呀', ''))
+        # a QQ face ([表情:名字], 甲) is not a sticker and stays as it is
+        self.assertEqual(stickers.pick_from_reply('好呀[表情:微笑][表情:2]', ['a', 'd']), ('好呀[表情:微笑][表情:2]', ''))
         self.assertEqual(stickers.pick_from_reply('好呀', ['a']), ('好呀', ''))
-        self.assertEqual(stickers.phone_line({'caption': '一只在笑的猫' * 3}), '[表情：一只在笑的猫一只在笑的猫]')
+        self.assertEqual(stickers.phone_line({'caption': '一只在笑的猫' * 3}), '[表情包：一只在笑的猫一只在笑的猫]')
 
 
 class SendingOne(unittest.TestCase):

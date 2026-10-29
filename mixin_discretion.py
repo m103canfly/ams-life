@@ -10,6 +10,10 @@ try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
+try:
+    from . import stickers
+except ImportError:
+    import stickers
 
 import contextvars
 
@@ -883,6 +887,14 @@ class DiscretionMixin:
         # 8) what else may hold their words: picture descriptions, the dedupe log, the
         #    in-process vector cache (texts as keys)
         counts["pictures"] = self._forget_pictures(pictures)
+        if person:
+            # step 2 (丙): the looks at the pictures he sent, and the stickers he sent (never
+            # what the owner gave), whether stickers are on now or not
+            counts["pictures"] += self._forget_pictures_of(person)
+            if hasattr(self, "_sticker_lib"):
+                gone_stickers = self._sticker_lib().forget_person(person)
+                if gone_stickers:
+                    counts["stickers"] = len(gone_stickers)
         self._forget_dedupe_rows(gone_events)
         EMBED_CACHE.clear()
 
@@ -1017,6 +1029,17 @@ class DiscretionMixin:
         if gone:
             IMAGE_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
         return len(gone)
+
+    def _forget_pictures_of(self, person) -> int:
+        """Looks at pictures someone sent (image_cache entries that say who sent them), and the
+        old entries that do not say so after stickers.DAYS (step 2, 丙)."""
+        if not person or not IMAGE_CACHE_PATH.exists():
+            return 0
+        cache = self._load_image_cache()
+        gone = stickers.prune_cache(cache, time.time(), gone_people=[person])
+        if gone:
+            IMAGE_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        return gone
 
     def _forget_dedupe_rows(self, event_ids) -> None:
         """The one-time dedupe log keeps event titles: its rows about deleted events go."""

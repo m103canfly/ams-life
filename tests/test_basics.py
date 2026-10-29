@@ -103,7 +103,12 @@ class Split(unittest.TestCase):
         # _familiarity, _note_tie, _window_state, _save_attention, _last_reply_here, _why_called,
         # _decide, _stop, _score, _ask_for_reply, _note_sent, _chain_of, _send_rest, _shape_reply,
         # _spend_for_panel)
-        self.assertEqual(len(methods), 389)
+        # her stickers in the plugin (step 2, 丙): +15 (AttentionMixin._after_words,
+        # DiscretionMixin._forget_pictures_of, and StickersMixin: _stickers_on, _sticker_lib,
+        # _sticker_lock, _look_once, _maybe_keep, _sticker_refs, _look_at_sticker_in_passing,
+        # _sticker_in_passing, _sticker_offer, _sticker_named, _sticker_cleared, _send_sticker,
+        # _sticker_after)
+        self.assertEqual(len(methods), 404)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

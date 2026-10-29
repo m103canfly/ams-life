@@ -23,6 +23,10 @@ class Image(_Comp):
     def fromURL(cls, url):
         return cls(url=str(url))
 
+    @classmethod
+    def fromBase64(cls, b64):
+        return cls(file='base64://' + str(b64))
+
 
 class Reply(_Comp):
     pass
