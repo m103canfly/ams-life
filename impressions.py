@@ -527,7 +527,7 @@ def add_day(rec, name, stats, day, red=redline.hit, judge=judged) -> None:
 
 
 async def nightly(store, place, lines, ask, day, registry=None, self_id="", extra_names=None, red=redline.hit,
-                  judge=judged) -> dict:
+                  judge=judged, still_current=None) -> dict:
     """One group, one night. `ask` is an async callable(prompt) -> answer text (the model).
     At most one call per group per day; marked as tried before the call. `extra_names`
     ({qq: names}): more names that become codes in what the model sees -- the owner's, and
@@ -541,33 +541,34 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="", extr
     if not picked:
         return {"skipped": "nobody"}
     picked_qq = {p["qq"] for p in picked}
-    # The model can use one person's private words in another's impression.
-    # Public material leaves the existing origin unchanged.
-    material_lines = [ln for ln in lines if isinstance(ln, dict) and _day(ln.get("ts")) == day]
-    material_origins = [discretion.origin_of(ln, place) for ln in material_lines
-                        if discretion.origin_of(ln, place)["where"].startswith("group:")
-                        and discretion.origin_of(ln, place)["visibility"] == discretion.PRIVATE]
+    safe_lines = [ln for ln in lines if isinstance(ln, dict) and not (
+        discretion.origin_of(ln, place)["where"].startswith("group:")
+        and discretion.origin_of(ln, place)["visibility"] == discretion.PRIVATE)]
+    safe_ids = {id(ln) for ln in safe_lines}
+    safe_picked = [dict(p, lines=[ln for ln in p["lines"] if id(ln) in safe_ids]) for p in picked]
     for p in picked:
         others = [ln for ln in lines if str(ln.get("sender_id") or "") not in (p["qq"], str(self_id))
                   and ln.get("role") != "assistant" and _day(ln.get("ts")) == day]
         rec = data["people"].setdefault(p["qq"], _record(place, p["qq"]))
-        if material_origins:
-            rec["origin"] = discretion.merge([discretion.origin_of(rec, place)] + material_origins)
-        add_day(rec, p["name"], day_stats(p["lines"], others, red), day, red, judge)
+        own_stats = [ln if id(ln) in safe_ids else dict(ln, text="") for ln in p["lines"]]
+        other_stats = [ln for ln in others if id(ln) in safe_ids]
+        add_day(rec, p["name"], day_stats(own_stats, other_stats, red), day, red, judge)
         store.keep_names(p["qq"], [p["name"]])
     data["tried"] = day
     store.save(place, data)
     cards = group_names(lines, data["people"])
     for qq, ns in (extra_names or {}).items():
         cards.setdefault(str(qq), set()).update(str(n) for n in ns if n and not str(n).isdigit())
-    prompt, codes = prompt_for(picked, cards, addressed(lines, picked, day, self_id), red)
+    prompt, codes = prompt_for(safe_picked, cards, addressed(safe_lines, safe_picked, day, self_id), red)
     try:
         answer = await ask(prompt)
     except Exception as exc:  # counted as the day's call all the same
         return {"called": 1, "picked": len(picked), "written": 0, "error": type(exc).__name__}
+    if still_current is not None and not still_current():
+        return {"called": 1, "picked": len(picked), "written": 0, "skipped": "sources narrowed"}
     got = parse_answer(answer, codes, red, judge)
     names_seen = verify_aliases({qq: item["aliases"] for qq, item in got.items() if item.get("aliases")},
-                                lines, {q: [n for n in ns if n] for q, ns in group_names(lines).items()}, day)
+                                safe_lines, {q: [n for n in ns if n] for q, ns in group_names(safe_lines).items()}, day)
     data = store.load(place)
     for qq, item in got.items():
         rec = data["people"].get(qq)
@@ -579,8 +580,7 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="", extr
         rec["topics"] = item["topics"] or rec.get("topics", [])
         if names_seen.get(qq):
             merged = list(dict.fromkeys(list(rec.get("aliases") or []) + names_seen[qq]))
-            if discretion.origin_of(rec, place)["visibility"] != discretion.PRIVATE:
-                store.keep_names(qq, merged)
+            store.keep_names(qq, merged)
             rec["aliases"] = merged[-MAX_ALIASES:]
         rec["updated"] = day
     store.save(place, data)

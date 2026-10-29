@@ -1310,10 +1310,12 @@ class EventsMixin:
             title = str(ev.get("title") or "").strip()
             body = str(ev.get("central_details") or ev.get("event") or "").strip()
             meaning = str(ev.get("meaning_to_her") or "").strip()
-            people = discretion.origin_of(ev)["people"]
+            origin = discretion.origin_of(ev)
+            people = origin["people"]
             if lab["may"] == discretion.NO:   # the last look before sending (send_check)
                 self._forbid(event, "event:" + str(ev.get("id") or ""), "\n".join(x for x in (title, body, meaning) if x),
-                             people)
+                             [] if origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                             else people)
             elif lab["may"] == discretion.ANON:
                 self._forbid_names(event, "event:" + str(ev.get("id") or ""), people)
             if body:

@@ -49,8 +49,9 @@ class DiscretionMixin:
             return True
 
         # Work already waiting for a model must not write old public copies back.
-        self._privacy_epoch = int(getattr(self, "_privacy_epoch", 0)) + 1
-        self._begin_job()
+        epochs = self.__dict__.setdefault("_privacy_epochs", {})
+        epochs[place] = epochs.get(place, 0) + 1
+        self._begin_job(place)
         lib = self._read_library()
         if sum(narrow(x) for x in lib.get("entries", [])):
             self._write_library(lib)
@@ -88,8 +89,7 @@ class DiscretionMixin:
                 changed = narrow(item) or changed
         if changed:
             self._write_window(place, win)
-        # Old impression records have no per-message provenance, and the shared
-        # model call may have used one person's words for another person's record.
+        # Narrow only an impression that actually names these sources.
         store = self._impression_store()
         data = store.load(place)
         changed = False
@@ -97,12 +97,6 @@ class DiscretionMixin:
             if not isinstance(rec, dict):
                 continue
             if narrow(rec):
-                changed = True
-            elif not discretion.origin_of(rec, place)["source_ids"]:
-                origin = discretion.origin_of(rec, place)
-                origin["visibility"] = discretion.PRIVATE
-                origin["source_ids"] = list(ids)
-                rec["origin"] = origin
                 changed = True
         if changed:
             store.save(place, data)
@@ -115,17 +109,17 @@ class DiscretionMixin:
     def _forget_count(self) -> int:
         return len(getattr(self, "_forget_log", None) or [])
 
-    def _begin_job(self) -> None:
+    def _begin_job(self, place="") -> None:
         _FORGET_MARK.set(self._forget_count())
-        _PRIVACY_MARK.set(int(getattr(self, "_privacy_epoch", 0)))
+        _PRIVACY_MARK.set((str(place or ""), dict(getattr(self, "_privacy_epochs", {}))))
         _KEEP_NOTHING.set(False)
 
-    def _continue_job(self) -> None:
+    def _continue_job(self, place="") -> None:
         """A later step of the same message (the reply) keeps the mark its request set
         (AstrBot runs one message, request to reply, in one task); only when this
         context has none does it start one."""
         if _FORGET_MARK.get() is None:
-            self._begin_job()
+            self._begin_job(place)
 
     def _job_stale(self) -> bool:
         """True when something was forgotten since this job started, or the message it is
@@ -133,8 +127,12 @@ class DiscretionMixin:
         if _KEEP_NOTHING.get():
             return True
         privacy_mark = _PRIVACY_MARK.get()
-        if privacy_mark is not None and privacy_mark != int(getattr(self, "_privacy_epoch", 0)):
-            return True
+        if privacy_mark is not None:
+            place, before = privacy_mark
+            epochs = getattr(self, "_privacy_epochs", {})
+            stale = before.get(place, 0) != epochs.get(place, 0) if place else before != epochs
+            if stale:
+                return True
         mark = _FORGET_MARK.get()
         if mark is None or self._forget_count() <= mark:
             return False
@@ -746,9 +744,12 @@ class DiscretionMixin:
             if lab["may"] == discretion.HIDE:
                 continue
             text = str(item.get("text") or "")
-            people = discretion.origin_of(item)["people"]
+            origin = discretion.origin_of(item)
+            people = origin["people"]
             if lab["may"] == discretion.NO:   # the last look before sending (send_check)
-                self._forbid(event, "note:" + str(item.get("id") or text[:12]), text, people)
+                self._forbid(event, "note:" + str(item.get("id") or text[:12]), text,
+                             [] if origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                             else people)
             elif lab["may"] == discretion.ANON:
                 self._forbid_names(event, "note:" + str(item.get("id") or text[:12]), people)
             if text:

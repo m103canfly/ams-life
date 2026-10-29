@@ -126,8 +126,10 @@ class PrivateStaysPrivate(unittest.TestCase):
         self.assertEqual(r['event']['origin']['visibility'], d.PRIVATE)
         self.assertEqual(r['note']['origin']['visibility'], d.PRIVATE)
         self.assertEqual(r['digest']['origin']['visibility'], d.PRIVATE)
-        self.assertEqual(r['impression']['origin']['visibility'], d.PRIVATE)
-        self.assertIsNone(r['impression_elsewhere'])
+        self.assertEqual(r['impression']['origin']['visibility'], d.PUBLIC)
+        self.assertIsNotNone(r['impression_elsewhere'])
+        self.assertEqual(r['other_impression']['origin']['visibility'], d.PUBLIC)
+        self.assertIsNotNone(r['other_impression_elsewhere'])
         memory = [x for x in r['memory'] if set(x['origin']['source_ids']) & set(r['source_ids'])]
         self.assertTrue(memory)
         self.assertTrue(all(x['origin']['visibility'] == d.PRIVATE for x in memory))
@@ -140,14 +142,24 @@ class PrivateStaysPrivate(unittest.TestCase):
         self.assertEqual(r['private_user_view']['relationship']['we_memory'], [])
         self.assertEqual(r['private_user_view']['relationship']['transactive_map'], {})
 
-    def test_group_original_is_forbidden_without_recall(self):
+    def test_group_private_recall_forbids_words_not_name(self):
         r = run_case('keep_in_group')
+        self.assertNotIn('10001', r['present'])
+        self.assertEqual(r['without_recall'], [])
+        self.assertTrue(r['recalled'][0])
+        self.assertFalse(r['name_check']['leak'])
         self.assertTrue(r['check']['leak'])
-        self.assertTrue(r['check_quoted']['leak'])
-        self.assertFalse(r['own_chat_check']['leak'])
         self.assertTrue(any(x['private'] and '青柠七号' in x['text'] for x in r['forbidden']))
-        self.assertTrue(all(x['vec'] is None for x in r['forbidden'] if x.get('group_private')))
+        self.assertTrue(all(not x['names'] for x in r['forbidden']))
         self.assertEqual(r['sent'], '')
+
+    def test_global_memory_off_skips_send_check(self):
+        r = run_case('keep_in_group')
+        self.assertEqual(r['off_calls'], [])
+        self.assertEqual(r['off_reply'], '芒果最近好像挺忙的')
+
+    def test_narrowing_only_invalidates_the_same_group(self):
+        self.assertEqual(run_case('keep_in_group')['epochs'], [True, False])
 
     def test_private_never_reaches_a_group_prompt(self):
         r = run_case('private')

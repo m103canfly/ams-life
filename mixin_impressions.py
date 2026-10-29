@@ -237,11 +237,13 @@ class ImpressionsMixin:
                 continue
             try:
                 lines = self._read_window(place)["recent"]
+                epoch = getattr(self, "_privacy_epochs", {}).get(place, 0)
                 done[place] = await impressions.nightly(self._impression_store(), place, lines, ask, day,
                                                         registry=self._registry(),
                                                         extra_names=self._material_names(place, lines),
                                                         red=self._red_lines_for("impressions"),
-                                                        judge=self._judgements_for("impressions"))
+                                                        judge=self._judgements_for("impressions"),
+                                                        still_current=lambda: getattr(self, "_privacy_epochs", {}).get(place, 0) == epoch)
             except Exception as exc:
                 logger.warning("[ams-life] impressions for %s failed: %s", place, exc)
         if any(r.get("called") for r in done.values()):

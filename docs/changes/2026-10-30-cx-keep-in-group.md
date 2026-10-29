@@ -9,8 +9,9 @@ already made from the preceding messages in its two-minute window.
 `mixin_phone.py` detects the request, preserves the message IDs, and marks current and
 preceding window lines. `mixin_discretion.py` narrows matching library entries, event
 archive and session copies, insights, self-model notes, window lines and open loops; it
-also narrows relevant impressions. Work still waiting for a model is marked stale so it
-cannot overwrite a narrowed record with an older copy.
+also narrows impressions that actually carry matching source IDs. A pending per-group job
+is made stale only when its own group is narrowed. Jobs with no single place retain a
+conservative snapshot of all groups.
 
 Origin call-site inventory from `make_origin(` and `visibility_of(`:
 
@@ -31,25 +32,25 @@ Origin call-site inventory from `make_origin(` and `visibility_of(`:
   group-private material from that person is present.
 - `mixin_digest.py` checks the selected source lines for private visibility; `digest.py`
   also collects fallback IDs for group-private lines without a platform message ID.
-- `impressions.py` attaches the day's group-private source origins conservatively to each
-  impression, because the shared model call can use one person's words for another;
-  days without those sources leave the existing origins unchanged.
-  Display outside a private impression's group is dropped, and cross-group alias
-  collection excludes private records. For older impressions without IDs, a follow-up
-  narrows each such record in the group rather than guessing which fields came from it.
+- `impressions.py` excludes group-private lines from the model's material and alias
+  verification, and keeps counts and hours. Impression origins stay as before; a record
+  carrying source IDs that match a follow-up is narrowed, but an older record without
+  such IDs is not. Names and aliases are still saved for anonymization. When a follow-up
+  arrives while this group's impression model call is waiting, the answer is discarded
+  because the model may have seen the newly narrowed lines. Counts saved before the call
+  still stand; text-derived phrase statistics from that in-flight call cannot currently
+  be traced back to individual messages.
 - `discretion.py` provides the existing default, fallback, merge and table rules;
   `visibility_of` is called by `make_origin`. `tools/import_old.py` imports old data
   and is outside the future-message rule.
 
-`mixin_send_check.py` includes retained group-private originals from windows and the
-memory library as private forbidden items even when not recalled; `main.py` runs the
-check with `global_memory` on or off, without changing its default. These additional
-window items use literal and existing hint checks without fetching embeddings for each
-line. An exact repeat of a group-private original is blocked even if it is quoted in the
-request; otherwise existing allowed/common-piece exclusions and paraphrase limits apply.
-Phone lines hold at most 300 characters and expire after 24 hours; if a message was not
-also retained in memory, its expired or truncated original cannot be checked. This
-does not add a permanent copy or change existing retention and forgetting rules.
+`main.py` runs the send check only with `global_memory` on, as before. A recalled
+group-private memory, event or note labelled NO is forbidden by its text, without
+forbidding the speaker's name; the existing private hint checks still apply. The check
+does not scan unrecalled material or handle a prompt built before the follow-up narrowed
+its sources. Phone lines hold at most 300 characters and expire after 24 hours; once
+expired or truncated, a line not retained in memory cannot be recalled or checked.
+This does not add a permanent copy or change existing retention and forgetting rules.
 Relationship evidence that has lost all of its source IDs cannot be traced back after
 its source window and memory have expired.
 
@@ -61,13 +62,12 @@ the unrelated group-private canary; deliberately leaked group secrets remain che
 
 Offline tests exercise real `on_message` handling, current and preceding visibility,
 time, person and group boundaries, negations, derived stores, digest, impression,
-send check and replay canary. No model or network is needed. The full suite passes
-(572 tests); `tests/golden/` is unchanged, since neither golden conversation has a
-keep-in-group request.
+send check and replay canary. No model or network is needed. The 584-test result in the
+review predates this revision; the revision has not been run here. `tests/golden/` is unchanged.
 
 Files: `discretion.py`, `digest.py`, `impressions.py`, `main.py`, `mixin_phone.py`,
 `mixin_discretion.py`, `mixin_memory.py`, `mixin_events.py`, `mixin_llm.py`, `mixin_people.py`,
 `mixin_digest.py`, `mixin_impressions.py`, `mixin_send_check.py`, `send_check.py`,
 `tools/audit_replay.py`, `tools/replay.py`, `tests/discretion_cases.py`,
-`tests/test_discretion.py`, `tests/test_replay_tools.py`, `tests/test_keep_in_group_audit.py`,
-`tests/test_basics.py` (+2 plugin methods).
+`tests/test_discretion.py`, `tests/test_impressions.py`, `tests/test_replay_tools.py`,
+`tests/test_keep_in_group_audit.py`, `tests/test_basics.py` (+1 plugin method).

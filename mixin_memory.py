@@ -782,7 +782,7 @@ class MemoryMixin:
         try:
             # ams-life: forgetting may happen while this waits for the model; if
             # it does, the copy held here is stale and must not be saved back.
-            self._begin_job()
+            self._begin_job(self._here(event))
             doc = self._load_memory(event)
             entries = doc.get("entries")
             if not isinstance(entries, list) or len(entries) < 2:
@@ -1860,7 +1860,9 @@ class MemoryMixin:
                 n_no += 1
                 held.append((score, str(entry.get("id") or "")))
                 # the last look before sending (send_check): its words and who it is about
-                self._forbid(event, "memory:" + str(entry.get("id") or ""), text, people, entry.get("vector"))
+                group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                self._forbid(event, "memory:" + str(entry.get("id") or ""), text,
+                             [] if group_private else people, entry.get("vector"))
             elif lab["may"] == discretion.ANON:
                 self._forbid_names(event, "memory:" + str(entry.get("id") or ""), people)
             if lab.get("asked") == discretion.NO and isinstance(entry.get("asked_in"), dict):

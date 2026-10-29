@@ -30,35 +30,6 @@ _SEGMENT = re.compile(r"\n|；(?=（)")
 
 
 class SendCheckMixin:
-    def _forbid_group_private(self, event):
-        """Include retained group-private originals even when recall did not select them."""
-        note = self._check_note(event)
-        if note.get("group_private_loaded"):
-            return
-        note["group_private_loaded"] = True
-        here = self._here(event)
-        seen = set()
-        items = list(self._read_library().get("entries") or [])
-        for place in self._window_places():
-            if place.startswith("group:") and place != here:
-                items.extend(self._read_window(place)["recent"])
-        for item in items:
-            if not isinstance(item, dict) or item.get("role") == "assistant" or item.get("deleted"):
-                continue
-            origin = discretion.origin_of(item)
-            if (not origin["where"].startswith("group:") or origin["where"] == here
-                    or origin["visibility"] != discretion.PRIVATE):
-                continue
-            text = str(item.get("text") or "")
-            if not text or (origin["where"], text) in seen:
-                continue
-            seen.add((origin["where"], text))
-            iid = "group-private:" + _sha256(origin["where"] + "\n" + text)[:20]
-            self._forbid(event, iid, text, origin["people"], private=True)
-            note["forbidden"][-1]["group_private"] = True
-            # Avoid an embedding call for every unselected phone line on every reply.
-            note["forbidden"][-1]["no_embed"] = True
-
     # ------------------------------------------------------------------
     # what this reply may not bring up, noted while its prompt is built
     # ------------------------------------------------------------------
@@ -127,17 +98,15 @@ class SendCheckMixin:
     # the look, the second try, nothing sent
     # ------------------------------------------------------------------
     async def _check_reply(self, event, reply) -> dict:
-        self._forbid_group_private(event)
         note = self._check_note(event)
         forbidden = note.get("forbidden") or []
         if not forbidden or not str(reply or "").strip():
             return {"leak": False, "ids": [], "why": {}, "close": [], "top": 0.0}
         vec = None
         try:
-            if any(item.get("vec") or not item.get("no_embed") for item in forbidden):
-                vec = await self._embed_text(str(reply))
+            vec = await self._embed_text(str(reply))
             for item in forbidden:
-                if item.get("vec") is None and item.get("text") and not item.get("no_embed"):
+                if item.get("vec") is None and item.get("text"):
                     cache = getattr(self, "_check_vecs", None)
                     if not isinstance(cache, dict):
                         cache = self._check_vecs = {}

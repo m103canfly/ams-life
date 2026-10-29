@@ -165,6 +165,49 @@ class Aliases(unittest.TestCase):
 
 
 class Nightly(unittest.TestCase):
+    def test_group_private_lines_are_not_sent_and_other_person_remains_visible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            lines = window()
+            secret = line('10001', '甲', '青柠七号是今晚的暗号，别外传', 2, msg_id='private1')
+            secret['origin'] = im.discretion.make_origin(G1, ['10001'], ['private1'], im.discretion.PRIVATE)
+            lines.append(secret)
+            lines.append(dict(secret, sender_id='10003', text='@柠檬 青柠七号别外传', msg_id='private2',
+                              origin=im.discretion.make_origin(G1, ['10003'], ['private2'], im.discretion.PRIVATE)))
+            result, calls = self.run_night(store, lines, '{}')
+            self.assertEqual(result['called'], 1)
+            self.assertNotIn('青柠七号', calls[0])
+            self.assertNotIn('别外传', calls[0])
+            rec = store.load(G1)['people']['10002']
+            self.assertEqual(rec['origin']['visibility'], im.discretion.PUBLIC)
+            self.assertIsNotNone(im.view(rec, G1, G2, present_here=True))
+
+    def test_private_impression_alias_is_still_kept_for_anonymizing(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            data = store.load(G1)
+            rec = im._record(G1, '10002')
+            rec['origin']['visibility'] = im.discretion.PRIVATE
+            data['people']['10002'] = rec
+            store.save(G1, data)
+            answer = json.dumps({'P1': {'aliases': ['阿柠']}}, ensure_ascii=False)
+            with patch.object(im, 'verify_aliases', return_value={'10002': ['阿柠']}):
+                self.run_night(store, window(), answer)
+            self.assertIn('阿柠', store.names_of('10002'))
+
+    def test_narrowing_while_model_waits_discards_answer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = im.Store(Path(tmp) / 'people')
+            current = [True]
+            async def ask(prompt):
+                current[0] = False
+                return json.dumps({'P1': {'style': '说话很轻'}}, ensure_ascii=False)
+            result = asyncio.run(im.nightly(store, G1, window(), ask, DAY,
+                                            still_current=lambda: current[0]))
+            self.assertEqual(result['written'], 0)
+            self.assertNotEqual(store.load(G1)['people']['10002']['style'], '说话很轻')
+
     def run_night(self, store, lines, answer, day=DAY, registry=None):
         calls = []
 

@@ -577,7 +577,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if not self.enabled:
             return
         try:
-            self._begin_job()
+            self._begin_job(self._here(event))
             self._check_registry(event)  # someone (or a message) she may not keep: nothing is stored
             self._window_add_message(event)
             self._listen_body(event)
@@ -623,7 +623,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
         # for the session lock (the previous one still waiting for the model) before this
-        self._continue_job()
+        self._continue_job(self._here(event))
         self._check_registry(event)
         await self._ensure_profile(event)
         core = self._core(event)
@@ -782,12 +782,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 parts.append({"type": "text", "text": _compact, "_no_save": True})
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
-        # step 2: what may be said here, for the last look at the reply (send_check); with
-        # global_memory off too, for what a group asked to keep in the group
-        self._note_allowed(event, req, _compact)
-        if _offer:   # the offered stickers' labels are not "said here": one that leaks is still caught
-            _note = self._check_note(event)
-            _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
+        if _global:
+            self._note_allowed(event, req, _compact)
+            if _offer:   # offered sticker labels are not words said here
+                _note = self._check_note(event)
+                _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
 
     @filter.on_agent_done()
     async def on_agent_done(self, event: AstrMessageEvent, run_context, response: LLMResponse):
@@ -795,11 +794,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         internal.py _save_to_history, from run_context.messages): make it hold what was sent
         -- the words said once more, not the first ones -- and none of the model's thinking."""
         if self.enabled:
-            note = self._check_note(event)
-            group_private = any(str(x.get("id") or "").startswith("group-private:")
-                                for x in note.get("forbidden") or [])
-            if (getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False)
-                    or group_private):
+            if getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False):
                 self._settle_history(event, run_context)
 
     @filter.on_llm_response()
@@ -811,7 +806,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         if getattr(self, "self_decide", False):
             self._note_spend("reply", response)   # step 2: the money of the day
-        self._continue_job()
+        self._continue_job(self._here(event))
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
@@ -841,7 +836,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._check_note(event).update(sent="", outcome="silent")
             self._stop(event)
             return
-        if _reply.strip():
+        if getattr(self, "global_memory", False) and _reply.strip():
             # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
             # If the look itself fails, the reply is held back as if it leaked.
             try:

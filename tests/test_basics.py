@@ -113,8 +113,8 @@ class Split(unittest.TestCase):
         # _sticker_in_passing, _sticker_offer, _sticker_named, _sticker_cleared, _send_sticker,
         # _sticker_after); the owner's page of her stickers: +6 (_page_body, _page_query, page_stickers,
         # page_sticker_image, page_sticker_delete, page_sticker_add)
-        # keep-in-group: +2 (_narrow_group_sources and _forbid_group_private)
-        self.assertEqual(len(methods), 422)
+        # keep-in-group: +1 (_narrow_group_sources)
+        self.assertEqual(len(methods), 421)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
