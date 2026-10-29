@@ -152,6 +152,7 @@ class SendCheckMixin:
         """The reply as it may be sent: as it is, said once more, or "" (nothing is sent: the
         event is stopped, so AstrBot neither sends nor saves it). Logs only ids."""
         result = await self._check_reply(event, reply)
+        self._check_note(event)["top"] = result["top"]   # the highest cosine (for the replay)
         if result["close"]:
             self._count_check("close")
             logger.info("[ams-life] send check: close (%s)",
