@@ -491,6 +491,12 @@ class ThirdReplay(unittest.TestCase):
         # in his own chat she may say it
         self.assertTrue(any(secret in r['sent'] for r in self.replies if r['probe'] == 'owner_own_chat'))
 
+    def test_said_once_more_is_what_the_send_check_did(self):
+        # every "redone" is one second try of the send check (not words that changed otherwise)
+        stats = json.loads((self.out / 'replay.json').read_text('utf-8'))['stats']
+        self.assertEqual(stats.get('model_calls_fake_redo', 0), stats.get('replies_redone', 0))
+        self.assertGreater(stats.get('replies_redone', 0), 0)
+
     def test_the_audit_passes_and_counts(self):
         self.assertTrue(self.result['pass'], json.dumps(self.result['checks'], ensure_ascii=False)[:2000])
         s = self.result['sent_summary']

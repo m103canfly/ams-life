@@ -873,9 +873,10 @@ def main(argv=None):
             resp = LLMResponse(first)
             loop.run_until_complete(plugin.on_llm_response(event, resp))
             harness.drain(loop)
-            outcome = ("held" if event.is_stopped() else "redone" if resp.completion_text != first else "sent") \
-                if first.strip() else "empty"
             note = getattr(event, "_ams_check", None) or {}
+            # what the send check did (its own word: a state tag cut out is not "said once more");
+            # nothing to look at (no reply, or nothing it may not say here): "sent" / "empty"
+            outcome = note.get("outcome") or ("held" if event.is_stopped() else "sent" if first.strip() else "empty")
             stats["replies_" + outcome] += 1
             stats["replies_%s_%s" % ("probe" if row.get("canary") else "normal", outcome)] += 1
             replies.write(json.dumps({

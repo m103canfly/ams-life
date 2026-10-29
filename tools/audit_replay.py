@@ -99,6 +99,9 @@ LIMITS = [
     "warning, the private one still a failure, and the numbers check leaves it out",
     "numbers: kept in what she keeps since 10-29 (the owner); a number brought somewhere it was not "
     "said is what the numbers check looks for, a deleted person's number what the forgotten check does",
+    "the third replay (--model-replies): she is given this turn's prompt only, not AstrBot's earlier turns "
+    "of the conversation; so what AstrBot would keep in its history (the first words, the model's thinking) "
+    "is not seen here -- the send check's tests cover that",
     "private check: reply prompts only; prompts for the model are checked for QQ numbers, forgotten "
     "material and the canaries, not for private words. A prompt's place is the turn that started it; a "
     "nightly job's is 'nightly', but the note of one window and a private chat's notebook sitting are "
