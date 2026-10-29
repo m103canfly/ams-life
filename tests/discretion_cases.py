@@ -987,6 +987,18 @@ def run():
         t(60, '跟大家说下，我在偷偷准备一个惊喜蛋糕', '10001', '芒果', A)
         t(30, '小爱 惊喜蛋糕准备得怎么样了', '10001', '芒果', A)
         t(30, '小爱 惊喜蛋糕的事', '10004', '桃子', B)
+    elif CASE == 'same_words':
+        # he says it in a group, then the very same words to her in private
+        t(0, '我中午吃了一碗牛肉面', '10001', '芒果', A, reply='听起来好香')
+        t(30, '我中午吃了一碗牛肉面', '10001', '芒果')
+        # someone tells her something in private, then someone says the same words in a group
+        t(30, '我下午要去剪头发了', '10005', '栗子')
+        t(30, '我下午要去剪头发了', '10002', '柠檬', B)
+    elif CASE == 'same_words_known':
+        # the private chat had these very words before; then a group, then private again
+        t(0, '我中午吃了一碗牛肉面', '10001', '芒果')
+        t(30, '我中午吃了一碗牛肉面', '10003', '阿星', A)
+        t(30, '我中午吃了一碗牛肉面', '10001', '芒果')
     elif CASE == 'one_body':
         out['v_start'] = plugin._core(None).v
         for text in ('太开心了！！！我终于抽到了！！！', '好耶！十连出金了', '笑死，运气也太好了吧', '真的好高兴啊',

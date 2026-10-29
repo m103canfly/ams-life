@@ -218,6 +218,40 @@ class SaidInTheGroupToo(unittest.TestCase):
         self.assertNotIn('芒果', b['prompt'])
 
 
+class SameWordsElsewhere(unittest.TestCase):
+    """What was said elsewhere in the very words just said here still comes back: the words
+    just kept from this turn are not "already known here" (they used to hide it). Words this
+    place had before still hide the same words from elsewhere, and the discretion table is
+    as it was."""
+
+    @staticmethod
+    def elsewhere(turn, words):
+        return [ln for ln in turn['prompt'].split('\n') if '（别处）' in ln and words in ln]
+
+    def test_said_in_a_group_then_the_same_in_private(self):
+        r = run_case('same_words')
+        p = r['turns'][1]
+        self.assertIn('FriendMessage:10001', p['session'])
+        lines = self.elsewhere(p, '我中午吃了一碗牛肉面')
+        self.assertEqual(len(lines), 1, p['prompt'])
+        self.assertTrue(lines[0].endswith('（别处）有人说过：我中午吃了一碗牛肉面'), lines)
+        for who in ('芒果', '10001'):
+            self.assertNotIn(who, '\n'.join(self.elsewhere(p, '牛肉面')))
+
+    def test_told_in_private_stays_there_even_in_the_same_words(self):
+        r = run_case('same_words')
+        g = r['turns'][3]
+        self.assertIn('GroupMessage:900002', g['session'])
+        self.assertEqual(self.elsewhere(g, '剪头发'), [])
+        self.assertNotIn('栗子', g['prompt'])
+
+    def test_words_this_place_had_before_still_hide_the_same_from_elsewhere(self):
+        r = run_case('same_words_known')
+        p = r['turns'][2]
+        self.assertIn('FriendMessage:10001', p['session'])
+        self.assertEqual(self.elsewhere(p, '牛肉面'), [])
+
+
 class Phone(unittest.TestCase):
     """She has a phone: what was said stays in its own chat window; the body keeps no text."""
 

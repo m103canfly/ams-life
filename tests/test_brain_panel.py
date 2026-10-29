@@ -78,7 +78,7 @@ class InThePanel(unittest.TestCase):
         self.assertIn('body.brain-filled #view-brain{position:fixed;inset:0', css)
 
     def test_wheel_and_drag_stay_on_the_map(self):
-        css = (ROOT / 'pages' / 'brain' / 'brain.css').read_text(encoding='utf-8')
+        css = (ROOT / 'pages' / 'starmap' / 'brain.css').read_text(encoding='utf-8')
         self.assertIn('overscroll-behavior:none', css)
         self.assertIn('#galaxy canvas{display:block;width:100%;height:100%;outline:none;touch-action:none}', css)
         globe = (ROOT / 'tools' / 'brain' / 'src' / 'globe.js').read_text(encoding='utf-8')
