@@ -83,6 +83,10 @@ try:
 except ImportError:
     from mixin_attention import AttentionMixin
     import attention
+try:
+    from .mixin_selfie import SelfieMixin
+except ImportError:
+    from mixin_selfie import SelfieMixin
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -92,7 +96,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, SelfieMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -844,5 +848,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         try:
             asyncio.create_task(self._maybe_relationship_impression(event, core))
             asyncio.create_task(self._maybe_relationship_narrative(event, core))
+        except Exception:
+            pass
+        # ams-life: 她说完话之后——要不要发一张自拍、要不要发一条语音（默认按关键词触发，每天有上限）
+        try:
+            asyncio.create_task(self._media_after_reply(event, _reply))
         except Exception:
             pass

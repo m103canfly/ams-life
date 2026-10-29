@@ -29,7 +29,9 @@ class Reply(_Comp):
 
 
 class Record(_Comp):
-    pass
+    @classmethod
+    def fromFileSystem(cls, path):
+        return cls(file=str(path))
 
 
 class At(_Comp):
