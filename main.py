@@ -83,6 +83,10 @@ try:
 except ImportError:
     from mixin_attention import AttentionMixin
     import attention
+try:
+    from .mixin_browse import BrowseMixin
+except ImportError:
+    from mixin_browse import BrowseMixin
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -92,7 +96,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, BrowseMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -122,6 +126,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (甲): she decides herself whether to answer (off by default; off, AstrBot decides
         # as before: an @ of her, "/", every private message)
         self.self_decide = bool(self.config.get("self_decide", False))
+        # step 2 (丁): her browser -- in a reply, two read-only tools of the plugin's own (off by default)
+        self.browse_enabled = bool(self.config.get("browse_enabled", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
@@ -605,6 +611,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:   # failing, she gets none rather than all of them
             req.func_tool = None
             logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
+        else:
+            try:   # step 2 (丁): then her browser's two tools, only those (browse_enabled)
+                self._give_browse_tools(req, event)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: tools not given (%s)", type(exc).__name__)
         if not self.enabled or not self.inject_intent:
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
@@ -779,6 +790,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         if getattr(self, "self_decide", False):
             self._note_spend("reply", response)   # step 2: the money of the day
+        if self._browse_on():
+            try:   # step 2 (丁): the rounds her tools took, into the browser's own money
+                self._browse_after_reply(event, response)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
         self._continue_job()
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
