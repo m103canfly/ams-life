@@ -29,6 +29,7 @@ button{font:inherit}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav-item{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--muted);padding:11px 10px;cursor:pointer;text-align:left;width:100%;text-transform:uppercase;font-size:var(--fs-body);letter-spacing:.1em;border-left:2px solid transparent}
 .nav-item:hover{color:var(--ink);background:rgba(255,255,255,.45)}
+a.nav-item{text-decoration:none}
 .nav-item.active{color:var(--ink);background:var(--panel);border-left-color:var(--accent);font-weight:600}
 .ni-icon{width:18px;text-align:center;font-size:var(--fs-body);color:currentColor}
 .side-box{margin-top:auto;border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(12px);padding:12px;position:relative}
