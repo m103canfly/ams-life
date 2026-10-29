@@ -88,7 +88,13 @@
       if (!frame || ev.source !== frame.contentWindow) return;
       const m = ev.data;
       if (!m || m.channel !== CHANNEL) return;
-      if (m.kind === "hello") tell({ kind: "hello", isDark: !!(opts.dark && opts.dark()) });
+      if (m.kind === "hello") {
+        const dark = !!(opts.dark && opts.dark());
+        tell({ kind: "hello", isDark: dark });
+        // and the theme itself: the map's own first answer only notes it, so a light panel showed a dark bar
+        // around a light map until the theme was switched once
+        tell({ kind: "theme", dark });
+      }
       else if (m.kind === "get") relay(m);
       else if (m.kind === "exit-fill") setFill(false);
     });

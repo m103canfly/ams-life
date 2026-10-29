@@ -1,0 +1,198 @@
+/* ams-life (AGPL-3.0); see NOTICE.md. Her look (10-29, the owner chose "v2丙月白"): 月白 colours on clear glass,
+   loaded after styles.css. Rules, the same on every page:
+   - type 12 / 13 / 14 / 16 / 20 / 28; corners 6 / 10 / 16; shadows flat / lifted / popped; spacing in steps of 4;
+   - layers by the thickness of the glass: the page's soft light -> thin glass (side bar, groups) -> thick glass
+     (cards) -> popped glass (the big card, the chosen tab); higher is brighter, with a bigger shadow;
+   - no glow around words (the owner: "字体不要加光晕"): words stay clear by their colour alone;
+   - without backdrop-filter, or when the system asks for less transparency, every glass is an opaque card;
+     when it asks for less motion, nothing lifts, presses or slides, only colours change.
+   Her pictures (the avatar, the half-body art) come from the plugin's data folder through look.js; without them
+   the panel shows its own drawn mark and no art. */
+:root{
+  --font:"Segoe UI Variable Text","Segoe UI","Noto Sans SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --font-title:"Segoe UI Variable Display","Segoe UI","Noto Sans SC","Microsoft YaHei UI",system-ui,sans-serif;
+  --fs-tag:12px; --fs-note:13px; --fs-body:14px; --fs-lead:16px;
+  --fs-h4:16px; --fs-h3:20px; --fs-h2:20px; --fs-h1:28px; --fs-display:28px;
+  --r-s:6px; --r-m:10px; --r-l:16px; --r-pill:999px;
+  --sh-0:none;
+  --sh-1:0 1px 2px rgba(var(--shadow-rgb),.05),0 2px 8px rgba(var(--shadow-rgb),.06);
+  --sh-2:0 4px 12px rgba(var(--shadow-rgb),.08),0 12px 28px rgba(var(--shadow-rgb),.08);
+  --sh-3:0 12px 32px rgba(var(--shadow-rgb),.16),0 24px 60px rgba(var(--shadow-rgb),.14);
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --blur-thin:blur(20px) saturate(175%); --blur-thick:blur(28px) saturate(190%); --blur-pop:blur(36px) saturate(205%);
+  /* 月白, light */
+  --bg:#f2f2f4; --bg2:#e9e9ee; --panel:#ffffff; --panel2:#f6f6f7; --line:rgba(0,0,0,.12); --line2:rgba(0,0,0,.07);
+  --ink:#1d1d1f; --text:#38383c; --muted:#4c4c51; --faint:#525257; --accent2-text:#186b85; --accent-strong:#c0407c;
+  --accent:#d6538f; --accent2:#2a9cbd; --accent-rgb:214,83,143; --accent2-rgb:42,156,189; --accent3-rgb:170,170,190; --shadow-rgb:0,0,0;
+  --light4-rgb:235,205,220; --light5-rgb:200,222,232;
+  --glass-thin:rgba(255,255,255,.14); --glass-thick:rgba(255,255,255,.22); --glass-pop:rgba(255,255,255,.36);
+  --glass-hover:rgba(255,255,255,.26); --glass-chip:rgba(0,0,0,.05);
+  --rim-top:rgba(255,255,255,1); --rim-bottom:rgba(0,0,0,.07); --rim-side:rgba(255,255,255,.65);
+  --light-a:.30; --light-b:.26; --light-c:.40; --stars:0; --art-ghost:.22;
+}
+[data-theme="dark"]{
+  --bg:#0f0f11; --bg2:#141416; --panel:#1c1c1f; --panel2:#242428; --line:rgba(255,255,255,.13); --line2:rgba(255,255,255,.07);
+  --ink:#f5f5f7; --text:#dcdce0; --muted:#c8c8ce; --faint:#bcbcc2; --accent2-text:#6fd2ea; --accent-strong:#ff7eb6;
+  --accent:#ff7eb6; --accent2:#6fd2ea; --accent-rgb:255,126,182; --accent2-rgb:111,210,234; --accent3-rgb:120,120,140; --shadow-rgb:0,0,0;
+  --light4-rgb:150,110,130; --light5-rgb:100,130,150;
+  --glass-thin:rgba(40,40,46,.16); --glass-thick:rgba(46,46,52,.22); --glass-pop:rgba(58,58,66,.32);
+  --glass-hover:rgba(255,255,255,.07); --glass-chip:rgba(255,255,255,.07);
+  --rim-top:rgba(255,255,255,.22); --rim-bottom:rgba(0,0,0,.45); --rim-side:rgba(255,255,255,.12);
+  --light-a:.26; --light-b:.22; --light-c:.30; --stars:.35; --art-ghost:.20;
+}
+
+/* type */
+body{font-family:var(--font);font-size:var(--fs-body);line-height:1.6;color:var(--text);background:var(--bg);background-image:none;
+  -webkit-font-smoothing:antialiased}
+b,strong,h1,h2,h3{color:var(--ink)}
+h1,h2,.hero h2{font-family:var(--font-title);letter-spacing:.01em;text-transform:none}
+h1{font-size:var(--fs-h1);font-weight:700}
+h2{font-size:var(--fs-h3);font-weight:650}
+h3{font-size:var(--fs-lead);font-weight:650;letter-spacing:.01em;text-transform:none}
+h1::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 4px rgba(var(--accent-rgb),.15);margin-right:14px;vertical-align:.2em}
+.eyebrow,.crumb,.hint,.side-label,.side-box-title,.telemetry-strip span,.metric span,.signal-grid small,.intent-grid small,
+.api-grid label,.legend,.signal-legend,.statusbar,.orb-meta,.noise-row,.status-pill,.chip,.btn,.nav-item,.brand small,.side-foot{
+  letter-spacing:.04em}
+.eyebrow,.side-label,.side-box-title,.crumb{font-size:var(--fs-tag);color:var(--muted);font-weight:600}
+.hint,.mem-card .hint{font-size:var(--fs-tag);color:var(--muted)}
+.num,.metric b,.orb-meta b,.signal-grid b,.noise-row b,.telemetry-strip b{font-variant-numeric:tabular-nums}
+
+/* the light she sits in: soft colour, a few stars in the dark, her art faint behind the glass */
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+  radial-gradient(42vw 42vw at 6% 10%,rgba(var(--accent-rgb),var(--light-a)) 0,transparent 68%),
+  radial-gradient(36vw 36vw at 94% 14%,rgba(var(--accent2-rgb),var(--light-b)) 0,transparent 68%),
+  radial-gradient(46vw 46vw at 72% 98%,rgba(var(--accent3-rgb),var(--light-c)) 0,transparent 68%),
+  radial-gradient(30vw 30vw at 34% 62%,rgba(var(--light4-rgb),calc(var(--light-a) * .55)) 0,transparent 70%),
+  radial-gradient(26vw 26vw at 58% 30%,rgba(var(--light5-rgb),calc(var(--light-b) * .55)) 0,transparent 70%),
+  linear-gradient(160deg,var(--bg) 0%,var(--bg2) 100%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--stars);
+  background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.9) 0 1px,transparent 1.6px),
+    radial-gradient(circle at 70% 60%,rgba(255,255,255,.7) 0 1px,transparent 1.6px),
+    radial-gradient(circle at 45% 85%,rgba(var(--accent2-rgb),.9) 0 1px,transparent 1.6px);
+  background-size:220px 220px,300px 300px,380px 380px}
+.shell{position:relative;z-index:0;gap:0}
+.has-art .main::before{content:"";position:fixed;right:-2vw;bottom:-4vh;width:min(58vw,900px);height:min(58vw,900px);z-index:-1;
+  pointer-events:none;background:var(--art) right bottom/contain no-repeat;opacity:var(--art-ghost)}
+
+/* layout and the plain shape of each layer */
+.sidebar{padding:var(--sp-5) var(--sp-4);gap:var(--sp-4)}
+.main{padding:var(--sp-6) 40px var(--sp-5);max-width:1200px}
+.topbar,.hero,.panel,.metric,.telemetry-strip,.side-box,.session,.empty,.settings-panel,.fold-panel.expanded{border-radius:var(--r-l)}
+.hero::after,.metric::before,.side-box::before,.hero-rail,.hero-index,.hero-scale,.hero-side{display:none}
+.topbar{padding:var(--sp-5) var(--sp-5) var(--sp-4);margin-bottom:var(--sp-4)}
+.telemetry-strip{margin:0 0 var(--sp-4);padding:var(--sp-1);gap:var(--sp-1);border-radius:var(--r-m)}
+.telemetry-strip>div{border-right:0;border-radius:var(--r-s);padding:var(--sp-2) var(--sp-3)}
+.telemetry-strip>div:nth-child(odd){background:var(--glass-chip)}
+.telemetry-strip b{font-size:var(--fs-body);letter-spacing:.02em}
+.hero{padding:var(--sp-6);gap:var(--sp-5)}
+.hero h2{font-size:var(--fs-display);margin-bottom:var(--sp-2)}
+.hero p{color:var(--text);font-size:var(--fs-lead);max-width:480px}
+.metrics{gap:var(--sp-3);margin-top:var(--sp-4)}
+.metric{padding:var(--sp-4) var(--sp-5);border-radius:var(--r-m);gap:var(--sp-2)}
+.metric span{font-size:var(--fs-note);color:var(--muted);text-transform:none}
+.metric b{font-size:var(--fs-h1);font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.bar{height:6px;border-radius:var(--r-pill);background:var(--panel2)}
+.bar i{border-radius:var(--r-pill);background:var(--ink)}
+[data-theme="dark"] .bar i{background:var(--text)}
+.metric:first-child .bar i,.metric:nth-child(2) .bar i{background:var(--accent)}
+.grid{gap:var(--sp-4);margin-top:var(--sp-4)}
+.panel{padding:var(--sp-5)}
+.panel-head{border-bottom:1px solid var(--line2);padding-bottom:var(--sp-3);margin-bottom:var(--sp-4)}
+.noise-track,.p-track,.spec-track,.intent-track,.rel-bar{height:6px;border-radius:var(--r-pill);background:var(--panel2)}
+.noise-track i,.p-track i{border-radius:var(--r-pill);background:var(--accent2)}
+.section-title{margin:var(--sp-6) 0 var(--sp-3)}
+.section-title.mt{margin-top:var(--sp-6)}
+.chips{gap:var(--sp-2)}
+.chip{border-radius:var(--r-pill);color:var(--text);padding:var(--sp-1) var(--sp-3);text-transform:none}
+.btn{color:var(--ink);text-transform:none;font-weight:600}
+.status-pill{border-radius:var(--r-pill);padding:var(--sp-1) var(--sp-3);text-transform:none}
+.nav{gap:var(--sp-1)}
+.nav-item{border:0;border-left:0;color:var(--muted);text-transform:none;font-size:var(--fs-body);font-weight:500}
+.nav-item.active{color:var(--ink);font-weight:650}
+.nav-item.active .ni-icon{color:var(--accent)}
+.side-box{border-radius:var(--r-m);padding:var(--sp-3) var(--sp-4)}
+.fold-grid{gap:var(--sp-3);padding:var(--sp-3);border-radius:var(--r-l)}
+.fold-icon{border-radius:var(--r-s)}
+input,select,textarea,.api-grid input,.api-grid select{border-radius:var(--r-s)!important;border:1px solid var(--line)!important;background:var(--panel)!important}
+.mem-card{border-radius:var(--r-m);padding:var(--sp-4) var(--sp-5)}
+.mem-tier,.mem-legend-tag,.fb-tip{border-radius:var(--r-pill)}
+.orb-tag{border-radius:var(--r-s);letter-spacing:.04em;color:var(--ink)}
+/* the second accent as words: a deeper cyan in light, so small numbers stay readable on glass */
+.orb-tag b,#orbValence{color:var(--accent2-text)}
+.api-panel h3,.api-head{letter-spacing:.04em}
+
+/* thin glass: the side bar, groups, the strip of numbers */
+.sidebar,.telemetry-strip,.fold-grid,.side-box{
+  background:var(--glass-thin)!important;-webkit-backdrop-filter:var(--blur-thin);backdrop-filter:var(--blur-thin);
+  border:1px solid var(--rim-side)!important;
+  box-shadow:inset 0 1px 0 var(--rim-top),inset 0 -1px 0 var(--rim-bottom),var(--sh-1)}
+.sidebar{border-width:0 1px 0 0!important}
+/* thick glass: cards and buttons */
+.topbar,.panel,.metric,.session,.empty,.mem-card,.settings-panel,.fold-panel.expanded,.fold-panel.folded,.btn,.status-pill{
+  background:var(--glass-thick)!important;-webkit-backdrop-filter:var(--blur-thick);backdrop-filter:var(--blur-thick);
+  border:1px solid var(--rim-side)!important;
+  box-shadow:inset 0 1px 0 var(--rim-top),inset 0 -1px 0 var(--rim-bottom),var(--sh-1)}
+/* popped glass: the big card on the front page, the chosen tab */
+.hero,.nav-item.active,.fold-panel.folded.active,.persona-tab.active,.settings-tab.active,.nav-glider{
+  background:var(--glass-pop)!important;-webkit-backdrop-filter:var(--blur-pop);backdrop-filter:var(--blur-pop);
+  border:1px solid var(--rim-side)!important;
+  box-shadow:inset 0 1px 0 var(--rim-top),inset 0 -1px 0 var(--rim-bottom),var(--sh-2)}
+.hero{box-shadow:inset 0 1px 0 var(--rim-top),inset 0 -1px 0 var(--rim-bottom),var(--sh-3)}
+.orb-tag{background:var(--glass-thick)!important;-webkit-backdrop-filter:var(--blur-thin);backdrop-filter:var(--blur-thin);border:1px solid var(--rim-side)!important}
+.chip{background:var(--glass-chip)!important;border:1px solid var(--rim-side)!important}
+
+/* the chosen tab is a glass capsule; look.js slides one capsule (.nav-glider) under the tabs */
+.nav{position:relative}
+.nav-item{position:relative;z-index:1;border-radius:var(--r-pill)!important;padding:var(--sp-2) var(--sp-4)!important;
+  transition:background-color .18s,box-shadow .18s,transform .12s,color .18s}
+.nav-item:hover:not(.active){background:var(--glass-hover)}
+.nav-glider{position:absolute;left:0;top:0;z-index:0;border-radius:var(--r-pill);pointer-events:none;
+  transition:transform .32s cubic-bezier(.2,.8,.2,1),height .32s,opacity .18s}
+.nav.glides .nav-item.active{background:transparent!important;border-color:transparent!important;box-shadow:none!important;
+  -webkit-backdrop-filter:none;backdrop-filter:none}
+.fold-panel.folded{border-radius:var(--r-l)!important}
+.fold-panel.folded:hover{transform:translateY(-1px)}
+/* buttons: small glass, lit on hover, pressed in */
+.btn{border-radius:var(--r-pill)!important;padding-left:var(--sp-4)!important;padding-right:var(--sp-4)!important}
+.btn:hover,.fold-panel.folded:hover{background:var(--glass-pop)!important;color:var(--ink);
+  box-shadow:inset 0 1px 0 var(--rim-top),inset 0 -1px 0 var(--rim-bottom),var(--sh-2)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.98);box-shadow:inset 0 1px 3px rgba(var(--shadow-rgb),.18)}
+.btn.primary{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0)),var(--accent-strong)!important;color:#fff!important;border-color:rgba(255,255,255,.35)!important}
+[data-theme="dark"] .btn.primary{color:#1d1d1f!important}
+
+/* her pictures (look.js): the avatar in the corner, the half-body art on the left of the big card, its cut
+   right edge fading out. Without them: a drawn ring and star, and the big card keeps its plain layout. */
+.mark{position:relative;width:40px!important;height:40px!important;border-radius:50%!important;flex:none;
+  background:radial-gradient(circle at 50% 50%,rgba(var(--accent-rgb),.16),transparent 70%)!important;
+  border:2px solid var(--accent2)!important;box-shadow:var(--sh-1)!important}
+.mark span,.mark::before{display:none!important}
+.mark::after{content:"✦";position:absolute;inset:0;display:grid;place-items:center;color:var(--accent);font-size:18px;line-height:1}
+.has-avatar .mark{background:var(--avatar) center/cover no-repeat!important;border:2px solid var(--panel)!important;
+  box-shadow:0 0 0 2px var(--accent),var(--sh-1)!important}
+.has-avatar .mark::after{display:none}
+.hero::before{display:none}
+.has-art .hero{position:relative;isolation:isolate;overflow:hidden;padding-left:440px!important}
+.has-art .hero::before{content:"";display:block;position:absolute;left:-30px;top:0;bottom:0;width:480px;height:auto;border:0;z-index:-1;pointer-events:none;
+  background:var(--art) left bottom/auto 100% no-repeat;
+  -webkit-mask-image:linear-gradient(90deg,#000 72%,transparent 98%);mask-image:linear-gradient(90deg,#000 72%,transparent 98%)}
+
+/* no glass where it cannot be drawn, or where the system asks for less transparency: opaque cards, layers by shadow */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .sidebar,.telemetry-strip,.fold-grid,.side-box,.topbar,.panel,.metric,.session,.empty,.mem-card,.settings-panel,
+  .fold-panel,.btn,.status-pill,.hero,.nav-item.active,.nav-glider,.orb-tag{background:var(--panel)!important}
+  .sidebar,.telemetry-strip,.fold-grid{background:var(--bg2)!important}
+  .btn.primary{background:var(--accent-strong)!important}
+}
+@media (prefers-reduced-transparency:reduce){
+  .sidebar,.telemetry-strip,.fold-grid,.side-box,.topbar,.panel,.metric,.session,.empty,.mem-card,.settings-panel,
+  .fold-panel,.btn,.status-pill,.hero,.nav-item.active,.nav-glider,.orb-tag{background:var(--panel)!important;
+    -webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  .sidebar,.telemetry-strip,.fold-grid{background:var(--bg2)!important}
+  .btn.primary{background:var(--accent-strong)!important}
+  .has-art .main::before{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .btn:active:not(:disabled),.fold-panel.folded:hover{transform:none}
+  .nav-item,.nav-glider{transition:background-color .18s,color .18s}
+}

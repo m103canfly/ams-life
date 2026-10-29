@@ -98,6 +98,7 @@ class Split(unittest.TestCase):
         # SendCheckMixin: _check_note, _forbid, _forbid_names, _note_allowed, _common_pieces,
         # _check_reply, _redo_reply, _look_at_reply, _set_reply, _settle_history, _count_check,
         # _check_counts_today); review of PR #33: +1 (_check_failed: the look itself failed, held back)
+        # her look (月白 on glass): +1 (page_look, her pictures for the panel, read only)
         # she decides herself whether to answer (step 2, 甲): +21 (on_message_decide, and
         # AttentionMixin: _spending, _attention_cfg, _usage_of, _note_spend, _spent_today,
         # _familiarity, _note_tie, _window_state, _save_attention, _last_reply_here, _why_called,
@@ -107,7 +108,7 @@ class Split(unittest.TestCase):
         # _browse_names, _give_browse_tools, _tool_context, _builtin_web_tool, _tool_search, _tool_read,
         # _browse_after_reply, _browse_for_panel); its second part: +8 (_remember_web, _browse_keep_reply,
         # _browse_state, _browse_save_state, _last_message_ts, _browse_topics, _maybe_go_browse, _browse_trip)
-        self.assertEqual(len(methods), 408)
+        self.assertEqual(len(methods), 409)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

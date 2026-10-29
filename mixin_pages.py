@@ -11,6 +11,10 @@ try:
     from .body import *  # noqa: F401,F403
 except ImportError:
     from body import *  # noqa: F401,F403
+try:
+    from . import ui_look
+except ImportError:
+    import ui_look
 
 
 class PagesMixin:
@@ -358,8 +362,14 @@ class PagesMixin:
                          "what she keeps, page by page, numbers hidden (read-only)")
                 register("/astrbot_plugin_ams_life/page/memories/number", self.page_memories_number, ["GET"],
                          "one row's words as kept, when the owner asks (read-only)")
+                # ams-life: her avatar and art for the panel's look, from the data folder only (ui_look.py)
+                register("/astrbot_plugin_ams_life/page/look", self.page_look, ["GET"],
+                         "her pictures for the panel, when the owner put them in (read-only)")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
+
+    async def page_look(self, args=None):
+        return {"status": "ok", "data": await asyncio.to_thread(ui_look.read_ui_images, DATA_DIR)}
 
     def _memory_stats(self):
         sessions = 0
