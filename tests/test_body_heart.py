@@ -366,7 +366,7 @@ class Notebook(unittest.TestCase):
     def test_what_she_writes_is_scrubbed_when_kept(self):
         r = run_case('notebook_scrub')
         new = [x for x in r['saved'] if '爬山' in x]
-        self.assertEqual(new, ['某人说柠檬 [号码] 也想去爬山'])
+        self.assertEqual(new, ['某人说柠檬 10002 也想去爬山'])   # numbers stay (the owner, 10-29); someone deleted goes
         self.assertEqual(r['notebook'], r['saved'])
 
     def test_forgetting_reaches_her_notebook(self):
@@ -395,7 +395,7 @@ class EveryName(unittest.TestCase):
 
     def test_name_sources_join_in(self):
         import mixin_discretion
-        holder = type('P', (mixin_discretion.DiscretionMixin,), {})()
+        holder = type('P', (mixin_discretion.DiscretionMixin,), {'_window_places': lambda self: []})()
         holder._name_index = {'10003': {'阿星'}}
         holder.register_name_source(lambda person: ['星星'] if person == '10003' else [])
         self.assertEqual(holder._known_names(['10003']), ['10003', '星星', '阿星'])

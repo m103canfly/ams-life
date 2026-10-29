@@ -291,7 +291,7 @@ class MemoryMixin:
             red = {id(e) for e in new if self._red_line(e.get("text"), "memory")}
             kept = [e for e in lib.get("entries") or [] if self._origin_kept(e) and id(e) not in red]
             if new:
-                scrub = self._scrubber()
+                scrub = self._gone_remover()
                 for e in new:
                     if isinstance(e.get("text"), str):
                         e["text"] = scrub(e["text"])

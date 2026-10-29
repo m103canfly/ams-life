@@ -33,7 +33,7 @@ PUBLIC, PRIVATE, SELF = "public", "private", "self"
 FULL, ANON, DROP = "full", "anon", "drop"
 SOMEONE = "有人"
 SOMEBODY = "某人"   # someone deleted, or an @ with no name: in what she keeps
-NUMBER = "[号码]"   # a number she knows to be someone's or some chat's
+NUMBER = "[号码]"   # a deleted person's number; a person's number brought up elsewhere
 _NOT_PEOPLE = {"", "self", "summary", "unknown", "她"}
 _KIND = re.compile(r"(FriendMessage|GroupMessage|GuildMessage|TempMessage|OtherMessage)")
 
@@ -188,29 +188,48 @@ def at_names(text) -> list:
     return [(m.group(1).strip(), m.group(2)) for m in _AT_NAMED.finditer(str(text or ""))]
 
 
-def strip_numbers(text, numbers=(), her=(), her_name="", gone=(), ats=()) -> str:
-    """A message as she keeps it: an @ keeps the name only ("@昵称"; "@某人" with no name or
-    for someone deleted; her own name for an @ of her), and every number in `numbers` (whole
-    numbers only) becomes NUMBER. Other long numbers are left alone. `ats`: (name, number) of
-    the message's own @ parts, replaced exactly first ("@名字(号码)", whatever the name holds)."""
+def _whole_numbers(text, numbers) -> str:
+    nums = sorted({str(n) for n in numbers if len(str(n)) >= 5 and str(n).isdigit()}, key=len, reverse=True)
+    if not nums:
+        return text
+    return re.sub(r"(?<![0-9])(?:%s)(?![0-9])" % "|".join(nums), NUMBER, text)
+
+
+def drop_gone(text, gone=(), her=(), her_name="", numbers=(), ats=()) -> str:
+    """A message as she keeps it: as AstrBot wrote it -- an @ is "@名字(号码)", QQ numbers and
+    group numbers stay (the owner, 10-29) -- but an @ of her is her own name, an @ of someone
+    deleted (`gone`) is "@某人", and every number in `numbers` (the forget registry's people and
+    messages; whole numbers only) becomes NUMBER. `ats`: (name, number) of the message's own @
+    parts, replaced exactly first ("@名字(号码)", whatever the name holds)."""
     her, gone = {str(x) for x in her}, {str(x) for x in gone}
 
-    def at(name, qq):
+    def at(whole, qq):
         if qq in her:
             return "@" + (her_name or SOMEBODY)
         if qq in gone:
             return "@" + SOMEBODY
-        return "@" + (name.strip() or SOMEBODY)
+        return whole
     out = str(text or "")
     for name, qq in sorted(ats, key=lambda x: -len(str(x[0]))):
         if name and qq:
-            out = out.replace("@%s(%s)" % (name, qq), at(name, str(qq)))
-    out = _AT_NAMED.sub(lambda m: at(m.group(1), m.group(2)), out)
-    out = _AT_NUMBER.sub(lambda m: at("", m.group(1)), out)
-    nums = sorted({str(n) for n in numbers if len(str(n)) >= 5 and str(n).isdigit()}, key=len, reverse=True)
-    if nums:
-        out = re.sub(r"(?<![0-9])(?:%s)(?![0-9])" % "|".join(nums), NUMBER, out)
-    return out
+            whole = "@%s(%s)" % (name, qq)
+            out = out.replace(whole, at(whole, str(qq)))
+    out = _AT_NAMED.sub(lambda m: at(m.group(0), m.group(2)), out)
+    out = _AT_NUMBER.sub(lambda m: at(m.group(0), m.group(1)), out)
+    return _whole_numbers(out, numbers)
+
+
+def hide_numbers(text, numbers) -> str:
+    """What was said in one place, brought up in another without names (anon): people's
+    numbers go with their names -- an @ of one of `numbers` keeps the name only ("@名字",
+    which anonymize then takes), a bare "@号码" is "@某人", and each of `numbers` becomes NUMBER."""
+    nums = {str(n) for n in numbers if len(str(n)) >= 5 and str(n).isdigit()}
+    out = str(text or "")
+    if not nums:
+        return out
+    out = _AT_NAMED.sub(lambda m: "@" + (m.group(1).strip() or SOMEBODY) if m.group(2) in nums else m.group(0), out)
+    out = _AT_NUMBER.sub(lambda m: "@" + SOMEBODY if m.group(1) in nums else m.group(0), out)
+    return _whole_numbers(out, nums)
 
 
 def names_in(item) -> list:

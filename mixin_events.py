@@ -1304,15 +1304,16 @@ class EventsMixin:
                        "summary", "insight", "lesson", "event_key")
 
     def _keep_record_text(self, record, what) -> bool:
-        """Before an event or an insight is written: numbers out of its text; False when it
-        crosses a red line (then it is not written)."""
+        """Before an event or an insight is written: someone deleted out of its text; False
+        when it crosses a red line (then it is not written)."""
         if not isinstance(record, dict):
             return True
         for k in self._KEPT_TEXT_KEYS:
             if isinstance(record.get(k), str):
-                record[k] = self._scrub(record[k])
+                record[k] = self._without_gone(record[k])
         if isinstance(record.get("source_texts"), list):
-            record["source_texts"] = [self._scrub(x) if isinstance(x, str) else x for x in record["source_texts"]]
+            record["source_texts"] = [self._without_gone(x) if isinstance(x, str) else x
+                                      for x in record["source_texts"]]
         return not self._red_line(" ".join(str(record.get(k) or "") for k in self._KEPT_TEXT_KEYS), what)
 
     def _append_insight(self, record: dict) -> None:

@@ -183,6 +183,18 @@ if CASE == 'number_card':
     result['people'] = people
     result['search'] = search('10006')
 
+if CASE == 'numbers_in_words':
+    # numbers are kept in what she keeps (the owner, 10-29); the page still shows none of them
+    turn('小爱 我的号是 10002 我们群号是 %s 周末去爬山' % G1, '10002', '柠檬', group=G1, reply='一起呀', msg_id='m-num')
+    g = graph()
+    result['text'] = json.dumps(g, ensure_ascii=False)
+    result['kept'] = [e['text'] for e in plugin._read_library(vectors=False)['entries']]
+    mem = [n for n in g['data']['nodes'] if n['kind'] == 'memory']
+    result['details'] = [node(n['id'])['data'] for n in mem]
+    result['search'] = {q: search(q) for q in ('10002', G1, '我的号是')}
+    lemon = [p for p in g['data']['nodes'] if p['kind'] == 'person' and node(p['id'])['data']['title'] == '柠檬']
+    result['qq'] = node(lemon[0]['id'], 'qq')['data'] if lemon else None
+
 if CASE == 'paging':
     brain_graph.PART_NODES, brain_graph.PART_EDGES = 4, 5
     whole = graph()

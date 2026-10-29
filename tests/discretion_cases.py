@@ -600,7 +600,7 @@ def run():
             loop.run_until_complete(plugin._maybe_write_notebook())
             out['calls'] = len(calls)
         elif CASE == 'notebook_scrub':
-            # what she writes in her notebook is kept like the rest: a number she knows goes, and
+            # what she writes in her notebook is kept like the rest: numbers stay (10-29), and
             # someone deleted is 某人 (not only at the next start)
             t(0, '小爱 早上好', '10002', '柠檬', A)
             t(10, '小爱 我也在', '10003', '阿星', A)
@@ -653,6 +653,22 @@ def run():
         out['changes'] = plugin.self_model['notebook_night']['changes']
         t(0, '小爱 早上好', '10002', '柠檬', A)
         out['group'] = out['turns'][-1]['prompt']
+    elif CASE == 'numbers_elsewhere':
+        # the owner, 10-29: numbers are kept; what was said openly in group A comes up in group B
+        # without names -- and without the numbers she knows (his, group A's); a group she is not
+        # in she cannot tell from any number, so its number stays
+        said = '小爱，我们群周末要去爬山 我的号是 10002 群号 900001 隔壁群 900077'
+        out['a'] = t(0, said, '10002', '柠檬', A, reply='爬山好呀')
+        plugin._begin_job()
+        origin = main.discretion.make_origin('group:' + A, ['10002'], ['m_hike'])
+        plugin._append_event_archive({
+            'id': 'hike', 'ts': clock.now, 'session': 'default:GroupMessage:' + A, 'title': '周末爬山',
+            'event': '柠檬（10002）约群 900001 周末爬山，隔壁群 900077 也去', 'event_key': 'hike', 'origin': origin})
+        plugin.self_model['notebook'] = [{'id': 'n1', 'text': '柠檬 10002 约群 900001 爬山，隔壁群 900077 也去', 'ts': 0,
+                                          'origin': origin}]
+        out['b'] = t(60, '小爱，我们群周末要去爬山 我的号是 群号 隔壁群 你听说了吗', '10004', '桃子', B)
+        out['same'] = t(30, '小爱 爬山的事你还记得吗', '10002', '柠檬', A)
+        out['kept'] = [e['text'] for e in plugin._read_library(vectors=False)['entries']]
     elif CASE == 'names_everywhere':
         # 阿星 goes by another group card in group B; a thing said openly in both comes up
         # in a third group: every name he goes by is taken out

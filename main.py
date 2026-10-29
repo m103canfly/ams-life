@@ -370,7 +370,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:
             logger.warning("[ams-life] memory id / vector migration failed: %s", exc)
         try:
-            self._migrate_numbers()  # numbers kept before step 1-3-5 are taken out (copies archived first)
+            self._remove_gone_at_start()  # someone deleted is taken out of what she keeps (copies archived first)
         except Exception as exc:
             logger.warning("[ams-life] number migration failed: %s", exc)
         try:
@@ -586,13 +586,13 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                     if isinstance(c, str):
                         text = c
                         break
-        # ams-life: what she keeps of it (memory, open loops) has no numbers (_scrub), and
-        # neither has what AstrBot sends the model of this message (it writes an @ as
-        # "@昵称(号码)"; a second @ of her carries her own number). What AstrBot keeps in its
-        # own history is step 2's.
-        text = self._scrub(text, event)
+        # ams-life: what she keeps of it (memory, open loops), and what AstrBot sends the model
+        # of this message, keep it as it was said -- "@名字(号码)", numbers too -- but someone
+        # deleted is 某人 and an @ of her is her name (_without_gone). What AstrBot keeps in
+        # its own history is step 2's.
+        text = self._without_gone(text, event)
         if isinstance(getattr(req, "prompt", None), str) and req.prompt:
-            req.prompt = self._scrub(req.prompt, event)
+            req.prompt = self._without_gone(req.prompt, event)
         # The core must observe the incoming message; otherwise v/a/stress and
         # fallback labels only change when the model emits a hidden <biocore> tag.
         _query_vec = None

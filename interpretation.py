@@ -258,8 +258,9 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
 
     ams-life step 1-2: every line only describes (her state, how she stands with
     the person, what she remembers, ...); nothing tells the model how to reply.
-    No numbers, no QQ numbers; the body line names nobody. Lines with nothing to
-    say are left out.
+    The lines it writes itself carry no numbers and no QQ numbers; what she remembers
+    is as she kept it (numbers kept since 10-29, the owner; from elsewhere without the
+    numbers she knows). The body line names nobody. Lines with nothing to say are left out.
     """
     out = []
     brief = body_brief(core)
