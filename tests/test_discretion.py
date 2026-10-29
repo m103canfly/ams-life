@@ -166,6 +166,39 @@ class SomeoneOnlyAtted(unittest.TestCase):
             self.assertNotIn(word, b)
 
 
+class Frames(unittest.TestCase):
+    """The owner, 10-29: names she writes back are framed 「」 where she keeps them."""
+
+    def test_a_name_goes_with_its_frame(self):
+        a = d.anonymize
+        self.assertEqual(a('「阿星」约「柠檬」', ['阿星'], to='某人'), '某人约「柠檬」')
+        self.assertEqual(a('「阿星」约「柠檬」', ['阿星', '柠檬']), '有人约有人')
+        self.assertEqual(a('阿星约「柠檬」', ['阿星', '柠檬']), '有人约有人')   # framed or not
+
+    def test_unframe_takes_off_only_frames_round_a_name(self):
+        u = d.unframe
+        self.assertEqual(u('「柠檬」约「Tom Lee」'), '柠檬约「Tom Lee」')   # a space: not taken for a name
+        self.assertEqual(u('他说「周末 一起去吧」，「好的，」'), '他说「周末 一起去吧」，「好的，」')
+        self.assertEqual(u('「「柠檬」」'), '「柠檬」')
+
+    def test_the_notebook_is_asked_to_keep_them(self):
+        import interpretation
+        self.assertIn('名字照材料里那样，用「」框着', interpretation.notebook_prompt([], []))
+
+    def test_reply_prompt_has_names_without_frames(self):
+        r = run_case('frames')
+        self.assertIn(['「柠檬」约「阿星」爬山', '「柠檬」说「周末 一起去吧」，「阿星」答应了'], r['kept'])
+        a = [ln for ln in r['a']['prompt'].splitlines() if ln.startswith('[最近的事]')]
+        self.assertEqual(len(a), 1, r['a']['prompt'])
+        self.assertIn('柠檬约阿星爬山', a[0])
+        self.assertIn('「周末 一起去吧」', a[0])       # a quote she did not frame stays as typed
+        self.assertNotIn('「柠檬」', r['a']['prompt'])
+        self.assertNotIn('「阿星」', r['a']['prompt'])
+        b = [ln for ln in r['b']['prompt'].splitlines() if ln.startswith('[最近的事]')]
+        self.assertTrue(b and '有人约有人爬山' in b[0], r['b']['prompt'])
+        self.assertNotIn('「有人」', r['b']['prompt'])
+
+
 class SaidInTheGroupToo(unittest.TestCase):
     """No exception any more: what he told her in private stays in that private chat,
     even after he says nearly the same thing in a group himself."""

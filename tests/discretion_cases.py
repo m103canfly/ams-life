@@ -685,6 +685,19 @@ def run():
         out['kept'] = [e['text'] for e in plugin._read_library(vectors=False)['entries']]
         plugin._name_index = None   # as after a restart: the index is built again from what she keeps
         out['known_after_restart'] = sorted(plugin._known_numbers())
+    elif CASE == 'frames':
+        # the owner, 10-29: names she writes back are framed in what she keeps; the reply model
+        # sees them bare; a quote someone typed with 「」 stays as typed
+        hear(plugin, loop, 0, '我说过「周末 一起去吧」，记得吗', '10002', '柠檬', A)
+        plugin._begin_job()
+        plugin._append_event_archive({
+            'id': 'hike', 'ts': clock.now, 'session': 'default:GroupMessage:' + A, 'title': '「柠檬」约「阿星」爬山',
+            'event': '「柠檬」说「周末 一起去吧」，「阿星」答应了', 'event_key': 'hike',
+            'origin': main.discretion.make_origin('group:' + A, ['10002', '10003'], ['m_hike'])})
+        hear(plugin, loop, 1, '我也去', '10003', '阿星', A)
+        out['a'] = t(10, '小爱 爬山的事你还记得吗', '10004', '桃子', A)
+        out['b'] = t(10, '小爱 爬山的事你听说了吗', '10001', '芒果', B)
+        out['kept'] = [(e['title'], e['event']) for e in plugin._event_archive(10, read_only=True)]
     elif CASE == 'names_everywhere':
         # 阿星 goes by another group card in group B; a thing said openly in both comes up
         # in a third group: every name he goes by is taken out

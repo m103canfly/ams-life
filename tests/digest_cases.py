@@ -272,6 +272,8 @@ if CASE == 'everywhere':
     # an event about it, of 柠檬's alone: its key names him, and a key merged into it too
     add_event('柠檬约阿星打副本', '柠檬约阿星周末一起打副本', 'default:GroupMessage:' + G1, ['10002'],
               digest_kind=False, merged_event_keys=['阿星的副本局'])
+    # and a note of the night, its names framed (the owner, 10-29)
+    add_event('「阿星」约「柠檬」打副本', '「柠檬」答应了「阿星」', 'default:GroupMessage:' + G1, ['10002'], id='framed')
     result['before'] = files_with('阿星', archive=False)
     result['keys_before'] = [(e.get('event_key'), e.get('merged_event_keys'))
                              for e in plugin._event_archive(100, read_only=True)]
@@ -279,6 +281,9 @@ if CASE == 'everywhere':
     result['at_once'] = files_with('阿星', archive=False)
     result['keys_at_once'] = [(e.get('event_key'), e.get('merged_event_keys'))
                               for e in plugin._event_archive(100, read_only=True)]
+    result['framed_at_once'] = [(e.get('title'), e.get('event')) for e in plugin._event_archive(100, read_only=True)
+                                if e.get('id') == 'framed']
+    result['framed_somebody'] = files_with('「某人」', archive=False) + files_with('「有人」', archive=False)
     result['prompt'] = ask('小爱 周末的副本谁去', '10001', '芒果', group=G1, reply='还不知道', msg_id='w3')
     result['after_a_turn'] = files_with('阿星', archive=False)
     plugin = new_plugin()                                      # a restart

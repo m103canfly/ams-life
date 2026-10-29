@@ -1248,6 +1248,7 @@ def notebook_prompt(entries, materials, private_sitting=False, max_entries=20, m
             '{"changes":[{"op":"add","text":"……","private":false,"uses":["m2"]},'
             '{"op":"edit","no":1,"text":"……","private":true,"uses":["m1","m3"]},{"op":"delete","no":2}]}\n'
             "private 写你觉得这一条是不是私事；uses 写这一条用到了哪些材料的编号。"
+            "名字照材料里那样，用「」框着。"
             % (where, book, mats, max_edits, max_chars, max_entries))
 
 

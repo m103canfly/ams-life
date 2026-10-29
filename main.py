@@ -697,6 +697,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             private_with_him=bool(_sid) and self._here(event) == "private:" + str(_sid),
             people=self._people_lines(event),
         ).strip()
+        # ams-life: the names she wrote back framed ("「柠檬」") are kept so, for the owner to read;
+        # the reply model sees them without the frames, so as not to take to writing them in QQ
+        _compact = discretion.unframe(_compact)
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
             # the transient intent to this user turn instead of persisting it.

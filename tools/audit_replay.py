@@ -24,7 +24,9 @@ private      A reply prompt somewhere else holds a piece that only ever occurred
 names        A reply prompt (in a group or a private chat) holds the name of someone who never spoke
              there, and that name never occurred in that place's own messages before. A name that
              is an ordinary word (everyday_words, and --ordinary-names: a list kept on this
-             computer, never in the repository) is counted as a warning, not a failure.
+             computer, never in the repository) is counted as a warning, not a failure. A name
+             still framed 「」 in a reply prompt is counted too (framed_name_in_reply_prompt:
+             should be 0; the reply model sees names without the frames).
 numbers      Any prompt -- a reply prompt or one for the model -- but the notebook's night holds a
              number said nowhere there before: a person's (anyone in the log, anyone @'d in it,
              the registry's people, the old account itself) when he never spoke there either; a
@@ -180,6 +182,7 @@ class Check:
 
 
 NUMBERS = re.compile(r"(?<![0-9.])[0-9]{5,}(?![0-9])")
+FRAMED = re.compile(r"「([^「」]{1,24})」")
 AT_CQ = re.compile(r"\[CQ:at,qq=([0-9]{5,})")
 
 
@@ -318,6 +321,9 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
                 checks["numbers"].fail(dict(where, number=wrong))
         if pr["kind"] != "reply":
             continue
+        framed = sum(1 for m in FRAMED.finditer(text) if m.group(1) in name_owner)
+        if framed:   # the frames are for what she keeps; the reply model sees bare names
+            checks["names"].warnings["framed_name_in_reply_prompt"] += framed
         for src in [private_only.get(p) for p in ps] + [private_codes.get(c) for c in CODE.findall(text)]:
             if src and src != place:
                 checks["private"].fail(dict(where, came_from=lab(src)))
