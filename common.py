@@ -215,6 +215,11 @@ SEEN_HALF_LIFE_MIN = 360.0     # wanting to be seen grows halfway back to 1 in 6
 SEEN_RELIEF = 0.4              # someone answering her keeps 40% of it
 AMBIENT_WINDOW_SECONDS = 1800  # how lively the chats are: others' messages in the last 30 minutes
 AMBIENT_BUSY_COUNT = 30        # ... this many or more is as lively as it gets
+PRESENT_SECONDS = 1800         # step 2: who is here but not talking to her: wrote in the last 30 minutes,
+PRESENT_LINES = 20             # ... at most 20 lines back in that group's window
+ELSEWHERE_MAX = 4              # step 2: memories from elsewhere in one reply prompt, at most
+ELSEWHERE_PRIVATE_MAX = 2      # ... of which at most this many she may not say here
+EVENTS_PRIVATE_MAX = 1         # [最近的事]: of its three, at most one she may not say here
 # Her heart (step 1-2): only what she writes herself, in her notebook.
 NOTEBOOK_MAX = 20              # entries
 NOTEBOOK_CHARS = 40            # characters per entry

@@ -531,6 +531,8 @@ def main(argv=None):
     ap.add_argument("--digest", action="store_true",
                     help="let her note what happened today in each window each night (daily_digest)")
     ap.add_argument("--notebook", action="store_true", help="let her write her notebook each night")
+    ap.add_argument("--global-memory", action="store_true",
+                    help="step 2: one memory everywhere, each thing labelled (the setting global_memory)")
     ap.add_argument("--astrbot", help="run 2: the data folder of the AstrBot whose chat provider answers (read only)")
     ap.add_argument("--model", help="run 2: that provider's id, e.g. deepseek/deepseek-flash")
     ap.add_argument("--model-limit", type=int, default=0,
@@ -686,7 +688,7 @@ def main(argv=None):
     ctx = harness.FakeContext()
     ctx.provider = RecordingProvider()
     ctx.persona_manager = Personas()
-    plugin = plugin_main.BioCorePlugin(ctx, config={})
+    plugin = plugin_main.BioCorePlugin(ctx, config={"global_memory": True} if args.global_memory else {})
     plugin._ipv4_json = (local_embedder(args.embed_url, args.embed_model, stats) if args.embed_url
                          else harness.fake_ipv4_json)
     # her own 5-minute loop runs on the real clock and would do the nightly jobs at no place
@@ -833,6 +835,7 @@ def main(argv=None):
                "remember_replies": args.remember_replies, "impressions": args.impressions,
                "vectors": ("%s (%s)" % (args.embed_url, args.embed_model)) if args.embed_url else "fake",
                "aliases": bool(args.aliases), "digest": args.digest, "notebook": args.notebook,
+               "global_memory": bool(args.global_memory),
                "model": ("%s (%s)" % (model_name, model_base)) if post else "fake",
                "model_limit": args.model_limit if post else 0, "model_caps": caps,
                "model_calls_before": ledger.before if post else 0,

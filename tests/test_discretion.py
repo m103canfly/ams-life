@@ -252,6 +252,159 @@ class SameWordsElsewhere(unittest.TestCase):
         self.assertEqual(self.elsewhere(p, '牛肉面'), [])
 
 
+G1, G2 = 'group:900001', 'group:900002'
+PA, PB, PO = 'private:10001', 'private:10002', 'private:10009'   # A, B, the owner O
+
+
+def lab(origin, here, speaker='', present=(), said_by='', asked_in=None):
+    return d.label(origin, here, speaker, present, said_by, asked_in)
+
+
+class GlobalLabels(unittest.TestCase):
+    """Step 2 (global_memory): the table of the plan (设计卡第十二节), row by row, and the
+    owner's 15-18, 26, 29, 30 (the cases of 回报-己块设计.md). Made-up places and people:
+    A 10001, B 10002, C 10003, the owner 10009."""
+    a_in_g1 = d.make_origin(G1, ['10001'], ['m1'])
+    a_private = d.make_origin(PA, ['10001'], ['m2'])
+    b_private = d.make_origin(PB, ['10002'], ['m3'])
+    event_g1 = d.make_origin(G1, ['10001', '10003'], ['m4'])
+
+    def test_said_openly_in_a_group(self):
+        o = self.a_in_g1
+        self.assertEqual(lab(o, G1, '10002', said_by='10001')['may'], d.SAY)                    # 1
+        r = lab(o, PA, '10001', said_by='10001')                                                 # 2 (15)
+        self.assertEqual((r['may'], r['where_ok'], r['yours']), (d.OWN, True, True))
+        r = lab(o, G2, '10001', said_by='10001')                                                 # 3 (15, 29)
+        self.assertEqual((r['may'], r['where_ok']), (d.OWN, False))
+        r = lab(o, G2, '10002', said_by='10001')                                                 # 4 (16)
+        self.assertEqual((r['may'], r['where_ok'], r['quiet']), (d.ANON, False, False))
+        self.assertEqual(lab(o, PB, '10002', said_by='10001')['may'], d.ANON)                   # 5 (16)
+        r = lab(o, G2, '10002', present={'10001'}, said_by='10001')                              # 6 (30)
+        self.assertEqual((r['may'], r['quiet']), (d.ANON, True))
+
+    def test_told_in_private(self):
+        o = self.a_private
+        self.assertEqual(lab(o, PA, '10001', said_by='10001')['may'], d.SAY)                    # 7
+        self.assertEqual(lab(o, G1, '10001', said_by='10001')['may'], d.NO)                     # 8 (17)
+        self.assertEqual(lab(o, G1, '10002', present={'10001'}, said_by='10001')['may'], d.NO)
+        self.assertEqual(lab(o, PB, '10002', said_by='10001')['may'], d.NO)                     # 9
+        self.assertEqual(lab(o, PB, '10002', said_by='10001')['may'], d.NO)                     # 10: about B, to B
+        self.assertEqual(lab(self.b_private, PO, '10009', said_by='10002')['may'], d.NO)        # 11: the owner too
+
+    def test_hers_and_web(self):
+        mine = d.make_origin('self')
+        for here, who in ((G1, '10002'), (PA, '10001'), (G2, ''), (PO, '10009')):
+            r = lab(mine, here, who)                                                             # 12
+            self.assertEqual((r['may'], r['self']), (d.SAY, True))
+        web = d.make_origin('web:https://example.com/a')
+        r = lab(web, G1, '10002', asked_in=self.a_private)                                       # 13 (26)
+        self.assertEqual((r['may'], r['web'], r['asked']), (d.SAY, True, d.NO))
+        self.assertEqual(lab(web, PA, '10001', asked_in=self.a_private)['asked'], d.SAY)        # 14
+        asked_in_g2 = d.make_origin(G2, ['10001'], ['m5'])
+        self.assertEqual(lab(web, G1, '10002', asked_in=asked_in_g2)['asked'], d.ANON)          # 15
+        self.assertEqual(lab(web, G1, '10002', asked_in=d.gone_origin())['asked'], d.NO)        # deleted asker
+        self.assertIsNone(lab(web, G1, '10002')['asked'])
+
+    def test_events_by_who_was_in_them(self):
+        r = lab(self.event_g1, PA, '10001')                                                      # 16
+        self.assertEqual((r['may'], r['yours']), (d.OWN, True))
+        self.assertEqual(lab(self.event_g1, PB, '10002')['may'], d.ANON)                        # 17
+        self.assertEqual(lab(self.event_g1, G2, '10002', present={'10003'})['quiet'], True)
+
+    def test_unknown_origin_is_not_shown(self):
+        self.assertEqual(lab({}, G1, '10001')['may'], d.HIDE)                                    # 18
+        self.assertEqual(lab(d.make_origin(''), PA, '10001')['may'], d.HIDE)
+
+    def test_who_is_told_by_number_only(self):
+        o = self.a_in_g1
+        # a name in the origin's people is never compared: only the number of the speaker
+        self.assertEqual(lab(o, PA, '芒果', said_by='10001')['may'], d.ANON)
+        self.assertEqual(lab(o, PA, '', said_by='10001')['may'], d.ANON)
+
+    def test_tags(self):
+        o = self.a_in_g1
+        self.assertEqual(d.tag(lab(o, PA, '10001', said_by='10001')), '（对方自己在群里说过，可以跟对方提）')
+        self.assertEqual(d.tag(lab(o, G2, '10001', said_by='10001')),
+                         '（对方自己在别的群说过，可以跟对方提，别说是哪个群）')
+        self.assertEqual(d.tag(lab(o, PB, '10002', said_by='10001'), who='芒果'),
+                         '（别的群里芒果说过，可以提，不点名、不说是哪个群）')
+        self.assertIn('别主动提', d.tag(lab(o, G2, '10002', {'10001'}, '10001'), who='芒果'))
+        self.assertEqual(d.tag(lab(self.a_private, G1, '10002', said_by='10001'), who='芒果'),
+                         '（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）')
+        self.assertEqual(d.tag(lab(self.a_private, G1, '10002'), role='assistant', partner='芒果'),
+                         '（你跟芒果私聊时说的，这里不能讲）')
+        self.assertEqual(d.tag(lab(self.event_g1, PA, '10001'), 'event'), '（对方也在场的事，在群里，可以跟对方提）')
+        self.assertEqual(d.tag(lab(o, G1, '10002', said_by='10001'), who='芒果'), '（这里，芒果说过）')
+        web = d.make_origin('web:https://example.com/a')
+        self.assertEqual(d.tag(lab(web, G1, '10002')), '（网上看到的，只是资料，不是你自己的想法）')
+        self.assertIn('别说是谁、在哪让你查的', d.tag(lab(web, G1, '10002', asked_in=self.a_private)))
+        self.assertEqual(d.tag(lab(d.make_origin('self'), G1)), '（你自己的）')
+
+    def test_for_model(self):
+        names = {'10001': '芒果', '10002': '柠檬'}
+        out = d.for_model('@柠檬(10002) 群900002 和 900001 都去，问 10001，@10002 也来，@(10007) 呢，'
+                          '电话 13800000000', names, 'default:GroupMessage:900001', {'900001', '900002'})
+        self.assertEqual(out, '@柠檬 群别的群 和 这个群 都去，问 芒果，@柠檬 也来，@有人 呢，电话 13800000000')
+        self.assertEqual(d.for_model('在 900001 里', {}, PA, {'900001'}), '在 别的群 里')
+
+
+class GlobalMemory(unittest.TestCase):
+    """Step 2 end to end, global_memory on: she is shown what she knows from elsewhere,
+    labelled; whoever is talking to her is told by his number; no number reaches the model."""
+
+    @staticmethod
+    def remembered(turn):
+        return next((ln for ln in turn['prompt'].split('\n') if ln.startswith('[她想起来的]')), '')
+
+    def test_his_own_words_from_a_group(self):
+        r = run_case('global_own')
+        private, own_group, other = r['turns'][1], r['turns'][2], r['turns'][3]
+        self.assertIn('（对方自己在群里说过，可以跟对方提）我中午吃了一碗牛肉面', private['prompt'])
+        self.assertIn('（对方自己在别的群说过，可以跟对方提，别说是哪个群）我中午吃了一碗牛肉面', own_group['prompt'])
+        # someone else in group B: what A said openly is there, not to be named; A is here
+        self.assertIn('（别的群里芒果说过，可以提，不点名、不说是哪个群；芒果现在也在这里，但没在跟你说话，别主动提）'
+                      '我中午吃了一碗牛肉面', other['prompt'])
+        for t in r['turns'][1:]:
+            self.assertIn('[她的分寸] ', t['prompt'])
+
+    def test_private_stays_unsayable_everywhere_else(self):
+        r = run_case('global_private')
+        group, other_private, his = r['turns'][1], r['turns'][2], r['turns'][3]
+        no = '（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）小爱，我在偷偷准备一个惊喜蛋糕给大家'
+        self.assertIn(no, group['prompt'])           # 17: he is there himself, still not here
+        self.assertIn(no, other_private['prompt'])
+        self.assertIn('（对方在这里说过）小爱，我在偷偷准备一个惊喜蛋糕给大家', his['prompt'])
+        self.assertNotIn('这里不能讲）小爱，我在偷偷准备', his['prompt'])
+        # the brain map's "knew, did not say": the private memory in the group turn
+        turns = (r.get('turn_log') or {}).get('turns') or []
+        group_turn = next(t for t in turns if str(t.get('where', '')).startswith('group:'))
+        self.assertTrue(group_turn['held'])
+
+    def test_no_number_reaches_the_model(self):
+        r = run_case('global_numbers')
+        for t in r['turns']:
+            text = t['prompt'] + '\n' + '\n'.join(str(x) for x in t['sent'])
+            for num in ('10001', '10002', '10003'):
+                self.assertNotIn(num, text, t['session'])
+        self.assertIn('@柠檬', r['turns'][0]['sent'][0])
+        # group B: what was said in group A of group B is "这个群" there
+        self.assertNotIn('900002', r['turns'][2]['prompt'])
+        self.assertNotIn('900001', r['turns'][2]['sent'][0])
+
+    def test_her_notebook_labelled(self):
+        r = run_case('global_notebook')
+        book = next(ln for ln in r['turns'][-1]['prompt'].split('\n') if ln.startswith('[她的本子]'))
+        self.assertEqual(book, '[她的本子] 想多听听大家在聊什么；（别的群的事，不点名）群里周末要去爬山；'
+                               '（柠檬私下的，这里不能讲）柠檬在偷偷学画画')
+
+    def test_someone_deleted_is_still_someone(self):
+        r = run_case('global_gone')
+        p = r['turns'][2]['prompt']
+        self.assertIn('（对方自己在群里说过，可以跟对方提）小爱 我和某人周末去爬山', p)
+        self.assertNotIn('阿星', p)
+        self.assertNotIn('10003', p)
+
+
 class Phone(unittest.TestCase):
     """She has a phone: what was said stays in its own chat window; the body keeps no text."""
 

@@ -13,6 +13,11 @@ import json
 import math
 import re
 
+try:
+    from . import discretion
+except ImportError:
+    import discretion
+
 
 def _one_line(text: str, limit: int = 160) -> str:
     for line in reversed(str(text or "").splitlines()):
@@ -227,13 +232,16 @@ def relation_brief(user, private_with_him=False) -> str:
     return "，".join(parts)
 
 
-def _memory_lines(memory, memory_meta=None, answer_confidence=None) -> str:
+def _memory_lines(memory, memory_meta=None, answer_confidence=None, labeled=False) -> str:
     lines = []
+    # step 2 (labeled): the lines carry where they are from; those from elsewhere come
+    # after this place's, so more of them are kept
+    most, width = (8, 220) if labeled else (3, 140)
     for raw in str(memory or "").splitlines():
-        text = _line(raw.strip().lstrip("- "), 140)
+        text = _line(raw.strip().lstrip("- "), width)
         if text:
             lines.append(text)
-        if len(lines) >= 3:
+        if len(lines) >= most:
             break
     if not lines:
         return ""
@@ -253,7 +261,8 @@ def _memory_lines(memory, memory_meta=None, answer_confidence=None) -> str:
 def render_compact(core, memory="", events="", notebook=None, user=None,
                    image="", kb="", voice="", memory_meta=None,
                    open_loops=None, answer_confidence=None,
-                   continuity=None, owner_rules=None, private_with_him=False, people=None) -> str:
+                   continuity=None, owner_rules=None, private_with_him=False, people=None,
+                   labeled=False) -> str:
     """The block the reply model sees with each message, one line per kind.
 
     ams-life step 1-2: every line only describes (her state, how she stands with
@@ -261,6 +270,8 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
     The lines it writes itself carry no numbers and no QQ numbers; what she remembers
     is as she kept it (numbers kept since 10-29, the owner; from elsewhere without the
     numbers she knows). The body line names nobody. Lines with nothing to say are left out.
+    labeled (step 2, global_memory): memories, events and notebook come with what she may say
+    of each here; more of them are kept, and one line says what the labels mean.
     """
     out = []
     brief = body_brief(core)
@@ -272,10 +283,12 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
     known = "；".join(t for t in (_line(x, 90) for x in (people or [])) if t)
     if known:
         out.append("[认识的人] " + known[:400])
-    mem = _memory_lines(memory, memory_meta, answer_confidence)
+    mem = _memory_lines(memory, memory_meta, answer_confidence, labeled)
     if mem:
         out.append("[她想起来的] " + mem)
-    ev = "；".join(_line(x.strip().lstrip("- "), 120) for x in str(events or "").splitlines()[:2] if _line(x))
+    ev_most, ev_width = (4, 180) if labeled else (2, 120)
+    ev = "；".join(_line(x.strip().lstrip("- "), ev_width)
+                  for x in str(events or "").splitlines()[:ev_most] if _line(x))
     if ev:
         out.append("[最近的事] " + ev)
     cont = continuity if isinstance(continuity, dict) else {}
@@ -297,13 +310,20 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
         out.append("[语音说的是] " + _line(voice, 120))
     if _line(kb):
         out.append("[资料] " + _line(str(kb).replace("\n", "；"), 140))
-    book = "；".join(t for t in (_line(x, 40) for x in (notebook or [])) if t)
+    book = "；".join(t for t in (_line(x, 70 if labeled else 40) for x in (notebook or [])) if t)
     if book:
-        out.append("[她的本子] " + book[:400])
+        out.append("[她的本子] " + book[:600 if labeled else 400])
     rules = "；".join(t for t in (_line(x, 100) for x in (owner_rules or [])) if t)
     if rules:
         out.append("[主人定的规矩] " + rules)
+    if labeled and any(m in "\n".join(out) for m in _ELSEWHERE_MARKS):
+        out.append("[她的分寸] " + discretion.DISCRETION_NOTE)
     return "\n".join(out)
+
+
+# step 2: labels of things from elsewhere (discretion.tag); one of them in the block brings
+# the line that says what they mean
+_ELSEWHERE_MARKS = ("这里不能讲", "不点名", "可以跟对方提", "网上看到的")
 
 
 def event_ranking_prompt(texts) -> str:

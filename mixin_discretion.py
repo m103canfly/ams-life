@@ -555,6 +555,116 @@ class DiscretionMixin:
                 lines.append(text)
         return lines
 
+    # ------------------------------------------------------------------
+    # Step 2 (global_memory): the reply prompt shows her everything, each item labelled
+    # with what she may say of it here (discretion.label / discretion.tag). The helpers
+    # above stay for everything else.
+    # ------------------------------------------------------------------
+    def _present_people(self, event) -> set:
+        """Who is here but not talking to her: those who wrote in this group's window in the
+        last PRESENT_SECONDS, at most PRESENT_LINES lines back (not the speaker, not her)."""
+        here = self._here(event)
+        if not here.startswith("group:"):
+            return set()
+        speaker = str(self._speaker(event)[0] or "")
+        her = {str(x) for x in (getattr(self, "_her_ids", None) or ())}
+        since = time.time() - PRESENT_SECONDS
+        out = set()
+        for x in self._read_window(here)["recent"][-PRESENT_LINES:]:
+            if x.get("role") == "assistant" or float(x.get("ts", 0) or 0) < since:
+                continue
+            sid = str(x.get("sender_id") or "")
+            if sid and sid != speaker and sid not in her:
+                out.add(sid)
+        return out
+
+    def _display_name(self, person) -> str:
+        """The one name to show for a person (never his number): the name in his record,
+        else one he was seen with; 某人 when none is known."""
+        person = str(person or "").strip()
+        if not person:
+            return discretion.SOMEBODY
+        try:
+            safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in person)[:60]
+            path = USER_DIR / (safe + ".json")
+            if path.exists():
+                name = str(json.loads(path.read_text(encoding="utf-8")).get("sender_name") or "").strip()
+                if name and not name.isdigit():
+                    return name
+        except Exception:
+            pass
+        seen = sorted(n for n in self._names_index().get(person, set()) if n and not n.isdigit())
+        return seen[0] if seen else discretion.SOMEBODY
+
+    def _partner_name(self, origin) -> str:
+        """Whose private chat an item is from (for "这里不能讲" labels)."""
+        where = str((origin or {}).get("where") or "")
+        return self._display_name(where.split(":", 1)[1]) if where.startswith("private:") else discretion.SOMEBODY
+
+    def _label_for(self, item, event, said_by="", present=None) -> dict:
+        origin = discretion.origin_of(item)
+        asked = item.get("asked_in") if isinstance(item, dict) else None
+        return discretion.label(origin, self._here(event), str(self._speaker(event)[0] or ""),
+                                self._present_people(event) if present is None else present,
+                                said_by=said_by, asked_in=asked if isinstance(asked, dict) else None)
+
+    def _for_model(self, text, event) -> str:
+        """discretion.for_model with what she knows: every number she knows becomes a name
+        (her own number her name), group numbers "这个群" / "别的群"."""
+        names = {}
+        her = set(getattr(self, "_her_ids", None) or ())
+        for person in self._names_index():
+            if person not in her:
+                names[person] = self._display_name(person)
+        for h in her:
+            names[str(h)] = HER_NAME
+        groups = {p.split(":", 1)[1] for p in self._window_places() if p.startswith("group:")}
+        return discretion.for_model(text, names, self._here(event), groups)
+
+    def _numbers_out_of_request(self, req, event) -> None:
+        """Step 2: _for_model over what AstrBot put into this request: the message
+        ("@昵称(号码)"), the system prompt, the history, and the parts other plugins added
+        (the group context lines name an @ by its number when it has no name). The system
+        prompt and the parts are this turn's only; the message and the history are what
+        AstrBot saves back as this conversation, so there they stay without the numbers."""
+        def fix(text):
+            return self._for_model(text, event) if isinstance(text, str) and text else text
+        try:
+            req.prompt = fix(getattr(req, "prompt", None))
+            req.system_prompt = fix(getattr(req, "system_prompt", None))
+            for msg in getattr(req, "contexts", None) or []:
+                if not isinstance(msg, dict):
+                    continue
+                if isinstance(msg.get("content"), str):
+                    msg["content"] = fix(msg["content"])
+                elif isinstance(msg.get("content"), list):
+                    for part in msg["content"]:
+                        if isinstance(part, dict) and isinstance(part.get("text"), str):
+                            part["text"] = fix(part["text"])
+            for part in getattr(req, "extra_user_content_parts", None) or []:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    part["text"] = fix(part["text"])
+                elif isinstance(getattr(part, "text", None), str):
+                    part.text = fix(part.text)
+        except Exception as exc:
+            logger.warning("[ams-life] numbers out of the request failed: %s", exc)
+
+    def _labeled_notebook(self, event) -> list:
+        """Her notebook for the reply prompt: every entry she may know, with its label."""
+        lines = []
+        present = self._present_people(event)
+        for item in (self.self_model or {}).get("notebook") or []:
+            if not isinstance(item, dict):
+                continue
+            lab = self._label_for(item, event, present=present)
+            if lab["may"] == discretion.HIDE:
+                continue
+            text = str(item.get("text") or "")
+            if text:
+                lines.append(discretion.tag(lab, "note", partner=self._partner_name(discretion.origin_of(item)))
+                             + text)
+        return lines
+
     def _self_model_for(self, event) -> dict:
         """Self model as seen from here: "narrative" is her notebook, only the entries
         allowed here (used for goal relevance)."""
