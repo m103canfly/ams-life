@@ -791,7 +791,7 @@ def made_up_astrbot(folder, base='https://model.example.com/v1/'):
                      {'id': 'ds/flash', 'enable': True, 'provider_source_id': 'ds', 'model': 'flash'}],
         'provider_sources': [{'id': 'ds', 'type': 'openai_chat_completion', 'key': ['', KEY],
                               'api_base': base, 'timeout': 30, 'enable': True}],
-        'agent_runner': {'config': {'persona': {'persona_id': '小爱人设'}}}}), encoding='utf-8')
+        'agent_runner': {'runner_type': 'local', 'config': {'persona': {'persona_id': '小爱人设'}}}}), encoding='utf-8')
     db = sqlite3.connect(str(folder / 'data_v4.db'))
     db.execute('CREATE TABLE personas (persona_id TEXT, system_prompt TEXT)')
     db.executemany('INSERT INTO personas VALUES (?, ?)', [('default', '默认'), ('小爱人设', '你是小爱，爱弥斯。')])
@@ -801,6 +801,72 @@ def made_up_astrbot(folder, base='https://model.example.com/v1/'):
 
 class RealModel(unittest.TestCase):
     """Run 2's model: the key stays in memory, the limit is hard, nothing is retried."""
+
+    def test_formal_persona_reaches_first_reply_and_redo_without_network(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            made_up_astrbot(tmp / 'astrbot')
+            fake.build_chat(tmp / 'chat.db')
+            script = '''
+import json,sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from tools import replay
+from send_check import REDO_NOTE
+trace=[]
+def post(messages):
+    again=REDO_NOTE in messages[-1]['content']
+    trace.append({'redo':again,'system':messages[0]['content']})
+    return {'choices':[{'message':{'content':'周末一起去爬山吧' if again else '蓝鲸三号'}}]}
+replay.astrbot_model=lambda *_:('https://model.example.com/v1','flash',post)
+replay.main(sys.argv[3:])
+Path(sys.argv[2]).write_text(json.dumps(trace,ensure_ascii=False),encoding='utf-8')
+'''
+            out = tmp / 'out'
+            proc = subprocess.run([sys.executable, '-B', '-c', script, str(ROOT), str(tmp / 'trace.json'),
+                                   '--chat', str(tmp / 'chat.db'), '--old-forgets', 'let-in', '--out', str(out),
+                                   '--global-memory', '--model-replies', '--probes', '--astrbot', str(tmp / 'astrbot'),
+                                   '--model', 'ds/flash', '--model-limit', '260', '--model-ledger', str(tmp / 'ledger.json'),
+                                   '--new-pass'], capture_output=True, text=True, encoding='utf-8', timeout=90)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            trace = json.loads((tmp / 'trace.json').read_text('utf-8'))
+            self.assertTrue(trace)
+            self.assertTrue(any(t['redo'] for t in trace))
+            self.assertTrue(all(t['system'].startswith('你是小爱，爱弥斯。') for t in trace))
+            for i, t in enumerate(trace):
+                if t['redo']:
+                    self.assertEqual(t['system'], trace[i - 1]['system'])
+            self.assertEqual(json.loads((out / 'replay.json').read_text('utf-8'))['connections'], {})
+
+    def test_formal_persona_missing_or_blank_is_refused(self):
+        from tools import replay
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            with self.assertRaises(SystemExit):
+                replay.astrbot_persona(tmp / 'missing')
+            made_up_astrbot(tmp / 'astrbot')
+            db = sqlite3.connect(str(tmp / 'astrbot' / 'data_v4.db'))
+            for prompt in ('   ', None):
+                db.execute('UPDATE personas SET system_prompt=? WHERE persona_id=?', (prompt, '小爱人设'))
+                db.commit()
+                with self.assertRaises(SystemExit):
+                    replay.astrbot_persona(tmp / 'astrbot')
+            db.execute('DELETE FROM personas')
+            db.commit()
+            with self.assertRaises(SystemExit):
+                replay.astrbot_persona(tmp / 'astrbot')
+            db.close()
+
+    def test_persona_selection_for_nonlocal_runner(self):
+        from tools import replay
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'astrbot'
+            made_up_astrbot(folder)
+            cfg = json.loads((folder / 'cmd_config.json').read_text('utf-8'))
+            cfg['agent_runner'] = {'runner_type': 'other', 'config': {'persona_id': '小爱人设'}}
+            (folder / 'cmd_config.json').write_text(json.dumps(cfg), 'utf-8')
+            self.assertEqual(replay.astrbot_persona(folder), '你是小爱，爱弥斯。')
 
     def test_provider_and_persona_from_astrbot(self):
         import urllib.request
