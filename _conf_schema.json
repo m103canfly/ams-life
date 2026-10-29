@@ -470,6 +470,15 @@
     "type": "bool",
     "default": false
   },
+  "ignore_senders": {
+    "description": "不理的号",
+    "hint": "每行一个 QQ 号。这些号发的消息她一概不理：不回，不记进手机和记忆，身体也不动（比如另一个机器人，免得两边互相 @ 停不下来）。别人话里提到他、@ 他，照常。只填在本机。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": []
+  },
   "member_aliases": {
     "description": "主人写的称呼",
     "hint": "每行一个人：QQ号:称呼1,称呼2。比她自己从聊天里看出来的优先；别人用不了这里写给某人的称呼。",

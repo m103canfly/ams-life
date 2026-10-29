@@ -87,7 +87,8 @@ class Split(unittest.TestCase):
         # (_scrub_stores: what others said of him, 某人 everywhere as soon as he is deleted)
         # numbers kept (10-29): the scrub methods renamed, none more; review of PR #20: +2
         # (_note_at, _note_ats: someone only @'d is known by his number)
-        self.assertEqual(len(methods), 337)
+        # senders she ignores (the owner, 10-29): +1 (_ignored_sender)
+        self.assertEqual(len(methods), 338)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
