@@ -105,8 +105,9 @@ class Split(unittest.TestCase):
         # _spend_for_panel)
         # her browser in a reply (step 2, 丁): +11 (BrowseMixin: _browse_on, _browse_ledger, _browse_quota,
         # _browse_names, _give_browse_tools, _tool_context, _builtin_web_tool, _tool_search, _tool_read,
-        # _browse_after_reply, _browse_for_panel)
-        self.assertEqual(len(methods), 400)
+        # _browse_after_reply, _browse_for_panel); its second part: +8 (_remember_web, _browse_keep_reply,
+        # _browse_state, _browse_save_state, _last_message_ts, _browse_topics, _maybe_go_browse, _browse_trip)
+        self.assertEqual(len(methods), 408)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

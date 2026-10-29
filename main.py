@@ -795,6 +795,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 self._browse_after_reply(event, response)
             except Exception as exc:
                 logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
+            try:   # and the pages she read, as web memories (who asked kept apart)
+                await self._browse_keep_reply(event)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
         self._continue_job()
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)

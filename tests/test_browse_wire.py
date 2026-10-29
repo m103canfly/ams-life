@@ -1,5 +1,6 @@
-"""Step 2 (丁): her browser in a reply (mixin_browse.py), end to end in browse_cases.py with stand-ins
-for AstrBot's tool classes, its DeepSeek search / fetch and the resolver. All made up; no network."""
+"""Step 2 (丁): her browser (mixin_browse.py) -- in a reply, what she keeps of a page, her own trips --
+end to end in browse_cases.py with stand-ins for AstrBot's tool classes, its DeepSeek search / fetch,
+the model and the resolver. All made up; no network, no model."""
 import json
 import os
 import subprocess
@@ -96,6 +97,61 @@ class Money(unittest.TestCase):
         self.assertAlmostEqual(r['spent'], (4 * 0.00075 + (18000 * 0.3 + 6000 * 0.006 + 1200 * 1.2) / 1e6) * 7.2, places=5)
         self.assertFalse(r['chat_spend_has_browse'])                    # apart from the chat's money
         self.assertEqual(r['panel']['limit'], 5.0)
+
+
+
+class Kept(unittest.TestCase):
+    def test_a_page_read_in_a_reply_is_kept_by_the_page_not_her_reply(self):
+        r = run_case('reply')
+        self.assertEqual([w['url'] for w in r['web']], ['https://example.com/a', 'https://news.example.org/cat'])
+        for w in r['web']:
+            self.assertTrue(w['text'].startswith('一页：正文'))
+            self.assertNotIn('找到啦', w['text'])                        # her reply is not in it
+            self.assertNotIn('（资料完）', w['text'])
+            self.assertEqual(w['origin']['where'], 'web:' + w['url'])     # the page: public
+            self.assertEqual(w['origin']['people'], [])
+            self.assertEqual((w['asked_in']['where'], w['asked_in']['people']), ('group:900001', ['10001']))
+
+    def test_who_asked_deleted_the_page_stays_who_asked_is_the_mark(self):
+        r = run_case('reply')
+        self.assertEqual(r['forget_counts']['asked_in'], 2)
+        self.assertEqual([w['url'] for w in r['web_after']], ['https://example.com/a', 'https://news.example.org/cat'])
+        for w in r['web_after']:
+            self.assertEqual(w['asked_in'], {'where': 'gone', 'people': [], 'source_ids': [], 'visibility': 'private'})
+
+
+class Trip(unittest.TestCase):
+    def test_she_goes_when_curious_and_quiet_not_at_once_not_at_night(self):
+        r = run_case('trip')
+        self.assertFalse(r['not_curious'])
+        self.assertTrue(r['went'])
+        self.assertFalse(r['again_at_once'])                             # 40 minutes between trips
+        self.assertFalse(r['at_night'])
+
+    def test_the_rounds_the_plugin_runs_with_her_two_tools(self):
+        r = run_case('trip')
+        self.assertEqual([x['tools'] for x in r['rounds']], [['ams_web_search', 'ams_read_page']] * 3)
+        self.assertEqual([x['last'] for x in r['rounds']], ['user', 'tool', 'tool'])   # results go back each round
+        self.assertEqual(r['calls'], [{'query': '推荐的猫咖', 'count': 5}, {'url': 'https://news.example.org/cat'}])
+        self.assertEqual(r['tool_umo'], ['ams-life:browse'])            # the stand-in "chat" for AstrBot's tools
+
+    def test_what_she_saw_kept_as_hers_and_a_wish_to_tell(self):
+        r = run_case('trip')
+        self.assertEqual(r['web'], [{'text': '猫咖开业：看着挺可爱的（https://news.example.org/cat）',
+                                     'asked_in': {'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'},
+                                     'where': 'web:https://news.example.org/cat'}])   # a page she did not read: not kept
+        self.assertEqual(r['wishes'], [{'url': 'https://news.example.org/cat', 'what': '新开了猫咖', 'group_hint': '群1'}])
+        self.assertEqual(r['boredom_after'], 0.7)
+
+    def test_a_trip_is_paid_by_the_browser_not_the_chat(self):
+        r = run_case('trip')
+        self.assertEqual(r['ledger'], {'trips': 1, 'searches': 1, 'fetches': 1, 'input_miss': 6000, 'output': 300})
+        self.assertEqual(r['chat_spend'], '')
+
+    def test_a_wish_loses_the_name_of_someone_deleted(self):
+        r = run_case('trip')
+        self.assertTrue(r['wishes_after'])
+        self.assertFalse(any('芒果' in w for w in r['wishes_after']), r['wishes_after'])
 
 
 if __name__ == '__main__':
