@@ -230,6 +230,7 @@ class SelfieMixin:
                     self._media_bump("voice")
                     await asyncio.sleep(1.5)   # her written answer goes out first
                     await event.send(MessageChain([Record.fromFileSystem(str(path))]))
+                    self._note_she_sent(event, "voice")
                     logger.info("[ams-life] voice sent: %s", path.name)
 
             if want_selfie:
@@ -239,6 +240,7 @@ class SelfieMixin:
                 if path is not None:
                     self._media_bump("selfie")
                     await event.send(MessageChain([Image.fromFileSystem(str(path))]))
+                    self._note_she_sent(event, "selfie")
                     logger.info("[ams-life] selfie sent: %s", path.name)
         except Exception as exc:
             logger.warning("[ams-life] camera or voice failed: %s", exc)

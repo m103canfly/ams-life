@@ -1,6 +1,7 @@
 """Offline checks for bounded mood events; all examples are invented."""
 import sys
 import re
+from contextlib import ExitStack
 from unittest import mock
 import unittest
 from pathlib import Path
@@ -11,11 +12,115 @@ from test_body_heart import CLOCK, body, interpretation  # noqa: E402
 import attention  # noqa: E402
 import mixin_phone  # noqa: E402
 import mixin_attention  # noqa: E402
+import mixin_selfie  # noqa: E402
 import harness  # noqa: E402
 import main  # noqa: E402
 
 
+class MoodPhone(mixin_phone.PhoneMixin):
+    mood_events_enabled = True
+
+    def __init__(self):
+        self.core = body.BioCore()
+        self.origin = {'where': 'private:10005', 'people': ['10005'],
+                       'source_ids': ['made-up-message'], 'visibility': 'private'}
+        self.win = {'recent': []}
+
+    def _here(self, event): return 'private:10005'
+    def _speaker(self, event): return ('10005', '测试者')
+    def _job_stale(self): return False
+    def _read_window(self, place): return self.win
+    def _write_window(self, place, win): self.win = win
+    def _event_origin(self, event): return dict(self.origin)
+    def _without_gone(self, text, event): return text
+    def _addresses_her(self, event): return True
+    def _window_places(self): return ['private:10005']
+    def _familiarity(self, person): return 1.0
+    def _core(self, event): return self.core
+
+
 class MoodEvents(unittest.TestCase):
+    def _check_answer_once(self, phone):
+        event = object()
+        phone._window_add_reply(event, '一句话')
+        for _ in range(20):
+            if phone._mood_note_answer(event, 'private'):
+                phone.core.mood_event('answered')
+        self.assertEqual(sum(x['kind'] == 'answered' for x in phone.core.mood_events), 1)
+        phone._window_add_reply(event, '另一句话')
+        if phone._mood_note_answer(event, 'private'):
+            phone.core.mood_event('answered')
+        self.assertEqual(sum(x['kind'] == 'answered' for x in phone.core.mood_events), 2)
+
+    def test_each_reply_is_answered_once(self):
+        self._check_answer_once(MoodPhone())
+
+    def test_answer_dedup_mutation_is_detected(self):
+        class NoDedup(MoodPhone):
+            def _mood_note_answer(self, event, why):
+                for line in self.win['recent']:
+                    line.pop('mood_answered', None)
+                return super()._mood_note_answer(event, why)
+        with self.assertRaises(AssertionError):
+            self._check_answer_once(NoDedup())
+
+    def test_origin_reconstruction_preserves_ignore_tracking(self):
+        phone = MoodPhone()
+        event = type('Event', (), {'_mood_direct': True})()
+        phone._window_add_reply(event, '一句话')
+        line = phone.win['recent'][0]
+        self.assertNotIn('mood_direct', line['origin'])
+        line['origin'] = mixin_phone.discretion.origin_of(line)
+        CLOCK.advance(600)
+        phone._sweep_windows()
+        self.assertEqual(phone.core.mood_events[-1]['kind'], 'ignored')
+
+    def test_sent_selfie_counts_once_and_answer_prevents_loss(self):
+        event = type('Event', (), {'_mood_direct': True})()
+        silent, answered = MoodPhone(), MoodPhone()
+        for phone in (silent, answered):
+            phone._window_add_reply(event, '一句话')
+            phone._note_she_sent(event, 'selfie')
+            self.assertEqual(phone.win['recent'][-1]['text'], '[自拍]')
+            self.assertTrue(phone.win['recent'][-1]['mood_checked'])
+            self.assertTrue(phone.win['recent'][0]['mood_share'])
+        answered.win['recent'].append({'role': 'user', 'sender_id': '10005', 'ts': CLOCK() + 10})
+        CLOCK.advance(600)
+        silent._sweep_windows()
+        answered._sweep_windows()
+        self.assertEqual([x['kind'] for x in silent.core.mood_events], ['unanswered_share'])
+        self.assertFalse(getattr(answered.core, 'mood_events', []))
+
+    def test_media_note_rejects_unknown_kind_and_off_switch(self):
+        phone = MoodPhone()
+        event = type('Event', (), {'_mood_direct': True})()
+        phone._window_add_reply(event, '一句话')
+        phone._note_she_sent(event, 'raw text')
+        phone.mood_events_enabled = False
+        phone._note_she_sent(event, 'selfie')
+        self.assertEqual(len(phone.win['recent']), 1)
+        self.assertNotIn('mood_share', phone.win['recent'][0])
+
+    def test_brief_keeps_event_and_body_details(self):
+        core = body.BioCore()
+        core.mood_event('criticism')
+        core.talked = .9
+        core.ambient = .8
+        brief = interpretation.body_brief(core)
+        self.assertIn('刚才被说得有点不高兴', brief)
+        self.assertIn('今天说得太多了', brief)
+        self.assertIn('各处这会儿挺热闹', brief)
+
+    def test_brief_replaces_only_mood_and_energy_phrases(self):
+        core = body.BioCore()
+        core.mood_event('praise')
+        core.v, core.energy, core.talked = .5, .2, .9
+        brief = interpretation.body_brief(core)
+        self.assertIn('心情很好，话也多了起来', brief)
+        self.assertIn('有点困了', brief)
+        self.assertIn('今天说得太多了', brief)
+        self.assertNotIn('心情不错', brief)
+        self.assertNotIn('不太起劲', brief)
     def test_every_event_changes_its_stated_fields(self):
         for kind, changes in body.MOOD_EVENT_CHANGES.items():
             if kind == 'sleep':
@@ -139,7 +244,7 @@ class MoodEvents(unittest.TestCase):
                 self.core = body.BioCore()
                 self.familiarity = familiarity
                 self.win = {'recent': [{'role': 'assistant', 'ts': CLOCK(),
-                                        'origin': {'people': ['10005'], 'mood_direct': direct}}]}
+                                        'mood_direct': direct, 'origin': {'people': ['10005']}}]}
 
             def _window_places(self):
                 return ['group:900001']
@@ -174,7 +279,7 @@ class MoodEvents(unittest.TestCase):
             def __init__(self, answered):
                 self.core = body.BioCore()
                 self.win = {'recent': [{'role': 'assistant', 'ts': CLOCK(), 'mood_share': True,
-                                        'origin': {'people': ['10005'], 'mood_direct': True}}]}
+                                        'mood_direct': True, 'origin': {'people': ['10005']}}]}
                 if answered:
                     self.win['recent'].append({'role': 'user', 'sender_id': '10005', 'ts': CLOCK() + 30})
             def _window_places(self): return ['private:10005']
@@ -192,6 +297,59 @@ class MoodEvents(unittest.TestCase):
 
 
 class DecisionHearing(unittest.IsolatedAsyncioTestCase):
+    async def test_media_send_success_and_failure_control_mood_note(self):
+        class Sender(mixin_selfie.SelfieMixin):
+            def __init__(self, kind):
+                self.kind = kind
+                self.notes = []
+            def _media_settings(self):
+                return {'selfie_daily_limit': 0, 'voice_daily_limit': 0}
+            def _media_wanted(self, event, cfg, enabled_key, keywords_key):
+                return enabled_key == self.kind + '_enabled'
+            def _media_bump(self, kind): pass
+            def _note_she_sent(self, event, kind): self.notes.append((event, kind))
+            async def _make_voice(self, text): return Path('voice.wav')
+            async def _make_selfie(self, scene): return Path('selfie.png')
+
+        class Event:
+            def __init__(self, fails): self.fails = fails
+            async def send(self, chain):
+                if self.fails:
+                    raise RuntimeError('simulated send failure')
+
+        async def no_wait(_): pass
+        with mock.patch.object(mixin_selfie.asyncio, 'sleep', no_wait):
+            for kind in ('selfie', 'voice'):
+                for fails in (False, True):
+                    with self.subTest(kind=kind, fails=fails):
+                        sender, event = Sender(kind), Event(fails)
+                        await sender._media_after_reply(event, '一段话')
+                        self.assertEqual(sender.notes, [] if fails else [(event, kind)])
+
+    async def test_on_message_counts_first_answer_per_reply(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={'mood_events_enabled': True})
+        phone = MoodPhone()
+        event = harness.FakeEvent('继续', sender='10005', name='测试者')
+        event._mood_direct = True
+        methods = {'_here': phone._here, '_speaker': phone._speaker, '_job_stale': phone._job_stale,
+                   '_read_window': phone._read_window, '_write_window': phone._write_window,
+                   '_event_origin': phone._event_origin, '_without_gone': phone._without_gone,
+                   '_addresses_her': phone._addresses_her, '_core': phone._core,
+                   '_why_called': lambda e: 'private'}
+        with ExitStack() as stack:
+            for name, implementation in methods.items():
+                stack.enter_context(mock.patch.object(plugin, name, side_effect=implementation))
+            for name in ('_begin_job', '_check_registry', '_window_add_message', '_listen_body',
+                         '_mood_clock', '_ensure_autonomy_task', '_sticker_in_passing'):
+                stack.enter_context(mock.patch.object(plugin, name))
+            plugin._window_add_reply(event, '一句话')
+            for _ in range(20):
+                await plugin.on_message(event)
+            self.assertEqual(sum(x['kind'] == 'answered' for x in phone.core.mood_events), 1)
+            plugin._window_add_reply(event, '另一句话')
+            await plugin.on_message(event)
+            self.assertEqual(sum(x['kind'] == 'answered' for x in phone.core.mood_events), 2)
+
     async def test_message_through_decision_and_panel(self):
         plugin = main.BioCorePlugin(harness.FakeContext(), config={
             'mood_events_enabled': True, 'self_decide': True, 'owner_qq': '10005'})
@@ -257,23 +415,6 @@ class DecisionHearing(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await called._decide(Event()), 'request')
             self.assertEqual(selected.core.v, initial)
             self.assertEqual(called.core.v, initial)
-
-    async def test_media_only_share_is_recorded_after_successful_send(self):
-        class MediaBase:
-            async def _media_after_reply(self, event, reply):
-                await event.send('image')
-        class Owner(mixin_attention.AttentionMixin, MediaBase):
-            mood_events_enabled = True
-            def __init__(self): self.lines = []
-            def _window_add_reply(self, event, text): self.lines.append(text)
-        class Event:
-            async def send(self, chain): return None
-
-        owner, event = Owner(), Event()
-        await owner._media_after_reply(event, '')
-        self.assertEqual(owner.lines, ['[分享]'])
-        self.assertNotIn('send', event.__dict__)
-
 
 if __name__ == '__main__':
     unittest.main()

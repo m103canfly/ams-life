@@ -602,10 +602,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                         if not _why and _familiar < .3:
                             _weight *= MOOD_BYSTANDER_WEIGHT
                         _core.mood_event(_kind, _weight)
-                    _last_ts, _last_to = self._last_reply_here(self._here(event))
-                    if (_why == "continue" or (_last_ts and _sid in _last_to
-                            and time.time() - _last_ts <= 86400
-                            and (self._here(event).startswith("private:") or self._addresses_her(event)))):
+                    if self._mood_note_answer(event, _why):
                         _core.mood_event("answered")
                     if not getattr(self, "self_decide", False) and not _why:
                         self._hear_mood(event)

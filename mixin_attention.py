@@ -221,30 +221,6 @@ class AttentionMixin:
         except (OSError, ValueError, TypeError):
             logger.warning("[ams-life] mood night transition could not be saved")
 
-    async def _media_after_reply(self, event, reply):
-        """Record a media-only share after it is actually sent."""
-        if not getattr(self, "mood_events_enabled", False) or str(reply or "").strip():
-            return await super()._media_after_reply(event, reply)
-        original = event.send
-        had_instance_send = "send" in getattr(event, "__dict__", {})
-
-        async def send_and_note(chain):
-            result = await original(chain)
-            self._window_add_reply(event, "[分享]")
-            return result
-
-        try:
-            event.send = send_and_note
-        except Exception:
-            return await super()._media_after_reply(event, reply)
-        try:
-            return await super()._media_after_reply(event, reply)
-        finally:
-            if had_instance_send:
-                event.send = original
-            else:
-                delattr(event, "send")
-
     # ------------------------------------------------------------------
     # the decision
     # ------------------------------------------------------------------

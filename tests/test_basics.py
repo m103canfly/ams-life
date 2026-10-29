@@ -118,7 +118,8 @@ class Split(unittest.TestCase):
         # _browse_after_reply, _browse_for_panel); review of PR #39: +3 (_browse_urls, _message_words,
         # _may_go_out: only the addresses given, nothing private goes out)
         # mood (step 2, 乙): +2 (hearing what she was not asked about, the night's end)
-        self.assertEqual(len(methods), 436)
+        # Mood review: +2 (a reply is answered once; note a successfully sent medium).
+        self.assertEqual(len(methods), 438)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
