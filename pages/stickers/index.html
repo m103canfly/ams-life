@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <!-- ams-life (AGPL-3.0); see NOTICE.md. "她的表情包": the owner sees her stickers, deletes one, adds some.
      Her pictures come from the plugin through AstrBot's page bridge (read with the owner's login); none is in
-     this repository. Opened without AstrBot, it shows made-up drawings so that the page can be looked at. -->
+     this repository. Opened without AstrBot, it shows made-up drawings so that the page can be looked at.
+     pages/dashboard/stickers/ is this folder copied, byte for byte, so that the panel can open it inside its own
+     frame ("她的表情包" in the panel's side list); there it offers the way back. -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="light dark" />
 <title>她的表情包</title>
-<link rel="stylesheet" href="./stickers.css?v=20261030-1" />
+<link rel="stylesheet" href="./stickers.css?v=20261030-2" />
 </head>
 <body>
 <div class="page">
@@ -15,6 +17,7 @@
     <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>她的表情包</b><small>小爱自己存的、旧小爱的、你给的</small></div></div>
     <p class="counts" id="counts">加载中…</p>
     <div class="top-actions">
+      <a class="btn" id="backLink" href="../" hidden>← 回到面板</a>
       <span class="badge" id="previewBadge" hidden>示例（编造的图）：没有连上 AstrBot</span>
       <button type="button" class="btn" id="themeBtn">深色</button>
     </div>
@@ -64,6 +67,6 @@
     </div>
   </div>
 </dialog>
-<script src="./stickers.js?v=20261030-1"></script>
+<script src="./stickers.js?v=20261030-2"></script>
 </body>
 </html>

@@ -1,6 +1,8 @@
 /* ams-life (AGPL-3.0); see NOTICE.md. "她的表情包" (index.html): her stickers through AstrBot's page bridge --
    page/stickers (one page of them), page/stickers/image (one picture), page/stickers/delete, page/stickers/add.
-   No picture is in this page or this repository; opened without AstrBot it shows made-up drawings. */
+   No picture is in this page or this repository; opened without AstrBot it shows made-up drawings.
+   pages/dashboard/stickers/ is this folder copied: the panel opens it inside its own frame, because AstrBot lets a
+   plugin page neither change the address of the window nor open another page of the plugin. */
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -240,7 +242,22 @@
     };
   }
 
+  // ---------------------------------------------------------------- back to the panel
+  // Only when the panel opened this page (its copy in pages/dashboard/stickers/, ?from=panel): back to the view
+  // the owner left, in the theme the page is in now.
+  function wayBack() {
+    const q = new URLSearchParams(location.search);
+    if (q.get("from") !== "panel") return;
+    const back = /^[a-z]{1,20}$/.test(q.get("back") || "") ? q.get("back") : "overview";
+    const link = $("backLink");
+    link.hidden = false;
+    link.addEventListener("click", () => {
+      link.href = "../?view=" + back + "&theme=" + (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+    });
+  }
+
   async function start() {
+    wayBack();
     bridge = findBridge();
     const forced = new URLSearchParams(location.search).get("theme");
     if (forced === "dark" || forced === "light") setTheme(forced === "dark");

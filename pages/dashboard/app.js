@@ -1837,7 +1837,15 @@
   const brainFrame=window.BioBrainFrame?window.BioBrainFrame.attach({bridge:()=>bridge,dark:()=>document.documentElement.dataset.theme==="dark"}):null;
   // ams-life: "她记住了什么" (memories.js): read only, but for a confirmed delete of one memory
   const memoryList=window.BioMemoryList?window.BioMemoryList.attach({bridge:()=>bridge}):null;
-  document.querySelectorAll(".nav-item").forEach(a=>a.addEventListener("click",()=>switchView(a.dataset.view)));
+  document.querySelectorAll(".nav-item[data-view]").forEach(a=>a.addEventListener("click",()=>switchView(a.dataset.view)));
+  // ams-life: "她的表情包" is a page of its own (pages/stickers/). AstrBot lets a plugin page neither change the
+  // window's address nor open another page of the plugin, so a copy of it in ./stickers/ opens in this frame,
+  // told which view to come back to and in which theme.
+  const stickersLink=$("stickersLink");
+  if(stickersLink) stickersLink.addEventListener("click",()=>{
+    const on=document.querySelector(".nav-item.active[data-view]");
+    stickersLink.href="./stickers/?from=panel&back="+encodeURIComponent(on?on.dataset.view:"overview")+"&theme="+(document.documentElement.dataset.theme==="dark"?"dark":"light");
+  });
   function visualSave(){storeSet("bio_show_noise",visual.noise?"1":"0");storeSet("bio_show_echo",visual.echo?"1":"0");storeSet("bio_show_ripple",visual.ripple?"1":"0");storeSet("bio_show_dominance",visual.dominance?"1":"0");storeSet("bio_show_social",visual.social?"1":"0");storeSet("bio_show_links",visual.links?"1":"0");storeSet("bio_show_nodes",visual.nodes?"1":"0");storeSet("bio_show_node_links",visual.nodeLinks?"1":"0");storeSet("bio_show_memory_nodes",visual.memoryNodes?"1":"0");storeSet("bio_show_memory_balls_important",visual.memoryBallsImportant?"1":"0");storeSet("bio_show_emotion_rings",visual.emotionRings?"1":"0");storeSet("bio_intensity",visual.intensity);storeSet("bio_memory_ring_style",visual.memoryRingStyle);storeSet("bio_memory_ball_color_mode",visual.memoryBallColorMode);storeSet("bio_memory_ball_gravity",visual.memoryBallGravity?"1":"0");storeSet("bio_show_orb_legend",visual.orbLegend?"1":"0");storeSet("bio_show_autonomy_panel",visual.showAutonomyPanel?"1":"0");storeSet("bio_show_learning_panel",visual.showLearningPanel?"1":"0");storeSet("bio_show_chain_list",visual.showChainList?"1":"0");if(window.__biocoreState)window.__biocoreState.visual=Object.assign({},visual);}
   $("swShowNoise").checked=visual.noise; $("swShowEcho").checked=visual.echo; $("swShowRipple").checked=visual.ripple;
   if($("swShowDominance"))$("swShowDominance").checked=visual.dominance;
@@ -2254,7 +2262,7 @@
     }
   });
 
-  try { const v = new URLSearchParams(location.search).get('view'); if (v) switchView(v); } catch (e) {}
+  try { const v = new URLSearchParams(location.search).get("view"); if (v && $("view-" + v)) switchView(v); } catch (e) {}
   const foldSvg = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
   const foldIcons = [
     foldSvg('<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="3"/>'),

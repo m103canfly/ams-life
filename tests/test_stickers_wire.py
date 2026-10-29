@@ -2,6 +2,7 @@
 stand-in model, NapCat client and picture server. All made up; the pictures are a few bytes made there."""
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -163,6 +164,69 @@ class PageLook(unittest.TestCase):
             for key in ('--bg', '--bg2', '--ink', '--text', '--muted', '--faint', '--accent', '--accent2',
                         '--accent-strong', '--glass-thin', '--glass-thick', '--glass-pop'):
                 self.assertEqual(mine.get(key), panel.get(key), (theme, key))
+
+
+class FromThePanel(unittest.TestCase):
+    """The panel's "她的表情包" opens a copy of the page (pages/dashboard/stickers/) in the panel's own frame:
+    AstrBot gives a plugin page no way to another page of the plugin. Only there is there a way back."""
+    PAGES = HERE.parent / 'pages'
+
+    def test_the_panels_copy_is_the_page(self):
+        def files(folder):
+            return {p.name: p.read_bytes().replace(b'\r\n', b'\n') for p in folder.iterdir() if p.is_file()}
+        page, copy = files(self.PAGES / 'stickers'), files(self.PAGES / 'dashboard' / 'stickers')
+        self.assertEqual(sorted(copy), sorted(page))
+        for name in page:
+            self.assertEqual(copy[name], page[name], name + ': copy pages/stickers/ into pages/dashboard/stickers/')
+
+    def test_the_panel_opens_it_in_its_own_frame(self):
+        import re
+        dash = self.PAGES / 'dashboard'
+        link = re.search(r'<a class="nav-item" id="stickersLink" href="([^"]*)"[^>]*>', (dash / 'index.html').read_text('utf-8'))
+        self.assertEqual(link.group(1), './stickers/?from=panel')
+        self.assertNotIn('target=', link.group(0))
+        app = (dash / 'app.js').read_text('utf-8')
+        self.assertIn('document.querySelectorAll(".nav-item[data-view]").forEach', app)   # the link is no view
+        self.assertIn('if (v && $("view-" + v)) switchView(v);', app)                       # ?view= only a real one
+
+    @unittest.skipUnless(shutil.which('node'), 'needs Node.js')
+    def test_the_way_back_only_from_the_panel(self):
+        script = r'''
+function stub(init) {   // any element: what is set is kept, anything else is another stub
+  const t = Object.assign(function () {}, init || {}, { listeners: {} });
+  return new Proxy(t, {
+    get(o, k) {
+      if (k in o) return o[k];
+      if (k === 'addEventListener') return (type, fn) => { (o.listeners[type] = o.listeners[type] || []).push(fn); };
+      if (k === Symbol.toPrimitive) return () => '';
+      if (typeof k === 'symbol') return undefined;
+      return (o[k] = stub());
+    },
+    apply() { return stub(); },
+    construct() { return stub(); },
+  });
+}
+const els = {};
+global.window = global;
+global.location = { search: process.argv[2] };
+global.document = { readyState: 'complete', documentElement: stub(), addEventListener() {}, createElement: () => stub(),
+                    getElementById: (id) => els[id] || (els[id] = stub(id === 'backLink' ? { hidden: true, href: '../' } : {})) };
+global.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
+global.FileReader = class {};
+process.on('unhandledRejection', () => {});
+require(process.argv[1]);
+const link = document.getElementById('backLink');
+(link.listeners.click || []).forEach((f) => f());
+console.log(JSON.stringify([link.hidden, link.href]));
+process.exit(0);
+'''
+        def opened(search):
+            out = subprocess.run(['node', '-e', script, str(self.PAGES / 'stickers' / 'stickers.js'), search],
+                                 capture_output=True, text=True, encoding='utf-8', timeout=60, check=True).stdout
+            return json.loads(out.strip().splitlines()[-1])
+        self.assertEqual(opened(''), [True, '../'])                                     # its own page: no way back
+        self.assertEqual(opened('?from=panel&back=memories&theme=dark'), [False, '../?view=memories&theme=dark'])
+        self.assertEqual(opened('?from=panel&back=../../x'), [False, '../?view=overview&theme=light'])
 
 
 class Forgotten(unittest.TestCase):
