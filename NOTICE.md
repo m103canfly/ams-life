@@ -10,6 +10,8 @@ repository is the unmodified upstream snapshot; every later change is in the git
 
 ## Modifications (summary, newest first)
 
+From 2026-10-30, each change is described in its own file under `docs/changes/` (one file per pull request, named by date and branch); the table below lists the changes before that date. Every modified source file still carries a line pointing to this file.
+
 | Date | Change |
 | --- | --- |
 | 2026-10-29 | Step 2, one memory everywhere (setting `global_memory`, off by default; off, nothing changes): the reply prompt shows what she knows from every place, each item labelled with what she may say of it here (`discretion.label`, `discretion.tag`; the rules of the plan's section 12 and the owner's 15-18, 26, 29-31), who is talking to her told by QQ number; recall from elsewhere (`_labeled_elsewhere`), `[最近的事]` and her notebook labelled; one line says what the labels mean; no QQ or group number reaches the model (`discretion.for_model`). `tools/replay.py --global-memory`; `tools/audit_replay.py` checks the labels then. |
