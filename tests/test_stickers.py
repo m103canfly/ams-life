@@ -171,6 +171,11 @@ class InAReply(unittest.TestCase):
         self.assertEqual(stickers.pick_from_reply('好呀[表情包:2]', ['a', 'd']), ('好呀', 'd'))
         self.assertEqual(stickers.pick_from_reply('好呀[表情包：9]', ['a', 'd']), ('好呀', ''))
         self.assertEqual(stickers.pick_from_reply('好呀[表情包:c]', ['a', 'd']), ('好呀', ''))
+        # any [表情包...] mark goes out, whatever is in it; only an offered number is sent
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包：一只 猫]', ['a1']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包 2]', ['a', 'd']), ('好呀', ''))
+        self.assertEqual(stickers.pick_from_reply('好呀[表情包：2 ]', ['a', 'd']), ('好呀', 'd'))
+        self.assertEqual(stickers.pick_from_reply('[表情包]好呀[表情包:]', ['a']), ('好呀', ''))
         # a QQ face ([表情:名字], 甲) is not a sticker and stays as it is
         self.assertEqual(stickers.pick_from_reply('好呀[表情:微笑][表情:2]', ['a', 'd']), ('好呀[表情:微笑][表情:2]', ''))
         self.assertEqual(stickers.pick_from_reply('好呀', ['a']), ('好呀', ''))

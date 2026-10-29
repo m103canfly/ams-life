@@ -114,7 +114,8 @@ class Event(harness.FakeEvent):
 
 def run():
     on = CASE != 'off'
-    config = {'self_decide': True, 'stickers_enabled': on, 'owner_qq': OWNER, 'attention_level': 'normal'}
+    config = {'self_decide': True, 'stickers_enabled': on, 'owner_qq': OWNER, 'attention_level': 'normal',
+              'global_memory': CASE == 'held'}
     ctx = harness.FakeContext()
     ctx.provider = Provider()
     sent = []
@@ -132,7 +133,7 @@ def run():
     out = {}
     lib = plugin._sticker_lib()
     now = time.time()
-    if CASE in ('reply', 'off', 'alone', 'fallback', 'forget'):
+    if CASE in ('reply', 'off', 'alone', 'fallback', 'forget', 'held'):
         lib.add(png(3, 3, 7), now, source='self', from_qq='10001', from_where='group:' + A,
                 look={'caption': '一只在笑的猫', 'emotion': '开心', 'scene': '夸人'})
         lib.add(png(3, 3, 8), now, source='owner', from_qq=OWNER, note='主人给的兔子')
@@ -140,11 +141,13 @@ def run():
                 look={'caption': '一只在哭的狗', 'emotion': '难过', 'scene': '安慰'})
     by_caption = {r['caption']: sid for sid, r in lib.rows.items()}
 
-    def reply(text, bot=None, words='小爱 夸夸我'):
+    def reply(text, bot=None, words='小爱 夸夸我', forbid=''):
         event = Event(words, wake=True, bot=bot)
         req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
         loop.run_until_complete(plugin.on_message(event))
         loop.run_until_complete(plugin.on_llm_request(event, req))
+        if forbid:   # something labelled "这里不能讲" in this reply's prompt (made up)
+            plugin._forbid(event, 'm-x', text=forbid, people=['10002'])
         prompt = '\n'.join(p.get('text') if isinstance(p, dict) else str(p) for p in req.extra_user_content_parts)
         offered = list(getattr(event, mixin_stickers.OFFERED_ATTR, None) or [])
         resp = LLMResponse(text)
@@ -162,6 +165,13 @@ def run():
         bot = Bot()
         out['r'] = reply('好呀[表情包:1]', bot)
         out['calls'] = bot.calls
+        out['old_mark'] = reply('好呀[表情包：一只 在笑的猫]', bot)['text']   # from her history: never sent
+    elif CASE == 'held':
+        # the send check is on; the sticker's label is about something that may not be said here
+        bot = Bot()
+        out['r'] = reply('好呀，你最棒\n[表情包:1]', bot, forbid='一只在笑的猫')
+        out['calls'] = len(bot.calls)
+        out['sent'] = sent
     elif CASE == 'reply':
         bot = Bot()
         out['named'] = reply('好呀，你最棒\n[表情包:1]', bot)

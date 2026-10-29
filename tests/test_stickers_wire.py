@@ -69,11 +69,20 @@ class Offered(unittest.TestCase):
         self.assertEqual(r['sent'][0], {'umo': 'default:GroupMessage:900001', 'chain': [['Image', None, 'base64://']]})
         self.assertEqual(r['sent_total'], 2)                          # no client at all: the same
 
-    def test_switch_off_nothing(self):
+    def test_switch_off_nothing_sent_marks_still_taken_out(self):
         r = run_case('off')
         self.assertFalse(r['r']['offer_in_prompt'])
-        self.assertEqual(r['r']['text'], '好呀[表情包:1]')            # as before: nothing taken out
+        self.assertEqual(r['r']['text'], '好呀')                       # a mark never reaches QQ
+        self.assertEqual(r['old_mark'], '好呀')                        # nor one copied from her history
         self.assertEqual(r['calls'], [])
+
+    def test_a_label_the_send_check_holds_back_the_words_still_go(self):
+        r = run_case('held')
+        self.assertEqual(r['r']['text'], '好呀，你最棒')
+        self.assertFalse(r['r']['stopped'])
+        self.assertFalse(r['r']['sent_flag'])
+        self.assertEqual(r['calls'], 0)                                # no call_action
+        self.assertEqual(r['sent'], [])                                # and no plain picture either
 
 
 class Looked(unittest.TestCase):

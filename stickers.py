@@ -383,20 +383,23 @@ def pick_candidates(rows, now, valence=0.0, similarity=None, k=CANDIDATES, recen
     return [sid for _s, sid in sorted(scored, key=lambda x: (-x[0], x[1]))[:k]]
 
 
-# [表情包:n], not [表情:名字]: that one is a QQ face (attention.py), and must stay one
-_PICKED = re.compile(r"\[表情包[:：]\s*([^\]\s]+)\s*\]")
+# [表情包:n], not [表情:名字]: that one is a QQ face (attention.py), and must stay one. Every mark that
+# starts so goes out of what is sent, whatever is in it (her history keeps [表情包：标签], labels may hold
+# spaces); only one holding an offered number is sent.
+_MARK = re.compile(r"\[表情包[^\]]*\]")
+_NUMBER = re.compile(r"\[表情包[:：]\s*(\d+)\s*\]")
 
 
 def pick_from_reply(text, offered) -> tuple:
-    """(the reply without the mark, the sticker it names) -- only one that was offered; the
+    """(the reply without any mark, the sticker it names) -- only one that was offered; the
     candidates are numbered 1..n in the prompt."""
     offered = list(offered or [])
     chosen = ""
-    for m in _PICKED.finditer(str(text or "")):
-        tag = m.group(1)
-        if tag.isdigit() and 1 <= int(tag) <= len(offered):
-            chosen = chosen or offered[int(tag) - 1]
-    return _PICKED.sub("", str(text or "")).strip(), chosen
+    for m in _MARK.finditer(str(text or "")):
+        n = _NUMBER.fullmatch(m.group(0))
+        if n and 1 <= int(n.group(1)) <= len(offered):
+            chosen = chosen or offered[int(n.group(1)) - 1]
+    return _MARK.sub("", str(text or "")).strip(), chosen
 
 
 def phone_line(row) -> str:

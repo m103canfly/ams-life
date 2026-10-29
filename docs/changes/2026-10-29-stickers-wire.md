@@ -30,6 +30,16 @@ Her stickers wired into the plugin (step 2, part 丙; the logic is `stickers.py`
 - Not here yet: the stickers page (`pages/stickers/`) with the owner's delete and add, a PR of its own on the
   new look (#37).
 
+Review of PR #38 (`审核-PR38.md`), two changes before merging:
+
+- Every mark that starts `[表情包` goes out of what is sent, whatever is in it (a label with a space, a full-width
+  colon, no number); only one holding an offered number is sent. Marks are taken out with stickers off too: her
+  history may hold `[表情包：标签]` from before, and she may copy one.
+- The send check now really looks at a sticker's label: the offered stickers' lines were part of the prompt, and
+  everything in the prompt counted as allowed, so a label could never be caught. They are taken out of the allowed
+  text (`main.on_llm_request`). A test: with global_memory on and a label that is about something not to be said
+  here, the words go, the sticker does not (no `call_action`, no plain picture); it fails with either change undone.
+
 ## Files
 
 - `mixin_stickers.py`, `tests/stickers_cases.py`, `tests/test_stickers_wire.py` (new)

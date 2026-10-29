@@ -752,6 +752,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
+        _offer = ""
         if self._stickers_on():
             # step 2 (丙): a few of her stickers to pick from (none is sent unless she names it)
             try:
@@ -780,6 +781,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if _global:
             # step 2: what may be said here, for the last look at the reply (send_check)
             self._note_allowed(event, req, _compact)
+            if _offer:   # the offered stickers' labels are not "said here": one that leaks is still caught
+                _note = self._check_note(event)
+                _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
 
     @filter.on_agent_done()
     async def on_agent_done(self, event: AstrMessageEvent, run_context, response: LLMResponse):
@@ -816,10 +820,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 pass
         _reply = _clean
-        _sticker = ""
-        if self._stickers_on():
-            # step 2 (丙): the sticker she named ([表情包:n], only an offered one), sent after her words
-            _reply, _sticker = self._sticker_named(event, response, _reply)
+        # step 2 (丙): the sticker she named ([表情包:n], only an offered one), sent after her words. Marks
+        # are taken out with stickers off too: her history may hold [表情包：标签] from before
+        _reply, _sticker = self._sticker_named(event, response, _reply)
+        if not self._stickers_on():
+            _sticker = ""
         if getattr(self, "self_decide", False) and attention.silent(_reply) \
                 and not (_sticker and attention.SILENT not in _reply):   # a sticker alone is not silence
             # step 2 (甲): she chose to say nothing (【不说】): nothing is sent, nothing kept
@@ -836,10 +841,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 _reply = self._check_failed(event, exc)
             if not _reply:
                 return
-            if self._stickers_on():   # said once more: a mark in the new words is taken out too
-                _reply, _again = self._sticker_named(event, response, _reply)
-                _sticker = _sticker or _again
-                self._check_note(event)["sent"] = _reply
+            # said once more: a mark in the new words is taken out too
+            _reply, _again = self._sticker_named(event, response, _reply)
+            _sticker = _sticker or (_again if self._stickers_on() else "")
+            self._check_note(event)["sent"] = _reply
         if _sticker and not await self._sticker_cleared(event, _sticker):
             _sticker = ""
         _then = self._sticker_after(event, _sticker) if _sticker else None
