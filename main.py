@@ -136,6 +136,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (甲): she decides herself whether to answer (off by default; off, AstrBot decides
         # as before: an @ of her, "/", every private message)
         self.self_decide = bool(self.config.get("self_decide", False))
+        self.mood_events_enabled = bool(self.config.get("mood_events_enabled", False))
         # step 2 (丙): her stickers -- she keeps the ones she likes and sends them (off by default;
         # looking at pictures, image_caption, has to be on too)
         self.stickers_enabled = bool(self.config.get("stickers_enabled", False))
@@ -587,6 +588,27 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._check_registry(event)  # someone (or a message) she may not keep: nothing is stored
             self._window_add_message(event)
             self._listen_body(event)
+            if getattr(self, "mood_events_enabled", False):
+                self._mood_clock()
+                _sid = str(self._speaker(event)[0] or "")
+                _self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+                if not (_self_id and _sid == _self_id):
+                    _why = self._why_called(event)
+                    setattr(event, "_mood_direct", bool(_why))
+                    _core = self._core(None)
+                    for _kind in mood_kinds(getattr(event, "message_str", ""), bool(_why)):
+                        _familiar = self._familiarity(_sid)
+                        _weight = (.6 + .4 * _familiar) if _kind == "criticism" else 1.0
+                        if not _why and _familiar < .3:
+                            _weight *= MOOD_BYSTANDER_WEIGHT
+                        _core.mood_event(_kind, _weight)
+                    _last_ts, _last_to = self._last_reply_here(self._here(event))
+                    if (_why == "continue" or (_last_ts and _sid in _last_to
+                            and time.time() - _last_ts <= 86400
+                            and (self._here(event).startswith("private:") or self._addresses_her(event)))):
+                        _core.mood_event("answered")
+                    if not getattr(self, "self_decide", False) and not _why:
+                        self._hear_mood(event)
             self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
             self._sticker_in_passing(event)  # step 2 (丙): a QQ sticker she was not called for, a look of its own
         except Exception as exc:

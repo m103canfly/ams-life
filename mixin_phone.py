@@ -101,7 +101,34 @@ class PhoneMixin:
         any more does not keep old lines on disk (reading a window writes it back pruned)."""
         for place in self._window_places():
             try:
-                self._read_window(place)
+                win = self._read_window(place)
+                if getattr(self, "mood_events_enabled", False):
+                    changed = False
+                    recent = win["recent"]
+                    for i, line in enumerate(recent):
+                        if line.get("role") != "assistant" or line.get("mood_checked"):
+                            continue
+                        origin = line.get("origin") or {}
+                        people = origin.get("people") or []
+                        if not origin.get("mood_direct") or len(people) != 1:
+                            continue
+                        person = str(people[0])
+                        familiarity = self._familiarity(person)
+                        delay = 600 if familiarity >= .8 else 1800 if familiarity >= .3 else 0
+                        if not delay:
+                            continue
+                        stamp = float(line.get("ts", 0) or 0)
+                        if any(x.get("role") != "assistant" and str(x.get("sender_id") or "") == person
+                               for x in recent[i + 1:]):
+                            line["mood_checked"] = True
+                            changed = True
+                        elif time.time() - stamp >= delay:
+                            kind = "unanswered_share" if line.get("mood_share") else "ignored"
+                            self._core(None).mood_event(kind, familiarity)
+                            line["mood_checked"] = True
+                            changed = True
+                    if changed:
+                        self._write_window(place, win)
             except Exception as exc:
                 logger.warning("[ams-life] window sweep failed: %s", exc)
 
@@ -278,8 +305,13 @@ class PhoneMixin:
             return
         win = self._read_window(here)
         text = self._without_gone(text, event)
-        win["recent"].append({"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS],
-                              "origin": self._event_origin(event)})
+        origin = self._event_origin(event)
+        if getattr(self, "mood_events_enabled", False):
+            origin["mood_direct"] = bool(getattr(event, "_mood_direct", False))
+        line = {"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS], "origin": origin}
+        if getattr(self, "mood_events_enabled", False) and text == "[分享]":
+            line["mood_share"] = True
+        win["recent"].append(line)
         self._write_window(here, win)
 
     def _window_lines(self, event, n=6) -> list:

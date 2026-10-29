@@ -1716,6 +1716,11 @@
     if($("iFlowExpr"))$("iFlowExpr").textContent=L(it.expression)||"--";
     if($("iFlowPlan"))$("iFlowPlan").textContent=it.plan||"--";
     $("iEmotion").textContent=L(it.emotion); $("iNeed").textContent=L(it.need); $("iExpr").textContent=L(it.expression);
+    if ($("moodEventRow")) {
+      const events=Array.isArray(data.mood_events)?data.mood_events:null;
+      $("moodEventRow").hidden=!events;
+      if(events) $("moodEventList").textContent=events.map(x=>new Date(Number(x.ts)*1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})+" "+x.kind).join("；")||"暂无";
+    }
     if($("iCompound"))$("iCompound").textContent=it.compound||"-";
     if($("iSpectrum"))$("iSpectrum").textContent=_spec||"-";
     if($("iPlan"))$("iPlan").textContent=it.plan||"-";
