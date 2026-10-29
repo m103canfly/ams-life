@@ -2368,7 +2368,7 @@
       if(t.classList.contains('active')) activate(null); else activate(name);
     }));
   }
-  const BIO_VERSION = "v1.2.99";
+  const BIO_VERSION = "v0.1.0";   // ams-life's own (metadata.yaml), what the update check compares with
   setTimeout(() => { const _sv = $("sideVersion"); if (_sv) _sv.textContent = "ams-life " + BIO_VERSION; }, 0);
   const BIO_REPO_SLUG = "m103canfly/ams-life";
   const GITEE_KEY = "bio_gitee_repo";
