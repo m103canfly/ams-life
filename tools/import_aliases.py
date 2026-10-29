@@ -68,10 +68,15 @@ def session_dir(session) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in str(session or "default"))[:80]
 
 
-class Gates:
-    """The two gates every merged item passes: the run's made-up test data, the registry."""
+def _whole_numbers(numbers):
+    return re.compile(r"(?<![0-9])(?:%s)(?![0-9])" % "|".join(map(re.escape, sorted(numbers)))) if numbers else None
 
-    def __init__(self, canaries, reg):
+
+class Gates:
+    """The two gates every merged item passes: the run's made-up test data (and the people on
+    the --exclude-people list, left out the same way), the registry."""
+
+    def __init__(self, canaries, reg, excluded=()):
         self.reg = reg
         people = canaries.get("people") or {}
         self.people = {str(v) for v in (people.values() if isinstance(people, dict) else people) if str(v)}
@@ -81,12 +86,14 @@ class Gates:
         self.places = {str(r.get("place")) for r in rows if str(r.get("place") or "").startswith("private:")}
         self.places |= {"private:" + p for p in self.people}
         self.names = {str(r.get("name")) for r in rows if len(str(r.get("name") or "")) >= 2}
-        self.numbers = re.compile(r"(?<![0-9])(?:%s)(?![0-9])" % "|".join(map(re.escape, sorted(self.people)))) \
-            if self.people else None
+        self.numbers = _whole_numbers(self.people)
+        self.excluded = {str(x) for x in excluded} - self.people
+        self.excluded_numbers = _whole_numbers(self.excluded)
 
     def made_up(self, item, people=(), where="", sender="") -> str:
-        """Why `item` is the run's made-up test data, or ''."""
-        if set(map(str, people)) & self.people:
+        """Why `item` is the run's made-up test data, or someone on the list's; or ''."""
+        people = set(map(str, people))
+        if people & self.people:
             return "made_up_person"
         if str(where) in self.places:
             return "made_up_chat"
@@ -99,6 +106,9 @@ class Gates:
             return "made_up_number"
         if any(n in text for n in self.names):
             return "made_up_name"
+        if people & self.excluded or str(sender) in self.excluded or str(where) in {"private:" + p for p in self.excluded} \
+                or (self.excluded_numbers and self.excluded_numbers.search(text)):
+            return "excluded_person"
         return ""
 
     def why_not(self, item) -> str:
@@ -144,10 +154,73 @@ def _linked(entry, kept_ids) -> dict:
     return out
 
 
-def merge_replay(run, out, reg, canaries) -> dict:
-    """Merge the four things of <run>/data into `out` through the gates. Counts only."""
+# Relationship records (users/<qq>.json), as the plugin reads and cleans them when someone is
+# deleted (mixin_discretion._record_mentions, _forget_relationship_text; a test keeps the two the same).
+REL_TEXT_LISTS = ("we_memory", "annotations", "milestones")
+REL_TEXT_MAPS = ("transactive_map", "destination_map", "social_world")
+EVERYDAY_WORDS = {"哈哈", "哈哈哈", "嘿嘿", "嗯嗯", "好的", "可以", "你好", "什么", "这个", "那个", "大家",
+                  "真的", "没有", "就是", "然后", "知道", "有人", "某人"}
+
+
+def user_file(qq) -> str:
+    """users/ file name of `qq`, as the plugin names it (mixin_people._user_path)."""
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in str(qq or "unknown"))[:60] + ".json"
+
+
+def record_mentions(rec, person, names) -> bool:
+    """Does a relationship record draw from `person`? (mixin_discretion._record_mentions)"""
+    rel = rec.get("relationship") if isinstance(rec.get("relationship"), dict) else {}
+    texts, name_fields, ids = [], [], []
+
+    def take(x):
+        if isinstance(x, dict):
+            texts.extend(str(x.get(k) or "") for k in ("text", "key", "title", "latest_text"))
+            texts.extend(str(ev.get("text") or "") for ev in x.get("evidence") or [] if isinstance(ev, dict))
+            name_fields.append(str(x.get("sender_name") or x.get("name") or ""))
+            ids.append(str(x.get("sender_id") or x.get("qq") or ""))
+        elif isinstance(x, str):
+            texts.append(x)
+    for key in REL_TEXT_LISTS + REL_TEXT_MAPS:
+        value = rel.get(key)
+        if isinstance(value, dict):
+            for k, v in value.items():
+                texts.append(str(k))
+                take(v)
+        elif isinstance(value, list):
+            for v in value:
+                take(v)
+    if person in ids or person in name_fields:
+        return True
+    number = re.compile(r"(?<![0-9])%s(?![0-9])" % re.escape(person))
+    if any(number.search(t) for t in texts):
+        return True
+    names = [n for n in names if len(n) >= 2 and not n.isdigit()]
+    if any(n in name_fields for n in names):
+        return True
+    return any(n in t for n in names if n not in EVERYDAY_WORDS for t in texts)
+
+
+def _clean_record(rec, says_bad) -> None:
+    """As the plugin does to someone else's record when a person is deleted
+    (_forget_relationship_text): sub-records that draw from them, or do not say where they
+    came from, go; the three word maps are emptied (rebuilt later); the numbers stay."""
+    rel = rec.get("relationship")
+    if not isinstance(rel, dict):
+        return
+    for key in REL_TEXT_LISTS:
+        if isinstance(rel.get(key), list):
+            rel[key] = [x for x in rel[key] if isinstance(x, dict)
+                        and (list(x.get("source_ids") or []) + list(x.get("evidence_refs") or []))
+                        and not says_bad({"relationship": {key: [x]}})]
+    for key in REL_TEXT_MAPS:
+        if rel.get(key):
+            rel[key] = [] if isinstance(rel.get(key), list) else {}
+
+
+def merge_replay(run, out, reg, canaries, excluded=()) -> dict:
+    """Merge the four things of <run>/data (and users/) into `out` through the gates. Counts only."""
     data = run / "data"
-    gates = Gates(canaries, reg)
+    gates = Gates(canaries, reg, excluded)
     counts = {}
 
     def tally(kind, why):
@@ -184,7 +257,7 @@ def merge_replay(run, out, reg, canaries) -> dict:
     # events, and each place's copy written again from them
     ev_path = data / "archives" / "events.jsonl"
     if ev_path.is_file():
-        lines, by_session = [], {}
+        kept_events = []
         for line in ev_path.read_text("utf-8").splitlines():
             if not line.strip():
                 continue
@@ -196,8 +269,16 @@ def merge_replay(run, out, reg, canaries) -> dict:
             why = gates.why_not(rec) if isinstance(rec, dict) else "unreadable"
             tally("event", why)
             if not why:
-                lines.append(line)
-                by_session.setdefault(session_dir(rec.get("session")), []).append(line)
+                kept_events.append((line, rec))
+        event_ids = {str(rec.get("id") or "") for _line, rec in kept_events}
+        lines, by_session = [], {}
+        for line, rec in kept_events:
+            linked = {k: [x for x in rec[k] if not isinstance(x, dict) or str(x.get("id") or "") in event_ids]
+                      for k in ("links", "chain_links") if isinstance(rec.get(k), list)}
+            if any(len(v) != len(rec[k]) for k, v in linked.items()):   # none to an event left out
+                line = json.dumps(dict(rec, **linked), ensure_ascii=False)
+            lines.append(line)
+            by_session.setdefault(session_dir(rec.get("session")), []).append(line)
         (out / "archives").mkdir(parents=True, exist_ok=True)
         (out / "archives" / "events.jsonl").write_text("".join(x + "\n" for x in lines), encoding="utf-8")
         for name, own in by_session.items():
@@ -239,12 +320,50 @@ def merge_replay(run, out, reg, canaries) -> dict:
             tally("notebook", why)
             if not why:
                 notebook.append(x)
-        (out / "self_model.json").write_text(json.dumps({"notebook": notebook}, ensure_ascii=False, indent=1),
-                                             encoding="utf-8")
+        # "heart": 1, or at its first start the plugin would keep a copy of this file
+        # (self_model.before_heart.json) that no later delete reaches
+        (out / "self_model.json").write_text(json.dumps({"notebook": notebook, "heart": 1}, ensure_ascii=False,
+                                                        indent=1), encoding="utf-8")
+
+    # relationship records: whoever may not be kept, his own file goes; anyone else's that
+    # draws from such a person is cleaned as the plugin does when someone is deleted
+    if (data / "users").is_dir():
+        bad = gates.people | gates.excluded | {q for q in reg.people() if not reg.may_keep_untimed(q, "")}
+        known = {}
+        for r in canaries.get("rows") or []:
+            known.setdefault(str(r.get("user_id") or ""), set()).add(str(r.get("name") or ""))
+        names_path = data / "people" / impressions.NAMES_FILE
+        for qq, ns in (json.loads(names_path.read_text("utf-8")) if names_path.is_file() else {}).items():
+            known.setdefault(str(qq), set()).update(str(n) for n in ns or [])
+
+        def says_bad(rec):
+            return bool(gates.made_up(rec)) or any(record_mentions(rec, b, sorted(known.get(b, ()))) for b in bad)
+        for path in sorted((data / "users").glob("*.json")):
+            try:
+                rec = json.loads(path.read_text("utf-8"))
+            except ValueError:
+                tally("users", "unreadable")
+                continue
+            who = str(rec.get("sender_id") or path.stem) if isinstance(rec, dict) else ""
+            why = gates.why_not_person(who, "", {}) if who else "unreadable"
+            if why:
+                tally("users", why)
+                continue
+            (out / "users").mkdir(parents=True, exist_ok=True)
+            if not says_bad(rec):
+                shutil.copyfile(path, out / "users" / user_file(who))
+                tally("users", "")
+                continue
+            _clean_record(rec, says_bad)
+            if says_bad(rec):
+                tally("users", "still_draws_from_someone_left_out")
+                continue
+            (out / "users" / user_file(who)).write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+            tally("users", "cleaned")
     return {k: dict(sorted(v.items())) for k, v in sorted(counts.items())}
 
 
-def stage(bundle, out, day="", replay=None) -> dict:
+def stage(bundle, out, day="", replay=None, exclude=None) -> dict:
     """Copy the registry, load the aliases with it into out/people/, merge a replay run if
     given, write the counts."""
     bundle = Path(bundle).resolve()
@@ -260,6 +379,16 @@ def stage(bundle, out, day="", replay=None) -> dict:
         if not (run / "data").is_dir():
             raise SystemExit("no data/ in %s: not a replay run" % run)
         canaries = _read_canaries(run)
+    excluded = []
+    if exclude:
+        if not replay:
+            raise SystemExit("--exclude-people goes with --replay")
+        ex = Path(exclude)
+        if not ex.is_file():
+            raise SystemExit("no list at %s: nothing merged" % ex)
+        excluded = [x.strip() for x in ex.read_text("utf-8-sig").splitlines() if x.strip() and not x.strip().startswith("#")]
+        if not all(x.isdigit() for x in excluded):
+            raise SystemExit("%s: one number a line: nothing merged" % ex)
     out = _guard.output_dir(out, "the staged data")
     day = day or time.strftime("%Y-%m-%d")
     reg_path = out / forget_registry.FILE_NAME
@@ -269,7 +398,7 @@ def stage(bundle, out, day="", replay=None) -> dict:
     with forget_registry.ForgetRegistry(reg_path) as reg:
         loaded = impressions.from_bundle(impressions.Store(out / "people"), people, registry=reg, day=day)
         rows = reg.stats()
-        merged = merge_replay(run, out, reg, canaries) if run else None
+        merged = merge_replay(run, out, reg, canaries, excluded) if run else None
     with closing(sqlite3.connect("file:" + reg_path.as_posix() + "?mode=ro", uri=True)) as db:
         names = {"people": db.execute("SELECT COUNT(DISTINCT qq) FROM names").fetchone()[0],
                  "name_hashes": db.execute("SELECT COUNT(*) FROM names").fetchone()[0]}
@@ -282,7 +411,7 @@ def stage(bundle, out, day="", replay=None) -> dict:
         "registry": {"rows": rows, "names": names},
     }
     if run:
-        summary["replay"] = {"made_up_test_data": bool(canaries), "merged": merged}
+        summary["replay"] = {"made_up_test_data": bool(canaries), "excluded_people": len(set(excluded)), "merged": merged}
     (out / REPORT).write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     return summary
 
@@ -292,9 +421,11 @@ def main(argv=None):
     ap.add_argument("--bundle", required=True, help="the import bundle (tools/import_old.py), read only")
     ap.add_argument("--out", required=True, help="new or empty folder (not in AstrBot's data, not in the repo)")
     ap.add_argument("--replay", help="a tools/replay.py run folder (read only): merge what it left her")
+    ap.add_argument("--exclude-people", help="with --replay: a list on this computer (not in the repository), one "
+                                             "number a line, of people left out like the run's made-up ones")
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
-    print(json.dumps(stage(args.bundle, args.out, replay=args.replay), ensure_ascii=False, indent=1))
+    print(json.dumps(stage(args.bundle, args.out, replay=args.replay, exclude=args.exclude_people), ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":
