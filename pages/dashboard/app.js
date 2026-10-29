@@ -325,6 +325,7 @@
   async function load(){
     clearTimeout(timer);
     try { bridge = window.AstrBotPluginView || window.AstrBotPluginPage || window.astrbotPluginView || null; if (!bridge && window.parent && window.parent !== window) bridge = window.parent.AstrBotPluginView || window.parent.AstrBotPluginPage || null; } catch (e) { bridge = null; }
+    if (bridge && window.BioFeedback) bridge = window.BioFeedback.wrap(bridge);   // a clicked call shows 正在…… / 好了 / 没成功 (feedback.js)
     try{
       let _embedded = false;
       try { _embedded = !!(window.parent && window.parent !== window); } catch (e) { _embedded = false; }
