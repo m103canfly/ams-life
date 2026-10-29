@@ -1,12 +1,12 @@
 // ams-life (AGPL-3.0); see NOTICE.md.
 // Builds the brain map page: src/brain.js + the vendored Galaxy View renderer
-// (src/galaxy/, MIT) + three.js and d3-force-3d -> pages/brain/brain.bundle.js,
+// (src/galaxy/, MIT) + three.js and d3-force-3d -> pages/starmap/brain.bundle.js,
 // one local file, nothing loaded from the network. Also copies the license of
-// every package that ends up in the bundle into pages/brain/licenses/, and the
+// every package that ends up in the bundle into pages/starmap/licenses/, and the
 // page itself (src/page/: index.html, brain.css, sample.js) next to it, and the
 // page as text for the panel (panel-page.js).
 //
-// The same page is written twice, byte for byte: pages/brain/ (its own page in
+// The same page is written twice, byte for byte: pages/starmap/ (its own page in
 // AstrBot) and pages/dashboard/brain/ (shown inside the panel). AstrBot serves a
 // plugin page only from its own folder, under a token for that page, so the panel
 // cannot load ../brain/; it needs a copy inside pages/dashboard/. Neither copy is
@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const page = path.resolve(here, '../../pages/brain');
+const page = path.resolve(here, '../../pages/starmap');
 const panelCopy = path.resolve(here, '../../pages/dashboard/brain');
 const licenses = path.join(page, 'licenses');
 const GENERATED = '<!-- 由 tools/brain/build.mjs 生成，改 tools/brain/src/（page/index.html），不要手改这一份。 -->';
@@ -108,4 +108,4 @@ fs.writeFileSync(path.join(page, 'panel-page.js'),
 	'window.BioBrainPage = ' + JSON.stringify(panelHtml) + ';\n');
 fs.rmSync(panelCopy, { recursive: true, force: true });
 fs.cpSync(page, panelCopy, { recursive: true });
-console.log('written: pages/brain/ and pages/dashboard/brain/');
+console.log('written: pages/starmap/ and pages/dashboard/brain/');

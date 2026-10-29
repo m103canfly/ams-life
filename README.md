@@ -43,8 +43,9 @@ BioCore 原来的说明、更新日志放在 `docs/upstream/`，没有改动。
 | `memory_list.py` | 面板里“她记住了什么”那一页：同一份快照列成表（记忆、事件、本子、群友印象），按种类、地方、公开私下、日期、字筛，一页最多 50 条；号码先藏着，点一下才给；只读，只有记忆能删（走原来的删除接口，先确认） |
 | `interpretation.py` | 回复时给模型看的几行描述（她现在怎样、她想起来的、她的本子、主人定的规矩……；不带“该怎么回”。她自己写的几行不带数字；想起来的照存下的原样，号码也在，别处来的去掉名字和号码），各种提示词 |
 | `memory_meta.py` `relationship_meta.py` | BioCore 原有模块 |
-| `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开） |
-| `pages/brain/` `tools/brain/` | “她的脑子”：她的记忆画成一个能转的星球（只读；见 `docs/brain-viz.md`）。面板里也有这一项（`pages/dashboard/brain/` 是同一份，由 `tools/brain/build.mjs` 写，`brain_frame.js` 嵌进去） |
+| `pages/dashboard/` | 状态面板（AstrBot WebUI 里打开）；AstrBot 侧栏只进按名字排第一的页，所以它要排第一 |
+| `.astrbot-plugin/i18n/` | 两页在 AstrBot 里显示的名字（“ams-life 面板”“她的脑子（单独一页）”） |
+| `pages/starmap/` `tools/brain/` | “她的脑子”：她的记忆画成一个能转的星球（只读；见 `docs/brain-viz.md`）。面板里也有这一项（`pages/dashboard/brain/` 是同一份，由 `tools/brain/build.mjs` 写，`brain_frame.js` 嵌进去） |
 | `tests/` | 离线测试，不连 AstrBot、不联网、不调用模型 |
 | `tools/` | 离线工具：导入旧数据、回放旧聊天记录、查漏；只写到仓库外的新文件夹 |
 | `docs/` | 改造计划、上游原文档 |

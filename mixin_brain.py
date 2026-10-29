@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
-"""ams-life: the brain map (pages/brain) in the plugin, read only.
+"""ams-life: the brain map (pages/starmap) in the plugin, read only.
 
 - page/brain, page/brain/node, page/brain/search: what she keeps, as the page's
   stars and lines (brain_graph.py), behind the dashboard login like the rest of

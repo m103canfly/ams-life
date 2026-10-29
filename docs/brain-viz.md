@@ -1,6 +1,6 @@
 # 她的脑子（可视化）
 
-插件面板左边的“她的脑子”那一项（10-29 起；见下面“在面板里”），也还是单独的一页 `pages/brain/`。把她的记忆、事件、认识的人、群和私聊窗口、本子画成一张会动的网，身体的几样画成中间的“核”。还能一轮一轮看她每次回话想起了什么。
+插件面板左边的“她的脑子”那一项（10-29 起；见下面“在面板里”），也还是单独的一页 `pages/starmap/`（10-29 前叫 `pages/brain/`；AstrBot 按文件夹名字排插件的页，侧栏只进第一页，所以单独这页的名字要排在面板 `dashboard` 后面，`tests/test_plugin_pages.py` 看着）。把她的记忆、事件、认识的人、群和私聊窗口、本子画成一张会动的网，身体的几样画成中间的“核”。还能一轮一轮看她每次回话想起了什么。
 
 - **只读**：页面只用 `bridge.apiGet` 读，没有任何写的路子。删东西回原来的面板。
 - **不出本机**：不从网上加载任何东西，也不往外发。
@@ -27,7 +27,7 @@
 - 星的名字（窗口、身体、想起的、没说的）；
 - 原来就有的筛选、搜索、抽屉、每轮回话那一排。
 
-**第二段（10-28）接上了真数据**：从 AstrBot 后台打开时，页面从面板的只读接口取她的数据（`mixin_brain.py` + `brain_graph.py`）。接口不通、或者直接用浏览器打开 `pages/brain/index.html`，就显示编造的示例（`sample.js`，源文件在 `tools/brain/src/page/`），顶上写明“示例数据（编造）”和原因。
+**第二段（10-28）接上了真数据**：从 AstrBot 后台打开时，页面从面板的只读接口取她的数据（`mixin_brain.py` + `brain_graph.py`）。接口不通、或者直接用浏览器打开 `pages/starmap/index.html`，就显示编造的示例（`sample.js`，源文件在 `tools/brain/src/page/`），顶上写明“示例数据（编造）”和原因。
 
 ## 怎么看
 
@@ -74,8 +74,8 @@
 
 主人要把星图放进面板，不要单独一页。做法：
 
-- **放两份，一模一样**：`build.mjs` 一次写两份，`pages/brain/`（单独那一页，留着）和 `pages/dashboard/brain/`（面板用）。两份都只由 `build.mjs` 生成，不手改；`index.html` 第二行写着“由 tools/brain/build.mjs 生成”。测试逐字节比两份（`licenses/` 也算）。
-  - 为什么放两份：AstrBot 发插件页面时，口令是按页面发的，每一页只能读自己文件夹里的文件。面板读不到 `../brain/`，只能读 `pages/dashboard/` 里面的。
+- **放两份，一模一样**：`build.mjs` 一次写两份，`pages/starmap/`（单独那一页，留着）和 `pages/dashboard/brain/`（面板用）。两份都只由 `build.mjs` 生成，不手改；`index.html` 第二行写着“由 tools/brain/build.mjs 生成”。测试逐字节比两份（`licenses/` 也算）。
+  - 为什么放两份：AstrBot 发插件页面时，口令是按页面发的，每一页只能读自己文件夹里的文件。面板读不到 `../starmap/`，只能读 `pages/dashboard/` 里面的。
   - AstrBot 只把 `pages/` 下面一层的文件夹当成页面，`pages/dashboard/brain/` 不会多出一页。
 - **嵌法：srcdoc 的 iframe**（`pages/dashboard/brain_frame.js`）。
   - 第一次点开“她的脑子”才建。页面的 HTML 由 `build.mjs` 写成 `panel-page.js`（`window.BioBrainPage`），里面加了 `<base href="brain/">`，脚本和样式照旧从 `brain/` 读文件。
@@ -96,7 +96,7 @@
 
 ## 打包
 
-页面用的是一个打好的文件 `brain.bundle.js`，跟页面一起写在 `pages/brain/` 和 `pages/dashboard/brain/`，提交在仓库里。页面本身（`index.html`、`brain.css`、`sample.js`）的源文件在 `tools/brain/src/page/`。
+页面用的是一个打好的文件 `brain.bundle.js`，跟页面一起写在 `pages/starmap/` 和 `pages/dashboard/brain/`，提交在仓库里。页面本身（`index.html`、`brain.css`、`sample.js`）的源文件在 `tools/brain/src/page/`。
 
 重新打包：
 
@@ -108,7 +108,7 @@ node build.mjs
 
 - 只装三个包，版本都钉死：three 0.184.0、d3-force-3d 3.0.6（跟 Galaxy View 锁定的一样）、esbuild 0.25.5；
 - 不跑任何安装脚本；`node_modules` 不提交。
-- `build.mjs` 会把打进去的每个包的许可证复制到 `pages/brain/licenses/`，再把整个文件夹照样写一份到 `pages/dashboard/brain/`。
+- `build.mjs` 会把打进去的每个包的许可证复制到 `pages/starmap/licenses/`，再把整个文件夹照样写一份到 `pages/dashboard/brain/`。
 
 ## 数据格式 `ams-life.brain/1`
 

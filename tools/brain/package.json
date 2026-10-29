@@ -1,7 +1,7 @@
 {
   "name": "ams-life-brain-page",
   "private": true,
-  "description": "Builds pages/brain/brain.bundle.js (the brain map page) from src/ and the vendored Galaxy View renderer.",
+  "description": "Builds pages/starmap/brain.bundle.js (the brain map page) from src/ and the vendored Galaxy View renderer.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {

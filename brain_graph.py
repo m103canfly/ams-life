@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
-"""The brain map's data (pages/brain, docs/brain-viz.md): what she keeps, as stars
+"""The brain map's data (pages/starmap, docs/brain-viz.md): what she keeps, as stars
 and lines, read only.
 
 - build(): what the plugin keeps -> the page's format (ams-life.brain/1). The graph
