@@ -5,8 +5,8 @@ uses, and sends them as QQ stickers (the owner, 10-29). Not wired into the plugi
 
 - sniff / image_size / check_image: a picture is what its first bytes say (JPEG, PNG, GIF,
   WebP), at most MAX_BYTES and MAX_SIDE a side; anything else is refused;
-- check_image_url: a picture is fetched only from QQ's picture servers (http/https, no user,
-  port 80/443);
+- check_image_url / fetch_picture: a picture is fetched only from QQ's picture servers (http/https,
+  no user, port 80/443; a redirect elsewhere is not followed), at most MAX_BYTES;
 - stickers_in_raw: which pictures of a message QQ marks as stickers (NapCat's sub_type 1,
   read from the message as NapCat sent it: AstrBot's Image drops the mark);
 - LOOK_PROMPT / parse_look / should_keep: one look at a picture answers what it shows and
@@ -32,6 +32,8 @@ import json
 import re
 import struct
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -154,6 +156,30 @@ def check_image_url(url) -> tuple:
     if not any(host == d or host.endswith("." + d) for d in QQ_HOSTS):
         return False, "not a QQ picture server"
     return True, ""
+
+
+class QQOnlyRedirect(urllib.request.HTTPRedirectHandler):
+    """A picture moved somewhere else is followed only to QQ's picture servers."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        ok, _why = check_image_url(newurl)
+        if not ok:
+            raise urllib.error.URLError("redirect away from QQ's picture servers")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def fetch_picture(url, timeout=15) -> bytes:
+    """The bytes of a picture on QQ's servers, at most MAX_BYTES; b'' otherwise."""
+    ok, _why = check_image_url(url)
+    if not ok:
+        return b""
+    opener = urllib.request.build_opener(QQOnlyRedirect)
+    try:
+        with opener.open(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=timeout) as resp:
+            data = resp.read(MAX_BYTES + 1)
+    except Exception:
+        return b""
+    return b"" if len(data) > MAX_BYTES else data
 
 
 # ----------------------------------------------------------------------
@@ -357,24 +383,28 @@ def pick_candidates(rows, now, valence=0.0, similarity=None, k=CANDIDATES, recen
     return [sid for _s, sid in sorted(scored, key=lambda x: (-x[0], x[1]))[:k]]
 
 
-_PICKED = re.compile(r"\[表情[:：]\s*([^\]\s]+)\s*\]")
+# [表情包:n], not [表情:名字]: that one is a QQ face (attention.py), and must stay one. Every mark that
+# starts so goes out of what is sent, whatever is in it (her history keeps [表情包：标签], labels may hold
+# spaces); only one holding an offered number is sent.
+_MARK = re.compile(r"\[表情包[^\]]*\]")
+_NUMBER = re.compile(r"\[表情包[:：]\s*(\d+)\s*\]")
 
 
 def pick_from_reply(text, offered) -> tuple:
-    """(the reply without the mark, the sticker it names) -- only one that was offered; the
+    """(the reply without any mark, the sticker it names) -- only one that was offered; the
     candidates are numbered 1..n in the prompt."""
     offered = list(offered or [])
     chosen = ""
-    for m in _PICKED.finditer(str(text or "")):
-        tag = m.group(1)
-        if tag.isdigit() and 1 <= int(tag) <= len(offered):
-            chosen = chosen or offered[int(tag) - 1]
-    return _PICKED.sub("", str(text or "")).strip(), chosen
+    for m in _MARK.finditer(str(text or "")):
+        n = _NUMBER.fullmatch(m.group(0))
+        if n and 1 <= int(n.group(1)) <= len(offered):
+            chosen = chosen or offered[int(n.group(1)) - 1]
+    return _MARK.sub("", str(text or "")).strip(), chosen
 
 
 def phone_line(row) -> str:
     """How a sticker she sent is kept in her phone."""
-    return "[表情：%s]" % (str((row or {}).get("caption") or "表情")[:12])
+    return "[表情包：%s]" % (str((row or {}).get("caption") or "表情")[:12])
 
 
 # ----------------------------------------------------------------------

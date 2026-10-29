@@ -107,8 +107,13 @@ class Split(unittest.TestCase):
         # her camera and her voice, as the owner wired them in on 10-30: +9 (SelfieMixin:
         # _media_settings, _media_count, _media_bump, _media_wanted, _post_json, _post_selfie,
         # _make_selfie, _make_voice, _media_after_reply)
-        # keep-in-group: _narrow_group_sources and _forbid_group_private
-        self.assertEqual(len(methods), 401)
+        # her stickers in the plugin (step 2, 丙): +15 (AttentionMixin._after_words,
+        # DiscretionMixin._forget_pictures_of, and StickersMixin: _stickers_on, _sticker_lib,
+        # _sticker_lock, _look_once, _maybe_keep, _sticker_refs, _look_at_sticker_in_passing,
+        # _sticker_in_passing, _sticker_offer, _sticker_named, _sticker_cleared, _send_sticker,
+        # _sticker_after)
+        # keep-in-group: +2 (_narrow_group_sources and _forbid_group_private)
+        self.assertEqual(len(methods), 416)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
