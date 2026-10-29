@@ -11,6 +11,10 @@ try:
     from .body import *  # noqa: F401,F403
 except ImportError:
     from body import *  # noqa: F401,F403
+try:
+    from . import stickers
+except ImportError:
+    import stickers
 
 
 class MediaMixin:
@@ -215,6 +219,10 @@ class MediaMixin:
 
     async def _image_context(self, event) -> str:
         refs = self._image_refs(event)
+        stickers_on = bool(getattr(self, "_stickers_on", None) and self._stickers_on())
+        if stickers_on:
+            # step 2 (丙): QQ stickers of this message are looked at wherever it was sent
+            refs = list(dict.fromkeys(refs + self._sticker_refs(event)))
         if not refs:
             return ""
         if not self._llm_allowed("image_caption"):
@@ -239,14 +247,23 @@ class MediaMixin:
                 provider = self._vision_provider_for(event)
                 if provider is not None:
                     for ref in missing[:3]:
+                        look = None
                         try:
-                            resp = await provider.text_chat(prompt=prompt, image_urls=[ref])
-                            caption = interpretation.parse_image_caption(
-                                str(getattr(resp, "completion_text", "") or ""))
+                            if stickers_on:
+                                # one call: what it shows, and whether she keeps it (step 2, 丙)
+                                caption, look = await self._look_once(provider, ref, event)
+                            else:
+                                resp = await provider.text_chat(prompt=prompt, image_urls=[ref])
+                                caption = interpretation.parse_image_caption(
+                                    str(getattr(resp, "completion_text", "") or ""))
                         except Exception as exc:
                             logger.warning("[biocore] image caption failed: %s", exc)
                             caption = ""
-                        if caption:
+                        if caption and look is not None:
+                            cache[_sha256(ref)] = stickers.cache_entry(
+                                ref, look, self._speaker(event)[0], self._here(event), time.time())
+                            await self._maybe_keep(event, ref, look)
+                        elif caption:
                             cache[_sha256(ref)] = {"ref": ref, "caption": caption, "ts": time.time()}
                     self._save_image_cache(cache)
             except Exception as exc:

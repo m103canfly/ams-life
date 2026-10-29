@@ -10860,6 +10860,10 @@
   "/astrbot_plugin_ams_life/page/brain/search",
   "/astrbot_plugin_ams_life/page/memories",
   "/astrbot_plugin_ams_life/page/memories/number",
+  "/astrbot_plugin_ams_life/page/stickers",
+  "/astrbot_plugin_ams_life/page/stickers/image",
+  "/astrbot_plugin_ams_life/page/stickers/delete",
+  "/astrbot_plugin_ams_life/page/stickers/add",
   "/astrbot_plugin_ams_life/page/look"
  ],
  "turns": [

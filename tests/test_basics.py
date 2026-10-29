@@ -107,11 +107,17 @@ class Split(unittest.TestCase):
         # her camera and her voice, as the owner wired them in on 10-30: +9 (SelfieMixin:
         # _media_settings, _media_count, _media_bump, _media_wanted, _post_json, _post_selfie,
         # _make_selfie, _make_voice, _media_after_reply)
+        # her stickers in the plugin (step 2, 丙): +15 (AttentionMixin._after_words,
+        # DiscretionMixin._forget_pictures_of, and StickersMixin: _stickers_on, _sticker_lib,
+        # _sticker_lock, _look_once, _maybe_keep, _sticker_refs, _look_at_sticker_in_passing,
+        # _sticker_in_passing, _sticker_offer, _sticker_named, _sticker_cleared, _send_sticker,
+        # _sticker_after); the owner's page of her stickers: +6 (_page_body, _page_query, page_stickers,
+        # page_sticker_image, page_sticker_delete, page_sticker_add)
         # her browser in a reply (step 2, 丁): +11 (BrowseMixin: _browse_on, _browse_ledger, _browse_quota,
         # _browse_names, _give_browse_tools, _tool_context, _builtin_web_tool, _tool_search, _tool_read,
         # _browse_after_reply, _browse_for_panel); review of PR #39: +3 (_browse_urls, _message_words,
         # _may_go_out: only the addresses given, nothing private goes out)
-        self.assertEqual(len(methods), 413)
+        self.assertEqual(len(methods), 434)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

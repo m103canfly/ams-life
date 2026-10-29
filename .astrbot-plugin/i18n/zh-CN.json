@@ -1,10 +1,12 @@
 {
   "pages": {
     "dashboard": { "title": "ams-life 面板" },
-    "starmap": { "title": "她的脑子（单独一页）" }
+    "starmap": { "title": "她的脑子（单独一页）" },
+    "stickers": { "title": "她的表情包" }
   },
   "views": {
     "dashboard": { "title": "ams-life 面板" },
-    "starmap": { "title": "她的脑子（单独一页）" }
+    "starmap": { "title": "她的脑子（单独一页）" },
+    "stickers": { "title": "她的表情包" }
   }
 }
