@@ -21,6 +21,8 @@ MIN_CHARS = 1
 
 # what she picked as a QQ face: said out loud it would be "[表情:微笑]"
 _FACE = re.compile(r"\[表情[:：][^\]\n]{0,12}\]")
+_STICKER = re.compile(r"\[表情包[^\]\n]*\]")
+_NEXT_MESSAGE = re.compile(r"【下一条】")
 # the other things a message can carry, which are not words
 _CARRIED = re.compile(r"\[(?:图片|语音|视频|文件|聊天记录|戳一戳|卡片|分享|位置|音乐|骰子|猜拳|名片|消息)\]")
 # links, inline code and code blocks are read aloud as noise
@@ -39,6 +41,8 @@ def speakable(text, limit: int = 100) -> str:
         return ""
     s = _NOT_SPOKEN.sub(" ", s)
     s = _FACE.sub(" ", s)
+    s = _STICKER.sub(" ", s)
+    s = _NEXT_MESSAGE.sub(" ", s)
     s = _CARRIED.sub(" ", s)
     s = _MARKS.sub("", s)
     s = _SPACES.sub(" ", s)
