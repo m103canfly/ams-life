@@ -2026,22 +2026,29 @@
   }
   async function loadModels(kind, prefix) {
     const top = $("apiSaveStateTop");
-    if (!bridge) { if (top) top.textContent = "未连接 AstrBot 页面桥，无法获取模型"; return; }
+    const blockNote = $(prefix + "Note");
+    const say = (t) => { if (blockNote) blockNote.textContent = t; if (top) top.textContent = t; };
+    if (!bridge) { say("没连上 AstrBot 页面桥，取不到模型"); return; }
     const src = $(prefix + "Source"), base = $(prefix + "Base"), key = $(prefix + "Key"), model = $(prefix + "Model");
-    const state = $("apiSaveState");
-    if (state) state.textContent = "读取模型…";
+    say("正在读取模型…");
+    let timer = null;
     try {
-      const raw = await bridge.apiPost("page/models", {
-        kind, source: src.value, base_url: base.value, api_key: key.value
-      });
+      const raw = await Promise.race([
+        bridge.apiPost("page/models", {
+          kind, source: src.value, base_url: base.value, api_key: key.value
+        }),
+        new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("25 秒没有回应（页面桥没转发，或后端卡住）")), 25000); })
+      ]);
       const payload = raw && raw.data ? raw.data : raw;
       if (!payload || payload.status === "error") throw new Error((payload && payload.message) || "no models");
       const models = payload.models || [];
-      if (!models.length) throw new Error("empty model list");
+      if (!models.length) throw new Error("读回来是空列表");
       setOptions(model, models, model.value);
-      if (state) state.textContent = "已读取 " + models.length + " 个模型";
+      say("已读取 " + models.length + " 个模型");
     } catch (e) {
-      if (state) state.textContent = "读取失败：" + String(e && e.message || e);
+      say("读取失败：" + String((e && e.message) || e));
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
   async function saveApiConfig() {

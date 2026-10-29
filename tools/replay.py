@@ -348,15 +348,24 @@ def astrbot_model(data_dir, provider_id):
 
 def astrbot_persona(data_dir) -> str:
     """The default persona's system prompt of the AstrBot at `data_dir` (read only)."""
-    cfg = json.loads((Path(data_dir) / "cmd_config.json").read_text("utf-8-sig"))
-    pid = (((cfg.get("agent_runner") or {}).get("config") or {}).get("persona") or {}).get("persona_id") or ""
-    db = sqlite3.connect("file:" + (Path(data_dir) / "data_v4.db").resolve().as_posix() + "?mode=ro&immutable=1",
-                         uri=True)
     try:
-        row = db.execute("SELECT system_prompt FROM personas WHERE persona_id = ?", (pid,)).fetchone()
-    finally:
-        db.close()
-    return str(row[0] or "") if row else ""
+        cfg = json.loads((Path(data_dir) / "cmd_config.json").read_text("utf-8-sig"))
+        runner = cfg.get("agent_runner") or {}
+        config = runner.get("config") or {}
+        pid = ((config.get("persona") or {}).get("persona_id") if runner.get("runner_type") == "local"
+               else config.get("persona_id"))
+        if not pid:
+            raise SystemExit("AstrBot persona source is not selected; replay refused")
+        db = sqlite3.connect("file:" + (Path(data_dir) / "data_v4.db").resolve().as_posix() + "?mode=ro", uri=True)
+        try:
+            row = db.execute("SELECT system_prompt FROM personas WHERE persona_id = ?", (pid,)).fetchone()
+        finally:
+            db.close()
+    except Exception as exc:
+        raise SystemExit("AstrBot persona could not be read (%s); replay refused" % type(exc).__name__) from None
+    if not row or not str(row[0] or "").strip():
+        raise SystemExit("AstrBot persona is missing or blank; replay refused")
+    return str(row[0])
 
 
 def failure(exc) -> str:
@@ -611,7 +620,7 @@ def main(argv=None):
         model_base, model_name, post = astrbot_model(args.astrbot, args.model)
         u = urllib.parse.urlsplit(model_base)
         allowed.add((u.hostname, u.port or 443))
-        persona = astrbot_persona(args.astrbot) or PERSONA
+        persona = astrbot_persona(args.astrbot)
         ledger = Ledger(_guard.output_file(args.model_ledger, "the model ledger"),
                         "%s %s" % (Path(args.out).name, time.strftime("%Y-%m-%d %H:%M:%S")),
                         args.model_limit, new=args.new_pass)
@@ -898,7 +907,7 @@ def main(argv=None):
             continue
         if not row.get("request"):
             continue
-        req = ProviderRequest(prompt=event.message_str, system_prompt=PERSONA)
+        req = ProviderRequest(prompt=event.message_str, system_prompt=persona)
         loop.run_until_complete(plugin.on_llm_request(event, req))
         harness.drain(loop)
         prompts.write(json.dumps({

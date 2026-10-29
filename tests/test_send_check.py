@@ -14,7 +14,7 @@ sys.path.insert(0, str(HERE.parent))
 import send_check as sc  # noqa: E402
 
 SECRET = '芒果私下说：我的暗号是蓝鲸三号，下周三去医院复查'
-NO = [{'id': 'memory:m1', 'text': SECRET, 'names': ['芒果'], 'vec': [1.0, 0.0, 0.0]}]
+NO = [{'id': 'memory:m1', 'text': SECRET, 'private': True, 'names': ['芒果'], 'vec': [1.0, 0.0, 0.0]}]
 _CACHE = {}
 
 
@@ -38,6 +38,23 @@ def run_case(case):
 
 
 class Look(unittest.TestCase):
+    def test_known_admissions_only_with_private_context(self):
+        hints = ['我确实听他提过一嘴，不方便在这儿展开', '有些是在别处听到的',
+                 '他私下跟我说过', '这件事不方便展开', '我不方便说', '的确有这么回事', '不方便展开']
+        for hint in hints:
+            with self.subTest(hint=hint):
+                self.assertIn('hint', sc.check(hint, NO)['why'].get('memory:m1', []))
+                self.assertFalse(sc.check(hint, [])['leak'])
+                names_only = [{'id': 'anon', 'text': '', 'private': False, 'names': ['芒果']}]
+                self.assertFalse(sc.check(hint, names_only)['leak'])
+
+    def test_ordinary_inconvenience_and_privacy_principles(self):
+        for reply in ['今天不方便出门，明天吧', '我尊重每个人的隐私，不会讨论别人的私事',
+                      '别人的私事不方便说，我们聊点别的', '我听他提过这部电影，挺好看的',
+                      '我不方便说话，晚点再聊']:
+            with self.subTest(reply=reply):
+                self.assertFalse(sc.check(reply, NO)['leak'])
+
     def test_said_as_it_is(self):
         r = sc.check('偷偷告诉你，蓝鲸三号是他的暗号', NO, '你好呀')
         self.assertTrue(r['leak'])
@@ -96,6 +113,49 @@ class InThePlugin(unittest.TestCase):
     """send_check_cases.py: global_memory on; mango tells her a secret in private; then in a
     group the (fake) model answers with it."""
 
+    def test_admission_is_redone_and_only_safe_words_are_kept(self):
+        r = run_case('hint_redo')
+        g = r['group']
+        self.assertEqual(r['redo_calls'], 1)
+        self.assertIn('hint', '\n'.join(r['log']))
+        self.assertFalse(g['stopped'])
+        self.assertEqual(g['deliveries'], ['周末一起去爬山吧'])
+        self.assertEqual(g['response'], g['chain'])
+        self.assertEqual(g['history'], [{'type': 'text', 'text': '周末一起去爬山吧'}])
+        self.assertIn('周末一起去爬山吧', json.dumps(r['kept'], ensure_ascii=False))
+        self.assertNotIn('提过一嘴', json.dumps(r['kept'], ensure_ascii=False))
+
+    def test_every_failed_second_try_has_no_send_or_retention(self):
+        for case in ('hint_hold', 'hold', 'redo_error', 'redo_timeout', 'redo_empty',
+                     'no_provider', 'no_request', 'fails'):
+            with self.subTest(case=case):
+                r = run_case(case)
+                g = r['group']
+                self.assertTrue(g['stopped'])
+                self.assertEqual(g['deliveries'], [])
+                self.assertEqual((g['response'], g['chain']), ('', ''))
+                self.assertEqual(g['history'], [{'type': 'text', 'text': ''}])
+                self.assertIsNone(g['reasoning'])
+                self.assertEqual(r['redo_calls'], 0 if case in ('no_provider', 'no_request', 'fails') else 1)
+                self.assertEqual(r['counts'].get('redo_calls', 0), r['redo_calls'])
+                self.assertNotIn('提过一嘴', json.dumps(r['kept'], ensure_ascii=False))
+                self.assertNotIn('蓝鲸三号', json.dumps(r['kept'], ensure_ascii=False))
+                self.assertNotIn('SYNTHETIC_SENSITIVE_EXCEPTION_MARKER', '\n'.join(r['log']))
+                self.assertNotIn('SYNTHETIC_SENSITIVE_EXCEPTION_MARKER', '\n'.join(r['all_log']))
+
+    def test_context_boundaries_do_not_hold_back_safe_replies(self):
+        for case in ('ordinary', 'principle', 'no_private', 'names_only', 'own_hint', 'off_hint'):
+            with self.subTest(case=case):
+                r = run_case(case)
+                g = r.get('group') or r['private']
+                self.assertFalse(g['stopped'])
+                self.assertEqual(g['deliveries'], [g['response']])
+                self.assertEqual(r['redo_calls'], 0)
+                if case == 'names_only':
+                    self.assertEqual(g['forbidden'], ['synthetic-anonymous'])
+                if case == 'no_private':
+                    self.assertEqual(g['forbidden'], [])
+
     def test_said_once_more(self):
         r = run_case('redo')
         g = r['group']
@@ -103,7 +163,7 @@ class InThePlugin(unittest.TestCase):
         self.assertFalse(g['stopped'])
         self.assertIn('只回这一句话本身', r['redo_prompt'])            # asked once, with the line
         self.assertEqual(r['counts']['redone'], 1)
-        self.assertIn('send check: redone (memory:', '\n'.join(r['log']))
+        self.assertIn('send check: redone (', '\n'.join(r['log']))
         # what AstrBot will save: the words sent, no thinking, the thinking on the event cleared
         self.assertEqual(g['history'], [{'type': 'text', 'text': '周末一起去爬山吧'}])
         self.assertIsNone(g['reasoning'])
@@ -116,7 +176,7 @@ class InThePlugin(unittest.TestCase):
         g = r['group']
         self.assertTrue(g['stopped'])
         self.assertEqual(r['counts']['held'], 1)
-        self.assertIn('send check: held back (memory:', '\n'.join(r['log']))
+        self.assertIn('send check: held back (', '\n'.join(r['log']))
         self.assertNotIn('蓝鲸三号', json.dumps(r['kept'], ensure_ascii=False))
         self.assertTrue(all('蓝鲸' not in line for line in r['log']))   # ids only in the log
 
