@@ -624,40 +624,50 @@ class LLMMixin:
         except Exception as exc:
             logger.warning("[biocore] relationship narrative failed: %s", exc)
 
+    def _sees_images(self, provider) -> bool:
+        """Can this provider look at pictures? What AstrBot's config says it takes (modalities:
+        "image"; deepseek-flash, the owner's choice of 10-29, takes them); a provider whose config
+        says nothing is guessed by its name, as before (_provider_kind)."""
+        cfg = getattr(provider, "provider_config", None)
+        mods = cfg.get("modalities") if isinstance(cfg, dict) else None
+        if isinstance(mods, (list, tuple)):
+            return "image" in [str(m).strip().lower() for m in mods]
+        return self._provider_kind(provider) == "vision"
+
     def _vision_provider_for(self, event=None):
-        """Resolve the vision provider for image caption (never a text LLM)."""
+        """Resolve the vision provider for image caption (never a model that cannot see): the
+        one set for the function, else AstrBot's default image provider, else the chat model
+        when it sees images (the owner, 10-29: "用deepseek-flash", the one she talks with)."""
         _cfg = self._function_cfg("image_caption")
         _override = _cfg["provider"]
-        _pid = ""
+        _tried = []
         if _override and _override not in ("follow_llm", "main", "default", ""):
-            _pid = _override
-        if not _pid:
-            try:
-                _cfg_all = self.context.get_config()
-                _ps = _cfg_all.get("provider_settings", {}) if isinstance(_cfg_all, dict) else {}
-                _pid = str(_ps.get("default_image_caption_provider_id") or "exusiai-img")
-            except Exception:
-                _pid = "exusiai-img"
+            _tried.append(_override)
         try:
-            _vp = self.context.get_provider_by_id(_pid)
-        except Exception as exc:
-            logger.warning("[biocore] vision provider lookup failed (%s): %s", _pid, exc)
-            return None
-        if _vp is not None and self._provider_kind(_vp) == "vision":
-            return _vp
-        if _vp is not None:
-            logger.warning("[biocore] image_caption provider %s is not a vision provider; ignored", _pid)
-        # Fall back to the configured default image provider, but never a text LLM.
-        try:
-            _cfg = self.context.get_config()
-            _ps = _cfg.get("provider_settings", {}) if isinstance(_cfg, dict) else {}
+            _cfg_all = self.context.get_config()
+            _ps = _cfg_all.get("provider_settings", {}) if isinstance(_cfg_all, dict) else {}
             _def = str(_ps.get("default_image_caption_provider_id") or "")
-            if _def and _def != _pid:
-                _vp2 = self.context.get_provider_by_id(_def)
-                if _vp2 is not None and self._provider_kind(_vp2) == "vision":
-                    return _vp2
         except Exception:
-            pass
+            _def = ""
+        if _def and _def not in _tried:
+            _tried.append(_def)
+        for _pid in _tried:
+            try:
+                _vp = self.context.get_provider_by_id(_pid)
+            except Exception as exc:
+                logger.warning("[biocore] vision provider lookup failed (%s): %s", _pid, exc)
+                continue
+            if _vp is not None and self._sees_images(_vp):
+                return _vp
+            if _vp is not None:
+                logger.warning("[biocore] image_caption provider %s is not a vision provider; ignored", _pid)
+        try:
+            _umo = str(getattr(event, "unified_msg_origin", "") or "") if event is not None else None
+            _chat = self.context.get_using_provider(_umo)
+        except Exception:
+            _chat = None
+        if _chat is not None and self._sees_images(_chat):
+            return _chat
         return None
 
     async def _compile_profile(self, event):
