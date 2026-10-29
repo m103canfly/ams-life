@@ -90,7 +90,8 @@ class Split(unittest.TestCase):
         # senders she ignores (the owner, 10-29): +1 (_ignored_sender)
         # what she keeps as a list (panel, 10-29): +2 (page_memories, page_memories_number)
         # no tools in her reply (the owner, 10-29): +1 (_reply_tools_off)
-        self.assertEqual(len(methods), 341)
+        # looking at pictures with the chat model (step 2, 丙): +1 (_sees_images)
+        self.assertEqual(len(methods), 342)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
