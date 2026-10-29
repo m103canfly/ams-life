@@ -56,5 +56,22 @@ class NoTools(unittest.TestCase):
         self.assertIsNone(r['three'])
 
 
+
+class HookOrder(unittest.TestCase):
+    """Her on_llm_request runs after every other plugin's (AstrBot's own is priority 0, and
+    AstrBot sorts by priority, highest first): the tools are taken out last, and the numbers
+    come out of the group context lines the built-in plugin adds (step 2). The stand-in
+    AstrBot of the tests drops the decorator's arguments, so this reads them from main.py."""
+
+    def test_on_llm_request_priority_is_below_zero(self):
+        import ast
+        tree = ast.parse((HERE.parent / 'main.py').read_text(encoding='utf-8'))
+        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == 'on_llm_request')
+        deco = next(d for d in fn.decorator_list
+                    if isinstance(d, ast.Call) and getattr(d.func, 'attr', '') == 'on_llm_request')
+        prio = {k.arg: ast.literal_eval(k.value) for k in deco.keywords}.get('priority', 0)
+        self.assertLess(prio, 0)
+
+
 if __name__ == '__main__':
     unittest.main()

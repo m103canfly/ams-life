@@ -344,7 +344,8 @@ class GlobalLabels(unittest.TestCase):
         names = {'10001': '芒果', '10002': '柠檬'}
         out = d.for_model('@柠檬(10002) 群900002 和 900001 都去，问 10001，@10002 也来，@(10007) 呢，'
                           '电话 13800000000', names, 'default:GroupMessage:900001', {'900001', '900002'})
-        self.assertEqual(out, '@柠檬 群别的群 和 这个群 都去，问 芒果，@柠檬 也来，@有人 呢，电话 13800000000')
+        self.assertEqual(out, '@柠檬 别的群 和 这个群 都去，问 芒果，@柠檬 也来，@有人 呢，电话 13800000000')
+        self.assertEqual(d.for_model('群900001的人', {}, 'default:GroupMessage:900001', {'900001'}), '这个群的人')
         self.assertEqual(d.for_model('在 900001 里', {}, PA, {'900001'}), '在 别的群 里')
 
 

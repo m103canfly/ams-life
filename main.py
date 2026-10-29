@@ -566,7 +566,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if task is not None and not task.done():
             task.cancel()
 
-    @filter.on_llm_request()
+    # after every other plugin's (AstrBot's own is priority 0): the tools are taken out
+    # last, and the numbers come out of the group context lines it adds (step 2)
+    @filter.on_llm_request(priority=-10)
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
         if self._ignored_sender(event):   # on_message stopped it already; should it get this far
             event.stop_event()

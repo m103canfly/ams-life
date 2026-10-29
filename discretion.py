@@ -285,13 +285,13 @@ def for_model(text, names=None, here="", groups=()) -> str:
         return out
 
     def one(m):
-        n = m.group(0)
+        before, n = m.group(1) or "", m.group(2)
         if n == this_group:
-            return "这个群"
+            return "这个群"   # "群123456" too: the 群 in front goes with it
         if n in groups:
             return "别的群"
-        return names.get(n, n)
-    return re.sub(r"(?<![0-9])(?:%s)(?![0-9])" % "|".join(known), one, out)
+        return before + names.get(n, n)
+    return re.sub(r"(群)?(?<![0-9])(%s)(?![0-9])" % "|".join(known), one, out)
 
 
 # a one-character name ("鹿") is only a name where it plainly means someone: after an @, or
