@@ -44,7 +44,7 @@ class ToolSet:
         return bool(self.tools)
 
 
-config = {'allowed_tools': ['web_search_deepseek']} if CASE == 'allowed' else {}
+config = {'allowed_tools': ['web_search_deepseek']} if CASE in ('allowed', 'broken') else {}
 if CASE == 'plugin_off':
     config = {'enabled': False}
 plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
@@ -69,6 +69,18 @@ def ask(tools, text='小爱 你好'):
     left = getattr(req, 'func_tool', 'unset')
     return None if left is None else 'unset' if left == 'unset' else left.names()
 
+
+class Broken(ToolSet):
+    """A tool set that fails while tools are taken out of it."""
+
+    def remove_tool(self, name):
+        raise RuntimeError('made-up failure')
+
+
+if CASE == 'broken':
+    result = {'broken': ask(Broken(['future_task', 'web_search_deepseek']))}
+    OUT.write_text(json.dumps(result, ensure_ascii=False, indent=1), 'utf-8')
+    raise SystemExit(0)
 
 result = {
     'three': ask(ToolSet(['future_task', 'send_message_to_user', 'web_search_deepseek'])),

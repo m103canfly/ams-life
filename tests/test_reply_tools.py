@@ -47,6 +47,10 @@ class NoTools(unittest.TestCase):
         self.assertEqual(r['three'], ['web_search_deepseek'])
         self.assertEqual(r['logged'], ['[ams-life] tools taken out of the reply: future_task, send_message_to_user'])
 
+    def test_an_error_leaves_no_tools(self):
+        # review of PR #27: should taking them out fail, she gets none (not all of them)
+        self.assertIsNone(run_case('broken')['broken'])
+
     def test_with_the_plugin_switched_off_too(self):
         r = run_case('plugin_off')
         self.assertIsNone(r['three'])
