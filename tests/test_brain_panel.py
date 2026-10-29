@@ -168,7 +168,7 @@ out.framesAfter = box.children.length;
 out.frame = { srcdoc: frame.srcdoc, allowfullscreen: frame.allowfullscreen, bodyView: classes.has('brain-view') };
 const win = frame.contentWindow;
 from(win, { kind: 'hello' });
-out.hello = posted.splice(0).map(([m, o]) => [m.kind, m.isDark, o]);
+out.hello = posted.splice(0).map(([m, o]) => [m.kind, m.kind === 'theme' ? m.dark : m.isDark, o]);
 // another window saying the same is not listened to
 from({ postMessage() {} }, { kind: 'get', id: 1, route: 'page/brain', query: {} });
 out.strangerCalls = bridgeCalls.length;
@@ -216,7 +216,7 @@ process.stdout.write(JSON.stringify(out));
 
     def test_reads_passed_on_read_only(self):
         r = self.r
-        self.assertEqual(r['hello'], [['hello', True, '*']])
+        self.assertEqual(r['hello'], [['hello', True, '*'], ['theme', True, '*']])   # the theme follows the hello
         self.assertEqual(r['strangerCalls'], 0)
         self.assertEqual(r['passed'], [['page/brain/node', {'id': 'p:1', 'reveal': 'qq'}]])
         self.assertEqual(r['answer'], [['answer', 7, True, {'qq': '示例-1'}, '*']])
@@ -349,8 +349,9 @@ class InTheShell(unittest.TestCase):
         host = self.r['host']
         self.assertEqual(host['posts'], [])
         self.assertEqual(host['other'], [])
+        # page/look: her pictures for the panel's look (look.js), read only
         self.assertLessEqual({g['endpoint'] for g in host['gets']},
-                             {'page/status', 'page/brain', 'page/brain/node', 'page/brain/search'})
+                             {'page/status', 'page/brain', 'page/brain/node', 'page/brain/search', 'page/look'})
 
 
 if __name__ == '__main__':
