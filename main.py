@@ -809,7 +809,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             try:
                 _reply = await self._look_at_reply(event, response, _reply)
             except Exception as exc:
-                _reply = self._check_failed(event, exc)
+                _reply = self._check_failed(event, exc, response)
             if not _reply:
                 return
         if getattr(self, "self_decide", False):
