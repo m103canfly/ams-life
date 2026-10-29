@@ -21,7 +21,12 @@ uses, and sends them as QQ stickers (the owner, 10-29). Not wired into the plugi
   send_group_msg / send_private_msg, only to the chat of this message, only image
   (sub_type 1), text and face;
 - cache_entry / prune_cache: what a look at a picture leaves in image_cache.json, with who
-  sent it, so that deleting a person deletes it; entries that do not say so last DAYS.
+  sent it, so that deleting a person deletes it; entries that do not say so last DAYS;
+- place_labels / listing / view: the owner's page of her stickers ("她的表情包"): one page of
+  them, sorted and filtered, each with where it came from as "群1" / "私聊1" / "旧小爱" /
+  "主人给的" (never a number);
+- decode_upload: a picture the owner adds on that page: base64, at most MAX_BYTES, a picture by
+  its first bytes (check_image), whatever its name says.
 
 Only the standard library; no AstrBot.
 """
@@ -348,11 +353,16 @@ class Library:
         return gone
 
     def counts(self, now, soon_days=3) -> dict:
-        """For the panel's top line: how many, kept today, going within `soon_days`."""
+        """For the page's top line: how many, kept today, going within `soon_days`."""
+        return self.counts_of(self.rows, now, soon_days)
+
+    @staticmethod
+    def counts_of(rows, now, soon_days=3) -> dict:
+        rows = rows or {}
         today = time.strftime("%Y-%m-%d", time.localtime(now))
-        mine = [r for r in self.rows.values() if r.get("source") != "owner"]
-        return {"total": len(self.rows), "owner": len(self.rows) - len(mine),
-                "today": sum(1 for r in self.rows.values()
+        mine = [r for r in rows.values() if r.get("source") != "owner"]
+        return {"total": len(rows), "owner": len(rows) - len(mine),
+                "today": sum(1 for r in rows.values()
                              if time.strftime("%Y-%m-%d", time.localtime(float(r.get("saved_at", 0) or 0))) == today),
                 "soon": sum(1 for r in mine
                             if (DAYS - soon_days) * 86400 < now - float(r.get("last_used", 0) or 0) <= DAYS * 86400)}
@@ -471,3 +481,99 @@ def prune_cache(cache, now, gone_people=(), days=DAYS) -> int:
     for k in drop:
         cache.pop(k, None)
     return len(drop)
+
+
+# ----------------------------------------------------------------------
+# The owner's page of her stickers
+# ----------------------------------------------------------------------
+SORTS = ("saved", "used", "most", "soon")   # newest kept, last used, most used, going soonest
+PAGE_SIZE = 40
+OLD_LABEL, OWNER_LABEL = "旧小爱", "主人给的"
+
+
+def place_labels(rows) -> dict:
+    """"group:<n>" / "private:<n>" -> "群1" / "私聊1", numbered by when the first sticker came from there."""
+    first = {}
+    for r in (rows or {}).values():
+        where = str(r.get("from_where") or "")
+        if where.startswith(("group:", "private:")):
+            first[where] = min(first.get(where, float("inf")), float(r.get("saved_at", 0) or 0))
+    out, n = {}, {"group": 0, "private": 0}
+    for where in sorted(first, key=lambda w: (first[w], w)):
+        kind = "group" if where.startswith("group:") else "private"
+        n[kind] += 1
+        out[where] = ("群%d" if kind == "group" else "私聊%d") % n[kind]
+    return out
+
+
+def source_label(row, labels) -> str:
+    if row.get("source") == "owner":
+        return OWNER_LABEL
+    if row.get("source") == "old":
+        return OLD_LABEL
+    return labels.get(str(row.get("from_where") or ""), "别处")
+
+
+def view(sid, row, labels, now) -> dict:
+    """One sticker as the page shows it: no number of anyone, no address."""
+    owner = row.get("source") == "owner"
+    left = None if owner else max(0, int((DAYS * 86400 - (now - float(row.get("last_used", 0) or 0))) // 86400))
+    return {"id": sid, "caption": str(row.get("caption") or ""), "emotion": str(row.get("emotion") or ""),
+            "scene": str(row.get("scene") or ""), "why": str(row.get("why") or ""),
+            "from": source_label(row, labels), "owner": owner, "type": str(row.get("type") or ""),
+            "saved_at": float(row.get("saved_at", 0) or 0), "last_used": float(row.get("last_used", 0) or 0),
+            "uses": int(row.get("uses", 0) or 0), "days_left": left}
+
+
+def listing(rows, now, sort="saved", emotion="", scene="", source="", after=0, n=PAGE_SIZE) -> dict:
+    """One page of her stickers for the owner: {"items", "next", "counts", "emotions", "scenes", "sources"}.
+    `after`: how many were shown before (the page scrolls on); `source`: a label from "sources"."""
+    rows = rows or {}
+    labels = place_labels(rows)
+    items = [view(sid, r, labels, now) for sid, r in rows.items()]
+    emotions = sorted({x["emotion"] for x in items if x["emotion"]})
+    scenes = sorted({x["scene"] for x in items if x["scene"]})
+    sources = [OWNER_LABEL, OLD_LABEL] + sorted(set(labels.values()), key=lambda s: (s[:1] != "群", len(s), s))
+    sources = [s for s in sources if any(x["from"] == s for x in items)]
+    if emotion:
+        items = [x for x in items if x["emotion"] == emotion]
+    if scene:
+        items = [x for x in items if x["scene"] == scene]
+    if source:
+        items = [x for x in items if x["from"] == source]
+    sort = sort if sort in SORTS else "saved"
+    if sort == "saved":
+        items.sort(key=lambda x: (-x["saved_at"], x["id"]))
+    elif sort == "used":
+        items.sort(key=lambda x: (-x["last_used"], x["id"]))
+    elif sort == "most":
+        items.sort(key=lambda x: (-x["uses"], -x["last_used"], x["id"]))
+    else:   # going soonest: the owner's gifts never go, they come last
+        items.sort(key=lambda x: (x["days_left"] is None, x["days_left"] if x["days_left"] is not None else 0, x["id"]))
+    try:
+        start = max(0, int(after or 0))
+    except (TypeError, ValueError):
+        start = 0
+    n = max(1, min(PAGE_SIZE, int(n or PAGE_SIZE)))
+    page = items[start:start + n]
+    return {"items": page, "next": start + n if start + n < len(items) else None, "total": len(items),
+            "counts": Library.counts_of(rows, now), "emotions": emotions, "scenes": scenes, "sources": sources}
+
+
+def decode_upload(text) -> tuple:
+    """(bytes, '') for a picture the owner adds (base64, a data: prefix allowed), else (b'', why)."""
+    s = str(text or "").strip()
+    if s.startswith("data:"):
+        s = s.split(",", 1)[1] if "," in s else ""
+    s = "".join(s.split())
+    if not s:
+        return b"", "empty"
+    if len(s) > (MAX_BYTES * 4) // 3 + 8:
+        return b"", "too big"
+    import base64
+    try:
+        data = base64.b64decode(s, validate=True)
+    except (ValueError, TypeError):
+        return b"", "not base64"
+    kind, why = check_image(data)
+    return (data, "") if kind else (b"", why)

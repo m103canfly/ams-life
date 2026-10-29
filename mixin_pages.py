@@ -362,6 +362,15 @@ class PagesMixin:
                          "what she keeps, page by page, numbers hidden (read-only)")
                 register("/astrbot_plugin_ams_life/page/memories/number", self.page_memories_number, ["GET"],
                          "one row's words as kept, when the owner asks (read-only)")
+                # ams-life: "她的表情包" (pages/stickers, mixin_stickers.py): see, delete, add
+                register("/astrbot_plugin_ams_life/page/stickers", self.page_stickers, ["GET"],
+                         "her stickers, page by page (no numbers)")
+                register("/astrbot_plugin_ams_life/page/stickers/image", self.page_sticker_image, ["GET"],
+                         "one of her stickers' pictures (read-only)")
+                register("/astrbot_plugin_ams_life/page/stickers/delete", self.page_sticker_delete, ["POST"],
+                         "the owner deletes one of her stickers")
+                register("/astrbot_plugin_ams_life/page/stickers/add", self.page_sticker_add, ["POST"],
+                         "the owner adds a sticker (pictures only)")
                 # ams-life: her avatar and art for the panel's look, from the data folder only (ui_look.py)
                 register("/astrbot_plugin_ams_life/page/look", self.page_look, ["GET"],
                          "her pictures for the panel, when the owner put them in (read-only)")

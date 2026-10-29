@@ -14,7 +14,12 @@ Off unless stickers_enabled (and looking at pictures, image_caption, is on).
   one is sent, after her words, as a QQ sticker through the adapter's own client to this
   message's chat (stickers.send_params / allowed), else once as a plain picture, else not;
 - what she sent is kept in her phone and AstrBot's history as [表情包：标签];
-- deleting a person deletes what he sent and the looks at his pictures.
+- deleting a person deletes what he sent and the looks at his pictures;
+- the owner's page of her stickers (pages/stickers): one page of them (page/stickers), one picture
+  (page/stickers/image), delete one (page/stickers/delete, the owner's own gifts too; nothing goes
+  into the forget registry), add some (page/stickers/add: pictures only, by their first bytes, each
+  under a new name; marked "主人给的": never swept, not counted in the 300; labelled by the owner's line,
+  else by one look when looking at pictures is on, else "主人给的").
 """
 from __future__ import annotations
 
@@ -272,3 +277,103 @@ class StickersMixin:
         async def go():
             await self._send_sticker(event, sid, umo, place)
         return go
+
+    # ------------------------------------------------------------------
+    # the owner's page of her stickers (pages/stickers)
+    # ------------------------------------------------------------------
+    @staticmethod
+    async def _page_body(body):
+        if body is not None:
+            return body if isinstance(body, dict) else {}
+        try:
+            from quart import request
+            got = await request.get_json(silent=True)
+        except Exception:
+            got = None
+        return got if isinstance(got, dict) else {}
+
+    @staticmethod
+    def _page_query(args):
+        if args is not None:
+            return args
+        try:
+            from quart import request
+            return request.args
+        except Exception:
+            return {}
+
+    async def page_stickers(self, args=None):
+        """One page of her stickers: ?sort=saved|used|most|soon&emotion=&scene=&source=&after=<n>."""
+        a = self._page_query(args)
+        get = (lambda k: str(a.get(k) or "").strip()) if hasattr(a, "get") else (lambda k: "")
+        try:
+            data = stickers.listing(self._sticker_lib().rows, time.time(), get("sort") or "saved", get("emotion"),
+                                    get("scene"), get("source"), get("after") or 0)
+        except Exception as exc:
+            return {"status": "error", "message": "读不出表情包（%s）" % type(exc).__name__, "data": {"items": []}}
+        data["on"] = self._stickers_on()
+        return {"status": "ok", "data": data}
+
+    async def page_sticker_image(self, args=None):
+        """?id=<sticker>: the picture, as a data URL (only one of hers, by its id)."""
+        a = self._page_query(args)
+        sid = str(a.get("id") or "").strip() if hasattr(a, "get") else ""
+        lib = self._sticker_lib()
+        row = lib.rows.get(sid)
+        if not row:
+            return {"status": "error", "message": "没有这一张了", "data": {}}
+        try:
+            data = lib.path_of(sid).read_bytes()
+        except OSError:
+            return {"status": "error", "message": "这一张读不出来", "data": {}}
+        kind = stickers.sniff(data)
+        if not kind:
+            return {"status": "error", "message": "这一张不是图片", "data": {}}
+        mime = {"jpg": "jpeg"}.get(kind, kind)
+        return {"status": "ok", "data": {"id": sid, "url": "data:image/%s;base64,%s"
+                                         % (mime, base64.b64encode(data).decode("ascii"))}}
+
+    async def page_sticker_delete(self, body=None):
+        """{"id": <sticker>}: the owner deletes one (asked to confirm on the page first)."""
+        b = await self._page_body(body)
+        sid = str(b.get("id") or "").strip()
+        async with self._sticker_lock():
+            gone = self._sticker_lib().remove(sid)
+        if not gone:
+            return {"status": "error", "message": "没有这一张了", "data": {}}
+        logger.info("[ams-life] stickers: the owner deleted %s", sid[:10])
+        return {"status": "ok", "data": {"id": sid}}
+
+    async def page_sticker_add(self, body=None):
+        """{"picture": <base64>, "note": <a line, may be empty>}: the owner adds one. A picture only."""
+        b = await self._page_body(body)
+        data, why = stickers.decode_upload(b.get("picture"))
+        if not data:
+            return {"status": "error", "message": {"too big": "太大了（最多 5 MB）", "not a picture": "不是图片",
+                                                   "too large a side": "图太大了（边长最多 4096）"}.get(why, "收不了这张"),
+                    "data": {"why": why}}
+        note = " ".join(str(b.get("note") or "").split())[:60]
+        look = None
+        lib = self._sticker_lib()
+        async with self._sticker_lock():
+            sid, why = lib.add(data, time.time(), source="owner", from_qq=self._attention_cfg().get("owner", ""),
+                               from_where="owner", note=note or stickers.OWNER_LABEL)
+        if not sid:
+            return {"status": "error", "message": "收不了这张（%s）" % why, "data": {}}
+        if not note and self._llm_allowed("image_caption"):
+            # no line from the owner: one look for its labels (its money in the day's, as "vision")
+            try:
+                provider = self._vision_provider_for(None)
+                if provider is not None:
+                    _caption, look = await self._look_once(provider, str(lib.path_of(sid)), None)
+            except Exception as exc:
+                logger.warning("[ams-life] stickers: no look at the owner's picture (%s)", type(exc).__name__)
+            if look and look.get("caption"):
+                async with self._sticker_lock():
+                    row = lib.rows.get(sid)
+                    if row is not None:
+                        row.update(caption=look["caption"][:120], emotion=look.get("emotion", "")[:12],
+                                   scene=look.get("scene", "")[:20])
+                        lib._save()
+        logger.info("[ams-life] stickers: the owner added %s", sid[:10])
+        return {"status": "ok", "data": {"id": sid, "labelled": bool(look and look.get("caption")) or bool(note)}}

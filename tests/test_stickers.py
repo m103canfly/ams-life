@@ -269,5 +269,26 @@ class TheImport(unittest.TestCase):
                     import_stickers.stage(src, bad, now=NOW)
 
 
+
+class PageLogic(unittest.TestCase):
+    def test_places_numbered_by_when_first_seen(self):
+        rows = {'a': {'from_where': 'group:5', 'saved_at': 20}, 'b': {'from_where': 'group:3', 'saved_at': 10},
+                'c': {'from_where': 'private:7', 'saved_at': 30}, 'd': {'from_where': 'old', 'saved_at': 1}}
+        self.assertEqual(stickers.place_labels(rows), {'group:3': '群1', 'group:5': '群2', 'private:7': '私聊1'})
+
+    def test_pages_of_forty(self):
+        rows = {'s%02d' % i: {'caption': str(i), 'saved_at': i, 'last_used': i, 'source': 'self'} for i in range(45)}
+        first = stickers.listing(rows, 100)
+        self.assertEqual((len(first['items']), first['next']), (40, 40))
+        second = stickers.listing(rows, 100, after=40)
+        self.assertEqual((len(second['items']), second['next']), (5, None))
+
+    def test_upload_decoding(self):
+        import base64
+        self.assertEqual(stickers.decode_upload(''), (b'', 'empty'))
+        self.assertEqual(stickers.decode_upload('不是base64'), (b'', 'not base64'))
+        self.assertEqual(stickers.decode_upload(base64.b64encode(b'GIF87a').decode())[1], 'size unreadable')
+
+
 if __name__ == '__main__':
     unittest.main()

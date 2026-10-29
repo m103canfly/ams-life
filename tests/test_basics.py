@@ -108,8 +108,9 @@ class Split(unittest.TestCase):
         # DiscretionMixin._forget_pictures_of, and StickersMixin: _stickers_on, _sticker_lib,
         # _sticker_lock, _look_once, _maybe_keep, _sticker_refs, _look_at_sticker_in_passing,
         # _sticker_in_passing, _sticker_offer, _sticker_named, _sticker_cleared, _send_sticker,
-        # _sticker_after)
-        self.assertEqual(len(methods), 405)
+        # _sticker_after); the owner's page of her stickers: +6 (_page_body, _page_query, page_stickers,
+        # page_sticker_image, page_sticker_delete, page_sticker_add)
+        self.assertEqual(len(methods), 411)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
