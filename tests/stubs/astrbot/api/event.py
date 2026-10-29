@@ -40,6 +40,13 @@ class MessageChain:
         self.chain.append(Plain(text))
         return self
 
+    def get_plain_text(self):
+        from .message_components import Plain
+        return " ".join(c.text for c in self.chain if isinstance(c, Plain))
+
+    def __bool__(self):
+        return bool(self.chain)
+
 
 class MessageEventResult(MessageChain):
     def use_t2i(self, flag):

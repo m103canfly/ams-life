@@ -77,6 +77,12 @@ try:
     from .mixin_send_check import SendCheckMixin
 except ImportError:
     from mixin_send_check import SendCheckMixin
+try:
+    from .mixin_attention import AttentionMixin
+    from . import attention
+except ImportError:
+    from mixin_attention import AttentionMixin
+    import attention
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -86,7 +92,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -113,6 +119,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2: one memory everywhere, each thing labelled with what she may say of it
         # where she is (off by default; the owner turns it on after the third replay)
         self.global_memory = bool(self.config.get("global_memory", False))
+        # step 2 (甲): she decides herself whether to answer (off by default; off, AstrBot decides
+        # as before: an @ of her, "/", every private message)
+        self.self_decide = bool(self.config.get("self_decide", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
@@ -563,6 +572,20 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         except Exception as exc:
             logger.warning("[ams-life] window store failed: %s", exc)
 
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=-5)
+    async def on_message_decide(self, event: AstrMessageEvent):
+        """Step 2 (甲, self_decide): after on_message has kept the message, she decides whether
+        to answer it (mixin_attention._decide): a request for a reply, a stop, or nothing."""
+        if not self.enabled or not getattr(self, "self_decide", False) or self._ignored_sender(event):
+            return
+        try:
+            request = await self._decide(event)
+        except Exception as exc:   # the decision failing: as before, AstrBot decides
+            logger.warning("[ams-life] attention: the decision failed (%s)", type(exc).__name__)
+            return
+        if request is not None:
+            yield request
+
     async def terminate(self):
         """AstrBot calls this when the plugin is unloaded or reloaded: stop the 5-minute loop
         (it now runs whenever the plugin is on)."""
@@ -716,6 +739,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # ams-life: the names she wrote back framed ("「柠檬」") are kept so, for the owner to read;
         # the reply model sees them without the frames, so as not to take to writing them in QQ
         _compact = discretion.unframe(_compact)
+        if getattr(self, "self_decide", False):
+            # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
+            _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
         if _global:
             # step 2: no QQ number and no group number reaches the model (the owner, 10-29: 31)
             _compact = self._for_model(_compact, event)
@@ -751,6 +777,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         if not self.enabled:
             return
+        if getattr(self, "self_decide", False):
+            self._note_spend("reply", response)   # step 2: the money of the day
         self._continue_job()
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
@@ -769,6 +797,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 pass
         _reply = _clean
+        if getattr(self, "self_decide", False) and attention.silent(_reply):
+            # step 2 (甲): she chose to say nothing (【不说】): nothing is sent, nothing kept
+            logger.info("[ams-life] attention: she said nothing")
+            self._check_note(event).update(sent="", outcome="silent")
+            self._stop(event)
+            return
         if getattr(self, "global_memory", False) and _reply.strip():
             # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
             # If the look itself fails, the reply is held back as if it leaked.
@@ -778,6 +812,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 _reply = self._check_failed(event, exc)
             if not _reply:
                 return
+        if getattr(self, "self_decide", False):
+            # step 2 (甲): her messages as she wrote them -- QQ faces, several messages
+            _reply = self._shape_reply(event, response, _reply)
         try:
             core.observe_own(_reply)
             core.record_reply(_reply)

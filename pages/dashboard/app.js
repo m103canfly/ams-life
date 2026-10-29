@@ -1170,6 +1170,13 @@
       .map(([k,n])=>(RED_NAMES[k]||k)+" "+Number(n)+" 条");
     note.textContent=(red.filter?"红线过滤：开（碰到的不存）。":"红线过滤：关（一律不挡，只记数）。")+
       (parts.length?"现在存着的里面碰到红线的："+parts.join("，")+"。":"现在存着的里面没有碰到红线的话。");
+    // step 2 (self_decide): the money of the day
+    const spend=$("spendNote"), sp=data&&data.spend;
+    if(spend){
+      spend.hidden=!sp;
+      if(sp) spend.textContent="今天调模型花了约 "+Number(sp.spent||0).toFixed(2)+" 元，还剩 "+Number(sp.left||0).toFixed(2)+
+        " 元（上限 "+Number(sp.hard||0)+" 元"+(sp.state==="soft"?"，快到了：只回主人的私聊":sp.state==="hard"?"，到了：今天不回了":"")+"）。";
+    }
     // step 2 (global_memory): the last look before sending, today
     const send=$("sendNote"), sc=data&&data.send_check;
     if(send){

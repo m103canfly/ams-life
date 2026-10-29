@@ -17,6 +17,13 @@ except ImportError:
     import digest
 
 
+def _counted(plugin, kind, provider):
+    """step 2 (甲): the provider, its answers counted into the day's spending when the plugin
+    counts them (AttentionMixin._spending); as it is otherwise."""
+    count = getattr(plugin, "_spending", None)
+    return count(kind, provider) if count else provider
+
+
 class LLMMixin:
     def _load_profile(self):
         try:
@@ -127,13 +134,13 @@ class LLMMixin:
                 _p = None
             if _p is not None:
                 if self._provider_kind(_p) == "chat":
-                    return _p
+                    return _counted(self, kind, _p)
                 logger.warning("[biocore] llm function %s provider %s is not a chat provider; fallback to main LLM",
                                kind, _override)
             else:
                 logger.warning("[biocore] llm function %s provider %s not found; fallback to main LLM", kind, _override)
         try:
-            return await self.context.get_using_provider_async(_umo)
+            return _counted(self, kind, await self.context.get_using_provider_async(_umo))
         except Exception as exc:
             logger.warning("[biocore] main LLM provider lookup failed for %s: %s", kind, exc)
             return None
@@ -658,7 +665,7 @@ class LLMMixin:
                 logger.warning("[biocore] vision provider lookup failed (%s): %s", _pid, exc)
                 continue
             if _vp is not None and self._sees_images(_vp):
-                return _vp
+                return _counted(self, "vision", _vp)
             if _vp is not None:
                 logger.warning("[biocore] image_caption provider %s is not a vision provider; ignored", _pid)
         try:
@@ -667,7 +674,7 @@ class LLMMixin:
         except Exception:
             _chat = None
         if _chat is not None and self._sees_images(_chat):
-            return _chat
+            return _counted(self, "vision", _chat)
         return None
 
     async def _compile_profile(self, event):

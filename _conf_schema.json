@@ -470,6 +470,77 @@
     "type": "bool",
     "default": false
   },
+  "self_decide": {
+    "description": "她自己判断回不回（第 2 步，默认关）",
+    "hint": "打开后：叫到她（@、引用、叫名字、私聊、接她刚说的话）一定问模型，她可以挑不说、回个QQ小表情、一句短的、正经回一段，或者分几条发（最多5条）；群里没叫她的，程序先打分（不花钱），过了门槛才问模型。先等几秒，只看一段话的最后一条。夜里叫一次不回，10分钟内叫3次才醒。一个群一小时她最多约30句；每天的钱到了上限就不回（快到时只回主人的私聊）。关着时跟原来一样。",
+    "type": "bool",
+    "default": false
+  },
+  "her_names": {
+    "description": "叫她的名字",
+    "hint": "群里有人这样叫她，就算叫到她（句首、或者在空格标点后面，后面跟着标点、空格、“你”或者话完了；“小爱乱撞”不算）。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": ["小爱", "爱弥斯"]
+  },
+  "attention_level": {
+    "description": "没叫她时开口的门槛",
+    "hint": "less（少说）、normal（适中）、more（多说）。回放“只判断不调模型”出了三档的数以后，主人挑一档。",
+    "type": "string",
+    "default": "normal"
+  },
+  "owner_qq": {
+    "description": "主人的 QQ 号",
+    "hint": "只填在本机配置里，不进仓库。主人永远算最亲近的；钱快到上限时只回主人的私聊。",
+    "type": "string",
+    "default": ""
+  },
+  "day_budget_yuan": {
+    "description": "每天最多花多少钱（元）",
+    "hint": "回话、夜里那几样、看图都算；浏览器另算。到了当天就不回，第二天 0 点恢复。",
+    "type": "float",
+    "default": 10.0
+  },
+  "day_budget_soft_yuan": {
+    "description": "快到上限的线（元）",
+    "hint": "到了这条线，只回主人的私聊，群里不开口。",
+    "type": "float",
+    "default": 8.0
+  },
+  "price_input_miss": {
+    "description": "聊天模型价格：输入（没命中缓存），元/百万 token",
+    "hint": "默认按 DeepSeek deepseek-flash 官网的高峰价、7.2 元一美元算，往多里算。装机时再照官网核一次。",
+    "type": "float",
+    "default": 2.2
+  },
+  "price_input_hit": {
+    "description": "聊天模型价格：输入（命中缓存），元/百万 token",
+    "type": "float",
+    "default": 0.05
+  },
+  "price_output": {
+    "description": "聊天模型价格：输出，元/百万 token",
+    "type": "float",
+    "default": 8.7
+  },
+  "group_hour_max": {
+    "description": "一个群一小时她最多说几句",
+    "hint": "防两个机器人来回说个没完。到了这个群先不说，过一阵再说。",
+    "type": "int",
+    "default": 30
+  },
+  "night_start": {
+    "description": "夜里从几点开始",
+    "type": "string",
+    "default": "01:00"
+  },
+  "night_end": {
+    "description": "夜里到几点结束",
+    "type": "string",
+    "default": "08:25"
+  },
   "global_memory": {
     "description": "记忆全局共享（第 2 步，默认关）",
     "hint": "打开后，她在哪都能想起所有的事，每条写清能不能在这里说：别处私下说的标“这里不能讲”，别的群公开说的标“不点名”，正在跟她说话的人自己在别处说过的标“可以跟对方提”。别处私下的事也会进提示、发给聊天模型（带标签）。给模型看的话里不带 QQ 号、群号。关着时跟原来一样：别处私下的不给她看，别处公开的去名字。主人看过第三趟回放的结果再打开。",

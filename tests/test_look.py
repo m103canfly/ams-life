@@ -136,6 +136,11 @@ console.log(JSON.stringify(out));
 
 
 class Wording(unittest.TestCase):
+    def test_exact_page_title(self):
+        title = re.search(r'<title>(.*?)</title>', (DASH / 'index.html').read_text('utf-8'))
+        self.assertIsNotNone(title)
+        self.assertEqual(title.group(1), '小爱的内心世界')
+
     def test_no_biocore_on_screen(self):
         words = ('BioCore', 'BIOCORE', 'EMOTION CORE', '生物情绪核心', 'tendency layer')
         found = []
