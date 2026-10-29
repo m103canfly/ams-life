@@ -8,7 +8,9 @@ the Key stays AstrBot's). This module is what decides, with no AstrBot and no ne
 
 - check_url: a page she may read: http/https, no user or password, port 80/443 (or none),
   no host on this computer or the home network (by name, by address, by what the name
-  resolves to here when a resolver is given);
+  resolves to here when a resolver is given); urls_in: the addresses a text gives (she reads
+  only those a message gave or a search found: one she writes herself could carry something
+  private out in its words -- the reviewer, PR #39);
 - clean_query: what goes to the search service: no long numbers, none of the names she
   knows people by, at most QUERY_CHARS;
 - wrap: what she gets of a page or a search: cut to PAGE_CHARS, and wrapped as material,
@@ -132,6 +134,19 @@ def check_url(url, resolve=None) -> tuple:
         if any(_bad_address(a) for a in addresses):
             return False, "resolves to a local address"
     return True, ""
+
+
+_URL_IN_TEXT = re.compile(r"https?://[^\s<>\"'，。、；！？）)】\]」]+", re.I)
+
+
+def urls_in(text) -> list:
+    """The addresses written in a text (trailing punctuation off), in order, once each."""
+    out = []
+    for m in _URL_IN_TEXT.finditer(str(text or "")):
+        url = m.group(0).rstrip(".,;:!?'\"")
+        if url and url not in out:
+            out.append(url)
+    return out
 
 
 # ----------------------------------------------------------------------

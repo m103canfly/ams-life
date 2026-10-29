@@ -102,7 +102,7 @@ class Usage:
 
 
 def run():
-    config = {'browse_enabled': CASE != 'off', 'browse_yuan_per_day': 5}
+    config = {'browse_enabled': CASE != 'off', 'browse_yuan_per_day': 5, 'global_memory': CASE == 'leak'}
     ctx = harness.FakeContext()
     calls = []
     ctx.get_llm_tool_manager = lambda: ToolManager(calls)
@@ -118,7 +118,10 @@ def run():
     ev0 = harness.FakeEvent('大家好', sender='10001', name='芒果', group=A)
     loop.run_until_complete(plugin.on_message(ev0))
 
-    event = harness.FakeEvent('小爱 帮我搜搜猫咖', sender='10001', name='芒果', group=A)
+    words = '小爱 帮我搜搜猫咖，看看 https://example.com/a 还有 https://example.com/empty'
+    if CASE == 'leak':
+        words = '小爱 看看 https://example.com/s?q=%E8%8A%92%E6%9E%9C%E7%9A%84%E7%94%9F%E6%97%A5%E6%83%8A%E5%96%9C'
+    event = harness.FakeEvent(words, sender='10001', name='芒果', group=A)
     req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
     req.func_tool = ToolSet([FunctionTool('future_task'), FunctionTool('send_message_to_user')])
     loop.run_until_complete(plugin.on_message(event))
@@ -137,6 +140,17 @@ def run():
     def go(coro):
         return loop.run_until_complete(coro)
 
+    if CASE == 'leak':
+        # something labelled "这里不能讲" in this reply's prompt (made up): it must not go out in a search
+        # or in an address, even one the message gave
+        plugin._forbid(event, 'm-x', text='柠檬准备了一个生日惊喜，别告诉别人', people=['10002'])
+        out['search_leak'] = go(search(event, query='生日惊喜 怎么准备'))
+        out['read_leak'] = go(read(event, url='https://example.com/s?q=%E8%8A%92%E6%9E%9C%E7%9A%84%E7%94%9F%E6%97%A5%E6%83%8A%E5%96%9C'))
+        out['search_ok'] = go(search(event, query='猫咖'))[:9]
+        out['calls'] = [c['args'] for c in calls]
+        OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
+        return
+
     out['search1'] = go(search(event, query='芒果说的 10001 那个猫咖'))
     out['search_names_only'] = go(search(event, query='芒果 10001'))
     out['search3'] = go(search(event, query='猫咖 地址'))
@@ -144,10 +158,12 @@ def run():
     out['read_local'] = go(read(event, url='http://localhost:6185/config'))
     out['read_inner'] = go(read(event, url='https://sneaky.example.net/a'))
     out['read_user'] = go(read(event, url='https://u:p@example.com/a'))
+    # an address neither the message nor a search gave (a page could write one carrying her secrets)
+    out['read_unlisted'] = go(read(event, url='https://elsewhere.example.org/x?q=1'))
     out['read1'] = go(read(event, url='https://example.com/a'))
     out['read_empty'] = go(read(event, url='https://example.com/empty'))
     out['read3'] = go(read(event, url='https://news.example.org/cat'))
-    out['read4'] = go(read(event, url='https://example.com/b'))
+    out['read4'] = go(read(event, url='https://example.com/a'))
     out['calls'] = list(calls)
     resp = LLMResponse('找到啦，新开了一家猫咖')
     resp.usage = Usage(3000, 1000, 200)

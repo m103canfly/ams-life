@@ -85,12 +85,34 @@ class Read(unittest.TestCase):
         self.assertEqual(r['read4'], NO_MORE)
 
 
+class OnlyGivenAddresses(unittest.TestCase):
+    """She reads only an address this message gave or one of her searches found: one she (or a page)
+    writes could carry something private out to the site in its words (the reviewer, PR #39)."""
+
+    def test_an_address_nobody_gave_is_not_read(self):
+        r = run_case('reply')
+        self.assertEqual(r['read_unlisted'], '这个网址不能读：只能读消息里给的、或者搜索结果里的网址。')
+        self.assertNotIn('https://elsewhere.example.org/x?q=1', [c['args'].get('url') for c in r['calls']])
+
+    def test_the_messages_and_the_searchs_addresses_are_read(self):
+        r = run_case('reply')
+        self.assertTrue(r['read1'].startswith(HEAD % 'https://example.com/a'))          # in the message
+        self.assertTrue(r['read3'].startswith(HEAD % 'https://news.example.org/cat'))   # a search found it
+
+    def test_with_global_memory_nothing_private_goes_out(self):
+        r = run_case('leak')
+        self.assertEqual(r['search_leak'], '这个不能搜。')
+        self.assertEqual(r['read_leak'], '这个不能搜。')      # even an address the message gave
+        self.assertTrue(r['search_ok'].startswith('下面是网页上的资料'))
+        self.assertEqual(r['calls'], [{'query': '猫咖', 'count': 5}])   # only the harmless one went out
+
+
 class Money(unittest.TestCase):
     def test_the_browsers_own_account(self):
         r = run_case('reply')
         self.assertEqual(r['ledger'], {'searches': 2, 'searches_failed': 0, 'fetches': 2, 'fetches_failed': 1,
                                        'reply_calls': 6, 'input_miss': 18000, 'input_hit': 6000, 'output': 1200,
-                                       'blocked_urls': 3})
+                                       'blocked_urls': 4})
         # 4 successful searches and pages at 0.00075 dollars, and 6 rounds each as dear as the last one
         # (18000 / 6000 / 1200 tokens at 0.3 / 0.006 / 1.2 dollars a million), 7.2 yuan a dollar
         self.assertAlmostEqual(r['spent'], (4 * 0.00075 + (18000 * 0.3 + 6000 * 0.006 + 1200 * 1.2) / 1e6) * 7.2, places=5)
