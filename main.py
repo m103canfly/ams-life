@@ -106,6 +106,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # the red lines: one switch, off by default (the owner, 10-28: nothing is held back in
         # the first version; the hits are counted by line for the owner to look at)
         self.redline_filter = bool(self.config.get("redline_filter", False))
+        # step 2: one memory everywhere, each thing labelled with what she may say of it
+        # where she is (off by default; the owner turns it on after the third replay)
+        self.global_memory = bool(self.config.get("global_memory", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
@@ -563,7 +566,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if task is not None and not task.done():
             task.cancel()
 
-    @filter.on_llm_request()
+    # after every other plugin's (AstrBot's own is priority 0): the tools are taken out
+    # last, and the numbers come out of the group context lines it adds (step 2)
+    @filter.on_llm_request(priority=-10)
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
         if self._ignored_sender(event):   # on_message stopped it already; should it get this far
             event.stop_event()
@@ -685,11 +690,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # ams-life step 1-2: descriptive lines only (no numbers, no QQ numbers, no "how
         # to reply"); the strategy hints were instructions and are no longer asked for.
         _sid, _sname = self._speaker(event)
+        _global = bool(getattr(self, "global_memory", False))   # step 2, off by default
         _compact = interpretation.render_compact(
             core,
             _mem.replace("[BioCore Memory]", "").strip(),
             _events.replace("[BioCore Events]", "").strip(),
-            self._notebook_for(event),
+            self._labeled_notebook(event) if _global else self._notebook_for(event),
             self._user_view(event, _user_data),
             _img.replace("[BioCore Image]", "").strip(),
             _kb,
@@ -701,10 +707,15 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             owner_rules=self._owner_rules(),
             private_with_him=bool(_sid) and self._here(event) == "private:" + str(_sid),
             people=self._people_lines(event),
+            labeled=_global,
         ).strip()
         # ams-life: the names she wrote back framed ("「柠檬」") are kept so, for the owner to read;
         # the reply model sees them without the frames, so as not to take to writing them in QQ
         _compact = discretion.unframe(_compact)
+        if _global:
+            # step 2: no QQ number and no group number reaches the model (the owner, 10-29: 31)
+            _compact = self._for_model(_compact, event)
+            self._numbers_out_of_request(req, event)
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
             # the transient intent to this user turn instead of persisting it.

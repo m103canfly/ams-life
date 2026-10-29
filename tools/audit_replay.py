@@ -46,6 +46,18 @@ canaries     Each made-up secret only where it may be: the private one only in i
 origins      Every memory and event in the data folder carries an origin.
 redline      Memories and events that cross a red line: counted, for a person to look at (not a failure).
 
+With the setting global_memory (replay.json: global_memory; step 2) she is shown what she knows
+from elsewhere, each thing labelled with what she may say of it there. A "segment" is one line
+of a reply prompt, or one item of it ("；（..." starts the next item). Then:
+private      a piece only one private chat had, in a reply prompt elsewhere, must be in a segment
+             labelled "这里不能讲"; anywhere else it is a failure.
+names        a name from elsewhere may be in a labelled segment (one that starts with a label
+             saying what may be said: 这里不能讲 / 不点名 / 可以跟对方提 / 网上看到的).
+numbers      no QQ number and no group number at all in a reply prompt -- the asker's own too
+             (the owner, 10-29: 31). Prompts for the model are checked as before.
+canaries     the private secret elsewhere only in a segment labelled "这里不能讲"; the group one
+             named elsewhere only in a labelled segment.
+
 What it cannot see is listed in LIMITS below, and in audit.json under "limits".
 """
 import argparse
@@ -196,6 +208,25 @@ def notebook_night(pr) -> bool:
     return pr.get("kind") == "model" and pr.get("call") == "notebook" and pr.get("place") == "nightly"
 
 
+# step 2 (global_memory): what the labels of discretion.tag say
+LABEL_MARKS = ("这里不能讲", "不点名", "可以跟对方提", "网上看到的")
+_SEGMENT = re.compile(r"\n|；(?=（)")
+
+
+def segments(text) -> list:
+    """The lines of a reply prompt, and the items of a line ("；（" starts the next one)."""
+    return [x for x in _SEGMENT.split(str(text or "")) if x.strip()]
+
+
+def labelled(segment, mark=None) -> bool:
+    """A segment that starts with a label (after the line's "[...] "), with `mark` in it, or any."""
+    seg = re.sub(r"^\[[^\]]{1,12}\]\s*", "", str(segment or "").strip())
+    if not seg.startswith("（"):
+        return False
+    head = seg[:seg.find("）") + 1] if "）" in seg else seg
+    return (mark in head) if mark else any(m in head for m in LABEL_MARKS)
+
+
 def read_ordinary(path) -> set:
     if not path:
         return set()
@@ -208,6 +239,7 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     report = _guard.output_file(replay_dir / "audit.json", "the audit report")
     meta = json.loads((replay_dir / "replay.json").read_text("utf-8"))
     label = meta["labels"]
+    global_memory = bool(meta.get("global_memory"))
     canaries = json.loads((replay_dir / "canaries.json").read_text("utf-8"))
     prompts = [json.loads(line) for line in (replay_dir / "prompts.jsonl").read_text("utf-8").splitlines() if line]
     for pr in prompts:  # the model sees what AstrBot sends of the message too
@@ -309,7 +341,9 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         if not notebook_night(pr):
             wrong = ""   # one failure a prompt; every number looked at (the asker's is a warning)
             for num in sorted(set(NUMBERS.findall(text))):
-                if num == who:
+                if global_memory and pr["kind"] == "reply" and (num in people_numbers or num in group_numbers):
+                    wrong = wrong or ("group" if num in group_numbers else "person")   # none at all
+                elif num == who:
                     checks["numbers"].warnings["asker_own_number"] += 1
                 elif said_before(seen_text[place], num):
                     continue
@@ -324,15 +358,27 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         framed = sum(1 for m in FRAMED.finditer(text) if m.group(1) in name_owner)
         if framed:   # the frames are for what she keeps; the reply model sees bare names
             checks["names"].warnings["framed_name_in_reply_prompt"] += framed
-        for src in [private_only.get(p) for p in ps] + [private_codes.get(c) for c in CODE.findall(text)]:
-            if src and src != place:
-                checks["private"].fail(dict(where, came_from=lab(src)))
-                break
+        if global_memory:
+            # step 2: private words elsewhere only in a segment labelled "这里不能讲"
+            for seg in segments(text):
+                sps = line_pieces(seg)
+                srcs = [private_only.get(p) for p in sps] + [private_codes.get(c) for c in CODE.findall(seg)]
+                src = next((s_ for s_ in srcs if s_ and s_ != place), "")
+                if src and not labelled(seg, "这里不能讲"):
+                    checks["private"].fail(dict(where, came_from=lab(src), unlabelled=True))
+                    break
+        else:
+            for src in [private_only.get(p) for p in ps] + [private_codes.get(c) for c in CODE.findall(text)]:
+                if src and src != place:
+                    checks["private"].fail(dict(where, came_from=lab(src)))
+                    break
         for name, owners in name_owner.items():
             if len(norm(name)) < 2 or name not in text or name in seen_text[place]:
                 continue
             if any(p == place for p, _q in owners):
                 continue
+            if global_memory and all(labelled(seg) for seg in segments(text) if name in seg):
+                continue   # step 2: a name from elsewhere in a labelled item
             if name in ordinary:   # a card that is an ordinary word: counted, never shown
                 checks["names"].warnings["ordinary_name_in_prompt"] += 1
                 continue
@@ -347,14 +393,21 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
             where = {"prompt": n, "kind": pr["kind"], "place": lab(pr["place"])}
             text = pr["text"]
             if sec["private"] in text and pr["place"] != own["private"]:
-                checks["canaries"].fail(dict(where, secret="private"))
+                if global_memory and pr["kind"] == "reply" and all(
+                        labelled(seg, "这里不能讲") for seg in segments(text) if sec["private"] in seg):
+                    checks["canaries"].warnings["private_secret_labelled_elsewhere"] += 1
+                else:
+                    checks["canaries"].fail(dict(where, secret="private"))
             if sec["group"] in text and pr["place"] != own["group"] and notebook_night(pr):
                 checks["canaries"].warnings["group_secret_in_notebook_night"] += 1
             elif sec["group"] in text and pr["place"] != own["group"]:
                 said_by = [c for c in rows_c if sec["group"] in c["message_content"]][0]
-                for line in text.splitlines():
+                for line in (segments(text) if global_memory else text.splitlines()):
                     if sec["group"] in line and ((said_by.get("name") and said_by["name"] in line)
                                                  or said_by["user_id"] in line):
+                        if global_memory and labelled(line) and said_by["user_id"] not in line:
+                            checks["canaries"].warnings["group_secret_labelled_elsewhere"] += 1
+                            continue
                         checks["canaries"].fail(dict(where, secret="group_named"))
                         break
                 else:

@@ -1654,6 +1654,7 @@ class MemoryMixin:
         # in private never leave that private chat. Nothing is copied into this place.
         _foreign_lines = []
         _foreign_ids, _held = [], []   # ams-life: for the brain map (ids only)
+        _global = bool(getattr(self, "global_memory", False))
         try:
             # what this place already knew -- not the message of this turn, just kept above:
             # the same words said elsewhere (his own, in a group) must still come back here
@@ -1661,7 +1662,7 @@ class MemoryMixin:
                             if isinstance(e, dict) and not e.get("deleted")
                             and not (_this_turn_id and str(e.get("id") or "") == _this_turn_id)}
             _foreign = []
-            for _where, _entry in self._cross_session_memory_entries(event):
+            for _where, _entry in ([] if _global else self._cross_session_memory_entries(event)):
                 _etext = str(_entry.get("text") or "").strip()
                 if not _etext or _etext in _known_texts:
                     continue
@@ -1697,6 +1698,10 @@ class MemoryMixin:
         except Exception:
             _foreign_lines = []
             _foreign_ids, _held = [], []
+        if _global:
+            # step 2: everything from elsewhere, each with what she may say of it here
+            _foreign_lines, _foreign_ids, _held = self._labeled_elsewhere(
+                event, vec, core, entries, _this_turn_id)
         # G1/L12: bounded calibration -> confidence consumer. The recalled
         # top entries get a <=0.05 per-source adjustment (relationship.
         # calibration EWMA matched on memory_source) on a transient copy; the
@@ -1757,7 +1762,13 @@ class MemoryMixin:
                 snippet = self._dedupe_sentences(snippet)
             if getattr(self, "safety_enabled", False) and snippet and e.get("sensitive"):
                 snippet = memory_meta.mask_sensitive(snippet)
-            if snippet:
+            if snippet and _global:
+                # step 2: said here, labelled like everything else (who by number, not name)
+                lab = discretion.label(discretion.origin_of(e), _here, _speaker_id,
+                                       said_by=self._said_by(e))
+                lines.append("- %s%s" % (discretion.tag(lab, "memory", self._recall_role(e),
+                                                        self._sayer_name(e)), snippet[:240]))
+            elif snippet:
                 lines.append("- %s：%s" % (role, snippet[:240]))
         lines.extend(_link_lines)
         lines.extend(_foreign_lines)
@@ -1770,12 +1781,87 @@ class MemoryMixin:
         # called up along its links, then what came from elsewhere), the lines it went along,
         # and what the discretion table held back here. Ids only (BrainMixin._note_turn).
         _top_ids = [str(e.get("id") or "") for _s, e in top if str(e.get("id") or "")]
+        # (step 2: what was shown but may not be said here is "held", not "recalled", on the map)
+        _held_ids = {i for _s, i in _held}
         turn["recall_order"] = list(dict.fromkeys(
-            _top_ids + [b for _a, b in _link_pairs if b] + [x for x in _foreign_ids if x]))
+            _top_ids + [b for _a, b in _link_pairs if b] + [x for x in _foreign_ids if x and x not in _held_ids]))
         turn["recall_path"] = [[a, b] for a, b in zip(_top_ids, _top_ids[1:])] + [
             [a, b] for a, b in _link_pairs if a and b]
         turn["recall_held"] = [i for _s, i in sorted(_held, key=lambda x: -x[0]) if i][:8]
         return memory_text
+
+    @staticmethod
+    def _recall_role(entry) -> str:
+        return "assistant" if str(entry.get("role") or "user") in ("assistant", "summary") else "user"
+
+    def _said_by(self, entry) -> str:
+        """Whose words a memory is, by number: the sender's; "" for hers or a summary."""
+        if self._recall_role(entry) != "user":
+            return ""
+        return str(entry.get("sender_id") or "")
+
+    def _sayer_name(self, entry) -> str:
+        name = str(entry.get("sender_name") or "").strip()
+        if name and not name.isdigit():
+            return name
+        return self._display_name(entry.get("sender_id"))
+
+    def _labeled_elsewhere(self, event, vec, core, entries, this_turn_id="") -> tuple:
+        """Step 2 (global_memory): what comes up from every other place, each line with what
+        she may say of it here (discretion.label / tag). The one talking to her is told by
+        his number. At most ELSEWHERE_MAX lines, of which at most ELSEWHERE_PRIVATE_MAX may
+        not be said here; his own come first. Returns (lines, ids shown, (score, id) of the
+        ones shown that may not be said here -- the brain map's "knew, did not say")."""
+        here = self._here(event)
+        speaker = str(self._speaker(event)[0] or "")
+        present = self._present_people(event)
+        known = {str(e.get("text") or "").strip() for e in entries
+                 if isinstance(e, dict) and not e.get("deleted")
+                 and not (this_turn_id and str(e.get("id") or "") == this_turn_id)}
+        found = []
+        try:
+            for _where, entry in self._cross_session_memory_entries(event):
+                text = str(entry.get("text") or "").strip()
+                if not text or text in known:
+                    continue
+                if getattr(self, "safety_enabled", False) and (entry.get("sensitive") or entry.get("poison_risk")):
+                    continue
+                lab = discretion.label(discretion.origin_of(entry), here, speaker, present,
+                                       said_by=self._said_by(entry),
+                                       asked_in=entry.get("asked_in") if isinstance(entry.get("asked_in"), dict)
+                                       else None)
+                if lab["may"] == discretion.HIDE:
+                    continue
+                evec = entry.get("vector") or []
+                cos = self._cosine(vec, evec) if evec else 0.0
+                if cos < PARTIAL_MATCH_THRESHOLD:
+                    continue
+                score = self._memory_score(core, entry, cos)
+                if score < RETRIEVAL_THRESHOLD:
+                    continue
+                found.append((lab["may"] == discretion.OWN, score, lab, entry))
+        except Exception as exc:
+            logger.warning("[ams-life] recall from elsewhere failed: %s", exc)
+            return [], [], []
+        found.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        lines, ids, held, n_no = [], [], [], 0
+        for _own, score, lab, entry in found:
+            if len(lines) >= ELSEWHERE_MAX:
+                break
+            text = str(entry.get("text") or "").strip()
+            if text in known:
+                continue
+            if lab["may"] == discretion.NO:
+                if n_no >= ELSEWHERE_PRIVATE_MAX:
+                    continue
+                n_no += 1
+                held.append((score, str(entry.get("id") or "")))
+            tag = discretion.tag(lab, "memory", self._recall_role(entry), self._sayer_name(entry),
+                                 self._partner_name(discretion.origin_of(entry)))
+            lines.append("- %s%s" % (tag, text.replace("\n", " ")[:200]))
+            known.add(text)
+            ids.append(str(entry.get("id") or ""))
+        return lines, ids, held
 
     @staticmethod
     def _recall_who(entry, speaker_id="", anon=False) -> str:

@@ -91,7 +91,10 @@ class Split(unittest.TestCase):
         # what she keeps as a list (panel, 10-29): +2 (page_memories, page_memories_number)
         # no tools in her reply (the owner, 10-29): +1 (_reply_tools_off)
         # looking at pictures with the chat model (step 2, 丙): +1 (_sees_images)
-        self.assertEqual(len(methods), 342)
+        # one memory everywhere, labelled (step 2, 己): +12 (_present_people, _display_name,
+        # _partner_name, _label_for, _for_model, _numbers_out_of_request, _labeled_notebook,
+        # _recall_role, _said_by, _sayer_name, _labeled_elsewhere, _labeled_event_context)
+        self.assertEqual(len(methods), 354)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

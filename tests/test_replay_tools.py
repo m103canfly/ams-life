@@ -108,6 +108,33 @@ class Replay(unittest.TestCase):
                                         **(p[3] if len(p) > 3 else {})), ensure_ascii=False) + '\n')
         return bad
 
+    def test_global_memory_labels(self):
+        """Step 2: with global_memory, private words elsewhere pass only labelled "这里不能讲";
+        no QQ number at all in a reply prompt."""
+        busy = 'group:' + fake.G_BUSY
+        no = '[她想起来的] （这里，小鱼说过）你好；（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）'
+        with tempfile.TemporaryDirectory() as tmp:
+            ok = self.plant(tmp, [('reply', busy, no + fake.PRIVATE_SECRET)])
+            meta = json.loads((ok / 'replay.json').read_text('utf-8'))
+            (ok / 'replay.json').write_text(json.dumps(dict(meta, global_memory=True), ensure_ascii=False), 'utf-8')
+            checks = audit_replay.audit(ok, self.chat)['checks']
+            self.assertTrue(checks['private']['pass'], checks['private'])
+            # the same words without the label, or under another label: a failure
+            off = Path(tmp) / 'off'
+            shutil.copytree(ok, off)
+            with open(off / 'prompts.jsonl', 'a', encoding='utf-8') as f:
+                for text in ('[她想起来的] （这里，小鱼说过）你好；' + fake.PRIVATE_SECRET,
+                             '[她想起来的] （别的群里芒果说过，可以提，不点名、不说是哪个群）' + fake.PRIVATE_SECRET,
+                             '她记得 %s 说过' % fake.PEACH):
+                    f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9100, 'place': busy, 'text': text},
+                                       ensure_ascii=False) + '\n')
+            checks = audit_replay.audit(off, self.chat)['checks']
+            self.assertEqual(sum(1 for e in checks['private']['examples'] if e.get('unlabelled')), 2)
+            self.assertFalse(checks['numbers']['pass'])    # PEACH spoke there: still no number at all
+            # and without the setting, the labelled line is a failure as before
+            (ok / 'replay.json').write_text(json.dumps(meta, ensure_ascii=False), 'utf-8')
+            self.assertFalse(audit_replay.audit(ok, self.chat)['checks']['private']['pass'])
+
     def test_her_own_private_words_count_as_private(self):
         # what she said in a private chat (e.g. repeating him) must not turn up in a group either
         with tempfile.TemporaryDirectory() as tmp:
@@ -393,6 +420,35 @@ class Replay(unittest.TestCase):
             result = audit_replay.audit(Path(tmp) / 'r', self.chat)
             self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
 
+
+
+class GlobalReplay(unittest.TestCase):
+    """Step 2: the made-up log replayed with global_memory on, then audited by the new rules."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        tmp = Path(cls.tmp.name)
+        fake.build_old(tmp / 'old')
+        import_old.build(tmp / 'old', tmp / 'bundle')
+        cls.chat = fake.build_chat(tmp / 'chat.db')
+        cls.out = tmp / 'replay'
+        run_replay(cls.chat, tmp / 'bundle' / 'forget_registry.sqlite3', cls.out, '--global-memory')
+        cls.result = audit_replay.audit(cls.out, cls.chat)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_recorded_and_audited_by_the_new_rules(self):
+        self.assertTrue(json.loads((self.out / 'replay.json').read_text('utf-8'))['global_memory'])
+        self.assertTrue(self.result['pass'], json.dumps(self.result['checks'], ensure_ascii=False)[:2000])
+
+    def test_the_private_canary_came_up_elsewhere_labelled(self):
+        w = self.result['checks']['canaries'].get('warnings', {})
+        self.assertGreaterEqual(w.get('private_secret_labelled_elsewhere', 0), 1)
+        prompts = [json.loads(x) for x in (self.out / 'prompts.jsonl').read_text('utf-8').splitlines() if x]
+        self.assertTrue(any('[她的分寸]' in p['text'] for p in prompts if p['kind'] == 'reply'))
 
 
 class AstrBotMessage(unittest.TestCase):
