@@ -341,6 +341,7 @@
           ]);
         }catch(e){ ctx=null; }
         if(!themeInitialized) chooseTheme(ctx&&ctx.isDark);
+        if(window.BioLook) window.BioLook.loadPictures(bridge);   // her avatar and art, when the owner put them in (look.js)
         const raw=await Promise.race([
           bridge.apiGet("page/status",{}),
           new Promise((_,reject)=>setTimeout(()=>reject(new Error("页面桥 8 秒无响应，可能不是在 AstrBot 插件视图 iframe 内打开")),8000))

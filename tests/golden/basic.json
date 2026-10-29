@@ -10859,7 +10859,8 @@
   "/astrbot_plugin_ams_life/page/brain/node",
   "/astrbot_plugin_ams_life/page/brain/search",
   "/astrbot_plugin_ams_life/page/memories",
-  "/astrbot_plugin_ams_life/page/memories/number"
+  "/astrbot_plugin_ams_life/page/memories/number",
+  "/astrbot_plugin_ams_life/page/look"
  ],
  "turns": [
   {
