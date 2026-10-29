@@ -1169,6 +1169,14 @@
       .map(([k,n])=>(RED_NAMES[k]||k)+" "+Number(n)+" 条");
     note.textContent=(red.filter?"红线过滤：开（碰到的不存）。":"红线过滤：关（一律不挡，只记数）。")+
       (parts.length?"现在存着的里面碰到红线的："+parts.join("，")+"。":"现在存着的里面没有碰到红线的话。");
+    // step 2 (global_memory): the last look before sending, today
+    const send=$("sendNote"), sc=data&&data.send_check;
+    if(send){
+      send.hidden=!sc;
+      if(sc) send.textContent="今天发出前检查：重说 "+Number(sc.redone||0)+" 次，没发 "+Number(sc.held||0)+
+        " 次，可疑（没挡）"+Number(sc.close||0)+" 次"+
+        (Number(sc.failed||0)?"，检查出错没发 "+Number(sc.failed)+" 次":"")+"。";
+    }
   }
   function renderImpressions(){
     renderRedLines();

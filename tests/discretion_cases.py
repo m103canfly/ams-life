@@ -145,6 +145,8 @@ def run():
                 'wait_archive', 'wait_consolidate', 'turn_event', 'summary_origin',
                 'picture_event', 'picture_only', 'strong_no_narrative', 'prompt_shape'):  # summaries on, as in the golden 'full' run
         config = {'llm_only_reply_summary': False, 'memory_worthiness_enabled': False}
+    if CASE.startswith('global_'):   # step 2: one memory everywhere, labelled
+        config = {'global_memory': True}
     plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
     loop = asyncio.new_event_loop()
@@ -259,7 +261,7 @@ def run():
         t(30, '小爱 晚上好', '10004', '桃子', B)
         t(30, '小爱 在吗', '10001', '芒果')
         out['phone_heard'] = snapshot(plugin)['phone']
-        out['forgot'] = plugin._forget(person='10003')
+        out['forgot'] = plugin._owner_forget_person('10003')
         out['phone_after_forget'] = snapshot(plugin)['phone']
         for i in range(1005):  # more than a window holds
             hear(plugin, loop, 1, '刷屏第%d条' % i, '10005', '路人', A)
@@ -370,7 +372,7 @@ def run():
         out['events'] = snapshot(plugin)['events']
         out['events_raw'] = [json.loads(x) for x in (DATA / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()
                              if x.strip()]
-        out['forgot'] = plugin._forget(person='10003')
+        out['forgot'] = plugin._owner_forget_person('10003')
         out['after'] = snapshot(plugin)['events']
     elif CASE in ('picture_event', 'picture_only'):
         # the per-turn archive makes an event of a stretch with pictures in it (海鸥 sends
@@ -999,6 +1001,41 @@ def run():
         t(0, '我中午吃了一碗牛肉面', '10001', '芒果')
         t(30, '我中午吃了一碗牛肉面', '10003', '阿星', A)
         t(30, '我中午吃了一碗牛肉面', '10001', '芒果')
+    elif CASE == 'global_own':
+        # step 2, global_memory on: he said it openly in group A ...
+        t(0, '我中午吃了一碗牛肉面', '10001', '芒果', A, reply='听起来好香')
+        # ... asks about it in his private chat, then in group B, then someone else asks in B
+        t(30, '我中午吃了一碗牛肉面，你还记得吗', '10001', '芒果')
+        t(30, '小爱 我中午吃了一碗牛肉面，你知道吗', '10001', '芒果', B)
+        t(30, '小爱 谁中午吃了一碗牛肉面', '10004', '桃子', B)
+    elif CASE == 'global_private':
+        # told her in private; then in a group with him there; then someone else's private chat
+        t(0, '小爱，我在偷偷准备一个惊喜蛋糕给大家', '10001', '芒果', reply='好呀，我帮你保密')
+        t(30, '小爱 我在偷偷准备一个惊喜蛋糕给大家的事', '10001', '芒果', A)
+        t(30, '我在偷偷准备一个惊喜蛋糕给大家，听说了吗', '10002', '柠檬')
+        t(30, '我在偷偷准备一个惊喜蛋糕给大家，还记得吗', '10001', '芒果')
+        out['turn_log'] = json.loads((DATA / 'brain_turns.json').read_text('utf-8')) \
+            if (DATA / 'brain_turns.json').exists() else {}
+    elif CASE == 'global_numbers':
+        # an @ with a number, a group's number, another group's number in what she keeps
+        t(0, '@柠檬(10002) 周末一起去爬山吧 群900002也去', '10001', '芒果', A)
+        t(30, '小爱 周末一起去爬山吗 @柠檬(10002)', '10003', '阿星', A)
+        t(30, '小爱 周末爬山的事 900001 那边定了吗', '10003', '阿星', B)
+    elif CASE == 'global_notebook':
+        t(0, '小爱 早上好', '10001', '芒果', A)
+        t(0, '小爱 早上好', '10002', '柠檬')
+        plugin.self_model = dict(plugin.self_model or {}, notebook=[
+            {'text': '想多听听大家在聊什么', 'origin': main.discretion.make_origin('self')},
+            {'text': '群里周末要去爬山', 'origin': main.discretion.make_origin('group:' + A, ['10001'], ['n1'])},
+            {'text': '柠檬在偷偷学画画', 'origin': main.discretion.make_origin('private:10002', ['10002'], ['n2'])},
+            {'text': '来历不明的一条', 'origin': main.discretion.make_origin('')},
+        ])
+        t(30, '小爱 你最近在想什么', '10004', '桃子', B)
+    elif CASE == 'global_gone':
+        t(0, '小爱 我和阿星周末去爬山', '10001', '芒果', A)
+        t(10, '小爱 对，我也去爬山', '10003', '阿星', A)
+        out['forgot'] = plugin._owner_forget_person('10003')
+        t(30, '小爱 周末去爬山的事你还记得吗', '10001', '芒果')
     elif CASE == 'one_body':
         out['v_start'] = plugin._core(None).v
         for text in ('太开心了！！！我终于抽到了！！！', '好耶！十连出金了', '笑死，运气也太好了吧', '真的好高兴啊',

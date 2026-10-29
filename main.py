@@ -73,6 +73,10 @@ try:
     from .mixin_phone import PhoneMixin
 except ImportError:
     from mixin_phone import PhoneMixin
+try:
+    from .mixin_send_check import SendCheckMixin
+except ImportError:
+    from mixin_send_check import SendCheckMixin
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -82,7 +86,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -106,6 +110,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # the red lines: one switch, off by default (the owner, 10-28: nothing is held back in
         # the first version; the hits are counted by line for the owner to look at)
         self.redline_filter = bool(self.config.get("redline_filter", False))
+        # step 2: one memory everywhere, each thing labelled with what she may say of it
+        # where she is (off by default; the owner turns it on after the third replay)
+        self.global_memory = bool(self.config.get("global_memory", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
@@ -563,7 +570,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if task is not None and not task.done():
             task.cancel()
 
-    @filter.on_llm_request()
+    # after every other plugin's (AstrBot's own is priority 0): the tools are taken out
+    # last, and the numbers come out of the group context lines it adds (step 2)
+    @filter.on_llm_request(priority=-10)
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
         if self._ignored_sender(event):   # on_message stopped it already; should it get this far
             event.stop_event()
@@ -685,11 +694,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # ams-life step 1-2: descriptive lines only (no numbers, no QQ numbers, no "how
         # to reply"); the strategy hints were instructions and are no longer asked for.
         _sid, _sname = self._speaker(event)
+        _global = bool(getattr(self, "global_memory", False))   # step 2, off by default
         _compact = interpretation.render_compact(
             core,
             _mem.replace("[BioCore Memory]", "").strip(),
             _events.replace("[BioCore Events]", "").strip(),
-            self._notebook_for(event),
+            self._labeled_notebook(event) if _global else self._notebook_for(event),
             self._user_view(event, _user_data),
             _img.replace("[BioCore Image]", "").strip(),
             _kb,
@@ -701,10 +711,15 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             owner_rules=self._owner_rules(),
             private_with_him=bool(_sid) and self._here(event) == "private:" + str(_sid),
             people=self._people_lines(event),
+            labeled=_global,
         ).strip()
         # ams-life: the names she wrote back framed ("「柠檬」") are kept so, for the owner to read;
         # the reply model sees them without the frames, so as not to take to writing them in QQ
         _compact = discretion.unframe(_compact)
+        if _global:
+            # step 2: no QQ number and no group number reaches the model (the owner, 10-29: 31)
+            _compact = self._for_model(_compact, event)
+            self._numbers_out_of_request(req, event)
         if _compact:
             # Keep the system prompt stable (prefix-cache friendly) and attach
             # the transient intent to this user turn instead of persisting it.
@@ -717,6 +732,17 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 parts.append({"type": "text", "text": _compact, "_no_save": True})
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
+        if _global:
+            # step 2: what may be said here, for the last look at the reply (send_check)
+            self._note_allowed(event, req, _compact)
+
+    @filter.on_agent_done()
+    async def on_agent_done(self, event: AstrMessageEvent, run_context, response: LLMResponse):
+        """Step 2 (global_memory): AstrBot saves this turn after this hook (4.29.3,
+        internal.py _save_to_history, from run_context.messages): make it hold what was sent
+        -- the words said once more, not the first ones -- and none of the model's thinking."""
+        if self.enabled and getattr(self, "global_memory", False):
+            self._settle_history(event, run_context)
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
@@ -743,6 +769,15 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 pass
         _reply = _clean
+        if getattr(self, "global_memory", False) and _reply.strip():
+            # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
+            # If the look itself fails, the reply is held back as if it leaked.
+            try:
+                _reply = await self._look_at_reply(event, response, _reply)
+            except Exception as exc:
+                _reply = self._check_failed(event, exc)
+            if not _reply:
+                return
         try:
             core.observe_own(_reply)
             core.record_reply(_reply)
