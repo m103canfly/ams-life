@@ -691,6 +691,8 @@ class PagesMixin:
             "impressions": self._impressions_for_page(),
             # red-line hits by line (numbers only) and whether they are held back
             "red_lines": dict(self._red_line_census(), filter=bool(getattr(self, "redline_filter", False))),
+            # step 2: the last look before sending, today (numbers only; only with the switch on)
+            **({"send_check": self._check_counts_today()} if getattr(self, "global_memory", False) else {}),
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,
                 **dict(getattr(self, "_last_memory_meta", {}) or {})},

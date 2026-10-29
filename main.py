@@ -73,6 +73,10 @@ try:
     from .mixin_phone import PhoneMixin
 except ImportError:
     from mixin_phone import PhoneMixin
+try:
+    from .mixin_send_check import SendCheckMixin
+except ImportError:
+    from mixin_send_check import SendCheckMixin
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -82,7 +86,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -728,6 +732,17 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 parts.append({"type": "text", "text": _compact, "_no_save": True})
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
+        if _global:
+            # step 2: what may be said here, for the last look at the reply (send_check)
+            self._note_allowed(event, req, _compact)
+
+    @filter.on_agent_done()
+    async def on_agent_done(self, event: AstrMessageEvent, run_context, response: LLMResponse):
+        """Step 2 (global_memory): AstrBot saves this turn after this hook (4.29.3,
+        internal.py _save_to_history, from run_context.messages): make it hold what was sent
+        -- the words said once more, not the first ones -- and none of the model's thinking."""
+        if self.enabled and getattr(self, "global_memory", False):
+            self._settle_history(event, run_context)
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
@@ -754,6 +769,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception:
                 pass
         _reply = _clean
+        if getattr(self, "global_memory", False) and _reply.strip():
+            # step 2: the last look before it is sent; "" = nothing is sent and nothing kept
+            _reply = await self._look_at_reply(event, response, _reply)
+            if not _reply:
+                return
         try:
             core.observe_own(_reply)
             core.record_reply(_reply)

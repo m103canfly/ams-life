@@ -660,6 +660,11 @@ class DiscretionMixin:
             if lab["may"] == discretion.HIDE:
                 continue
             text = str(item.get("text") or "")
+            people = discretion.origin_of(item)["people"]
+            if lab["may"] == discretion.NO:   # the last look before sending (send_check)
+                self._forbid(event, "note:" + str(item.get("id") or text[:12]), text, people)
+            elif lab["may"] == discretion.ANON:
+                self._forbid_names(event, "note:" + str(item.get("id") or text[:12]), people)
             if text:
                 lines.append(discretion.tag(lab, "note", partner=self._partner_name(discretion.origin_of(item)))
                              + text)

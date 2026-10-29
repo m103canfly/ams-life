@@ -1310,6 +1310,12 @@ class EventsMixin:
             title = str(ev.get("title") or "").strip()
             body = str(ev.get("central_details") or ev.get("event") or "").strip()
             meaning = str(ev.get("meaning_to_her") or "").strip()
+            people = discretion.origin_of(ev)["people"]
+            if lab["may"] == discretion.NO:   # the last look before sending (send_check)
+                self._forbid(event, "event:" + str(ev.get("id") or ""), "\n".join(x for x in (title, body, meaning) if x),
+                             people)
+            elif lab["may"] == discretion.ANON:
+                self._forbid_names(event, "event:" + str(ev.get("id") or ""), people)
             if body:
                 tag = discretion.tag(lab, "event", partner=self._partner_name(discretion.origin_of(ev)))
                 lines.append("- %s%s：%s%s" % (tag, title or "事件", body, ("；意义：" + meaning) if meaning else ""))
