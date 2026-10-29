@@ -103,6 +103,68 @@ class Looked(unittest.TestCase):
         self.assertEqual(r['looks_after_gone'], 3)
 
 
+class OwnersPage(unittest.TestCase):
+    """The owner's page of her stickers (pages/stickers): page/stickers, .../image, .../delete, .../add."""
+
+    def test_the_list_says_where_from_never_a_number(self):
+        r = run_case('page')
+        # newest kept first; days left counted from when each was last used (kept: not used yet)
+        self.assertEqual(r['list'], [['一只在哭的狗', '私聊1', False, 29], ['一只在笑的猫', '群1', False, 28],
+                                     ['旧的猫', '旧小爱', False, 2]])
+        self.assertEqual(r['soon'], ['旧的猫', '一只在笑的猫', '一只在哭的狗'])
+        for number in ('900001', '10001', '10002'):
+            self.assertNotIn(number, r['list_text'])
+        self.assertEqual(r['sources'], ['旧小爱', '群1', '私聊1'])
+        self.assertEqual(r['only_sad'], ['一只在哭的狗'])
+
+    def test_one_picture_by_its_id_only(self):
+        r = run_case('page')
+        self.assertEqual(r['image'], ['ok', 'data:image/png;base64,'])
+        self.assertEqual(r['image_missing'], 'error')
+
+    def test_the_owner_adds_pictures_only(self):
+        r = run_case('page')
+        self.assertEqual(r['add'], 'ok')
+        self.assertEqual(r['add_html']['status'], 'error')
+        self.assertEqual(r['add_html']['message'], '不是图片')
+        self.assertEqual(r['add_svg_named_png'], 'error')            # a name that says png is not enough
+        self.assertEqual(r['add_big'], 'error')
+        self.assertEqual(r['add_huge_side'], 'error')
+        self.assertEqual(r['owner_row'], ['主人的小猫', '10009', 'owner'])
+
+    def test_the_owners_gifts_stay_until_the_owner_deletes_them(self):
+        r = run_case('page')
+        self.assertEqual(r['after_sweep'], ['主人的小猫'])            # a year on: only the gift is left
+        self.assertEqual((r['delete_gift'], r['delete_again']), ('ok', 'error'))
+        self.assertEqual(r['left'], [])
+
+    def test_deleted_on_the_page_never_kept_again_unless_the_owner_adds_it(self):
+        r = run_case('page')
+        self.assertEqual(r['dropped_file'], [r['gift_id']])           # a fingerprint, nothing else
+        self.assertEqual(r['keep_again'], ['', '主人删过'])
+        self.assertEqual(r['owner_again'], 'ok')
+
+
+class PageLook(unittest.TestCase):
+    """The page in the panel's look (#37): 月白 on clear glass, no glow around words (item 33)."""
+
+    def test_the_panels_colours_and_no_glow(self):
+        import re
+        pages = HERE.parent / 'pages'
+        page = (pages / 'stickers' / 'stickers.css').read_text('utf-8')
+        look = (pages / 'dashboard' / 'look.css').read_text('utf-8')
+        self.assertNotIn('text-shadow', page)
+
+        def values(css, theme):
+            block = re.search((r':root\{(.*?)\}' if theme == 'light' else r'\[data-theme="dark"\]\{(.*?)\}'), css, re.S).group(1)
+            return dict(re.findall(r'(--[\w-]+):\s*([^;]+);', block))
+        for theme in ('light', 'dark'):
+            mine, panel = values(page, theme), values(look, theme)
+            for key in ('--bg', '--bg2', '--ink', '--text', '--muted', '--faint', '--accent', '--accent2',
+                        '--accent-strong', '--glass-thin', '--glass-thick', '--glass-pop'):
+                self.assertEqual(mine.get(key), panel.get(key), (theme, key))
+
+
 class Forgotten(unittest.TestCase):
     def test_deleting_a_person_deletes_what_he_sent(self):
         r = run_case('forget')
