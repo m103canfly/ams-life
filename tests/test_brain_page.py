@@ -1,9 +1,9 @@
-"""The brain map page (pages/brain/): stays on this computer, only reads, sample is made up.
+"""The brain map page (pages/starmap/): stays on this computer, only reads, sample is made up.
 
 The page is built by tools/brain/build.mjs from tools/brain/src/ (our code plus
 the vendored Galaxy View renderer, MIT) and three.js / d3-force-3d into one file,
 brain.bundle.js, next to the page itself (src/page/). The same folder is written
-twice, to pages/brain/ and pages/dashboard/brain/ (the panel shows it; AstrBot
+twice, to pages/starmap/ and pages/dashboard/brain/ (the panel shows it; AstrBot
 serves a page only from its own folder). Static checks of the page files run everywhere. The sample-format
 checks run the sample generator with Node.js when it is installed (skipped
 otherwise); no browser, no network.
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGE = ROOT / 'pages' / 'brain'
+PAGE = ROOT / 'pages' / 'starmap'
 PANEL_COPY = ROOT / 'pages' / 'dashboard' / 'brain'
 SRC = ROOT / 'tools' / 'brain' / 'src'
 FILES = sorted(p for p in PAGE.iterdir() if p.is_file())
@@ -99,7 +99,7 @@ class ReadOnly(unittest.TestCase):
 
 
 class TwoCopies(unittest.TestCase):
-    """pages/brain/ and pages/dashboard/brain/ are the same build, byte for byte."""
+    """pages/starmap/ and pages/dashboard/brain/ are the same build, byte for byte."""
 
     def test_the_same_files_byte_for_byte(self):
         def files(root):

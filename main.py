@@ -646,7 +646,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _mem = await self._memory_recall(event, text, core, _img, vec=_query_vec, voice=_voice,
                                          user_data=_user_data, turn=_turn)
         _memory_meta = _turn.get("memory_meta") or {}
-        # ams-life: what this reply recalled, as ids only, for the brain map (pages/brain)
+        # ams-life: what this reply recalled, as ids only, for the brain map (pages/starmap)
         self._note_turn(event, _turn, core)
         try:
             asyncio.create_task(self._maybe_archive_events(event, core))

@@ -1,0 +1,10 @@
+{
+  "pages": {
+    "dashboard": { "title": "ams-life panel" },
+    "starmap": { "title": "Her brain map (own page)" }
+  },
+  "views": {
+    "dashboard": { "title": "ams-life panel" },
+    "starmap": { "title": "Her brain map (own page)" }
+  }
+}

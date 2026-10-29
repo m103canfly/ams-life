@@ -1,0 +1,10 @@
+{
+  "pages": {
+    "dashboard": { "title": "ams-life 面板" },
+    "starmap": { "title": "她的脑子（单独一页）" }
+  },
+  "views": {
+    "dashboard": { "title": "ams-life 面板" },
+    "starmap": { "title": "她的脑子（单独一页）" }
+  }
+}
