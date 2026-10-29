@@ -1252,6 +1252,8 @@ class EventsMixin:
         each window left out of those), then at most digest.PER_REPLY of the nightly notes:
         of this window, to do with this message (digest.for_reply)."""
         archive = self._event_archive(60)
+        if getattr(self, "global_memory", False):
+            return self._labeled_event_context(event, archive)
         events = self._visible_events(event, [e for e in archive if not digest.is_digest(e)][:9])
         events = sorted(events, key=lambda e: float(e.get("importance", 0.0) or 0.0) *
                         (0.5 + 0.5 * float(e.get("centrality", 0.5) or 0.5)), reverse=True)[:3]
@@ -1273,6 +1275,47 @@ class EventsMixin:
         if not lines:
             return ""
         self._bump_event_recall([str(e.get("id") or "") for e in events])
+        return "\n".join(lines)
+
+    def _labeled_event_context(self, event, archive) -> str:
+        """Step 2 (global_memory): [最近的事] picked as before, but from every event she
+        knows, each with what she may say of it here; of the weightiest three at most
+        EVENTS_PRIVATE_MAX she may not say here. Events are told apart by who was in them
+        (their people), not by who said what."""
+        present = self._present_people(event)
+        labeled = []
+        for ev in [e for e in archive if not digest.is_digest(e)][:9]:
+            if isinstance(ev, dict):
+                lab = self._label_for(ev, event, present=present)
+                if lab["may"] != discretion.HIDE:
+                    labeled.append((ev, lab))
+        labeled.sort(key=lambda x: float(x[0].get("importance", 0.0) or 0.0) *
+                     (0.5 + 0.5 * float(x[0].get("centrality", 0.5) or 0.5)), reverse=True)
+        picked, n_no = [], 0
+        for ev, lab in labeled:
+            if len(picked) >= 3:
+                break
+            if lab["may"] == discretion.NO:
+                if n_no >= EVENTS_PRIVATE_MAX:
+                    continue
+                n_no += 1
+            picked.append((ev, lab))
+        for ev in digest.for_reply(str(getattr(event, "message_str", "") or ""), archive, self._here(event)):
+            if isinstance(ev, dict):
+                lab = self._label_for(ev, event, present=present)
+                if lab["may"] != discretion.HIDE:
+                    picked.append((ev, lab))
+        lines = []
+        for ev, lab in picked:
+            title = str(ev.get("title") or "").strip()
+            body = str(ev.get("central_details") or ev.get("event") or "").strip()
+            meaning = str(ev.get("meaning_to_her") or "").strip()
+            if body:
+                tag = discretion.tag(lab, "event", partner=self._partner_name(discretion.origin_of(ev)))
+                lines.append("- %s%s：%s%s" % (tag, title or "事件", body, ("；意义：" + meaning) if meaning else ""))
+        if not lines:
+            return ""
+        self._bump_event_recall([str(ev.get("id") or "") for ev, _lab in picked])
         return "\n".join(lines)
 
     def _insights(self, limit: int = 5) -> list:
