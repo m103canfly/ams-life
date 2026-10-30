@@ -224,6 +224,12 @@ class AutonomyMixin:
                     await self._maybe_update_impressions()
                 except Exception as exc:
                     logger.warning("[ams-life] impressions failed: %s", exc)
+                if hasattr(self, "_maybe_go_browse"):
+                    try:   # step 2 (丁): she goes out to look by herself, now and then (browse_enabled)
+                        self._begin_job()
+                        await self._maybe_go_browse()
+                    except Exception as exc:
+                        logger.warning("[ams-life] browse trip failed: %s", exc)
                 try:
                     self._begin_job()
                     await self._maybe_slang()

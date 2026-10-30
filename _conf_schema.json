@@ -561,6 +561,12 @@
     "type": "bool",
     "default": false
   },
+  "browse_trips_enabled": {
+    "description": "她自己定时出门上网看看（默认关）",
+    "hint": "控制五分钟循环里她自己定时出门上网看看，默认关闭；还须打开 browse_enabled。回话时上网只看 browse_enabled，不受此开关影响。",
+    "type": "bool",
+    "default": false
+  },
   "browse_yuan_per_day": {
     "description": "浏览器每天最多花多少钱（元）",
     "hint": "搜索、读网页每次按 0.00075 美元算（DeepSeek 11-01 起收），加上为了搜、读多问模型的那几轮（按高峰价往多里估）。默认 5 元。",
