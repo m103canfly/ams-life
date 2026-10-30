@@ -16,6 +16,11 @@ try:
 except ImportError:
     import stickers
 
+# Short enough to describe a just-sent picture, bounded per conversation to limit memory.
+RECENT_IMAGE_SECONDS = 120
+RECENT_IMAGE_LIMIT = 10
+RECENT_IMAGE_LOOK_LIMIT = 3
+
 class MediaMixin:
     @staticmethod
     def _image_ref(img) -> str:
@@ -38,39 +43,81 @@ class MediaMixin:
         if not getattr(self, "image_recognition_enabled", True):
             return []
         try:
-            messages = event.get_messages() or []
+            if not event.is_private_chat() and not self._addresses_her(event):
+                return []
+            refs = []
+            for msg in event.get_messages() or []:
+                if isinstance(msg, Image):
+                    refs.append(self._image_ref(msg))
+                elif isinstance(msg, Reply):
+                    refs.extend(self._image_ref(child) for child in (getattr(msg, "chain", None) or []))
+            return list(dict.fromkeys(ref for ref in refs if ref))
         except Exception:
             return []
+
+    def _remember_images(self, event):
+        now = time.time()
+        state = getattr(self, '_recent_images', None)
+        if state is None:
+            state = self._recent_images = {}
+        for place in list(state):
+            state[place] = [row for row in state[place] if 0 <= now - row['ts'] <= RECENT_IMAGE_SECONDS]
+            if not state[place]:
+                del state[place]
+        here = self._here(event)
+        sender = str(self._speaker(event)[0] or '')
+        self_id = str(getattr(getattr(event, 'message_obj', None), 'self_id', '') or '')
+        if not here or not sender or sender == self_id or self._job_stale():
+            return
+        ids = self._source_ids(event)
+        try:
+            if not self._may_keep([sender], here, now, ids):
+                return
+        except Exception:
+            return
+        try:
+            messages = event.get_messages() or []
+        except Exception:
+            return
+        rows = state.setdefault(here, [])
+        for msg in messages:
+            ref = self._image_ref(msg)
+            if ref and not any(row['ref'] == ref and row['id'] == (ids[0] if ids else '') for row in rows):
+                rows.append({'ref': ref, 'sender': sender, 'id': ids[0] if ids else '', 'ts': now, 'seen': False})
+        del rows[:-RECENT_IMAGE_LIMIT]
+        if not rows:
+            state.pop(here, None)
+
+    def _forget_recent_images(self, person='', source_ids=()):
+        ids = set(str(x) for x in source_ids or ())
+        state = getattr(self, '_recent_images', {})
+        for here in list(state):
+            state[here] = [row for row in state[here]
+                           if not (person and row['sender'] == person) and row['id'] not in ids]
+            if not state[here]:
+                del state[here]
+
+    async def _quoted_image_refs(self, event):
         refs = []
-        private = bool(getattr(event, "is_private_chat", lambda: False)())
-        raw_text = str(getattr(event, "message_str", "") or "") + " " + self._text_from_components(event)
-        if private:
-            for msg in messages:
-                if isinstance(msg, Image):
-                    ref = self._image_ref(msg)
-                    if ref:
-                        refs.append(ref)
-                if isinstance(msg, Reply):
-                    for child in (getattr(msg, "chain", None) or []):
-                        ref = self._image_ref(child)
+        for msg in getattr(event, 'get_messages', lambda: [])() or []:
+            if not isinstance(msg, Reply) or any(self._image_ref(c) for c in (getattr(msg, 'chain', None) or [])):
+                continue
+            mid = getattr(msg, 'id', None) or getattr(msg, 'message_id', None)
+            if not mid:
+                continue
+            try:
+                result = await event.bot.api.call_action('get_msg', message_id=str(mid))
+                data = result.get('data', result) if isinstance(result, dict) else {}
+                parts = data.get('message', []) if isinstance(data, dict) else []
+                for part in parts if isinstance(parts, list) else []:
+                    if isinstance(part, dict) and part.get('type') == 'image' and isinstance(part.get('data'), dict):
+                        image = part['data']
+                        ref = str(image.get('url') or image.get('file') or image.get('path') or '').strip()
                         if ref:
                             refs.append(ref)
-        else:
-            if not any(w and w in raw_text for w in (getattr(self, "image_trigger_words", None) or [])):
-                return []
-            for msg in messages:
-                if isinstance(msg, Reply):
-                    for child in (getattr(msg, "chain", None) or []):
-                        ref = self._image_ref(child)
-                        if ref:
-                            refs.append(ref)
-        seen = set()
-        out = []
-        for ref in refs:
-            if ref not in seen:
-                seen.add(ref)
-                out.append(ref)
-        return out
+            except Exception:
+                continue
+        return refs
 
     def _load_image_cache(self) -> dict:
         try:
@@ -225,30 +272,85 @@ class MediaMixin:
             return ""
 
     async def _image_context(self, event) -> str:
+        if not self._llm_allowed('image_caption'):
+            return ''
         refs = self._image_refs(event)
-        if getattr(self, "_stickers_on", None) and self._stickers_on():
-            refs = list(dict.fromkeys(refs + self._sticker_refs(event)))
-        if not refs or not self._llm_allowed("image_caption"):
-            return ""
-        cache = self._load_image_cache()
-        if all(_sha256(ref) in cache for ref in refs):
-            self._image_last_used = time.time()
-            return "\n".join(str(cache[_sha256(ref)].get("caption")) for ref in refs[:3]
-                             if cache[_sha256(ref)].get("caption"))
-        self._group_reply_vision_active = getattr(self, '_group_reply_vision_active', 0) + 1
+        private = bool(getattr(event, 'is_private_chat', lambda: False)())
+        addressed = private or self._addresses_her(event)
+        if addressed and getattr(self, 'image_recognition_enabled', True):
+            refs = list(dict.fromkeys(refs + await self._quoted_image_refs(event)))
+        sticker_refs = self._sticker_refs(event) if getattr(self, '_stickers_on', None) and self._stickers_on() else []
+        recent = []
+        if addressed and not refs and not sticker_refs and getattr(self, 'image_recognition_enabled', True):
+            now = time.time()
+            sender = str(self._speaker(event)[0] or '')
+            recent = [row for row in reversed(getattr(self, '_recent_images', {}).get(self._here(event), []))
+                      if sender and row['sender'] == sender and not row['seen']
+                      and 0 <= now - row['ts'] <= RECENT_IMAGE_SECONDS][:RECENT_IMAGE_LOOK_LIMIT]
+            refs = list(dict.fromkeys(row['ref'] for row in recent))
+        if sticker_refs:
+            refs = list(dict.fromkeys(refs + sticker_refs))
+        if not refs:
+            return ''
+        def cached(cache, ref):
+            item = cache.get(_sha256(ref))
+            if not isinstance(item, dict) or not item.get('caption'):
+                return False
+            if item.get('where') and item['where'] != self._here(event):
+                return False
+            if item.get('from_qq') and str(item['from_qq']) != str(self._speaker(event)[0] or ''):
+                return False
+            return not item.get('ts') or 0 <= time.time() - float(item['ts']) < 86400
+
+        # Keep one selection through the lock; fetching a quote twice could change it.
+        setattr(event, '_ams_image_refs', refs)
         try:
-            async with self._group_image_lock():
+            cache = self._load_image_cache()
+            if all(cached(cache, ref) for ref in refs):
+                result = "\n".join(str(cache[_sha256(ref)].get('caption')) for ref in refs[:3]
+                                   if cache[_sha256(ref)].get('caption'))
+            else:
+                self._group_reply_vision_active = getattr(self, '_group_reply_vision_active', 0) + 1
+                try:
+                    async with self._group_image_lock():
+                        cache = self._load_image_cache()
+                        if all(cached(cache, ref) for ref in refs):
+                            result = "\n".join(str(cache[_sha256(ref)].get('caption')) for ref in refs[:3]
+                                               if cache[_sha256(ref)].get('caption'))
+                        else:
+                            result = await self._image_context_locked(event)
+                finally:
+                    self._group_reply_vision_active -= 1
+            if result and not self._job_stale():
+                self._image_last_used = time.time()
                 cache = self._load_image_cache()
-                if all(_sha256(ref) in cache for ref in refs):
-                    self._image_last_used = time.time()
-                    return "\n".join(str(cache[_sha256(ref)].get("caption")) for ref in refs[:3]
-                                     if cache[_sha256(ref)].get("caption"))
-                return await self._image_context_locked(event)
+                seen = {ref for ref in refs[:3] if (cache.get(_sha256(ref)) or {}).get('caption')}
+                here = self._here(event)
+                sender = str(self._speaker(event)[0] or '')
+                for row in getattr(self, '_recent_images', {}).get(here, []):
+                    if row['sender'] == sender and row['ref'] in seen:
+                        row['seen'] = True
+                if here.startswith('group:'):
+                    group = getattr(self, '_group_state', lambda: {})().get(here, {})
+                    group['queue'] = [row for row in group.get('queue', [])
+                                      if not (row[0] in seen and row[2] == sender)]
+                    for rows in group.get('pending', []):
+                        rows[:] = [row for row in rows if not (row[0] in seen and row[2] == sender)]
+                if recent:
+                    lines = []
+                    for row in recent:
+                        item = cache.get(_sha256(row['ref'])) or {}
+                        if item.get('caption'):
+                            lines.append('他%d秒前发的图：%s' % (max(0, int(time.time() - row['ts'])), item['caption']))
+                    return "\n".join(lines)
+            return result
         finally:
-            self._group_reply_vision_active -= 1
+            delattr(event, '_ams_image_refs')
 
     async def _image_context_locked(self, event) -> str:
-        refs = self._image_refs(event)
+        refs = getattr(event, '_ams_image_refs', None)
+        if refs is None:
+            refs = self._image_refs(event)
         stickers_on = bool(getattr(self, "_stickers_on", None) and self._stickers_on())
         if stickers_on:
             # step 2 (丙): QQ stickers of this message are looked at wherever it was sent

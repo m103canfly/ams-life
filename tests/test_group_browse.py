@@ -378,5 +378,150 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.p.looks, [])
 
 
+
+
+class RecentImageTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        class PictureDummy(Dummy, mixin_media.MediaMixin):
+            image_llama_server = ''
+            image_llama_model = ''
+            image_service_port = 0
+            image_recognition_enabled = True
+            image_trigger_words = []
+            def _stickers_on(self): return False
+            def _here(self, ev): return ('private:' if ev.private else 'group:') + ev.group
+            def _vision_provider_for(self, ev, source='reply'):
+                self.sources.append(source)
+                return self.provider
+        self.p = PictureDummy()
+        self.p.sources = []
+        self.p.context = SimpleNamespace(get_config=lambda: {})
+        self.calls = []
+        async def caption(**kwargs):
+            self.calls.append(kwargs['image_urls'][0])
+            return SimpleNamespace(completion_text='a picture')
+        self.p.provider = SimpleNamespace(text_chat=caption)
+
+    def ev(self, source='m1', sender='10001', group='900001', images=(), wake=False,
+           private=False, quote=None, bot=None):
+        parts = [mixin_media.Image(url=url) for url in images]
+        if quote is not None:
+            parts.append(quote)
+        ev = event(source, sender, group, wake=wake)
+        ev.private = private
+        ev.is_private_chat = lambda: private
+        ev.get_messages = lambda: parts
+        ev.bot = bot
+        return ev
+
+    async def test_group_addressed_image_and_empty_trigger_words(self):
+        ev = self.ev(images=[ref(1)], wake=True)
+        self.assertEqual(await self.p._image_context(ev), 'a picture')
+        self.assertEqual(self.calls, [ref(1)])
+        self.assertEqual(self.p.sources, ['reply'])
+
+    async def test_unaddressed_group_image_is_not_seen(self):
+        ev = self.ev(images=[ref(1)])
+        self.p._remember_images(ev)
+        self.assertEqual(await self.p._image_context(ev), '')
+        self.assertEqual(self.calls, [])
+
+    async def test_embedded_quoted_image(self):
+        quote = mixin_media.Reply(chain=[mixin_media.Image(url=ref(2))])
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=quote)), 'a picture')
+        self.assertEqual(self.calls, [ref(2)])
+
+    async def test_quote_id_fetches_only_images(self):
+        calls = []
+        async def action(name, **kwargs):
+            calls.append((name, kwargs))
+            return {'data': {'message': [{'type': 'text', 'data': {'text': 'ignored'}},
+                                          {'type': 'image', 'data': {'url': ref(3)}}]}}
+        bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+        ev = self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)
+        self.assertEqual(await self.p._image_context(ev), 'a picture')
+        self.assertEqual(calls, [('get_msg', {'message_id': 'm2'})])
+        self.assertEqual(self.calls, [ref(3)])
+
+    async def test_recent_image_has_age_and_is_removed_from_pending(self):
+        old = self.ev(images=[ref(1)])
+        self.p._remember_images(old)
+        self.p._recent_images['group:900001'][0]['ts'] -= 4
+        self.p._group_state()['group:900001'] = {'queue': [], 'pending': [[(ref(1), time.time(), '10001', 'm1')]]}
+        result = await self.p._image_context(self.ev('m2', wake=True))
+        self.assertRegex(result, r'他[45]秒前发的图')
+        self.assertEqual(self.calls, [ref(1)])
+        self.assertEqual(self.p._group_state()['group:900001']['pending'][0], [])
+        self.assertEqual(await self.p._image_context(self.ev('m3', wake=True)), '')
+
+    async def test_other_sender_and_other_place_are_isolated(self):
+        self.p._remember_images(self.ev(sender='10002', images=[ref(1)]))
+        self.p._remember_images(self.ev(group='900002', images=[ref(2)]))
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+        self.assertEqual(self.calls, [])
+
+    async def test_expired_image_is_not_seen(self):
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        self.p._recent_images['group:900001'][0]['ts'] -= 180
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+
+    async def test_forget_person_and_message_remove_images(self):
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        self.p._forget_recent_images('10001')
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+        self.p._remember_images(self.ev('m3', images=[ref(2)]))
+        self.p._forget_recent_images(source_ids=['m3'])
+        self.assertEqual(self.p._recent_images, {})
+
+    async def test_disabled_caption_preserves_unseen_image(self):
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        self.p._llm_allowed = lambda name: False
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+        self.assertFalse(self.p._recent_images['group:900001'][0]['seen'])
+        self.assertEqual(self.calls, [])
+
+    async def test_private_success_is_not_repeated_and_failure_can_retry(self):
+        first = self.ev(images=[ref(1)], private=True)
+        self.p._remember_images(first)
+        self.assertEqual(await self.p._image_context(first), 'a picture')
+        self.assertEqual(await self.p._image_context(self.ev('m2', private=True)), '')
+        failed = self.ev('m3', images=[ref(2)], private=True)
+        self.p._remember_images(failed)
+        self.p._llm_allowed = lambda name: False
+        self.assertEqual(await self.p._image_context(failed), '')
+        self.p._llm_allowed = lambda name: True
+        self.assertIn('发的图', await self.p._image_context(self.ev('m4', private=True)))
+        self.assertEqual(self.calls, [ref(1), ref(2)])
+
+    async def test_recent_images_are_bounded_and_newest_first(self):
+        for n in range(12):
+            self.p._remember_images(self.ev('m%d' % n, images=[ref(n)]))
+        self.assertEqual(len(self.p._recent_images['group:900001']), 10)
+        await self.p._image_context(self.ev('next', wake=True))
+        self.assertEqual(self.calls, [ref(11), ref(10), ref(9)])
+
+    async def test_lookback_increments_reply_counter(self):
+        import vision
+        ledger = {}
+        provider = self.p.provider
+        self.p._vision_provider_for = lambda ev, source='reply': vision.VisionGate(self.p, provider, ev, source)
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        with patch.object(vision, '_bytes', return_value=b'picture'), \
+             patch.object(vision, '_data_url', return_value='data:image/png;base64,AA=='), \
+             patch.object(vision, '_legacy_counts', return_value={}), \
+             patch.object(vision.mixin_attention, '_read_json', return_value=ledger), \
+             patch.object(vision.mixin_attention, '_write_json'):
+            await self.p._image_context(self.ev('m2', wake=True))
+            counts = vision.vision_for_panel({})
+        self.assertEqual(counts['reply'], 1)
+        self.assertEqual(counts['browse'], 0)
+        self.assertEqual(counts['calls'], 1)
+
+    async def test_quote_fetch_failure_is_ignored(self):
+        async def action(*args, **kwargs): raise RuntimeError('unavailable')
+        bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)), '')
+
+
 if __name__ == '__main__':
     unittest.main()

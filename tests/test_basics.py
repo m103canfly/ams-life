@@ -128,7 +128,8 @@ class Split(unittest.TestCase):
         # Mood review: +2 (a reply is answered once; note a successfully sent medium).
         # Group browsing adds 13 mixin methods and one property, a reply wrapper and an image helper.
         # SlangMixin: seven methods, including its two panel endpoints.
-        self.assertEqual(len(methods), 471)
+        # Recent images and quote lookup add three media methods.
+        self.assertEqual(len(methods), 474)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
