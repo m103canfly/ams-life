@@ -1,6 +1,7 @@
 """Offline group-opening rules with a stand-in vision provider and forget registry."""
 import asyncio
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -13,6 +14,8 @@ sys.path.insert(0, str(HERE))
 from test_body_heart import CLOCK as _CLOCK  # noqa: E402,F401
 import mixin_group_browse as groups  # noqa: E402
 import mixin_media  # noqa: E402
+import mixin_discretion  # noqa: E402
+import forget_registry  # noqa: E402
 
 
 def event(source='m1', sender='10001', group='900001', refs=(), wake=False):
@@ -382,7 +385,7 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
 
 class RecentImageTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        class PictureDummy(Dummy, mixin_media.MediaMixin):
+        class PictureDummy(Dummy, mixin_media.MediaMixin, mixin_discretion.DiscretionMixin):
             image_llama_server = ''
             image_llama_model = ''
             image_service_port = 0
@@ -443,6 +446,64 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, [('get_msg', {'message_id': 'm2'})])
         self.assertEqual(self.calls, [ref(3)])
 
+    async def test_embedded_quote_checks_forgotten_sender_and_message(self):
+        with forget_registry.ForgetRegistry() as registry:
+            self.p._registry = lambda: registry
+            self.p._may_keep = mixin_discretion.DiscretionMixin._may_keep.__get__(self.p)
+            registry.owner_delete(person='10002', source_ids=['deleted-message'])
+            for private in (False, True):
+                for sender, mid in (('10002', 'old-message'), ('10003', 'deleted-message')):
+                    quote = mixin_media.Reply(sender_id=sender, id=mid,
+                                              chain=[mixin_media.Image(url=ref(4))])
+                    self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), '')
+                quote = mixin_media.Reply(sender_id='10003', id='safe-message',
+                                          chain=[mixin_media.Image(url=ref(5))])
+                self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), 'a picture')
+            self.assertNotIn(ref(4), self.calls)
+
+    async def test_fetched_quote_checks_forgotten_sender_and_message(self):
+        with forget_registry.ForgetRegistry() as registry:
+            self.p._registry = lambda: registry
+            self.p._may_keep = mixin_discretion.DiscretionMixin._may_keep.__get__(self.p)
+            registry.owner_delete(person='10002', source_ids=['deleted-message'])
+            for private in (False, True):
+                for sender, mid, allowed in (('10002', 'old-message', False),
+                                              ('10003', 'deleted-message', False),
+                                              ('10003', 'safe-message', True)):
+                    async def action(name, **kwargs):
+                        return {'data': {'sender': {'user_id': sender},
+                                         'message': [{'type': 'image', 'data': {'url': ref(6 if allowed else 7)}}]}}
+                    bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+                    ev = self.ev(wake=True, private=private, quote=mixin_media.Reply(id=mid), bot=bot)
+                    self.assertEqual(bool(await self.p._image_context(ev)), allowed)
+            self.assertNotIn(ref(7), self.calls)
+
+    async def test_quote_unknown_sender_still_checks_message_registry(self):
+        # An unknown sender is omitted, so the registry can check only the known message ID.
+        with forget_registry.ForgetRegistry() as registry:
+            self.p._registry = lambda: registry
+            self.p._may_keep = mixin_discretion.DiscretionMixin._may_keep.__get__(self.p)
+            registry.owner_delete(person='10002', source_ids=['deleted-message'])
+            for mid, allowed in (('deleted-message', False), ('safe-message', True)):
+                quote = mixin_media.Reply(id=mid, chain=[mixin_media.Image(url=ref(8))])
+                self.assertEqual(bool(await self.p._image_context(self.ev(wake=True, quote=quote))), allowed)
+                async def action(name, **kwargs):
+                    return {'message': [{'type': 'image', 'data': {'url': ref(9)}}]}
+                bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+                ev = self.ev(wake=True, quote=mixin_media.Reply(id=mid), bot=bot)
+                self.assertEqual(bool(await self.p._image_context(ev)), allowed)
+
+    async def test_unreadable_registry_rejects_quoted_images(self):
+        def unreadable(*args): raise forget_registry.Unreadable('unavailable')
+        self.p._may_keep = unreadable
+        quote = mixin_media.Reply(sender_id='10003', id='m2', chain=[mixin_media.Image(url=ref(1))])
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=quote)), '')
+        async def action(name, **kwargs):
+            return {'sender': {'user_id': '10003'}, 'message': [{'type': 'image', 'data': {'url': ref(2)}}]}
+        bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)), '')
+        self.assertEqual(self.calls, [])
+
     async def test_recent_image_has_age_and_is_removed_from_pending(self):
         old = self.ev(images=[ref(1)])
         self.p._remember_images(old)
@@ -466,12 +527,29 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
 
     async def test_forget_person_and_message_remove_images(self):
-        self.p._remember_images(self.ev(images=[ref(1)]))
-        self.p._forget_recent_images('10001')
-        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
-        self.p._remember_images(self.ev('m3', images=[ref(2)]))
-        self.p._forget_recent_images(source_ids=['m3'])
-        self.assertEqual(self.p._recent_images, {})
+        # Run the real deletion method with empty stores isolated in a temporary directory.
+        self.p.self_model = {}
+        self.p._known_names = lambda people: []
+        self.p._read_library = lambda: {'entries': [], 'rooms': {}}
+        self.p._write_library = lambda lib: True
+        self.p._window_places = lambda: []
+        self.p._forget_pictures = lambda refs: 0
+        self.p._forget_pictures_of = lambda person: 0
+        self.p._forget_dedupe_rows = lambda ids: None
+        self.p._refresh_loop_pressure = lambda core: None
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.multiple(mixin_discretion, EVENT_ARCHIVE_PATH=root / 'events',
+                                INSIGHT_ARCHIVE_PATH=root / 'insights', EVENT_SESSION_DIR=root / 'sessions',
+                                USER_DIR=root / 'users', EMBED_CACHE={}):
+                self.p._remember_images(self.ev(images=[ref(1)]))
+                self.p._forget(person='10001')
+                self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+                self.assertEqual(self.p._recent_images, {})
+                self.p._remember_images(self.ev('m3', images=[ref(2)]))
+                self.p._forget(source_ids=['m3'])
+                self.assertEqual(self.p._recent_images, {})
+                self.assertEqual(await self.p._image_context(self.ev('m4', wake=True)), '')
 
     async def test_disabled_caption_preserves_unseen_image(self):
         self.p._remember_images(self.ev(images=[ref(1)]))

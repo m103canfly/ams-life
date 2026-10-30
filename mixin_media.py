@@ -50,7 +50,15 @@ class MediaMixin:
                 if isinstance(msg, Image):
                     refs.append(self._image_ref(msg))
                 elif isinstance(msg, Reply):
-                    refs.extend(self._image_ref(child) for child in (getattr(msg, "chain", None) or []))
+                    sender = str(getattr(msg, 'sender_id', '') or '').strip()
+                    mid = str(getattr(msg, 'id', '') or '').strip()
+                    try:
+                        allowed = self._may_keep([sender] if sender else [], self._here(event), None,
+                                                 [mid] if mid else [])
+                    except Exception:
+                        allowed = False
+                    if allowed:
+                        refs.extend(self._image_ref(child) for child in (getattr(msg, "chain", None) or []))
             return list(dict.fromkeys(ref for ref in refs if ref))
         except Exception:
             return []
@@ -109,6 +117,10 @@ class MediaMixin:
                 result = await event.bot.api.call_action('get_msg', message_id=str(mid))
                 data = result.get('data', result) if isinstance(result, dict) else {}
                 parts = data.get('message', []) if isinstance(data, dict) else []
+                sender_data = data.get('sender') if isinstance(data, dict) else None
+                sender = str(sender_data.get('user_id') or '').strip() if isinstance(sender_data, dict) else ''
+                if not self._may_keep([sender] if sender else [], self._here(event), None, [str(mid)]):
+                    continue
                 for part in parts if isinstance(parts, list) else []:
                     if isinstance(part, dict) and part.get('type') == 'image' and isinstance(part.get('data'), dict):
                         image = part['data']
