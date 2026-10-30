@@ -8,6 +8,8 @@ from urllib.parse import urljoin, urlsplit
 
 logger = logging.getLogger(__name__)
 OPEN_SECONDS = 20
+# Limit redirect chains to bound work and reject loops.
+MAX_HOPS = 5
 # Script-driven pages may fetch their visible content after DOMContentLoaded.
 SETTLE_SECONDS = 8
 TEXT_SECONDS = 10
@@ -17,6 +19,10 @@ SHOT_VIEWPORT = {"width": 390, "height": 844}
 SHOT_QUALITY = 70
 CHALLENGE_MARKERS = ("verify you are human", "checking your browser", "just a moment...",
                      "captcha", "cloudflare", "请验证您是人类")
+WEBRTC_INIT = """for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
+    try { Object.defineProperty(globalThis, name, {value: undefined, writable: false, configurable: false}); }
+    catch (_) { try { delete globalThis[name]; } catch (_) {} }
+}"""
 _lock = asyncio.Lock()
 
 
@@ -85,7 +91,21 @@ async def _visit(url, check, shot_path, on_block):
                 logger.info("[ams-life] browser: blocked request (%s)", reason)
                 await route.abort()
                 return
-            await route.continue_()
+            response = None
+            try:
+                response = await route.fetch(max_redirects=0, timeout=OPEN_SECONDS * 1000)
+                if 300 <= response.status < 400:
+                    blocked += 1
+                    logger.info("[ams-life] browser: blocked request (redirect)")
+                    await route.abort()
+                else:
+                    await route.fulfill(response=response)
+            except Exception:
+                logger.info("[ams-life] browser: request failed")
+                await route.abort()
+            finally:
+                if response is not None:
+                    await response.dispose()
 
         async def check_response(response):
             # Safety 4: redirects and all other responses are checked too.
@@ -101,11 +121,6 @@ async def _visit(url, check, shot_path, on_block):
 
         async def read(context):
             nonlocal blocked
-            ok, reason = await checked(url)
-            if not ok:
-                blocked += 1
-                logger.info("[ams-life] browser: page refused (%s)", reason)
-                return None
             await context.route("**/*", route_request)
             # Safety 3: close long-lived WebSockets before they can communicate.
             await context.route_web_socket("**/*", lambda ws: track(ws.close()))
@@ -114,8 +129,34 @@ async def _visit(url, check, shot_path, on_block):
             page.on("dialog", lambda dialog: track(dialog.dismiss()))
             context.on("page", lambda new_page: track(new_page.close()))
             context.on("response", lambda response: track(check_response(response)))
-            response = await asyncio.wait_for(page.goto(url, wait_until="domcontentloaded", timeout=OPEN_SECONDS * 1000),
-                                              timeout=OPEN_SECONDS)
+
+            async def navigate():
+                nonlocal blocked
+                address = url
+                for hop in range(MAX_HOPS + 1):
+                    ok, reason = await checked(address)
+                    if not ok:
+                        blocked += 1
+                        logger.info("[ams-life] browser: page refused (%s)", reason)
+                        return None
+                    probe = await context.request.get(address, max_redirects=0, timeout=OPEN_SECONDS * 1000)
+                    try:
+                        status, location = probe.status, probe.headers.get("location")
+                    finally:
+                        await probe.dispose()
+                    if 300 <= status < 400:
+                        if not location or hop == MAX_HOPS:
+                            logger.info("[ams-life] browser: redirect limit or missing location")
+                            return None
+                        address = urljoin(address, location)
+                        continue
+                    if not 200 <= status < 300:
+                        logger.info("[ams-life] browser: navigation failed")
+                        return None
+                    return await page.goto(address, wait_until="domcontentloaded", timeout=OPEN_SECONDS * 1000)
+                return None
+
+            response = await asyncio.wait_for(navigate(), timeout=OPEN_SECONDS)
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
             if rejected:
@@ -171,13 +212,16 @@ async def _visit(url, check, shot_path, on_block):
                     # Safety 3: disable the browser's encrypted DNS.
                     browser = await playwright.chromium.launch(channel="msedge", headless=True,
                                                                chromium_sandbox=True,
-                                                               args=["--disable-features=DnsOverHttps"])
+                                                               args=["--disable-features=DnsOverHttps",
+                                                                     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"])
                     # Safety 2: deny downloads, permissions and service workers; keep TLS and CSP checks.
                     options = dict(accept_downloads=False, permissions=[], service_workers="block",
                                    ignore_https_errors=False, bypass_csp=False)
                     if shot_path is not None:
                         options["viewport"] = dict(SHOT_VIEWPORT)
                     context = await browser.new_context(**options)
+                    # Safety 3: prevent pages from creating WebRTC peer connections.
+                    await context.add_init_script(WEBRTC_INIT)
                     # Safety 7: the caller passes the result to browse.wrap as untrusted material.
                     result = await asyncio.wait_for(read(context), timeout=OPEN_SECONDS + SETTLE_SECONDS + 2 * TEXT_SECONDS + SHOT_SECONDS)
                 finally:

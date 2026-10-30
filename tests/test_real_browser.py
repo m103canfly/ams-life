@@ -36,20 +36,40 @@ def check(url):
 
 
 class Route:
-    def __init__(self, url=URL, method='GET'):
+    def __init__(self, url=URL, method='GET', status=200):
         self.request = types.SimpleNamespace(url=url, method=method)
         self.result = None
+        self.response = FakeResponse(url, status)
+        self.fetch_args = None
 
     async def abort(self):
         self.result = 'abort'
 
-    async def continue_(self):
-        self.result = 'continue'
+    async def fetch(self, **kwargs):
+        self.fetch_args = kwargs
+        return self.response
+
+    async def fulfill(self, response):
+        self.result = 'fulfill'
+        self.fulfilled_response = response
 
 
 class FakeResponse:
     def __init__(self, url=URL, status=200, headers=None):
         self.url, self.status, self.headers = url, status, headers or {}
+        self.disposed = False
+
+    async def dispose(self):
+        self.disposed = True
+
+
+class FakeRequest:
+    def __init__(self):
+        self.calls, self.responses = [], {}
+
+    async def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return self.responses.get(url, FakeResponse(url))
 
 
 class FakePage:
@@ -65,6 +85,11 @@ class FakePage:
 
     async def goto(self, url, **kwargs):
         self.ctx.goto_args = kwargs
+        self.ctx.goto_url = url
+        self.ctx.main_route = Route(url, status=self.ctx.main_route_status)
+        await self.ctx.route_handler(self.ctx.main_route)
+        if self.ctx.main_route.result == 'abort':
+            return None
         for route in self.ctx.routes:
             await self.ctx.route_handler(route)
         for address in self.ctx.responses:
@@ -73,7 +98,7 @@ class FakePage:
             self.ctx.handlers['page'](self.ctx.popup)
         if self.ctx.dialog:
             self.handlers['dialog'](self.ctx.dialog)
-        self.url = self.ctx.final_url
+        self.url = self.ctx.final_url or url
         if self.ctx.fail:
             raise TimeoutError()
         return self.ctx.main_response
@@ -111,8 +136,10 @@ class FakeDialog:
 class FakeContext:
     def __init__(self):
         self.handlers, self.routes, self.responses = {}, [], []
-        self.final_url, self.body = URL, 'readable words'
+        self.final_url, self.body = None, 'readable words'
+        self.request = FakeRequest()
         self.main_response = FakeResponse()
+        self.main_route_status = 200
         self.settle_timeout, self.settled_body = False, None
         self.popup = self.dialog = None
         self.closed = self.fail = False
@@ -123,6 +150,9 @@ class FakeContext:
 
     async def route_web_socket(self, pattern, handler):
         self.ws_pattern, self.ws_handler = pattern, handler
+
+    async def add_init_script(self, script):
+        self.init_script = script
 
     async def new_page(self):
         return self.page
@@ -175,7 +205,8 @@ class Browser(unittest.TestCase):
         fake = FakePlaywright()
         self.assertEqual(self.run_browser(fake)['text'], 'readable words')
         self.assertEqual(fake.launch_args, {'channel': 'msedge', 'headless': True, 'chromium_sandbox': True,
-                                            'args': ['--disable-features=DnsOverHttps']})
+                                            'args': ['--disable-features=DnsOverHttps',
+                                                     '--force-webrtc-ip-handling-policy=disable_non_proxied_udp']})
         self.assertEqual(fake.context_args, {'accept_downloads': False, 'permissions': [], 'service_workers': 'block',
                                              'ignore_https_errors': False, 'bypass_csp': False})
         self.assertEqual(fake.context.pattern, '**/*')
@@ -190,7 +221,102 @@ class Browser(unittest.TestCase):
                                Route('https://missing.example.com/')]
         self.run_browser(fake)
         self.assertEqual([r.result for r in fake.context.routes],
-                         ['continue', 'continue', 'abort', 'abort', 'abort', 'abort'])
+                         ['fulfill', 'fulfill', 'abort', 'abort', 'abort', 'abort'])
+
+    def test_main_redirect_to_private_is_checked_before_request(self):
+        fake = FakePlaywright()
+        target = 'http://127.0.0.1/'
+        fake.context.request.responses[URL] = FakeResponse(URL, 302, {'location': target})
+        counts = []
+        self.assertIsNone(self.run_browser(fake, on_block=counts.append))
+        self.assertEqual([url for url, _ in fake.context.request.calls], [URL])
+        self.assertEqual(counts, [1])
+        self.assertFalse(hasattr(fake.context, 'goto_url'))
+        self.assertTrue(fake.context.closed and fake.closed)
+        fake = FakePlaywright()
+        fake.context.request.responses[URL] = FakeResponse(URL, 302, {'location': target})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'shot.jpg'
+            self.assertIsNone(self.run_browser(fake, path))
+            self.assertFalse(path.exists())
+            self.assertEqual([url for url, _ in fake.context.request.calls], [URL])
+
+    def test_main_public_redirect_is_followed_only_after_check(self):
+        fake = FakePlaywright()
+        target = 'https://example.com/next'
+        fake.context.request.responses[URL] = FakeResponse(URL, 302, {'location': '/next'})
+        result = self.run_browser(fake)
+        self.assertEqual(result['url'], target)
+        self.assertEqual([url for url, _ in fake.context.request.calls], [URL, target])
+        self.assertTrue(all(kw['max_redirects'] == 0 for _, kw in fake.context.request.calls))
+        self.assertEqual(fake.context.goto_url, target)
+        self.assertEqual(fake.context.main_route.result, 'fulfill')
+        self.assertEqual(fake.context.main_route.fetch_args['max_redirects'], 0)
+
+    def test_main_redirect_limit_and_loop(self):
+        for redirects in (real_browser.MAX_HOPS, real_browser.MAX_HOPS + 1):
+            with self.subTest(redirects=redirects):
+                fake = FakePlaywright()
+                urls = [URL] + ['https://example.com/hop%d' % n for n in range(redirects)]
+                for current, following in zip(urls, urls[1:]):
+                    fake.context.request.responses[current] = FakeResponse(current, 302, {'location': following})
+                result = self.run_browser(fake)
+                if redirects == real_browser.MAX_HOPS:
+                    self.assertEqual(result['url'], urls[-1])
+                    self.assertEqual(fake.context.goto_url, urls[-1])
+                else:
+                    self.assertIsNone(result)
+                    self.assertFalse(hasattr(fake.context, 'goto_url'))
+                self.assertEqual(len(fake.context.request.calls), real_browser.MAX_HOPS + 1)
+        fake = FakePlaywright()
+        fake.context.request.responses[URL] = FakeResponse(URL, 302, {'location': URL})
+        self.assertIsNone(self.run_browser(fake))
+        self.assertEqual(len(fake.context.request.calls), real_browser.MAX_HOPS + 1)
+        fake = FakePlaywright()
+        fake.context.request.responses[URL] = FakeResponse(URL, 302)
+        self.assertIsNone(self.run_browser(fake))
+        self.assertFalse(hasattr(fake.context, 'goto_url'))
+
+    def test_route_fetch_aborts_redirects_and_fulfills_other_responses(self):
+        fake = FakePlaywright()
+        fake.context.routes = [Route(status=302), Route(status=200), Route(status=404), Route(method='POST')]
+        counts = []
+        self.assertIsNotNone(self.run_browser(fake, on_block=counts.append))
+        self.assertEqual([r.result for r in fake.context.routes], ['abort', 'fulfill', 'fulfill', 'abort'])
+        self.assertEqual(counts, [2])
+        for route in fake.context.routes[:3]:
+            self.assertEqual(route.fetch_args['max_redirects'], 0)
+            self.assertTrue(route.response.disposed)
+        self.assertIsNone(fake.context.routes[-1].fetch_args)
+
+    def test_route_source_never_continues_unchecked(self):
+        source = (ROOT / 'real_browser.py').read_text('utf-8')
+        self.assertNotIn('.continue_', source)
+
+    def test_main_route_redirect_after_preflight_is_aborted(self):
+        fake = FakePlaywright()
+        fake.context.main_route_status = 302
+        counts = []
+        self.assertIsNone(self.run_browser(fake, on_block=counts.append))
+        self.assertEqual(fake.context.main_route.result, 'abort')
+        self.assertEqual(fake.context.main_route.fetch_args['max_redirects'], 0)
+        self.assertEqual(counts, [1])
+
+    def test_webrtc_disabled_and_local_network_protection_preserved(self):
+        fake = FakePlaywright()
+        self.run_browser(fake)
+        args = fake.launch_args['args']
+        self.assertIn('--force-webrtc-ip-handling-policy=disable_non_proxied_udp', args)
+        self.assertFalse(any('PrivateNetworkAccess' in arg or 'LocalNetworkAccess' in arg for arg in args))
+        self.assertIn('RTCPeerConnection', fake.context.init_script)
+        self.assertIn('webkitRTCPeerConnection', fake.context.init_script)
+        self.assertIn('value: undefined', fake.context.init_script)
+
+    def test_strict_check_rejects_private_dns_even_when_check_allows(self):
+        with mock.patch.object(real_browser.socket, 'getaddrinfo', side_effect=resolver):
+            ok, reason = real_browser._strict_url('https://private.example.com/', lambda url: (True, ''))
+        self.assertFalse(ok)
+        self.assertEqual(reason, 'local address')
 
     def test_response_redirect_to_local_is_rejected(self):
         fake = FakePlaywright()
@@ -314,7 +440,7 @@ class Browser(unittest.TestCase):
             self.assertEqual(fake.context.shot_args, {'path': str(path), 'type': 'jpeg', 'quality': 70,
                                                        'full_page': False, 'timeout': 10000})
         self.assertEqual(counts, [2])
-        self.assertEqual([r.result for r in fake.context.routes], ['abort', 'continue', 'abort'])
+        self.assertEqual([r.result for r in fake.context.routes], ['abort', 'fulfill', 'abort'])
         self.assertEqual(fake.context_args['viewport'], {'width': 390, 'height': 844})
         self.assertEqual(fake.context_args['permissions'], [])
         self.assertFalse(fake.context_args['accept_downloads'])
