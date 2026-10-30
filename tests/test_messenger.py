@@ -143,15 +143,11 @@ class SameAsThePlugin(unittest.TestCase):
         cls.made = None
         if not os.environ.get('AMS_LIFE_DATA_DIR'):
             cls.made = tempfile.mkdtemp(prefix='ams-life-messenger-')
+            cls.addClassCleanup(shutil.rmtree, cls.made, ignore_errors=True)
+            cls.addClassCleanup(os.environ.pop, 'AMS_LIFE_DATA_DIR', None)
             os.environ['AMS_LIFE_DATA_DIR'] = cls.made
         import mixin_attention
         cls.plugin = mixin_attention.AttentionMixin()
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.made:
-            os.environ.pop('AMS_LIFE_DATA_DIR', None)
-            shutil.rmtree(cls.made, ignore_errors=True)
 
     def test_the_words_and_faces_are_the_plugins_chain(self):
         for text in ('你好', '好的[表情:微笑]', '嗯[表情:调皮]！还有[表情:偷笑]'):
