@@ -149,7 +149,14 @@ class PhoneMixin:
             sid, _name = self._speaker(event)
         except Exception:
             sid = ""
-        return discretion.make_origin(self._here(event), [sid], self._source_ids(event))
+        here, ids = self._here(event), self._source_ids(event)
+        private = here.startswith("group:") and discretion.keep_in_group(
+            str(getattr(event, "message_str", "") or "") or self._message_text(event))
+        if here.startswith("group:") and not private:
+            private = any(discretion.is_about(discretion.origin_of(x), source_ids=ids)
+                          and discretion.origin_of(x)["visibility"] == discretion.PRIVATE
+                          for x in self._read_window(here)["recent"])
+        return discretion.make_origin(here, [sid], ids, discretion.PRIVATE if private else None)
 
     @staticmethod
     def _message_id(event) -> str:
@@ -282,13 +289,22 @@ class PhoneMixin:
         text = self._message_text(event)
         if not text:
             return
-        line = {"ts": time.time(), "role": "user", "sender_id": str(sid or ""),
+        now = time.time()
+        win = self._read_window(here)
+        if here.startswith("group:") and sid and discretion.keep_in_group(text):
+            previous = [x for x in win["recent"] if x.get("role") == "user"
+                        and str(x.get("sender_id") or "") == str(sid)
+                        and 0 <= now - float(x.get("ts", 0) or 0) <= 120][-3:]
+            ids = [s for x in previous for s in discretion.origin_of(x).get("source_ids", [])]
+            if ids:
+                self._narrow_group_sources(here, ids)
+                win = self._read_window(here)
+        line = {"ts": now, "role": "user", "sender_id": str(sid or ""),
                 "sender_name": str(name or ""), "msg_id": self._message_id(event),
                 "text": text[:WINDOW_MESSAGE_CHARS], "origin": self._event_origin(event)}
         quoted = self._reply_to(event)
         if quoted:
             line["reply_to"] = quoted
-        win = self._read_window(here)
         win["recent"].append(line)
         # AstrBot's own id of this chat, for deleting what AstrBot keeps when the owner
         # deletes someone (see _forget_in_astrbot)
@@ -402,7 +418,14 @@ class PhoneMixin:
             win = self._read_window(here)
             loops = [x for x in win["open_loops"] if isinstance(x, dict)]
             before = json.dumps(loops, ensure_ascii=False, sort_keys=True)
+            source = self._event_origin(event)
+            narrow = here.startswith("group:") and source["visibility"] == discretion.PRIVATE
+            old_status = {id(x): x.get("status") for x in loops} if narrow else {}
             memory_meta.resolve_open_loops(loops, text, stamp)
+            if narrow:
+                for existing in loops:
+                    if existing.get("status") != old_status[id(existing)]:
+                        existing["origin"] = discretion.merge([discretion.origin_of(existing, here), source])
             for new_loop in memory_meta.detect_open_loops(text, stamp):
                 merged = False
                 for existing in loops:
@@ -412,6 +435,8 @@ class PhoneMixin:
                             existing.get("text", ""), new_loop.get("text", "")) >= memory_meta.OPEN_LOOP_MERGE_SIMILARITY:
                         existing["last_mentioned_ts"] = stamp
                         existing["mentioned"] = int(existing.get("mentioned", 1) or 1) + 1
+                        if narrow:
+                            existing["origin"] = discretion.merge([discretion.origin_of(existing, here), source])
                         merged = True
                         break
                 if not merged:

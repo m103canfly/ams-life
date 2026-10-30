@@ -11,6 +11,9 @@ import tts  # noqa: E402
 
 
 class Speakable(unittest.TestCase):
+    def test_stickers_and_next_message_are_not_read_aloud(self):
+        self.assertEqual(tts.speakable('[表情包:挥手] 你好【下一条】晚安'), '你好 晚安')
+
     def test_qq_face_is_not_read_aloud(self):
         self.assertEqual(tts.speakable('[表情:微笑] 我在呢'), '我在呢')
 

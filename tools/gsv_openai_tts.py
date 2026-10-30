@@ -145,6 +145,27 @@ def models():
             "data": [{"id": "gpt-sovits-%s" % v, "object": "model"} for v in VOICES]}
 
 
+def speech_payload(text: str, body: dict, c: dict) -> dict:
+    payload = {
+        "text": text,
+        "text_lang": c.get("text_lang", "zh"),
+        "ref_audio_path": c.get("ref_audio"),
+        "prompt_text": c.get("prompt_text", ""),
+        "prompt_lang": c.get("prompt_lang", "zh"),
+        "speed_factor": float(body.get("speed") or c.get("speed") or 1.0),
+        "text_split_method": "cut5",
+        "media_type": "wav",
+        "streaming_mode": False,
+    }
+    for name, convert in (("temperature", float), ("top_k", int)):
+        value = body.get(name, c.get(name))
+        try:
+            payload[name] = convert(value)
+        except (TypeError, ValueError, OverflowError):
+            pass
+    return payload
+
+
 @app.post("/v1/audio/speech")
 async def speech(request: Request):
     body = await request.json()
@@ -161,17 +182,7 @@ async def speech(request: Request):
         set_voice(version)
     except Exception as exc:                     # keep speaking with whatever it had
         print("[openai-tts] voice switch failed: %s" % exc, flush=True)
-    payload = {
-        "text": text,
-        "text_lang": c.get("text_lang", "zh"),
-        "ref_audio_path": c.get("ref_audio"),
-        "prompt_text": c.get("prompt_text", ""),
-        "prompt_lang": c.get("prompt_lang", "zh"),
-        "speed_factor": float(body.get("speed") or c.get("speed") or 1.0),
-        "text_split_method": "cut5",
-        "media_type": "wav",
-        "streaming_mode": False,
-    }
+    payload = speech_payload(text, body, c)
     req = urllib.request.Request(API + "/tts", method="POST",
                                  data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                                  headers={"Content-Type": "application/json"})
