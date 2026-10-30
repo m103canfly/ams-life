@@ -29,7 +29,7 @@ class PortsMixin:
     def _messenger(self, event=None):
         """A messenger for this event and the plugin's context."""
         return adapter_astrbot_messenger.AstrBotMessenger(
-            self.context, lambda place: self._umo_of(place, event), lambda: getattr(event, "bot", None))
+            getattr(self, "context", None), lambda place: self._umo_of(place, event), lambda: getattr(event, "bot", None))
 
     def _model(self, provider):
         """A model client over this provider."""

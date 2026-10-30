@@ -15,13 +15,17 @@ try:
     from . import stickers
 except ImportError:
     import stickers
+try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
 
 # Short enough to describe a just-sent picture, bounded per conversation to limit memory.
 RECENT_IMAGE_SECONDS = 120
 RECENT_IMAGE_LIMIT = 10
 RECENT_IMAGE_LOOK_LIMIT = 3
 
-class MediaMixin:
+class MediaMixin(PortsMixin):
     @staticmethod
     def _image_ref(img) -> str:
         if not isinstance(img, Image):
@@ -114,7 +118,7 @@ class MediaMixin:
             if not mid:
                 continue
             try:
-                result = await event.bot.api.call_action('get_msg', message_id=str(mid))
+                result = await self._messenger(event).call('get_msg', message_id=str(mid))
                 data = result.get('data', result) if isinstance(result, dict) else {}
                 parts = data.get('message', []) if isinstance(data, dict) else []
                 sender_data = data.get('sender') if isinstance(data, dict) else None

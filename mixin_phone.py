@@ -23,6 +23,10 @@ try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
+try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
 
 WINDOW_MAX = 1000                   # lines per window, everyone's (AstrBot's group context keeps 1000 too)
 WINDOW_SECONDS = 24 * 3600          # every line stays 24 hours, hers too; older things live in memory
@@ -86,7 +90,7 @@ async def _expand_forward(plugin, event):
             fid = getattr(comp, "id", None) or getattr(comp, "res_id", None)
             if not fid:
                 continue
-            result = await event.bot.api.call_action("get_forward_msg", id=str(fid))
+            result = await plugin._messenger(event).call("get_forward_msg", id=str(fid))
             if not isinstance(result, dict):
                 continue
             data = result.get("data", result)
@@ -133,7 +137,7 @@ _OLD_BODY_TEXT_KEYS = ("open_loops", "event_anchors", "autobiography", "self_tim
                        "core_self", "narrative_self")
 
 
-class PhoneMixin:
+class PhoneMixin(PortsMixin):
     # ------------------------------------------------------------------
     # Windows on disk: a readable prefix plus a hash of the full window name,
     # and the file says which window it is (checked on every read).
