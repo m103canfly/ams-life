@@ -1329,7 +1329,12 @@ def detect_open_loops(text: Any, now: float | None = None) -> list[dict[str, Any
         return []
     if any(noise in raw for noise in _OPEN_LOOP_NOISE):
         return []
-    if ("?" in raw or "？" in raw) and "记得" not in raw:
+    if "?" in raw or "？" in raw or re.search(r"(?:记得|知道|清楚).{0,80}(?:吗|么|不记得|不知道)", raw):
+        return []
+    if re.search(r"(?:还记得|记不记得|知不知道|知道不知道)", raw):
+        return []
+    if re.search(r"(?:我|他|她)(?:明天|后天|下周|今天|今晚|过会|回头|下次)要", raw) and not any(
+            cue in raw for cue in ("提醒我", "帮我", "答应", "约好")):
         return []
     if not _has_open_loop_cue(raw):
         return []
@@ -1382,8 +1387,11 @@ def resolve_open_loops(loops: Any, text: Any, now: float | None = None) -> int:
             created_ts = float(created) if created is not None else current
         except Exception:
             created_ts = current
+        if created is None:
+            loop["created_ts"] = round(current, 3)
+            changed += 1
         age_days = max(0.0, (current - created_ts) / 86400.0)
-        window = {"soon": 1.0, "tomorrow": 2.0}.get(str(loop.get("due_hint") or ""), 7.0)
+        window = {"soon": 1.0, "tomorrow": 2.0, "none": 3.0}.get(str(loop.get("due_hint") or "none"), 7.0)
         if age_days > window:
             loop["status"] = "expired"
             loop["resolved_ts"] = round(current, 3)

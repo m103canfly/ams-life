@@ -294,6 +294,22 @@ def run():
                                 '蛋糕要做草莓味的', '草莓味的惊喜蛋糕听起来好甜']
         out['all_texts'] = out['private_texts'] + [x[0] for x in group_lines] + ['我陪着你']
         out.update(snapshot(plugin))
+    elif CASE == 'loops_by_person':
+        t(0, '记得明天提醒我交报告', '10002', '小林', A)
+        out['first'] = plugin._read_window('group:' + A)['open_loops']
+        t(1, '你好呀', '10003', '小周', A)
+        t(1, '你好呀', '10002', '小林', A)
+        t(1, '记得明天提醒我交报告', '10003', '小周', A)
+        out['both'] = plugin._read_window('group:' + A)['open_loops']
+        t(1, '交报告不用了', '10003', '小周', A)
+        out['settled'] = plugin._read_window('group:' + A)['open_loops']
+        win = plugin._read_window('group:' + A)
+        win['open_loops'] = [{'text': '旧群提醒', 'status': 'open'}]
+        plugin._write_window('group:' + A, win)
+        t(1, '再说一句', '10002', '小林', A)
+        private = 'private:10001'
+        plugin._write_window(private, {'recent': [], 'open_loops': [{'text': '旧私聊提醒', 'status': 'open'}]})
+        t(1, '再说一句', '10001', '小陈')
     elif CASE == 'loops':
         t(0, '记得提醒我明天交报告', '10001', '芒果', reply='记下啦')              # private loop
         t(30, '小爱 报告我交了', '10002', '柠檬', A)                              # settles nothing in private

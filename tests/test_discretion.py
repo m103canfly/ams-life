@@ -16,6 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import discretion as d  # noqa: E402
+import memory_meta  # noqa: E402
 
 _CACHE = {}
 
@@ -514,6 +515,35 @@ class Phone(unittest.TestCase):
         self.assertNotIn('[没做完的]', prompts[1])
         self.assertNotIn('[没做完的]', prompts[3])
         self.assertNotIn('交报告', prompts[3])
+
+    def test_open_loop_questions_and_other_peoples_plans(self):
+        for text in ('你还记得那件事吗', '那句话你记得吗', '记得那件事？',
+                     '你知不知道明天的安排', '我明天要交报告'):
+            with self.subTest(text=text):
+                self.assertEqual(memory_meta.detect_open_loops(text, 100), [])
+        self.assertEqual(memory_meta.detect_open_loops('记得明天提醒我交报告', 100)[0]['due_hint'], 'tomorrow')
+
+    def test_open_loop_without_date_expires_after_three_days(self):
+        loops = memory_meta.detect_open_loops('记得帮我查资料', 100)
+        memory_meta.resolve_open_loops(loops, '', 100 + 3 * 86400)
+        self.assertEqual(loops[0]['status'], 'open')
+        memory_meta.resolve_open_loops(loops, '', 100 + 3 * 86400 + 1)
+        self.assertEqual(loops[0]['status'], 'expired')
+        old = [{'text': '旧提醒', 'status': 'open'}]
+        memory_meta.resolve_open_loops(old, '', 100)
+        memory_meta.resolve_open_loops(old, '', 100 + 3 * 86400 + 1)
+        self.assertEqual(old[0]['status'], 'expired')
+
+    def test_open_loops_follow_the_speaker_and_keep_legacy_private(self):
+        r = run_case('loops_by_person')
+        self.assertEqual(r['first'][0]['origin']['people'], ['10002'])
+        prompts = [t['prompt'] for t in r['turns']]
+        self.assertNotIn('[没做完的]', prompts[1])
+        self.assertIn('[没做完的] 记得明天提醒我交报告', prompts[2])
+        self.assertEqual([x['origin']['people'] for x in r['both']], [['10002'], ['10003']])
+        self.assertEqual([x['status'] for x in r['settled']], ['open', 'canceled'])
+        self.assertNotIn('旧群提醒', prompts[5])
+        self.assertIn('[没做完的] 旧私聊提醒', prompts[6])
 
     def test_open_loop_cap_is_per_window(self):
         r = run_case('loops')

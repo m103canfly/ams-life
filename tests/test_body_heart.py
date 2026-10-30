@@ -179,7 +179,8 @@ class TellingTheMouth(unittest.TestCase):
                 if not line.startswith('[她想起来的]'):
                     for name in NAMES:
                         self.assertNotIn(name, line)
-        self.assertIn('[没做完的] 小爱，记得提醒我明天交报告', r['group'])
+        self.assertIn('[没做完的] 小爱，记得提醒我明天交报告', r['turns'][0]['prompt'])
+        self.assertNotIn('[没做完的]', r['group'])
         self.assertIn('[她想起来的] 阿星说过：', r['group'])
         for name in NAMES:  # in the private chat the group's lines come without names
             self.assertNotIn(name, r['private'])

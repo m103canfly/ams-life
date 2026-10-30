@@ -512,7 +512,13 @@ class PhoneMixin:
             source = self._event_origin(event)
             narrow = here.startswith("group:") and source["visibility"] == discretion.PRIVATE
             old_status = {id(x): x.get("status") for x in loops} if narrow else {}
-            memory_meta.resolve_open_loops(loops, text, stamp)
+            if here.startswith("group:"):
+                people = source["people"]
+                own = [x for x in loops if people and discretion.origin_of(x, here)["people"] == people]
+                memory_meta.resolve_open_loops(own, text, stamp)
+                memory_meta.resolve_open_loops(loops, "", stamp)
+            else:
+                memory_meta.resolve_open_loops(loops, text, stamp)
             if narrow:
                 for existing in loops:
                     if existing.get("status") != old_status[id(existing)]:
@@ -522,16 +528,18 @@ class PhoneMixin:
                 for existing in loops:
                     if str(existing.get("status") or "open") != "open":
                         continue
+                    if here.startswith("group:") and (not source["people"] or
+                            discretion.origin_of(existing, here)["people"] != source["people"]):
+                        continue
                     if memory_meta.text_similarity(
                             existing.get("text", ""), new_loop.get("text", "")) >= memory_meta.OPEN_LOOP_MERGE_SIMILARITY:
                         existing["last_mentioned_ts"] = stamp
                         existing["mentioned"] = int(existing.get("mentioned", 1) or 1) + 1
-                        if narrow:
-                            existing["origin"] = discretion.merge([discretion.origin_of(existing, here), source])
+                        existing["origin"] = discretion.merge([discretion.origin_of(existing, here), source])
                         merged = True
                         break
                 if not merged:
-                    new_loop["origin"] = self._event_origin(event)
+                    new_loop["origin"] = source
                     loops.append(new_loop)
             loops = loops[-int(memory_meta.OPEN_LOOP_MAX):]
             if json.dumps(loops, ensure_ascii=False, sort_keys=True) != before:
