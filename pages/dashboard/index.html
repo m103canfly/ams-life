@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="light dark" /><title>小爱的内心世界</title>
-<link rel="stylesheet" href="./styles.css?v=20261027-0215" />
+<link rel="stylesheet" href="./styles.css?v=20261030-1" />
 <link rel="stylesheet" href="./look.css?v=20261029-1" />
 </head>
 <body>
@@ -219,6 +219,7 @@
       <div class="panel intent-tabpanel" id="intentPanelFeeling" data-intent-tab="feeling">
         <div class="panel-head"><h3>她现在的感受</h3><span class="hint">FEELING</span></div>
         <div class="intent-row"><small>emotion / 情绪</small><b id="iEmotion">--</b></div>
+        <div class="intent-row" id="moodEventRow" hidden><small>最近什么让她心情变了</small><b id="moodEventList">--</b></div>
         <div class="intent-row"><small>compound / 复合情绪</small><b id="iCompound">--</b></div>
         <div class="intent-row"><small>spectrum / 最接近原型</small><b id="iSpectrum">--</b></div>
         <div class="intent-row"><small>novelty / 意外程度</small><b id="iNovelty">--</b></div>
@@ -597,8 +598,9 @@
         <div class="api-actions"><button type="button" class="btn mini" id="giteeSaveBtn">保存镜像</button><span class="api-note" id="giteeState">未配置</span></div>
         <p class="api-note" id="updateState">当前版本：加载中…</p>
         <p class="api-note" id="updateNote">ams-life 的更新由开发窗口装机，不要在 AstrBot 里点“更新”（会装回别的版本）。这里只看看有没有新版本。</p>
-        <a class="btn mini" id="updateOpenRepo" href="https://github.com/m103canfly/ams-life" target="_blank" rel="noopener">打开 GitHub 仓库</a>
-        <a class="btn mini" id="updateOpenGitee" href="#" target="_blank" rel="noopener" style="display:none">打开 Gitee 仓库</a>
+        <!-- ams-life: AstrBot's frame opens no new window, so these show the address to copy (repo_link.js) -->
+        <div class="api-actions"><button type="button" class="btn mini fb-skip" id="updateOpenRepo" data-repo="https://github.com/m103canfly/ams-life">GitHub 仓库地址</button><button type="button" class="btn mini fb-skip" id="updateOpenGitee" style="display:none">Gitee 仓库地址</button></div>
+        <div class="repo-addr" id="repoAddr" hidden><input type="text" id="repoAddrText" readonly aria-label="仓库地址" spellcheck="false"><button type="button" class="btn mini fb-skip" id="repoCopyBtn">复制</button><span class="api-note" id="repoCopyNote" role="status" aria-live="polite"></span></div>
         <p class="api-note about-line" id="aboutLine">小爱的身体和记忆用的是 ams-life（AGPL-3.0），基于 BioCore v1.2.99（Johnhmzm，AGPL-3.0）。源码：https://github.com/m103canfly/ams-life</p>
       </div>
       <div class="section-title mt" data-settings-title="settingsBackup"><div><div class="eyebrow">BACKUP</div><h2>核心备份</h2></div><span class="hint">含记忆/人设/API KEY</span></div>
@@ -614,6 +616,6 @@
     <footer class="statusbar"><span>她的心情是一种倾向，不是剧本。</span><span id="footTime"></span></footer>
   </main>
 </div>
-<script src="./feedback.js"></script><script src="./look.js?v=20261029-1"></script><script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script>
-<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261027-0215"></script><script src="./orb.js?v=20261027-0215"></script>
+<script src="./feedback.js"></script><script src="./look.js?v=20261029-1"></script><script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script><script src="./repo_link.js"></script>
+<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261030-1"></script><script src="./orb.js?v=20261027-0215"></script>
 </body></html>

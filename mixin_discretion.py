@@ -23,12 +23,85 @@ _FORGET_MARK = contextvars.ContextVar("ams_life_forget_mark", default=None)
 # ams-life: set when the message this job is about comes from someone (or is a message)
 # the forget registry rules out: she may still answer, but nothing of it is kept.
 _KEEP_NOTHING = contextvars.ContextVar("ams_life_keep_nothing", default=False)
+_PRIVACY_MARK = contextvars.ContextVar("ams_life_privacy_mark", default=None)
 
 _EVENT_TEXT_FIELDS = ("title", "event", "central_details", "meaning_to_her", "reflection",
                       "big_summary", "small_summary", "peripheral_details")
 
 
 class DiscretionMixin:
+    def _narrow_group_sources(self, place, source_ids):
+        """Narrow already-written derivatives of the messages preceding a request."""
+        self._slang_withdraw(source_ids=source_ids, place=place)
+        ids = {str(s) for s in source_ids if str(s or "")}
+        if not ids:
+            return
+
+        def narrow(item):
+            if not isinstance(item, dict):
+                return False
+            origin = discretion.origin_of(item, place)
+            if not discretion.is_about(origin, source_ids=ids):
+                return False
+            if origin["visibility"] == discretion.PRIVATE:
+                return False
+            origin["visibility"] = discretion.PRIVATE
+            item["origin"] = origin
+            return True
+
+        # Work already waiting for a model must not write old public copies back.
+        epochs = self.__dict__.setdefault("_privacy_epochs", {})
+        epochs[place] = epochs.get(place, 0) + 1
+        self._begin_job(place)
+        lib = self._read_library()
+        if sum(narrow(x) for x in lib.get("entries", [])):
+            self._write_library(lib)
+        paths = [EVENT_ARCHIVE_PATH, INSIGHT_ARCHIVE_PATH]
+        if EVENT_SESSION_DIR.exists():
+            paths.extend(sorted(EVENT_SESSION_DIR.glob("*/events.jsonl")))
+        for path in paths:
+            if not path.exists():
+                continue
+            lines, changed = [], False
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    lines.append(line)
+                    continue
+                if narrow(rec):
+                    line = json.dumps(rec, ensure_ascii=False)
+                    changed = True
+                lines.append(line)
+            if changed:
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+                atomic_file.replace(tmp, path)
+        changed = False
+        for key in ("narrative_items", "diary", "relationship_narratives", "notebook"):
+            for item in self.self_model.get(key) or []:
+                changed = narrow(item) or changed
+        if changed:
+            self._save_self_model()
+        win = self._read_window(place)
+        changed = False
+        for key in ("recent", "open_loops"):
+            for item in win[key]:
+                changed = narrow(item) or changed
+        if changed:
+            self._write_window(place, win)
+        # Narrow only an impression that actually names these sources.
+        store = self._impression_store()
+        data = store.load(place)
+        changed = False
+        for rec in data["people"].values():
+            if not isinstance(rec, dict):
+                continue
+            if narrow(rec):
+                changed = True
+        if changed:
+            store.save(place, data)
+
     # ------------------------------------------------------------------
     # Forget count: work that waited (for the model, the vector service)
     # holds copies from before; if anything was forgotten meanwhile, its
@@ -37,22 +110,30 @@ class DiscretionMixin:
     def _forget_count(self) -> int:
         return len(getattr(self, "_forget_log", None) or [])
 
-    def _begin_job(self) -> None:
+    def _begin_job(self, place="") -> None:
         _FORGET_MARK.set(self._forget_count())
+        _PRIVACY_MARK.set((str(place or ""), dict(getattr(self, "_privacy_epochs", {}))))
         _KEEP_NOTHING.set(False)
 
-    def _continue_job(self) -> None:
+    def _continue_job(self, place="") -> None:
         """A later step of the same message (the reply) keeps the mark its request set
         (AstrBot runs one message, request to reply, in one task); only when this
         context has none does it start one."""
         if _FORGET_MARK.get() is None:
-            self._begin_job()
+            self._begin_job(place)
 
     def _job_stale(self) -> bool:
         """True when something was forgotten since this job started, or the message it is
         about may not be kept (forget registry): do not write."""
         if _KEEP_NOTHING.get():
             return True
+        privacy_mark = _PRIVACY_MARK.get()
+        if privacy_mark is not None:
+            place, before = privacy_mark
+            epochs = getattr(self, "_privacy_epochs", {})
+            stale = before.get(place, 0) != epochs.get(place, 0) if place else before != epochs
+            if stale:
+                return True
         mark = _FORGET_MARK.get()
         if mark is None or self._forget_count() <= mark:
             return False
@@ -665,9 +746,12 @@ class DiscretionMixin:
             if lab["may"] == discretion.HIDE:
                 continue
             text = str(item.get("text") or "")
-            people = discretion.origin_of(item)["people"]
+            origin = discretion.origin_of(item)
+            people = origin["people"]
             if lab["may"] == discretion.NO:   # the last look before sending (send_check)
-                self._forbid(event, "note:" + str(item.get("id") or text[:12]), text, people)
+                self._forbid(event, "note:" + str(item.get("id") or text[:12]), text,
+                             [] if origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                             else people)
             elif lab["may"] == discretion.ANON:
                 self._forbid_names(event, "note:" + str(item.get("id") or text[:12]), people)
             if text:
@@ -703,6 +787,18 @@ class DiscretionMixin:
             return user_data
         sid, _name = self._speaker(event)
         if self._here(event) == "private:" + str(sid or ""):
+            # Old relationship text has no origin. If it could have been drawn
+            # from a group-private message, do not show those text fields here.
+            items = list(self._read_library(vectors=False).get("entries") or [])
+            for place in self._window_places():
+                if place.startswith("group:"):
+                    items.extend(self._read_window(place)["recent"])
+            restricted = any(discretion.origin_of(x)["where"].startswith("group:")
+                             and discretion.origin_of(x)["visibility"] == discretion.PRIVATE
+                             and str(sid) in discretion.origin_of(x)["people"] for x in items)
+            rel = user_data.get("relationship")
+            if restricted and isinstance(rel, dict):
+                return dict(user_data, relationship=dict(rel, we_memory=[], transactive_map={}))
             return user_data
         rel = user_data.get("relationship")
         if not isinstance(rel, dict) or not rel.get("we_memory"):
@@ -728,6 +824,8 @@ class DiscretionMixin:
         """
         person = str(person or "").strip()
         ids = [str(x) for x in (source_ids or []) if str(x or "").strip()]
+        self._group_forget_queue(person, ids)
+        self._forget_recent_images(person, ids)
         entry_ids = {str(x) for x in (entry_ids or []) if str(x or "").strip()}
         if not person and not ids and not entry_ids:
             return {}
@@ -1049,6 +1147,11 @@ class DiscretionMixin:
             return 0
         cache = self._load_image_cache()
         gone = stickers.prune_cache(cache, time.time(), gone_people=[person])
+        shared = [k for k, v in cache.items() if k.startswith("content:") and isinstance(v, dict)
+                  and str(person) in (v.get("from_qqs") or [])]
+        for k in shared:
+            cache.pop(k, None)
+        gone += len(shared)
         if gone:
             IMAGE_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
         return gone
@@ -1087,6 +1190,7 @@ class DiscretionMixin:
         reg.owner_delete(person=person)
         reg.remember_names(person, names)
         counts = self._forget(person=person)
+        self._slang_withdraw(person=person)
         # what others said of him, wherever she keeps it: 某人, now (not at the next restart,
         # and with no copy made first)
         counts["named"] = self._remove_gone_everywhere(keep_copies=False)
@@ -1103,6 +1207,7 @@ class DiscretionMixin:
         o = discretion.origin_of(target)
         if o["source_ids"]:
             self._registry().owner_delete(source_ids=o["source_ids"], place=o["where"] or forget_registry.EVERYWHERE)
+        self._slang_withdraw(source_ids=o["source_ids"])
         return self._forget(source_ids=o["source_ids"], entry_ids=[entry_id])
 
     def _place_umos(self) -> dict:
@@ -1114,17 +1219,29 @@ class DiscretionMixin:
                 out[place] = umo
         return out
 
-    async def _forget_in_astrbot(self, person, umos) -> dict:
+    async def _forget_in_astrbot(self, person, umos, group_places) -> dict:
         """What AstrBot itself keeps of a deleted person, through its public interfaces:
         the conversation of his private chat, and his rows in the platform message
         history (off by default). `umos`: place -> AstrBot's chat id, taken before the
-        phone was cleared. The group context buffer has no public interface and is not
-        touched (it holds at most the last messages of each group, in memory)."""
-        out = {"conversations": 0, "message_history": 0}
+        phone was cleared. Clear only the current conversation history in matching groups."""
+        out = {"conversations": 0, "message_history": 0, "group_contexts": 0}
         person = str(person or "").strip()
         if not person:
             return out
         conv = getattr(self.context, "conversation_manager", None)
+        failed = False
+        for umo in sorted({umos[p] for p in group_places if p in umos}):
+            try:
+                if conv is None:
+                    raise AttributeError("conversation manager unavailable")
+                cid = await conv.get_curr_conversation_id(umo)
+                if cid:
+                    await conv.update_conversation(umo, cid, history=[])
+                    out["group_contexts"] += 1
+            except Exception:
+                failed = True
+        if failed:
+            logger.warning("[ams-life] astrbot group context clear failed")
         for umo in [u for p, u in sorted(umos.items()) if p == "private:" + person]:
             try:
                 if conv is not None:

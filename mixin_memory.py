@@ -398,7 +398,7 @@ class MemoryMixin:
                 if not isinstance(e, dict) or e.get("shared_from_session"):
                     continue
                 o = discretion.origin_of(e, here)
-                e["origin"] = discretion.make_origin(here, o["people"], o["source_ids"])
+                e["origin"] = discretion.make_origin(here, o["people"], o["source_ids"], o["visibility"])
                 lib["entries"].append(e)
             lib["rooms"][here] = {k: v for k, v in d.items() if k not in ("entries", "schema_version")}
         self._write_library(lib)
@@ -782,7 +782,7 @@ class MemoryMixin:
         try:
             # ams-life: forgetting may happen while this waits for the model; if
             # it does, the copy held here is stale and must not be saved back.
-            self._begin_job()
+            self._begin_job(self._here(event))
             doc = self._load_memory(event)
             entries = doc.get("entries")
             if not isinstance(entries, list) or len(entries) < 2:
@@ -1435,7 +1435,8 @@ class MemoryMixin:
             duplicate["origin"] = discretion.make_origin(
                 _old_origin["where"] or _here, list(_old_origin["people"]) + [_sid],
                 list(_old_origin["source_ids"]) + list(duplicate["provenance"].get("message_refs") or []),
-                _old_origin["visibility"])
+                discretion.PRIVATE if self._event_origin(event)["visibility"] == discretion.PRIVATE
+                else _old_origin["visibility"])
             duplicate["last_write_ts"] = now
             self._apply_memory_encoding(duplicate, core, now, text)
             if _write_op != "NOOP":
@@ -1452,7 +1453,7 @@ class MemoryMixin:
                           "image_caption": str(extra or "").strip()[:1600],
                           "voice_text": str(voice or "").strip()[:1200],
                           "provenance": self._memory_provenance(event, now),
-                          "origin": discretion.make_origin(_here, [_sid], self._source_ids(event)),
+                          "origin": self._event_origin(event),
                           "importance": _importance,
                           "memory_source": _source,
                           "memory_confidence": memory_meta.initial_confidence(_source, _importance),
@@ -1859,7 +1860,9 @@ class MemoryMixin:
                 n_no += 1
                 held.append((score, str(entry.get("id") or "")))
                 # the last look before sending (send_check): its words and who it is about
-                self._forbid(event, "memory:" + str(entry.get("id") or ""), text, people, entry.get("vector"))
+                group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                self._forbid(event, "memory:" + str(entry.get("id") or ""), text,
+                             [] if group_private else people, entry.get("vector"))
             elif lab["may"] == discretion.ANON:
                 self._forbid_names(event, "memory:" + str(entry.get("id") or ""), people)
             if lab.get("asked") == discretion.NO and isinstance(entry.get("asked_in"), dict):
@@ -1916,6 +1919,9 @@ class MemoryMixin:
             except Exception:
                 _window = 0.0
             if _window > now and _cos >= 0.80:
+                _origin = self._event_origin(event)
+                if _origin["where"].startswith("group:") and _origin["visibility"] == discretion.PRIVATE:
+                    e["origin"] = discretion.merge([discretion.origin_of(e, self._here(event)), _origin])
                 _old_text = str(e.get("text", ""))
                 e["text"] = (_old_text + "\n[再巩固] " + text)[:1200]
                 try:
@@ -1930,6 +1936,9 @@ class MemoryMixin:
                 self._save_memory(event, doc)
                 return
             if _cos >= 0.93:
+                _origin = self._event_origin(event)
+                if _origin["where"].startswith("group:") and _origin["visibility"] == discretion.PRIVATE:
+                    e["origin"] = discretion.merge([discretion.origin_of(e, self._here(event)), _origin])
                 e["ts"] = now
                 e["last_used"] = now
                 e["hits"] = int(e.get("hits", 0)) + 1
@@ -1953,9 +1962,7 @@ class MemoryMixin:
                         "provenance": _prov,
                         # her reply belongs to the place, to the person she answered and to
                         # the message she answered: deleting that message deletes her reply too
-                        "origin": discretion.make_origin(
-                            self._here(event), [_sid],
-                            _prov.get("message_refs") if role == "user" else self._source_ids(event)),
+                        "origin": self._event_origin(event),
                         "importance": self._memory_importance(core, role),
                         "last_used": now, "next_review_ts": now + 86400, "review_count": 0})
         self._apply_memory_encoding(entries[-1], core, now, text)

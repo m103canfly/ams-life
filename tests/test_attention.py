@@ -43,6 +43,20 @@ class Called(unittest.TestCase):
         self.assertEqual(at.called(False, False, '10001', now=now), '')
 
 
+class MoodAttention(unittest.TestCase):
+    def test_mood_threshold_and_wait_follow_state(self):
+        self.assertLess(at.mood_threshold('normal', 0.8, 0.8), at.threshold('normal'))
+        self.assertGreater(at.mood_threshold('normal', -0.8, 0.2), at.threshold('normal'))
+        self.assertLess(at.mood_wait(6, 0.8, 0.8), 6)
+        self.assertGreater(at.mood_wait(6, -0.8, 0.2), 6)
+
+    def test_mood_adjustments_are_bounded(self):
+        for valence in (-10, 0, 10):
+            for energy in (-10, 0, 10):
+                self.assertTrue(0.20 <= at.mood_threshold('normal', valence, energy) <= 0.75)
+                self.assertTrue(1.0 <= at.mood_wait(6, valence, energy) <= 10.0)
+
+
 class HerName(unittest.TestCase):
     def test_her_name_as_a_call(self):
         for t in ('小爱，在吗', '小爱 你看这个', '好吧 小爱', '小爱你好', '小爱', '爱弥斯？', '@小爱 来'):
@@ -138,12 +152,20 @@ class WhatSheSends(unittest.TestCase):
 
     def test_split_at_most_five(self):
         self.assertEqual(at.split('一\n【下一条】\n二'), ['一', '二'])
-        self.assertEqual(at.split('嗯【不说】'), ['嗯'])                 # 【不说】 inside is never sent
-        self.assertEqual(at.split('一\n【下一条】\n【不说】'), ['一'])
+        self.assertEqual(at.split('嗯【不说】'), ['嗯【不说】'])
         seven = '【下一条】'.join(str(i) for i in range(7))
         parts = at.split(seven)
         self.assertEqual(len(parts), 5)
-        self.assertEqual(parts[-1], '4\n5\n6')       # the rest goes into the last
+        self.assertEqual(parts[-1], '4 5 6')
+
+    def test_newlines_lists_and_code_blocks(self):
+        self.assertEqual(at.split('a\n\nb\nc\nd\ne\nf'), ['a', 'b', 'c', 'd', 'e f'])
+        self.assertEqual(at.split('a\n- one\n- two\nb\n```\nx\ny\n```\nc'),
+                         ['a', '- one\n- two', 'b', '```\nx\ny\n```', 'c'])
+
+    def test_faces_stay_in_their_piece(self):
+        parts = at.split('one\ntwo[表情:微笑]')
+        self.assertEqual(at.pieces(parts[1]), [('text', 'two'), ('face', 14)])
 
     def test_faces(self):
         self.assertEqual(at.pieces('好呀[表情:微笑]'), [('text', '好呀'), ('face', 14)])
@@ -153,16 +175,65 @@ class WhatSheSends(unittest.TestCase):
     def test_typing_pause(self):
         self.assertEqual(at.typing_seconds(''), 1.0)
         self.assertEqual(at.typing_seconds('字' * 200), 3.0)
+        for length in (1, 30, 60, 100):
+            self.assertTrue(1.0 <= at.typing_seconds('字' * length) <= 3.0)
 
     def test_choices_are_told_not_ordered(self):
         self.assertIn('【不说】', at.CHOICES_NOTE)
-        self.assertIn('【下一条】', at.CHOICES_NOTE)
-        self.assertIn('最多5条', at.CHOICES_NOTE)
+        self.assertNotIn('【下一条】', at.CHOICES_NOTE)
+        self.assertIn('最多 5 条', at.PIECES_NOTE)
 
 
 
 class InThePlugin(unittest.TestCase):
     """attention_cases.py: the plugin with self_decide on (a fake model, made-up people)."""
+
+    def test_pieces_without_self_decide_and_switch_off(self):
+        r = run_case('pieces')
+        self.assertEqual(r['on']['chain'], [['Plain', 'one']])
+        self.assertEqual([s['chain'] for s in r['sent']],
+                         [[['Plain', 'two'], ['Face', 14]], [['Plain', 'three']]])
+        self.assertEqual(r['off']['text'], 'one\ntwo')
+        self.assertEqual(r['off']['chain'], [])
+        self.assertEqual(r['phone'], ['one\ntwo[表情:微笑]\nthree', 'one\ntwo'])
+
+    def test_pieces_stop_after_send_failure(self):
+        self.assertEqual(run_case('pieces')['failed_calls'], ['second'])
+
+    def test_split_reply_is_one_complete_astrbot_history_entry(self):
+        self.assertEqual(run_case('pieces_contract')['history'], [['text', 'first\nsecond\nthird']])
+
+    def test_sticker_follows_its_own_piece(self):
+        r = run_case('pieces_contract')
+        self.assertEqual(r['sticker_first'], [['Plain', 'first']])
+        self.assertEqual(r['sticker_order'], [['text', [['Plain', 'second']]], ['sticker', 'fake'],
+                                               ['text', [['Plain', 'third']]]])
+
+    def test_failed_sticker_does_not_stop_later_words(self):
+        r = run_case('pieces_contract')
+        self.assertEqual(r['failed_sticker_first'], [['Plain', 'first']])
+        self.assertEqual(r['failed_sticker_order'], [['text', [['Plain', 'second']]],
+                                                     ['sticker_failed', 'fake'],
+                                                     ['text', [['Plain', 'third']]]])
+
+    def test_voice_waits_until_all_reply_pieces_are_sent(self):
+        r = run_case('pieces_voice')
+        self.assertEqual(r['before_release'], [['text', 'first']])
+        self.assertEqual(r['order'], [['text', 'first'], ['text', 'second'], ['text', 'third'],
+                                      ['delay', 1.5], ['voice', 'Record']])
+
+    def test_send_check_and_silence_hold_the_entire_reply(self):
+        self.assertEqual(run_case('pieces_contract')['held'], [True, True, []])
+
+    def test_group_quote_and_at_only_on_first_piece(self):
+        r = run_case('pieces_contract')
+        self.assertEqual([c[0] for c in r['first']], ['Reply', 'At', 'Plain'])
+        self.assertEqual(r['rest'], [['text', [['Plain', 'second']]], ['text', [['Plain', 'third']]]])
+
+    def test_first_piece_has_no_pause_later_pieces_wait(self):
+        delays = run_case('pieces_contract')['delays']
+        self.assertEqual(len(delays), 2)
+        self.assertTrue(all(1 <= delay <= 3 for delay in delays))
 
     def test_called_astrbot_answers_as_before(self):
         r = run_case('called_at')['r']

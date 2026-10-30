@@ -30,6 +30,14 @@ def run_case(case):
 
 
 class Offered(unittest.TestCase):
+    def test_offers_are_not_saved_in_five_turns(self):
+        turns = run_case('history')['turns']
+        self.assertEqual(len(turns), 5)
+        for turn in turns:
+            self.assertTrue(turn['offer_in_prompt'])
+            self.assertIn('[她的表情包]', str(turn['model_parts']))
+            self.assertNotIn('[她的表情包]', str(turn['kept_parts']))
+
     def test_a_few_offered_she_names_one_it_goes_as_a_sticker(self):
         r = run_case('reply')
         n = r['named']
@@ -85,23 +93,95 @@ class Offered(unittest.TestCase):
         self.assertEqual(r['calls'], 0)                                # no call_action
         self.assertEqual(r['sent'], [])                                # and no plain picture either
 
+    def test_a_missing_sticker_does_not_hold_back_words(self):
+        r = run_case('missing')
+        self.assertFalse(r['r']['stopped'])
+        self.assertEqual(r['r']['chain'], [['Plain', 'one']])
+        self.assertFalse(r['r']['sent_flag'])
+        self.assertEqual(r['calls'], 0)
+        self.assertEqual([s['chain'] for s in r['sent']],
+                         [[['Plain', 'two', '']], [['Plain', 'three', '']]])
+
 
 class Looked(unittest.TestCase):
-    def test_qq_stickers_in_passing_one_look_each_kept_by_the_program(self):
+    def test_called_reply_opens_queue_without_waiting(self):
+        r = run_case('called_open')
+        self.assertEqual(r['before'], 0)
+        self.assertEqual(r['after'], 3)
+
+    def test_scored_reply_opens_queue_without_waiting(self):
+        r = run_case('scored_open')
+        self.assertTrue(r['asked'])
+        self.assertEqual(r['before'], 0)
+        self.assertEqual(r['after'], 3)
+
+    def test_qq_stickers_wait_for_open_then_are_kept_by_the_program(self):
         r = run_case('look')
+        self.assertEqual(r['looks_before_open'], 0)
         self.assertEqual(len(r['looks']), 3)                          # at most three a message
-        self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png'])   # only the one she keeps
+        self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png', 'https://gchat.qpic.cn/a.png',
+                                        'https://gchat.qpic.cn/b.png', 'https://gchat.qpic.cn/c.png'])
+        self.assertEqual(len(r['content_cache']), 3)
         self.assertEqual(r['kept'], [['一只在笑的猫', '10001', 'group:900001', 'self']])
         # every look is noted with who sent it and where (deleting him deletes it)
         self.assertEqual(r['cache'], [['一只在笑的猫', '10001', 'group:900001'], ['一张证件照', '10001', 'group:900001'],
                                       ['写着群友名字的图', '10001', 'group:900001']])
         self.assertEqual(r['looks_after'], 3)                         # the same picture: no second look
-        self.assertEqual(r['spend_kinds'], ['calls', 'vision'])       # in the day's money, once
+        self.assertEqual(r['spend_kinds'], ['calls', 'vision', 'vision_calls'])       # in the day's money, once
 
     def test_someone_deleted_is_not_looked_at(self):
         r = run_case('look')
+        self.assertFalse(r['queue_has_deleted'])
         self.assertEqual(r['kept_after_gone'], 1)
         self.assertEqual(r['looks_after_gone'], 3)
+
+
+class ImageInput(unittest.TestCase):
+    def test_text_file_is_not_sent_and_reply_continues(self):
+        r = run_case('non_image_reply')
+        self.assertEqual(r['vision_calls'], 0)
+        self.assertEqual(r['text'], 'okay')
+
+
+class VisionStatus(unittest.TestCase):
+    def test_vision_shown_only_after_a_look_today(self):
+        r = run_case('vision_status')
+        self.assertFalse(r['off_empty'])
+        self.assertFalse(r['on_empty'])
+        self.assertEqual(r['on_used']['calls'], 1)
+        self.assertEqual(r['on_used']['reply'], 1)
+        self.assertEqual(r['off_used'], r['on_used'])
+
+
+class VisionCounting(unittest.TestCase):
+    def test_each_vision_source_and_phone_selfie_are_shown(self):
+        r = run_case('vision_sources')
+        self.assertEqual([r['after_reply'][k] for k in ('reply', 'browse', 'owner_add')], [1, 0, 0])
+        self.assertEqual([r['after_browse'][k] for k in ('reply', 'browse', 'owner_add')], [1, 1, 0])
+        self.assertEqual([r['after_owner_add'][k] for k in ('reply', 'browse', 'owner_add')], [1, 1, 1])
+        self.assertEqual(r['after_owner_add']['calls'], 3)
+        self.assertEqual(r['gift'], 'ok')
+        self.assertEqual(r['phone_before'], 0)
+        self.assertEqual(r['phone_after'], 1)
+        self.assertEqual(r['calls'], 3)
+        self.assertEqual(set(r['vision_record']), {'reply', 'browse', 'owner_add', 'last'})
+        self.assertGreater(r['vision_record']['last'], 0)
+
+    def test_three_paths_count_without_stopping_for_both_provider_types(self):
+        for case in ('count_astrbot', 'count_api'):
+            with self.subTest(provider=case):
+                r = run_case(case)
+                self.assertEqual(r['marks'], {'31': 31, '100': 100})
+                self.assertEqual(r['calls'], 102)
+                self.assertEqual(r['last_gift'], {'status': 'ok', 'labelled': True})
+                self.assertEqual(r['panel']['calls'], 102)
+                self.assertEqual([r['panel'][k] for k in ('reply', 'browse', 'owner_add')], [34, 34, 34])
+                self.assertEqual(r['panel_without_decide'], r['panel'])
+                self.assertEqual(r['spent'], 0)
+                self.assertFalse(r['panel_next_day'])
+                self.assertEqual(r['calls_next_day'], 103)
+                self.assertEqual(r['panel_after_next']['calls'], 1)
+                self.assertEqual(r['panel_after_next']['reply'], 1)
 
 
 class OwnersPage(unittest.TestCase):

@@ -15,6 +15,14 @@ try:
     from . import digest
 except ImportError:
     import digest
+try:
+    from .mixin_phone import _phone_line
+except ImportError:
+    from mixin_phone import _phone_line
+try:
+    from .vision import ImageAPI, VisionGate
+except ImportError:
+    from vision import ImageAPI, VisionGate
 
 
 def _counted(plugin, kind, provider):
@@ -324,11 +332,13 @@ class LLMMixin:
         if not self._llm_allowed("tom_probe") or not self._llm_v2_cooldown_ok("tom_probe"):
             return
         try:
-            recent = [str(h.get("text") or "") for h in self._window_lines(event, 6)]
+            recent = [self._for_model(_phone_line(self, event,
+                      dict(h, text=interpretation._hint(h.get("text"), 100))), event)
+                      for h in self._window_lines(event, 6)]
             refs = [str(x) for x in (memory_entries or []) if str(x)][:6]
             proposal = await self._llm_v2_call(
                 "tom_probe",
-                interpretation.tom_prompt(user_data, recent, memory_lines=refs),
+                interpretation.tom_prompt(user_data, recent, memory_lines=refs, recent_limit=200),
                 lambda raw: interpretation.parse_tom_update(raw, allowed_refs=refs),
                 event)
             if not proposal:
@@ -622,9 +632,17 @@ class LLMMixin:
             _used = set(parsed["evidence_refs"] or [])
             _sources = [s for m in marks if str(m.get("key") or m.get("type") or "") in _used
                         for s in (m.get("source_ids") or [])]
+            _source_origins = [discretion.origin_of(x) for x in self._read_window(self._here(event))["recent"]
+                               if discretion.is_about(discretion.origin_of(x), source_ids=_sources)]
+            _source_origins += [discretion.origin_of(x) for x in self._read_library().get("entries", [])
+                                if discretion.is_about(discretion.origin_of(x), source_ids=_sources)]
+            _source_origins += [discretion.origin_of(x) for x in self._event_archive(1000)
+                                if discretion.is_about(discretion.origin_of(x), source_ids=_sources)]
+            _visibility = (discretion.PRIVATE if any(o["visibility"] == discretion.PRIVATE
+                                                     for o in _source_origins) else None)
             items.append({"ts": time.time(), "text": parsed["narrative"],
                           "evidence_refs": parsed["evidence_refs"],
-                          "origin": discretion.make_origin(self._here(event), [_sid], _sources)})
+                          "origin": discretion.make_origin(self._here(event), [_sid], _sources, _visibility)})
             self.self_model["relationship_narratives"] = items[-5:]
             self._save_self_model()
             self._llm_v2_mark("relationship_narrative")
@@ -632,21 +650,21 @@ class LLMMixin:
             logger.warning("[biocore] relationship narrative failed: %s", exc)
 
     def _sees_images(self, provider) -> bool:
-        """Can this provider look at pictures? What AstrBot's config says it takes (modalities:
-        "image"; deepseek-flash, the owner's choice of 10-29, takes them); a provider whose config
-        says nothing is guessed by its name, as before (_provider_kind)."""
+        """Check configured modalities, or guess by name when they are absent."""
         cfg = getattr(provider, "provider_config", None)
         mods = cfg.get("modalities") if isinstance(cfg, dict) else None
         if isinstance(mods, (list, tuple)):
             return "image" in [str(m).strip().lower() for m in mods]
         return self._provider_kind(provider) == "vision"
 
-    def _vision_provider_for(self, event=None):
-        """Resolve the vision provider for image caption (never a model that cannot see): the
-        one set for the function, else AstrBot's default image provider, else the chat model
-        when it sees images (the owner, 10-29: "用deepseek-flash", the one she talks with)."""
+    def _vision_provider_for(self, event=None, source="reply"):
+        """Use the selected vision provider, then AstrBot defaults, then capable chat."""
         _cfg = self._function_cfg("image_caption")
         _override = _cfg["provider"]
+        if _override == "image_api":
+            if not str((getattr(self, "config", {}) or {}).get("vision_image_api_model") or "").strip():
+                return None
+            return VisionGate(self, _counted(self, "vision", ImageAPI(self)), event, source)
         _tried = []
         if _override and _override not in ("follow_llm", "main", "default", ""):
             _tried.append(_override)
@@ -665,7 +683,7 @@ class LLMMixin:
                 logger.warning("[biocore] vision provider lookup failed (%s): %s", _pid, exc)
                 continue
             if _vp is not None and self._sees_images(_vp):
-                return _counted(self, "vision", _vp)
+                return VisionGate(self, _counted(self, "vision", _vp), event, source) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _vp)
             if _vp is not None:
                 logger.warning("[biocore] image_caption provider %s is not a vision provider; ignored", _pid)
         try:
@@ -674,7 +692,7 @@ class LLMMixin:
         except Exception:
             _chat = None
         if _chat is not None and self._sees_images(_chat):
-            return _counted(self, "vision", _chat)
+            return VisionGate(self, _counted(self, "vision", _chat), event, source) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _chat)
         return None
 
     async def _compile_profile(self, event):

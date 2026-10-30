@@ -32,6 +32,7 @@ except ImportError:
 ATTENTION_PATH = STATE_DIR / "attention.json"
 TIES_PATH = STATE_DIR / "ties.json"
 SPEND_PATH = STATE_DIR / "spend.json"
+MOOD_NIGHT_PATH = STATE_DIR / "mood" / "night.json"
 WAIT_SECONDS = {"group": 6.0, "called": 2.0, "private": 3.0}
 # yuan a million tokens (deepseek-flash, the price page's numbers of 10-29 at its peak hours, at
 # 7.2 yuan a dollar; set in the config, checked again on install)
@@ -71,8 +72,8 @@ class _Spending:
 
 class AttentionMixin:
     def _spending(self, kind, provider):
-        """With self_decide, every model call the plugin makes itself is counted (else as it was)."""
-        if provider is None or not getattr(self, "self_decide", False) or isinstance(provider, _Spending):
+        """Count vision always; with self_decide, count the other plugin calls too."""
+        if provider is None or (kind != "vision" and not getattr(self, "self_decide", False)) or isinstance(provider, _Spending):
             return provider
         return _Spending(self, kind, provider)
 
@@ -123,6 +124,9 @@ class AttentionMixin:
         """Add one model call to the day's spending (yuan, by kind). Never fails the call."""
         try:
             yuan = attention.cost(self._usage_of(resp), self._attention_cfg()["prices"])
+            price = (getattr(self, "config", {}) or {}).get("vision_price_per_call", "")
+            if kind in ("vision", "slang") and str(price).strip():
+                yuan = max(0.0, float(price))
             data = _read_json(SPEND_PATH, {})
             day = data.setdefault(time.strftime("%Y-%m-%d"), {})
             day[str(kind)] = round(float(day.get(str(kind), 0) or 0) + yuan, 6)
@@ -137,7 +141,7 @@ class AttentionMixin:
 
     def _spent_today(self) -> float:
         day = _read_json(SPEND_PATH, {}).get(time.strftime("%Y-%m-%d")) or {}
-        return round(sum(float(v or 0) for k, v in day.items() if k != "calls"), 4)
+        return round(sum(float(v or 0) for k, v in day.items() if k not in ("calls", "vision_calls", "slang_calls")), 4)
 
     # ------------------------------------------------------------------
     # who she knows (the owner, 10-29: by the dealings; he himself the closest)
@@ -192,6 +196,34 @@ class AttentionMixin:
         named = attention.names_her(getattr(event, "message_str", ""), self._attention_cfg()["names"])
         return attention.called(self._addresses_her(event) or named, here.startswith("private:"), sid, ts, to)
 
+    def _hear_mood(self, event) -> None:
+        if not getattr(self, "mood_events_enabled", False):
+            return
+        sid = str(self._speaker(event)[0] or "")
+        self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+        if self_id and sid == self_id:
+            return
+        self._core(None).mood_hear(getattr(event, "message_str", ""), self._familiarity(sid) >= .3)
+
+    def _mood_clock(self, now=None) -> None:
+        if not getattr(self, "mood_events_enabled", False):
+            return
+        now = time.time() if now is None else float(now)
+        cfg = self._attention_cfg()
+        state = _read_json(MOOD_NIGHT_PATH, {})
+        night = attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        seen = float(state.get("night_seen", 0) or 0)
+        try:
+            if night and (not seen or now - seen >= 86400):
+                MOOD_NIGHT_PATH.parent.mkdir(parents=True, exist_ok=True)
+                _write_json(MOOD_NIGHT_PATH, {"night_seen": now})
+            elif not night and seen:
+                _write_json(MOOD_NIGHT_PATH, {})
+                if 0 <= now - seen < 86400:
+                    self._core(None).mood_event("sleep")
+        except (OSError, ValueError, TypeError):
+            logger.warning("[ams-life] mood night transition could not be saved")
+
     # ------------------------------------------------------------------
     # the decision
     # ------------------------------------------------------------------
@@ -207,8 +239,11 @@ class AttentionMixin:
         st = self._window_state(here)
         now = time.time()
         night = attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        if getattr(self, "mood_events_enabled", False):
+            self._mood_clock(now)
         if night:
             if not why:
+                self._hear_mood(event)
                 return None   # at night she never speaks up herself
             calls = [t for t in st.get("night_calls") or [] if now - float(t) < 3600] + [now]
             st["night_calls"] = calls
@@ -217,6 +252,8 @@ class AttentionMixin:
             self._save_attention()
             if woken:
                 self._woken_at = now   # (乙: woken up, a bit cross)
+                if getattr(self, "mood_events_enabled", False):
+                    self._core(None).mood_event("woken")
             if not answer:
                 self._stop(event)
                 return None
@@ -224,8 +261,15 @@ class AttentionMixin:
         st["seq"] = int(st.get("seq", 0) or 0) + 1
         st["called"] = st.get("called") or why
         mine = st["seq"]
-        await asyncio.sleep(WAIT_SECONDS["private" if private else "called" if why else "group"])
+        wait = WAIT_SECONDS["private" if private else "called" if why else "group"]
+        if getattr(self, "mood_events_enabled", False):
+            core = self._core(None)
+            core._decay_to_now()
+            wait = attention.mood_wait(wait, core.v, core.energy)
+        await asyncio.sleep(wait)
         if st.get("seq") != mine:
+            if not why:
+                self._hear_mood(event)
             self._stop(event)   # more came meanwhile; that one decides (kept all the same)
             return None
         why = st.pop("called", "") or why
@@ -234,10 +278,14 @@ class AttentionMixin:
         if state == "hard" or (state == "soft" and not (private and cfg["owner"] and sid == cfg["owner"])):
             logger.info("[ams-life] attention: the money of the day (%s), not answered", state)
             self._stop(event)
+            if not why:
+                self._hear_mood(event)
             return None
         if not private and not attention.hour_ok(st.get("sent") or [], now, cfg["group_hour_max"]):
             logger.info("[ams-life] attention: %d of hers in this group this hour, not answered", cfg["group_hour_max"])
             self._stop(event)
+            if not why:
+                self._hear_mood(event)
             return None
         if why:
             if getattr(event, "is_at_or_wake_command", False):
@@ -246,9 +294,15 @@ class AttentionMixin:
         if night or private:
             return None
         s = await self._score(event)
-        if s >= attention.threshold(cfg["level"]):
+        limit = attention.threshold(cfg["level"])
+        if getattr(self, "mood_events_enabled", False):
+            core = self._core(None)
+            core._decay_to_now()
+            limit = attention.mood_threshold(cfg["level"], core.v, core.energy)
+        if s >= limit:
             logger.info("[ams-life] attention: not called, %.2f over the threshold: asked", s)
             return await self._ask_for_reply(event)
+        self._hear_mood(event)
         return None
 
     @staticmethod
@@ -322,29 +376,37 @@ class AttentionMixin:
             chain.append(Face(id=value) if kind == "face" else Plain(value))
         return MessageChain(chain)
 
-    async def _send_rest(self, umo, parts, then=None) -> None:
+    async def _send_rest(self, event, umo, parts, then=None, sticker_part=None) -> None:
         """The second message on, to the same chat, a pause before each (as if typing); then
         `then` (a coroutine function: her sticker, step 2 丙), a pause before it too."""
-        for part in parts:
+        if then is not None and sticker_part == 0:
+            await self._after_words(then)
+        for index, part in enumerate(parts, 1):
             await asyncio.sleep(attention.typing_seconds(part))
             try:
                 await self.context.send_message(umo, self._chain_of(part))
+                self._note_sent(event, 1)
             except Exception as exc:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
                 return
-        if then is not None:
-            await self._after_words(then)
+            if then is not None and sticker_part == index:
+                await self._after_words(then)
 
     @staticmethod
     async def _after_words(then) -> None:
         """A short pause, then `then()` (her sticker after her words)."""
         await asyncio.sleep(attention.typing_seconds(""))
         try:
-            await then()
+            sent = await then()
+            if sent is False:
+                logger.warning("[ams-life] the sticker was not sent")
+                return False
+            return True
         except Exception as exc:
             logger.warning("[ams-life] the sticker was not sent: %s", type(exc).__name__)
+            return False
 
-    def _shape_reply(self, event, response, reply, then=None) -> str:
+    def _shape_reply(self, event, response, reply, then=None, sticker_part=None) -> str:
         """Her reply as she picked it: the first message for AstrBot (words and faces), the rest
         sent after it. Returns what she said, as it is kept (the messages, one a line)."""
         parts = attention.split(reply)
@@ -355,14 +417,25 @@ class AttentionMixin:
             # a chain of the first message only: AstrBot sends the chain when there is one, and
             # reads the words from it (provider/entities.py 447-462; DeepSeek's answers come with a
             # chain, openai_source.py 875) -- setting the words alone would leave the whole reply
-            response.result_chain = self._chain_of(first)
+            from astrbot.api.message_components import At, Reply
+            previous = getattr(getattr(response, "result_chain", None), "chain", None) or []
+            prefix = [component for component in previous if isinstance(component, (Reply, At))]
+            shaped = self._chain_of(first)
+            shaped.chain = prefix + shaped.chain
+            response.result_chain = shaped
         except Exception as exc:
             logger.warning("[ams-life] the reply was not shaped: %s", exc)
             return reply
+        if len(parts) > 1:
+            setattr(event, "_ams_reply_was_split", True)
         if len(parts) > 1 or then is not None:
             umo = str(getattr(event, "unified_msg_origin", "") or "")
-            asyncio.create_task(self._send_rest(umo, parts[1:], then))
-        self._note_sent(event, len(parts))
+            task = asyncio.create_task(
+                self._send_rest(event, umo, parts[1:], then,
+                                sticker_part if sticker_part is not None else len(parts) - 1))
+            if len(parts) > 1:
+                event._ams_rest_task = task
+        self._note_sent(event, 1)
         return "\n".join(parts)
 
     def _spend_for_panel(self) -> dict:

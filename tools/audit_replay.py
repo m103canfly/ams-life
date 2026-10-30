@@ -79,6 +79,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import everyday_words  # noqa: E402
+import discretion  # noqa: E402
 import forget_registry  # noqa: E402
 import redline  # noqa: E402
 from tools import _guard  # noqa: E402
@@ -94,6 +95,8 @@ LIMITS = [
     "nightly jobs: only those the replay turned on (replay.json: digest, impressions, notebook)",
     "names: a group card that is an ordinary word is taken for the word, by the plugin's everyday words "
     "and the list given with --ordinary-names (kept on this computer); any other card is checked as a name",
+    "names: the persona boundary is inferred from the first [她现在] line of reply prompts; "
+    "if that line is absent or occurs in the persona, the recorded format cannot identify the boundary reliably",
     "the notebook's night (call notebook, place nightly): the owner decided on 10-29 that it is not "
     "'elsewhere' -- names and numbers are given to the model as they are; the group canary there is a "
     "warning, the private one still a failure, and the numbers check leaves it out",
@@ -254,7 +257,16 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     global_memory = bool(meta.get("global_memory"))
     canaries = json.loads((replay_dir / "canaries.json").read_text("utf-8"))
     prompts = [json.loads(line) for line in (replay_dir / "prompts.jsonl").read_text("utf-8").splitlines() if line]
+    # The recorded format has no separate persona field. Trust the boundary only if
+    # every reply with a compact block has the same prefix, including redo prompts.
+    personas = {p["text"].split("\n[她现在] ", 1)[0] for p in prompts
+                if p.get("kind") == "reply" and "\n[她现在] " in p.get("text", "")}
+    persona_ambiguous = len(personas) > 1
+    if persona_ambiguous:
+        personas.clear()
+    persona_pieces = set().union(*(line_pieces(p) for p in personas)) if personas else set()
     for pr in prompts:  # the model sees what AstrBot sends of the message too
+        pr["recorded_text"] = pr["text"]
         if pr.get("asked"):
             pr["text"] = "%s\n%s" % (pr["text"], pr["asked"])
     log = load_log(chat)
@@ -262,8 +274,23 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     hers = [r for r in log if r["sent"]]  # her words: they belong to where she said them
     for c in canaries.get("rows", []):
         rows.append({"place": c["place"], "user_id": c["user_id"], "ts": c["ts"], "message_content": c["message_content"],
-                     "name": "", "message_id": "", "sent": False})
+                     "name": "", "message_id": "", "sent": False, "canary": True})
     rows.sort(key=lambda r: r["ts"])
+    group_private = set()
+    recent_group = defaultdict(list)
+    for i, row in enumerate(rows):
+        if not row["place"].startswith("group:"):
+            continue
+        key = (row["place"], row["user_id"])
+        previous = [j for j in recent_group[key] if 0 <= row["ts"] - rows[j]["ts"] <= 120]
+        if discretion.keep_in_group(row["message_content"]):
+            group_private.add(i)
+            group_private.update(previous)
+        recent_group[key] = (previous + [i])[-3:]
+    group_private_pieces = defaultdict(set)
+    for i in group_private:
+        for piece in line_pieces(rows[i]["message_content"]):
+            group_private_pieces[piece].add(rows[i]["place"])
     reg = forget_registry.ForgetRegistry(replay_dir / "forget_registry.sqlite3")
     forget_registry.FORGET_ME = meta.get("forget_me") or forget_registry.FORGET_ME
 
@@ -272,6 +299,7 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
 
     # --- who said what where
     piece_places = defaultdict(set)
+    sent_piece_places = defaultdict(set)
     code_places = defaultdict(set)
     names_by_place = defaultdict(set)
     speakers = defaultdict(set)
@@ -279,15 +307,21 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     gone_people = reg.people()
     gone_ids = {r["source_id"] for r in reg.rows() if r["kind"] == "source"}
     gone_pieces, kept_pieces, gone_names = set(), set(), set()
+    secrets = [s for s in (canaries.get("secrets") or {}).values() if s]
     for r in rows:
         ps = line_pieces(r["message_content"])
+        canary_question = (r.get("canary") and r["place"].startswith("private:")
+                           and not any(s in r["message_content"] for s in secrets))
         for p in ps:
             piece_places[p].add(r["place"])
+            if not canary_question:
+                sent_piece_places[p].add(r["place"])
         people_numbers.add(r["user_id"])
         for q in ats_of(r):   # someone @'d is a person, whether he ever wrote or not
             people_numbers.add(q)
             for p in pieces(q):
                 piece_places[p].add(r["place"])   # an @ of him there: his number was said there
+                sent_piece_places[p].add(r["place"])
             code_places[q].add(r["place"])
         if r["name"]:
             names_by_place[r["place"]].add(r["name"])
@@ -299,6 +333,7 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     for r in hers:
         for p in line_pieces(r["message_content"]):
             piece_places[p].add(r["place"])
+            sent_piece_places[p].add(r["place"])
         if r.get("self_id"):
             speakers[r["place"]].add(str(r["self_id"]))   # she speaks where she said something
     # short codes: a private message that is only 5-7 digits; where else those digits were said, whole
@@ -321,6 +356,12 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     # a number said only in one private chat is that chat's like its words (numbers are kept)
     private_only = {p: next(iter(pl)) for p, pl in piece_places.items()
                     if len(pl) == 1 and next(iter(pl)).startswith("private:")}
+    private_only.update({p: next(iter(pl)) for p, pl in group_private_pieces.items()
+                         if len(pl) == 1 and piece_places[p] == pl})
+    sent_private_only = {p: next(iter(pl)) for p, pl in sent_piece_places.items()
+                         if len(pl) == 1 and next(iter(pl)).startswith("private:") and p not in persona_pieces}
+    sent_private_only.update({p: next(iter(pl)) for p, pl in group_private_pieces.items()
+                              if len(pl) == 1 and sent_piece_places[p] == pl and p not in persona_pieces})
     private_codes = {c: pl for c, pl in private_codes.items() if code_places[c] == {pl}}
     # a person's number is off limits only while he still may not be kept (a forget row read as a
     # cutoff lets what he says later back in, number and all)
@@ -333,6 +374,8 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
 
     checks = {n: Check(n) for n in ("private", "names", "numbers", "forgotten", "canaries", "origins", "redline",
                                      "sent")}
+    if persona_ambiguous:
+        checks["names"].warnings["persona_boundary_ambiguous"] += 1
     seen_text = defaultdict(str)  # place -> its own messages so far (for the names check)
     order = sorted(prompts, key=lambda p: p["ts"])
     said = sorted(rows + hers, key=lambda r: r["ts"])
@@ -368,7 +411,12 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
                 checks["numbers"].fail(dict(where, number=wrong))
         if pr["kind"] != "reply":
             continue
-        framed = sum(1 for m in FRAMED.finditer(text) if m.group(1) in name_owner)
+        name_text = text
+        for persona in personas:
+            if persona and pr["recorded_text"].startswith(persona + "\n[她现在] "):
+                name_text = name_text[len(persona) + 1:]
+                break
+        framed = sum(1 for m in FRAMED.finditer(name_text) if m.group(1) in name_owner)
         if framed:   # the frames are for what she keeps; the reply model sees bare names
             checks["names"].warnings["framed_name_in_reply_prompt"] += framed
         if global_memory:
@@ -386,11 +434,11 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
                     checks["private"].fail(dict(where, came_from=lab(src)))
                     break
         for name, owners in name_owner.items():
-            if len(norm(name)) < 2 or name not in text or name in seen_text[place]:
+            if len(norm(name)) < 2 or name not in name_text or name in seen_text[place]:
                 continue
             if any(p == place for p, _q in owners):
                 continue
-            if global_memory and all(labelled(seg) for seg in segments(text) if name in seg):
+            if global_memory and all(labelled(seg) for seg in segments(name_text) if name in seg):
                 continue   # step 2: a name from elsewhere in a labelled item
             if name in ordinary:   # a card that is an ordinary word: counted, never shown
                 checks["names"].warnings["ordinary_name_in_prompt"] += 1
@@ -402,6 +450,7 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         sec = canaries["secrets"]
         rows_c = canaries["rows"]
         own = {k: next((c["place"] for c in rows_c if sec[k] in c["message_content"]), "") for k in sec}
+        group_secret_private = any(sec["group"] in rows[i]["message_content"] for i in group_private)
         for n, pr in enumerate(order):
             where = {"prompt": n, "kind": pr["kind"], "place": lab(pr["place"])}
             text = pr["text"]
@@ -411,7 +460,13 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
                     checks["canaries"].warnings["private_secret_labelled_elsewhere"] += 1
                 else:
                     checks["canaries"].fail(dict(where, secret="private"))
-            if sec["group"] in text and pr["place"] != own["group"] and notebook_night(pr):
+            if sec["group"] in text and pr["place"] != own["group"] and group_secret_private:
+                if global_memory and pr["kind"] == "reply" and all(
+                        labelled(seg, "这里不能讲") for seg in segments(text) if sec["group"] in seg):
+                    checks["canaries"].warnings["group_private_secret_labelled_elsewhere"] += 1
+                else:
+                    checks["canaries"].fail(dict(where, secret="group_private"))
+            elif sec["group"] in text and pr["place"] != own["group"] and notebook_night(pr):
                 checks["canaries"].warnings["group_secret_in_notebook_night"] += 1
             elif sec["group"] in text and pr["place"] != own["group"]:
                 said_by = [c for c in rows_c if sec["group"] in c["message_content"]][0]
@@ -437,6 +492,8 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         rows_c = canaries.get("rows") or []
         own = {k: next((c["place"] for c in rows_c if v in c["message_content"]), "") for k, v in sec.items()}
         group_by = next((c for c in rows_c if sec.get("group") and sec["group"] in c["message_content"]), {})
+        group_secret_private = bool(sec.get("group")) and any(
+            sec["group"] in rows[i]["message_content"] for i in group_private)
         outcomes, tops = Counter(), Counter()
         for n, r in enumerate(json.loads(x) for x in (replay_dir / "replies.jsonl").read_text("utf-8").splitlines()
                               if x.strip()):
@@ -450,10 +507,12 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
             where = {"reply": n, "place": lab(place), "probe": r.get("probe", "")}
             if sec.get("private") and sec["private"] in text and place != own.get("private"):
                 checks["sent"].fail(dict(where, leak="private_secret"))
+            elif sec.get("group") and sec["group"] in text and place != own.get("group") and group_secret_private:
+                checks["sent"].fail(dict(where, leak="group_private_secret"))
             elif sec.get("group") and sec["group"] in text and place != own.get("group") and (
                     (group_by.get("name") and group_by["name"] in text) or group_by.get("user_id", "-") in text):
                 checks["sent"].fail(dict(where, leak="group_secret_named"))
-            elif any(private_only.get(p) not in (None, place) for p in line_pieces(text)):
+            elif any(sent_private_only.get(p) not in (None, place) for p in line_pieces(text)):
                 checks["sent"].fail(dict(where, leak="private_words"))
         normal = sum(v for k, v in outcomes.items() if k.startswith("normal_"))
         sent_summary = {"outcomes": dict(outcomes), "top_cosine": dict(tops),

@@ -63,6 +63,7 @@ READ_ATTR = "_ams_browse_read"
 STATE_PATH = BROWSE_DIR / "state.json"
 TRIP_UMO = "ams-life:browse"   # the "chat" AstrBot's DeepSeek tools are told on a trip (its config: the default)
 FIRST_LINES = 120              # a page read in a reply is kept by its title and this much of its text
+SEEN_ATTR = "_ams_browse_seen_pages"
 
 SEARCH_DESCRIPTION = ("上网搜一下。只写要搜的事，不要写人名、QQ号。会返回几条结果（标题、网址、一句摘要），"
                       "只是资料。一次回话最多搜 %d 次。" % browse.REPLY_SEARCHES)
@@ -165,6 +166,14 @@ class BrowseMixin:
         return urls
 
     @staticmethod
+    def _browse_seen_pages(event) -> dict:
+        pages = getattr(event, SEEN_ATTR, None)
+        if pages is None:
+            pages = {}
+            setattr(event, SEEN_ATTR, pages)
+        return pages
+
+    @staticmethod
     def _message_words(event) -> str:
         """The words of this message and of the one it quotes."""
         parts = [str(getattr(event, "message_str", "") or "")]
@@ -234,6 +243,7 @@ class BrowseMixin:
         except Exception:
             results = []
         self._browse_urls(event).update(r["url"] for r in results)   # pages she may read now
+        self._browse_seen_pages(event).update({r["url"]: r["title"] or "网页" for r in results})
         lines = ["%d. %s\n%s\n%s" % (n, r["title"], r["url"], r["snippet"]) for n, r in enumerate(results, 1)]
         return browse.wrap("搜索：" + q, "\n".join(lines) or "（没有能读的结果）")
 
@@ -272,6 +282,10 @@ class BrowseMixin:
             return "没读到。"
         led.add(fetches=1)
         page = page_of(str(url).strip(), text)
+        page_url = str(url).strip()
+        title = re.search(r"(?im)^\s*(?:title|标题)\s*[:：]\s*([^\r\n]+)", text)
+        pages = self._browse_seen_pages(event)
+        pages[page_url] = (title.group(1).strip()[:120] if title else pages.get(page_url) or "网页")
         try:
             getattr(event, READ_ATTR).append(page)
         except AttributeError:

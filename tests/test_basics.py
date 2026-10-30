@@ -28,6 +28,10 @@ class Identity(unittest.TestCase):
         self.assertTrue(ctx.web_routes)
         self.assertTrue(all(r.startswith('/astrbot_plugin_ams_life/page/') for r in ctx.web_routes), ctx.web_routes)
 
+    def test_group_browsing_defaults_off(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={})
+        self.assertFalse(plugin.browse_groups_enabled)
+
     def test_metadata(self):
         text = (ROOT / 'metadata.yaml').read_text('utf-8')
         self.assertIn('name: astrbot_plugin_ams_life', text)
@@ -107,9 +111,9 @@ class Split(unittest.TestCase):
         # her camera and her voice, as the owner wired them in on 10-30: +9 (SelfieMixin:
         # _media_settings, _media_count, _media_bump, _media_wanted, _post_json, _post_selfie,
         # _make_selfie, _make_voice, _media_after_reply)
-        # her stickers in the plugin (step 2, 丙): +15 (AttentionMixin._after_words,
+        # her stickers in the plugin (step 2, 丙): +14 (AttentionMixin._after_words,
         # DiscretionMixin._forget_pictures_of, and StickersMixin: _stickers_on, _sticker_lib,
-        # _sticker_lock, _look_once, _maybe_keep, _sticker_refs, _look_at_sticker_in_passing,
+        # _sticker_lock, _look_once, _maybe_keep, _sticker_refs,
         # _sticker_in_passing, _sticker_offer, _sticker_named, _sticker_cleared, _send_sticker,
         # _sticker_after); the owner's page of her stickers: +6 (_page_body, _page_query, page_stickers,
         # page_sticker_image, page_sticker_delete, page_sticker_add)
@@ -119,7 +123,15 @@ class Split(unittest.TestCase):
         # _may_go_out: only the addresses given, nothing private goes out); its second part: +8 (_remember_web,
         # _browse_keep_reply, _browse_state, _browse_save_state, _last_message_ts, _browse_topics,
         # _maybe_go_browse, _browse_trip)
-        self.assertEqual(len(methods), 442)
+        # keep-in-group: +1 (_narrow_group_sources)
+        # her phone tools replace the keyword media helpers: +9 overall
+        # Search results and successful reads keep their titles for the phone: +1.
+        # mood (step 2, 乙): +2 (hearing what she was not asked about, the night's end)
+        # Mood review: +2 (a reply is answered once; note a successfully sent medium).
+        # Group browsing adds 13 mixin methods and one property, a reply wrapper and an image helper.
+        # SlangMixin: seven methods, including its two panel endpoints.
+        # Recent images and quote lookup add three media methods.
+        self.assertEqual(len(methods), 482)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

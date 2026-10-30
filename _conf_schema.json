@@ -1,4 +1,44 @@
 {
+  "photo_enabled": {
+    "description": "她的手机：拍照（默认关）",
+    "type": "bool",
+    "default": false
+  },
+  "screenshot_enabled": {
+    "description": "她的手机：分享看过的网页（默认关）",
+    "type": "bool",
+    "default": false
+  },
+  "say_aloud_enabled": {
+    "description": "她的手机：语音（默认关）",
+    "type": "bool",
+    "default": false
+  },
+  "selfie_reference": {
+    "description": "自拍参考图文件名（selfie/refs 目录内）",
+    "type": "string",
+    "default": "her_base.png"
+  },
+  "phone_photo_retention": {
+    "description": "保留最近的手机照片数",
+    "type": "int",
+    "default": 50
+  },
+  "phone_voice_retention": {
+    "description": "保留最近的手机语音数",
+    "type": "int",
+    "default": 50
+  },
+  "phone_photo_price": {
+    "description": "每次出图费用（元，按服务价格填写）",
+    "type": "float",
+    "default": 0
+  },
+  "phone_voice_price": {
+    "description": "每次语音费用（元，本机服务填零）",
+    "type": "float",
+    "default": 0
+  },
   "enabled": {
     "description": "启用 BioCore",
     "hint": "关闭后不注入任何情绪状态，也不写 feedback。",
@@ -382,6 +422,28 @@
     },
     "default": []
   },
+  "slang_enabled": {
+    "description": "学习群里的说法",
+    "type": "bool",
+    "default": false
+  },
+  "slang_image_api_model": {
+    "description": "群说法释义模型（空则不调用）",
+    "type": "string",
+    "default": ""
+  },
+  "vision_image_api_model": {
+    "description": "插件看图小通道的模型名",
+    "hint": "默认空，不启用。在模型功能的 image_caption 提供方填写 image_api；地址和 Key 从插件 image 接口配置读取。",
+    "type": "string",
+    "default": ""
+  },
+  "vision_price_per_call": {
+    "description": "每次看图的价格（元）",
+    "hint": "留空按聊天模型价格计算；填 0 不计入每日花费，看图次数仍会记录。",
+    "type": "string",
+    "default": ""
+  },
   "image_cache_max_entries": {
     "description": "图片描述缓存上限",
     "hint": "同一张图片识别后复用描述，最多缓存多少条。",
@@ -470,9 +532,26 @@
     "type": "bool",
     "default": false
   },
+  "browse_groups_enabled": {
+    "description": "自己翻群聊（默认关）",
+    "hint": "打开群时顺便看最近的 QQ 表情；夜里不自己翻。",
+    "type": "bool",
+    "default": false
+  },
+  "browse_groups_min_minutes": {
+    "description": "自己翻群的最短间隔（分钟）",
+    "type": "int",
+    "default": 5
+  },
   "stickers_enabled": {
     "description": "她的表情包（第 2 步丙块，默认关）",
-    "hint": "打开后（看图那一项也要开着）：别人发的表情包、图片，她看一眼就知道图里是什么，喜欢、好玩、有用的就存下来（真人照片、截图、带个人信息的、带群梗的不存）；QQ 标成表情的，没叫她也看。回话时给她几张挑，她选了就跟在话后面发成 QQ 表情（不行就发成普通图片）。存了哪都能用；30 天不用就删，最多 300 张，主人给的不删不占数。删一个人时，他发的图一起删。看图的钱算进每天的钱里。",
+    "hint": "打开后（看图那一项也要开着）：回话时看这条消息里的图；开启翻群后，打开群时顺便看最近的 QQ 表情。喜欢、好玩、有用的就存下来（真人照片、截图、带个人信息的、带群梗的不存）。回话时给她几张挑，她选了就跟在话后面发成 QQ 表情（不行就发成普通图片）。存了哪都能用；30 天不用就删，最多 300 张，主人给的不删不占数。删一个人时，他发的图一起删。看图的钱算进每天的钱里。",
+    "type": "bool",
+    "default": false
+  },
+  "mood_events_enabled": {
+    "description": "心情跟着日子走（默认关）",
+    "hint": "开启后，听到的对话和发生的事会影响心情；心情和精力也会调整回应门槛和等待时间。",
     "type": "bool",
     "default": false
   },
@@ -487,6 +566,12 @@
     "hint": "搜索、读网页每次按 0.00075 美元算（DeepSeek 11-01 起收），加上为了搜、读多问模型的那几轮（按高峰价往多里估）。默认 5 元。",
     "type": "float",
     "default": 5.0
+  },
+  "reply_in_pieces": {
+    "description": "分条连发回话",
+    "hint": "一条回话按换行和【下一条】拆成几条连发，最多 5 条。",
+    "type": "bool",
+    "default": true
   },
   "self_decide": {
     "description": "她自己判断回不回（第 2 步，默认关）",

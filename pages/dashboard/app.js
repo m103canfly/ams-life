@@ -1063,7 +1063,7 @@
     let t="已彻底删除："+(parts.length?parts.join("、"):"没有找到要删的");
     if(Array.isArray(c.places)&&c.places.length) t+="；地方："+c.places.map(shortSession).join("、");
     const a=c.astrbot||{};
-    if(Number(a.conversations||0)||Number(a.message_history||0)) t+="；AstrBot 对话 "+Number(a.conversations||0)+" 个、消息记录 "+Number(a.message_history||0)+" 条";
+    if(c.astrbot) t+="；AstrBot 对话 "+Number(a.conversations||0)+" 个、消息记录 "+Number(a.message_history||0)+" 条、群上下文 "+Number(a.group_contexts||0)+" 个";
     if(Number(c.archived_copies||0)>0) t+="。迁移前的备份里还有删之前的旧数据（memory/archive/ 里 "+Number(c.archived_copies)+" 份，没有动）";
     return t;
   }
@@ -1173,9 +1173,26 @@
     // step 2 (self_decide): the money of the day
     const spend=$("spendNote"), sp=data&&data.spend;
     if(spend){
-      spend.hidden=!sp;
+      const phone=data&&data.phone_counts;
+      spend.hidden=!sp&&!phone;
+      if(!sp) spend.textContent="";
       if(sp) spend.textContent="今天调模型花了约 "+Number(sp.spent||0).toFixed(2)+" 元，还剩 "+Number(sp.left||0).toFixed(2)+
         " 元（上限 "+Number(sp.hard||0)+" 元"+(sp.state==="soft"?"，快到了：只回主人的私聊":sp.state==="hard"?"，到了：今天不回了":"")+"）。";
+    }
+    if(spend && data && data.phone_counts){
+      const p=data.phone_counts;
+      spend.textContent+=(sp?" ":"")+"今天自拍 "+Number(p.selfie||0)+" 张，随手拍 "+Number(p.snap||0)+" 张，截图 "+Number(p.screenshot||0)+" 张，语音 "+Number(p.voice||0)+" 条。";
+    }
+    const vision=data&&data.vision;
+    if(spend && vision){
+      spend.hidden=false;
+      const count="今天看图 "+Number(vision.calls||0)+" 张（回话 "+Number(vision.reply||0)+"，翻群和顺便看表情 "+Number(vision.browse||0)+"，主人加图 "+Number(vision.owner_add||0)+(vision.unattributed?"，之前未分类 "+Number(vision.unattributed):"")+"）。";
+      spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
+    }
+    if(spend && data && Number(data.slang_calls||0)>0){
+      spend.hidden=false;
+      const count="今天群说法释义 "+Number(data.slang_calls)+" 次。";
+      spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
     }
     // step 2 (global_memory): the last look before sending, today
     const send=$("sendNote"), sc=data&&data.send_check;
@@ -1716,6 +1733,11 @@
     if($("iFlowExpr"))$("iFlowExpr").textContent=L(it.expression)||"--";
     if($("iFlowPlan"))$("iFlowPlan").textContent=it.plan||"--";
     $("iEmotion").textContent=L(it.emotion); $("iNeed").textContent=L(it.need); $("iExpr").textContent=L(it.expression);
+    if ($("moodEventRow")) {
+      const events=Array.isArray(data.mood_events)?data.mood_events:null;
+      $("moodEventRow").hidden=!events;
+      if(events) $("moodEventList").textContent=events.map(x=>new Date(Number(x.ts)*1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})+" "+x.kind).join("；")||"暂无";
+    }
     if($("iCompound"))$("iCompound").textContent=it.compound||"-";
     if($("iSpectrum"))$("iSpectrum").textContent=_spec||"-";
     if($("iPlan"))$("iPlan").textContent=it.plan||"-";
@@ -1795,7 +1817,7 @@
         const options = filtered.length ? filtered
           : (vision ? [] : provs.filter(p=>_providerKind(p)!=="vision"));
         const followLabel = vision ? "跟随图片 API（默认视觉 provider）" : "跟随主 LLM";
-        sel.innerHTML='<option value="follow_llm">'+followLabel+'</option>'+options.map(p=>'<option value="'+esc(String(p.id||""))+'">'+esc(String(p.model||p.id||""))+'</option>').join("");
+        sel.innerHTML='<option value="follow_llm">'+followLabel+'</option>'+(vision?'<option value="image_api">插件看图小通道</option>':'')+options.map(p=>'<option value="'+esc(String(p.id||""))+'">'+esc(String(p.model||p.id||""))+'</option>').join("");
         sel.value=String(cfg.provider||"follow_llm");
       }
     });
@@ -2404,14 +2426,17 @@
   const BIO_REPO_SLUG = "m103canfly/ams-life";
   const GITEE_KEY = "bio_gitee_repo";
   let giteeRepo = String(storeGet(GITEE_KEY, "") || "").trim();
+  // ams-life: the repo buttons show their address to copy (repo_link.js); no new window in AstrBot's frame
+  const repoLink = window.BioRepoLink ? window.BioRepoLink.attach(document, navigator.clipboard) : { refresh(){} };
   function applyGiteeRepo(){
     const input = $("giteeRepo"), state = $("giteeState"), link = $("updateOpenGitee");
     if (input) input.value = giteeRepo;
     if (state) state.textContent = giteeRepo ? ("已配置 " + giteeRepo) : "未配置";
     if (link) {
       link.style.display = giteeRepo ? "" : "none";
-      if (giteeRepo) link.href = "https://gitee.com/" + giteeRepo;
+      link.dataset.repo = giteeRepo ? "https://gitee.com/" + giteeRepo : "";
     }
+    repoLink.refresh();
   }
   function _semverParts(v){
     return String(v || "").replace(/^v/i, "").split(/[.+-]/).slice(0, 3).map(n => parseInt(n, 10) || 0);

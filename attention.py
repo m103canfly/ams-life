@@ -46,8 +46,8 @@ _STOPS = r"\s，,。.！!？?：:、~～"
 
 # what she is told she may pick (one line of the reply block; it describes, it does not order)
 CHOICES_NOTE = ("你可以自己挑怎么回：不想回就只写%s；可以只回一个QQ小表情（写成[表情:名字]，名字有：%s）；"
-                "可以一句短的；也可以正经回一段。想分几条发，就在两条之间单独写一行%s，最多%d条。"
-                % (SILENT, "、".join(FACES), NEXT, MAX_MESSAGES))
+                "可以一句短的；也可以正经回一段。"
+                % (SILENT, "、".join(FACES)))
 
 
 # ------------------------------------------------------------------
@@ -163,6 +163,21 @@ def threshold(level="normal") -> float:
     return LEVELS.get(str(level or "normal"), LEVELS["normal"])
 
 
+def mood_threshold(level, valence, energy) -> float:
+    """Adjust the uncalled-message threshold by bounded mood and energy."""
+    v = max(-1.0, min(1.0, float(valence)))
+    e = max(0.0, min(1.0, float(energy)))
+    adjustment = -0.10 * v + 0.10 * max(0.0, 0.5 - e)
+    return max(0.20, min(0.75, threshold(level) + adjustment))
+
+
+def mood_wait(seconds, valence, energy) -> float:
+    """A bounded pause before deciding; this never changes the safety gates."""
+    v = max(-1.0, min(1.0, float(valence)))
+    e = max(0.0, min(1.0, float(energy)))
+    return max(1.0, min(10.0, float(seconds) - 2.0 * v + 4.0 * max(0.0, 0.5 - e)))
+
+
 # ------------------------------------------------------------------
 # the two safety nets
 # ------------------------------------------------------------------
@@ -195,12 +210,45 @@ def silent(text) -> bool:
     return not t or t.replace(SILENT, "").strip() == "" and SILENT in t
 
 
+PIECES_NOTE = "像真人发消息：想分几条就分几段写，每段一条，最多 5 条；一条里别换行。"
+
+
 def split(text, most=MAX_MESSAGES) -> list:
-    """The messages she wrote, split at 【下一条】; what is beyond `most` goes into the last."""
-    parts = [p.replace(SILENT, "").strip() for p in str(text or "").split(NEXT)]
+    """Split ordinary lines, preserving fenced code and consecutive list lines."""
+    parts, block, kind = [], [], None
+
+    def flush():
+        if block:
+            parts.append("\n".join(block).strip())
+            block.clear()
+
+    for line in str(text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if kind == "code":
+            block.append(line)
+            if line.lstrip().startswith("```"):
+                flush()
+                kind = None
+            continue
+        if line.lstrip().startswith("```"):
+            flush()
+            block.append(line)
+            if line.count("```") >= 2:
+                flush()
+                kind = None
+            else:
+                kind = "code"
+            continue
+        if re.match(r"^\s*(?:[-·] |\d+\.\s*)", line):
+            block.append(line)
+            kind = "list"
+            continue
+        flush()
+        kind = None
+        parts.extend(p.strip() for p in line.split(NEXT) if p.strip())
+    flush()
     parts = [p for p in parts if p]
     if len(parts) > most:
-        parts = parts[:most - 1] + ["\n".join(parts[most - 1:])]
+        parts = parts[:most - 1] + [" ".join(parts[most - 1:])]
     return parts
 
 

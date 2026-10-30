@@ -37,6 +37,97 @@ _PART_NAMES = {"Image": "[图片]", "Face": "[表情]", "Record": "[语音]", "V
                "File": "[文件]", "Forward": "[聊天记录]", "Node": "[聊天记录]", "Nodes": "[聊天记录]",
                "Poke": "[戳一戳]", "Json": "[卡片]", "Share": "[分享]", "Location": "[位置]",
                "Music": "[音乐]", "Dice": "[骰子]", "RPS": "[猜拳]", "Contact": "[名片]"}
+
+FORWARD_MAX = 20
+FORWARD_LINE_CHARS = 160
+
+
+def _original(text):
+    """Keep every line of external text inside its actual speaker's turn."""
+    return "\n".join(line if line.startswith("（原文）") else "（原文）" + line
+                     for line in str(text or "").split("\n"))
+
+
+def _history_original(text):
+    """Mark legacy history once; keep already framed turns as they were saved."""
+    text = str(text or "")
+    label = "（历史消息，发言人和时间未核实）"
+    if text.startswith(label):
+        return label + _original(text[len(label):])
+    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:主人|非主人)）：(?=（原文）)", text)
+    if framed:
+        return text[:framed.end()] + _original(text[framed.end():])
+    return label + _original(text)
+
+
+def _phone_line(plugin, event, line):
+    sid = str(line.get("sender_id") or "")
+    owner = str((plugin.config or {}).get("owner_qq", "") or "").strip()
+    name = HER_NAME if line.get("role") == "assistant" else str(line.get("sender_name") or "某人")
+    name = re.sub(r"[\r\n：:]", " ", name).strip()[:40] or "某人"
+    if line.get("role") != "assistant" and sid and sid == owner:
+        name += "（主人）"
+    elif line.get("role") != "assistant":
+        name += "（非主人）"
+    try:
+        stamp = time.strftime("%m-%d %H:%M", time.localtime(float(line.get("ts") or time.time())))
+    except (ValueError, TypeError, OverflowError, OSError):
+        stamp = time.strftime("%m-%d %H:%M", time.localtime())
+    return "[%s] %s：%s" % (stamp, name, _original(line.get("text")))
+
+
+async def _expand_forward(plugin, event):
+    """Fetch only on a reply; retain the enclosing message's origin in its window."""
+    rendered = []
+    try:
+        for comp in event.get_messages() or []:
+            if type(comp).__name__ not in ("Forward", "Nodes", "Node"):
+                continue
+            fid = getattr(comp, "id", None) or getattr(comp, "res_id", None)
+            if not fid:
+                continue
+            result = await event.bot.api.call_action("get_forward_msg", id=str(fid))
+            if not isinstance(result, dict):
+                continue
+            data = result.get("data", result)
+            messages = data.get("messages", []) if isinstance(data, dict) else []
+            for node in messages[:FORWARD_MAX] if isinstance(messages, list) else []:
+                if not isinstance(node, dict):
+                    continue
+                content = node.get("message", node.get("content", []))
+                if isinstance(content, str):
+                    body = re.sub(r"\[CQ:[^\]]*\]", "", content)
+                elif isinstance(content, list):
+                    body = "".join(str((part.get("data") or {}).get("text") or "")
+                                   for part in content if isinstance(part, dict)
+                                   and part.get("type") == "text" and isinstance(part.get("data"), dict))
+                else:
+                    body = ""
+                sender = node.get("sender") or {}
+                name = str(sender.get("nickname") or sender.get("card") or "某人") if isinstance(sender, dict) else "某人"
+                name = re.sub(r"[\r\n：:]|\d{5,}", " ", name).strip()[:40] or "某人"
+                body = re.sub(r"\d{5,}", "某人", plugin._for_model(body, event))
+                if body.strip():
+                    rendered.append(name + "：" + body[:FORWARD_LINE_CHARS])
+            if rendered:
+                break
+    except Exception:
+        return ""
+    if not rendered:
+        return ""
+    expanded = "（转发来的聊天记录，出处与本消息相同）\n" + "\n".join(_original(x) for x in rendered)
+    here, mid = plugin._here(event), plugin._message_id(event)
+    try:
+        if here and mid and not plugin._job_stale():
+            win = plugin._read_window(here)
+            for line in reversed(win["recent"]):
+                if line.get("role") == "user" and str(line.get("msg_id") or "") == mid:
+                    line["forward_text"] = expanded
+                    plugin._write_window(here, win)
+                    break
+    except Exception:
+        pass
+    return expanded
 # Body fields of older state files that held text; they never come back into the body.
 _OLD_BODY_TEXT_KEYS = ("open_loops", "event_anchors", "autobiography", "self_timeline",
                        "core_self", "narrative_self")
@@ -101,7 +192,34 @@ class PhoneMixin:
         any more does not keep old lines on disk (reading a window writes it back pruned)."""
         for place in self._window_places():
             try:
-                self._read_window(place)
+                win = self._read_window(place)
+                if getattr(self, "mood_events_enabled", False):
+                    changed = False
+                    recent = win["recent"]
+                    for i, line in enumerate(recent):
+                        if line.get("role") != "assistant" or line.get("mood_checked"):
+                            continue
+                        origin = line.get("origin") or {}
+                        people = origin.get("people") or []
+                        if not line.get("mood_direct") or len(people) != 1:
+                            continue
+                        person = str(people[0])
+                        familiarity = self._familiarity(person)
+                        delay = 600 if familiarity >= .8 else 1800 if familiarity >= .3 else 0
+                        if not delay:
+                            continue
+                        stamp = float(line.get("ts", 0) or 0)
+                        if any(x.get("role") != "assistant" and str(x.get("sender_id") or "") == person
+                               for x in recent[i + 1:]):
+                            line["mood_checked"] = True
+                            changed = True
+                        elif time.time() - stamp >= delay:
+                            kind = "unanswered_share" if line.get("mood_share") else "ignored"
+                            self._core(None).mood_event(kind, familiarity)
+                            line["mood_checked"] = True
+                            changed = True
+                    if changed:
+                        self._write_window(place, win)
             except Exception as exc:
                 logger.warning("[ams-life] window sweep failed: %s", exc)
 
@@ -122,7 +240,14 @@ class PhoneMixin:
             sid, _name = self._speaker(event)
         except Exception:
             sid = ""
-        return discretion.make_origin(self._here(event), [sid], self._source_ids(event))
+        here, ids = self._here(event), self._source_ids(event)
+        private = here.startswith("group:") and discretion.keep_in_group(
+            str(getattr(event, "message_str", "") or "") or self._message_text(event))
+        if here.startswith("group:") and not private:
+            private = any(discretion.is_about(discretion.origin_of(x), source_ids=ids)
+                          and discretion.origin_of(x)["visibility"] == discretion.PRIVATE
+                          for x in self._read_window(here)["recent"])
+        return discretion.make_origin(here, [sid], ids, discretion.PRIVATE if private else None)
 
     @staticmethod
     def _message_id(event) -> str:
@@ -252,16 +377,26 @@ class PhoneMixin:
             self_id = ""
         if self_id and str(sid) == self_id:
             return  # her own messages come in through on_llm_response
+        self._remember_images(event)
         text = self._message_text(event)
         if not text:
             return
-        line = {"ts": time.time(), "role": "user", "sender_id": str(sid or ""),
+        now = time.time()
+        win = self._read_window(here)
+        if here.startswith("group:") and sid and discretion.keep_in_group(text):
+            previous = [x for x in win["recent"] if x.get("role") == "user"
+                        and str(x.get("sender_id") or "") == str(sid)
+                        and 0 <= now - float(x.get("ts", 0) or 0) <= 120][-3:]
+            ids = [s for x in previous for s in discretion.origin_of(x).get("source_ids", [])]
+            if ids:
+                self._narrow_group_sources(here, ids)
+                win = self._read_window(here)
+        line = {"ts": now, "role": "user", "sender_id": str(sid or ""),
                 "sender_name": str(name or ""), "msg_id": self._message_id(event),
                 "text": text[:WINDOW_MESSAGE_CHARS], "origin": self._event_origin(event)}
         quoted = self._reply_to(event)
         if quoted:
             line["reply_to"] = quoted
-        win = self._read_window(here)
         win["recent"].append(line)
         # AstrBot's own id of this chat, for deleting what AstrBot keeps when the owner
         # deletes someone (see _forget_in_astrbot)
@@ -278,9 +413,60 @@ class PhoneMixin:
             return
         win = self._read_window(here)
         text = self._without_gone(text, event)
-        win["recent"].append({"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS],
-                              "origin": self._event_origin(event)})
+        origin = self._event_origin(event)
+        line = {"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS], "origin": origin}
+        if getattr(self, "mood_events_enabled", False):
+            line["mood_direct"] = bool(getattr(event, "_mood_direct", False))
+        win["recent"].append(line)
         self._write_window(here, win)
+
+    def _mood_note_answer(self, event, why) -> bool:
+        """Mark the latest addressed reply once when its recipient answers it."""
+        here = self._here(event)
+        person = str(self._speaker(event)[0] or "")
+        if not here or not person or self._job_stale():
+            return False
+        win = self._read_window(here)
+        for line in reversed(win["recent"]):
+            if line.get("role") != "assistant" or line.get("mood_media"):
+                continue
+            people = [str(x) for x in (line.get("origin") or {}).get("people") or []]
+            if person not in people:
+                continue
+            age = time.time() - float(line.get("ts", 0) or 0)
+            if (line.get("mood_answered") or not 0 <= age <= 86400
+                    or not (why == "continue" or (why and (here.startswith("private:")
+                                                            or self._addresses_her(event))))):
+                return False
+            line["mood_answered"] = True
+            self._write_window(here, win)
+            return True
+        return False
+
+    def _note_she_sent(self, event, kind) -> None:
+        """Note a successfully sent medium and associate it with its written reply."""
+        labels = {"selfie": "[自拍]", "snap": "[随手拍]", "screenshot": "[分享网页]", "voice": "[语音]"}
+        if not getattr(self, "mood_events_enabled", False) or kind not in labels or self._job_stale():
+            return
+        here = self._here(event)
+        if not here:
+            return
+        try:
+            origin = self._event_origin(event)
+            refs = origin.get("source_ids") or []
+            win = self._read_window(here)
+            for line in reversed(win["recent"]):
+                if line.get("role") != "assistant" or line.get("mood_media"):
+                    continue
+                saved = line.get("origin") or {}
+                if refs and refs == saved.get("source_ids") and origin.get("people") == saved.get("people"):
+                    line["mood_share"] = True
+                    break
+            win["recent"].append({"ts": time.time(), "role": "assistant", "text": labels[kind],
+                                  "origin": origin, "mood_media": True, "mood_checked": True})
+            self._write_window(here, win)
+        except Exception as exc:
+            logger.warning("[ams-life] sent medium could not be noted: %s", type(exc).__name__)
 
     def _window_lines(self, event, n=6) -> list:
         """The last `n` lines (anyone's) of the window she is in now, before the current message."""
@@ -324,20 +510,37 @@ class PhoneMixin:
             win = self._read_window(here)
             loops = [x for x in win["open_loops"] if isinstance(x, dict)]
             before = json.dumps(loops, ensure_ascii=False, sort_keys=True)
-            memory_meta.resolve_open_loops(loops, text, stamp)
+            source = self._event_origin(event)
+            narrow = here.startswith("group:") and source["visibility"] == discretion.PRIVATE
+            old_status = {id(x): x.get("status") for x in loops} if narrow else {}
+            if here.startswith("group:"):
+                people = source["people"]
+                own = [x for x in loops if people and discretion.origin_of(x, here)["people"] == people]
+                memory_meta.resolve_open_loops(own, text, stamp)
+                memory_meta.resolve_open_loops(loops, "", stamp)
+            else:
+                memory_meta.resolve_open_loops(loops, text, stamp)
+            if narrow:
+                for existing in loops:
+                    if existing.get("status") != old_status[id(existing)]:
+                        existing["origin"] = discretion.merge([discretion.origin_of(existing, here), source])
             for new_loop in memory_meta.detect_open_loops(text, stamp):
                 merged = False
                 for existing in loops:
                     if str(existing.get("status") or "open") != "open":
                         continue
+                    if here.startswith("group:") and (not source["people"] or
+                            discretion.origin_of(existing, here)["people"] != source["people"]):
+                        continue
                     if memory_meta.text_similarity(
                             existing.get("text", ""), new_loop.get("text", "")) >= memory_meta.OPEN_LOOP_MERGE_SIMILARITY:
                         existing["last_mentioned_ts"] = stamp
                         existing["mentioned"] = int(existing.get("mentioned", 1) or 1) + 1
+                        existing["origin"] = discretion.merge([discretion.origin_of(existing, here), source])
                         merged = True
                         break
                 if not merged:
-                    new_loop["origin"] = self._event_origin(event)
+                    new_loop["origin"] = source
                     loops.append(new_loop)
             loops = loops[-int(memory_meta.OPEN_LOOP_MAX):]
             if json.dumps(loops, ensure_ascii=False, sort_keys=True) != before:

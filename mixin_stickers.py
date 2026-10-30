@@ -4,8 +4,8 @@
 Off unless stickers_enabled (and looking at pictures, image_caption, is on).
 
 - one look at a picture answers what it shows and whether she keeps it (stickers.LOOK_PROMPT):
-  at reply time in _image_context, and when someone sends a QQ sticker in a chat she was not
-  called in (a task of its own, after the message is kept); one model call a picture, its money
+  at reply time in _image_context, and after she opens a group with queued QQ stickers;
+  one model call a picture, its money
   in the day's;
 - what she keeps is fetched from QQ's picture servers only, checked by its first bytes, and
   added to one library (one instance, one add at a time);
@@ -85,6 +85,13 @@ class StickersMixin:
         async with self._sticker_lock():
             if self._job_stale():   # someone deleted meanwhile: nothing of theirs is kept
                 return ""
+            origin = getattr(event, '_ams_group_origin', None)
+            if origin is not None:
+                try:
+                    if not self._may_keep(*origin):
+                        return ""
+                except Exception:
+                    return ""
             lib = self._sticker_lib()
             now = time.time()
             sid, why = lib.add(data, now, source="self", from_qq=str(sid_from or ""),
@@ -104,57 +111,9 @@ class StickersMixin:
         except Exception:
             return []
 
-    async def _look_at_sticker_in_passing(self, event) -> None:
-        """A QQ sticker in a chat she was not called in: one look, kept if she likes it. A task
-        of its own: the message is already kept, nothing is answered."""
-        refs = self._sticker_refs(event)
-        if not refs or not self._llm_allowed("image_caption"):
-            return
-        try:
-            cfg = self._attention_cfg()
-            if attention.budget(self._spent_today(), cfg["soft"], cfg["hard"]) == "hard":
-                return
-        except Exception:
-            pass
-        provider = self._vision_provider_for(event)
-        if provider is None:
-            return
-        cache = self._load_image_cache()
-        changed = False
-        for ref in refs[:3]:
-            key = _sha256(ref)
-            if key in cache:
-                continue
-            try:
-                caption, look = await self._look_once(provider, ref, event)
-            except Exception as exc:
-                logger.warning("[ams-life] stickers: a look failed: %s", type(exc).__name__)
-                continue
-            if caption:
-                cache[key] = stickers.cache_entry(ref, look, self._speaker(event)[0], self._here(event), time.time())
-                changed = True
-                await self._maybe_keep(event, ref, look)
-        if changed:
-            self._save_image_cache(cache)
-
     def _sticker_in_passing(self, event) -> None:
-        """on_message: start the look above for a QQ sticker (stickers on, not called)."""
-        if not self._stickers_on() or not self._sticker_refs(event):
-            return
-        try:
-            if self._job_stale():
-                return   # someone (or a message) she may not keep: not even looked at
-        except Exception:
-            return
-        try:
-            if self._addresses_her(event):
-                return   # the reply's own look takes it
-        except Exception:
-            pass
-        try:
-            asyncio.create_task(self._look_at_sticker_in_passing(event))
-        except Exception:
-            pass
+        """Remember a QQ sticker only for a later group opening."""
+        self._group_queue_sticker(event)
 
     # ------------------------------------------------------------------
     # offering a few in a reply's prompt
@@ -276,7 +235,7 @@ class StickersMixin:
         place = self._here(event)
 
         async def go():
-            await self._send_sticker(event, sid, umo, place)
+            return await self._send_sticker(event, sid, umo, place)
         return go
 
     # ------------------------------------------------------------------
@@ -367,7 +326,7 @@ class StickersMixin:
         if not note and self._llm_allowed("image_caption"):
             # no line from the owner: one look for its labels (its money in the day's, as "vision")
             try:
-                provider = self._vision_provider_for(None)
+                provider = self._vision_provider_for(None, source="owner_add")
                 if provider is not None:
                     _caption, look = await self._look_once(provider, str(lib.path_of(sid)), None)
             except Exception as exc:

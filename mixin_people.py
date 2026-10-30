@@ -206,6 +206,11 @@ class PeopleMixin:
                 )
                 _mem_doc = self._load_memory(event)
                 _entries = _mem_doc.get("entries") if isinstance(_mem_doc, dict) else []
+                # These relationship maps have no per-item origin. Do not put
+                # group-private material into a record shared with private chats.
+                _entries = [e for e in _entries if not (
+                    discretion.origin_of(e)["where"].startswith("group:")
+                    and discretion.origin_of(e)["visibility"] == discretion.PRIVATE)]
                 try:
                     _social_world = relationship_meta.build_social_world(_entries)
                 except Exception:

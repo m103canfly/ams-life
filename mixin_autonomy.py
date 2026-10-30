@@ -205,6 +205,8 @@ class AutonomyMixin:
                 try:
                     self._sweep_windows()
                     self._core(None).set_ambient(self._ambient_level())
+                    if getattr(self, "mood_events_enabled", False):
+                        self._mood_clock()
                 except Exception:
                     pass
                 try:
@@ -228,6 +230,15 @@ class AutonomyMixin:
                         await self._maybe_go_browse()
                     except Exception as exc:
                         logger.warning("[ams-life] browse trip failed: %s", exc)
+                try:
+                    self._begin_job()
+                    await self._maybe_slang()
+                except Exception:
+                    logger.warning("[ams-life] slang update failed")
+                try:
+                    await self._group_browse_tick()
+                except Exception as exc:
+                    logger.warning("[ams-life] group browse failed (%s)", type(exc).__name__)
                 if not (getattr(self, "proactive_autonomy", False)
                         or getattr(self, "autonomy_loop_enabled", False)):
                     continue

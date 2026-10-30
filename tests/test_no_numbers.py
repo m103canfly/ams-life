@@ -86,9 +86,9 @@ class WhatSheKeeps(unittest.TestCase):
 
     def test_what_astrbot_sends_the_model(self):
         r = run_case('at')
-        self.assertEqual(r['asked'][0], '记得提醒我 @桃子(10004) 明天要还我书 我号 10002 @小爱')
-        self.assertIn('小爱 我的号是 10002，我们群号是 900001 @桃子(10004) 周末见', r['asked'])
-        self.assertIn('某人的号是 [号码] @某人 你在吗', r['asked'])   # someone deleted, as in what she keeps
+        self.assertIn('（原文）记得提醒我 @桃子 明天要还我书', r['asked'][0])
+        self.assertTrue(any('（原文）小爱 我的号是' in text for text in r['asked']))
+        self.assertTrue(any('（原文）某人的号是 [号码] @某人 你在吗' in text for text in r['asked']))
         for text in r['asked']:
             self.assertNotIn('阿星(', text)
             self.assertNotIn('10003', text)

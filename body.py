@@ -8,6 +8,7 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 import zlib
+import copy
 
 
 # ams-life: habituation compares what was just heard with what was heard a few minutes
@@ -15,6 +16,54 @@ import zlib
 # words cannot be read back from it, and the share of equal positions estimates the
 # same pair-overlap (Jaccard) that _text_similarity measures on the words.
 _FINGERPRINT_SIZE = 32
+
+# Bounded changes, in body units; repeat hits within ten minutes are discounted.
+MOOD_EVENT_CHANGES = {
+    "praise": {"v": .06},
+    "criticism": {"v": -.06, "stress": .05},
+    "woken": {"v": -.06, "stress": .08, "energy": -.08},
+    "answered": {"v": .04, "seen_need": -.12},
+    "ignored": {"v": -.06, "seen_need": .08},
+    "unanswered_share": {"v": -.06, "seen_need": .08},
+    "quarrel": {"stress": .05},
+    "liked_topic": {"v": .04, "social": .05},
+    "fun_page": {"v": .04, "novelty_need": -.05},
+    "wrong_name": {"v": -.04},
+    "robot": {"v": -.04},
+    "sleep": {},
+}
+MOOD_EVENT_LABELS = {
+    "praise": "被夸了", "criticism": "被说了", "woken": "被吵醒了",
+    "answered": "有人接话", "ignored": "没被接话", "unanswered_share": "分享没人回应",
+    "quarrel": "群里有争执", "liked_topic": "聊到喜欢的事", "fun_page": "看到有趣的网页",
+    "wrong_name": "被叫错名字", "robot": "被当成机器人", "sleep": "睡了一觉",
+}
+MOOD_EVENT_LIMIT = .08
+MOOD_REPEAT_SECONDS = 600.0
+MOOD_REPEAT_FACTOR = .5
+MOOD_EVENT_HALF_LIFE_MINUTES = 120.0
+MOOD_BYSTANDER_WEIGHT = 1.0 / 3.0
+MOOD_PRAISE_WORDS = ("谢谢", "感谢", "真棒", "厉害", "可爱", "夸你")
+MOOD_CRITICISM_WORDS = ("讨厌你", "闭嘴", "笨蛋", "蠢", "烦死了", "骂你")
+MOOD_WRONG_NAME_WORDS = ("叫错名字", "不是你的名字")
+MOOD_ROBOT_WORDS = ("你是机器人", "只是机器人", "不过是机器人")
+MOOD_QUARREL_WORDS = ("吵架", "吵起来", "互相骂")
+MOOD_LIKED_WORDS = ("喜欢的东西", "你喜欢的", "你最喜欢")
+
+
+def mood_kinds(text, addressed=False):
+    """Conservative word cues; ambiguous emotional speech is ordinary conversation."""
+    text = str(text or "")
+    kinds = []
+    if addressed:
+        for kind, words in (("praise", MOOD_PRAISE_WORDS), ("criticism", MOOD_CRITICISM_WORDS),
+                            ("wrong_name", MOOD_WRONG_NAME_WORDS), ("robot", MOOD_ROBOT_WORDS),
+                            ("liked_topic", MOOD_LIKED_WORDS)):
+            if any(BioCore._word_hit(text, word) for word in words):
+                kinds.append(kind)
+    if any(BioCore._word_hit(text, word) for word in MOOD_QUARREL_WORDS):
+        kinds.append("quarrel")
+    return kinds
 
 
 def _fingerprint(text) -> tuple:
@@ -355,6 +404,61 @@ class BioCore:
         soc = float(getattr(self, "social", 0.55))
         self.stress = _clip(0.45 * max(0.0, -v) * a + 0.35 * (1.0 - d) + 0.20 * (1.0 - soc), 0, 1)
         self.energy = _clip(0.45 * a + 0.25 * max(0.0, v) + 0.20 * d + 0.10 * soc, 0, 1)
+        if hasattr(self, "_mood_stress"):
+            self.stress = _clip(self.stress + self._mood_stress, 0, 1)
+        if hasattr(self, "_mood_energy"):
+            self.energy = _clip(self.energy + self._mood_energy, 0, 1)
+
+    def mood_event(self, kind, weight=1.0, now=None) -> None:
+        """Apply one known event; retain only its kind and time, never its source."""
+        if kind not in MOOD_EVENT_CHANGES:
+            return
+        now = time.time() if now is None else float(now)
+        self._decay_to_now()
+        recent = getattr(self, "mood_events", [])
+        previous = next((x for x in reversed(recent) if x["kind"] == kind), None)
+        repeat = MOOD_REPEAT_FACTOR if previous and 0 <= now - previous["ts"] < MOOD_REPEAT_SECONDS else 1.0
+        weight = _clip(float(weight), 0, 1) * repeat
+        if kind == "sleep":
+            self._mood_stress = float(getattr(self, "_mood_stress", 0.0)) * .25
+            self._mood_energy = float(getattr(self, "_mood_energy", 0.0)) * .25
+            self.v = min(0.0, self.v) * .25 + max(0.0, self.v)
+            self.seen_need = .3 + (self.seen_need - .3) * .25
+        else:
+            for field, change in MOOD_EVENT_CHANGES[kind].items():
+                delta = max(-MOOD_EVENT_LIMIT, min(MOOD_EVENT_LIMIT, change * weight))
+                name = "_mood_" + field if field in ("stress", "energy") else field
+                low = -1.0 if field in ("v", "stress", "energy") else 0.0
+                before = float(getattr(self, name, 0.0))
+                setattr(self, name, _clip(before + delta, low, 1.0))
+                if field == "novelty_need":
+                    self._mood_novelty = float(getattr(self, "_mood_novelty", 0.0)) + self.novelty_need - before
+        self.mood_events = (recent + [{"kind": kind, "ts": now}])[-8:]
+        self._derive()
+
+    def mood_hear(self, text, familiar=False) -> None:
+        """Observe on a copy, then apply a bounded share of its emotional movement."""
+        text = str(text or "").strip()
+        if not text:
+            return
+        self._decay_to_now()
+        probe = copy.deepcopy(self)
+        probe._rng = __import__("random").Random(0)
+        probe.observe(text)
+        weight = 1.0 if familiar else MOOD_BYSTANDER_WEIGHT
+        fingerprint = _fingerprint(re.sub(r"\s+", "", text)[:120])
+        now = time.time()
+        previous = getattr(self, "_mood_heard", None)
+        if (previous and now - previous[0] < MOOD_REPEAT_SECONDS
+                and _fingerprint_similarity(previous[1], fingerprint) >= .65):
+            weight *= MOOD_REPEAT_FACTOR
+        self._mood_heard = (now, fingerprint)
+        for name in ("v", "a", "d", "social"):
+            delta = (float(getattr(probe, name)) - float(getattr(self, name))) * weight
+            delta = max(-MOOD_EVENT_LIMIT * weight, min(MOOD_EVENT_LIMIT * weight, delta))
+            low = -1.0 if name in ("v", "d") else 0.0
+            setattr(self, name, _clip(getattr(self, name) + delta, low, 1.0))
+        self._derive()
 
     def _trust(self) -> float:
         """ams-life: no global trust. The trust in the person she is answering, while
@@ -1348,6 +1452,14 @@ class BioCore:
             except Exception:
                 hl = 120.0
             return 0.5 ** (dt_min / hl)
+        if hasattr(self, "_mood_stress"):
+            self._mood_stress *= factor(MOOD_EVENT_HALF_LIFE_MINUTES)
+        if hasattr(self, "_mood_energy"):
+            self._mood_energy *= factor(MOOD_EVENT_HALF_LIFE_MINUTES)
+        if hasattr(self, "_mood_novelty"):
+            old = self._mood_novelty
+            self._mood_novelty *= factor(MOOD_EVENT_HALF_LIFE_MINUTES)
+            self.novelty_need = _clip(self.novelty_need + self._mood_novelty - old, 0, 1)
         _emo = str((getattr(self, "labels", {}) or {}).get("emotion") or "neutral")
         _ef = float((getattr(self, "emotion_decay_factors", {}) or {}).get(_emo, 1.0))
         # Batch4 B4: contextual recovery speed shortens the half-life only for
