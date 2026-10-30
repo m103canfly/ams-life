@@ -292,24 +292,19 @@ class InTheShell(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory()
+        cls.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        cls.addClassCleanup(cls.tmp.cleanup)
+        env = dict(os.environ, TEMP=cls.tmp.name, TMP=cls.tmp.name)
         server = subprocess.Popen([sys.executable, str(SHELL / 'serve.py'), '0'], stdout=subprocess.PIPE, text=True)
         try:
             url = server.stdout.readline().strip()
             proc = subprocess.run(['node', str(SHELL / 'drive.mjs'), url, browser(), str(Path(cls.tmp.name) / 'profile')],
-                                  capture_output=True, text=True, encoding='utf-8', timeout=240)
+                                  capture_output=True, text=True, encoding='utf-8', timeout=240, env=env)
             cls.r = json.loads(proc.stdout.strip().splitlines()[-1])
         finally:
             server.terminate()
             server.wait(timeout=10)
             server.stdout.close()
-
-    @classmethod
-    def tearDownClass(cls):
-        try:
-            cls.tmp.cleanup()
-        except OSError:
-            pass   # the browser may still hold its profile for a moment
 
     def test_ran_through(self):
         self.assertNotIn('failed', self.r, self.r.get('failed'))

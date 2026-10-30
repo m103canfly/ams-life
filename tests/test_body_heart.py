@@ -3,7 +3,9 @@
 The conversations run in discretion_cases.py (a fresh interpreter each, like the
 golden test); the small pieces are unit-tested here. All names and numbers are made up.
 """
+import atexit
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -15,6 +17,7 @@ import harness  # noqa: E402
 from test_discretion import run_case  # noqa: E402
 
 DATA = Path(tempfile.mkdtemp(prefix='ams-life-body-'))
+atexit.register(shutil.rmtree, DATA, ignore_errors=True)
 CLOCK = harness.prepare(DATA)
 import body  # noqa: E402
 import homeostasis  # noqa: E402

@@ -111,10 +111,8 @@ class ALook(unittest.TestCase):
 class TheLibrary(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.lib = stickers.Library(Path(self.tmp.name) / 'stickers')
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     def test_kept_once_by_content_in_its_own_folder(self):
         sid, why = self.lib.add(png(), NOW, from_qq='10002', from_where='group:900001', look={'caption': '猫'})
@@ -298,10 +296,8 @@ class OwnerDeleted(unittest.TestCase):
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='ams-life-dropped-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.lib = stickers.Library(self.tmp)
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_deleted_once_not_kept_again_the_owner_may(self):
         pic = png()

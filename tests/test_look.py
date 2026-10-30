@@ -50,11 +50,9 @@ def page_files():
 class Pictures(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='ams-life-ui-'))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.ui = self.tmp / 'ui'
         self.ui.mkdir()
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_none_is_fine(self):
         shutil.rmtree(self.ui)

@@ -383,10 +383,12 @@ class SameRulesAsThePlugin(unittest.TestCase):
 
     def test_mentions_and_file_names(self):
         script = r"""
-import sys, json, tempfile
+import atexit, shutil, sys, json, tempfile
 sys.path.insert(0, sys.argv[1]); sys.path.insert(0, sys.argv[1] + '/tests')
 import harness
-harness.prepare(tempfile.mkdtemp())
+data = tempfile.mkdtemp()
+atexit.register(shutil.rmtree, data, ignore_errors=True)
+harness.prepare(data)
 import mixin_discretion, mixin_people
 D = mixin_discretion.DiscretionMixin
 cases = json.loads(sys.argv[2])
@@ -417,10 +419,12 @@ print(json.dumps({'mentions': [D._record_mentions(D, rec, person, names) for rec
 class SameNamesAsThePlugin(unittest.TestCase):
     def test_session_folders(self):
         script = r"""
-import sys, json, tempfile
+import atexit, shutil, sys, json, tempfile
 sys.path.insert(0, sys.argv[1]); sys.path.insert(0, sys.argv[1] + '/tests')
 import harness
-harness.prepare(tempfile.mkdtemp())
+data = tempfile.mkdtemp()
+atexit.register(shutil.rmtree, data, ignore_errors=True)
+harness.prepare(data)
 import mixin_events, common
 out = [mixin_events.EventsMixin._event_session_file(s).relative_to(common.EVENT_SESSION_DIR).parent.as_posix()
        for s in json.loads(sys.argv[2])]

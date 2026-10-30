@@ -177,6 +177,9 @@ class SameAsThePlugin(unittest.TestCase):
         cls.made = None
         if not os.environ.get('AMS_LIFE_DATA_DIR'):
             cls.made = tempfile.mkdtemp(prefix='ams-life-adapter-')
+            import shutil
+            cls.addClassCleanup(shutil.rmtree, cls.made, ignore_errors=True)
+            cls.addClassCleanup(os.environ.pop, 'AMS_LIFE_DATA_DIR', None)
             os.environ['AMS_LIFE_DATA_DIR'] = cls.made
         import mixin_media
         import mixin_memory
@@ -193,13 +196,6 @@ class SameAsThePlugin(unittest.TestCase):
                      both]
         for ev in cls.cases:
             ev.is_at_or_wake_command = False
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.made:
-            os.environ.pop('AMS_LIFE_DATA_DIR', None)
-            import shutil
-            shutil.rmtree(cls.made, ignore_errors=True)
 
     def test_the_fields_follow_the_plugin(self):
         for ev in self.cases:

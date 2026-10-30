@@ -1,4 +1,6 @@
 """Import, identity and licence checks that need no conversation."""
+import atexit
+import shutil
 import sys
 import tempfile
 import unittest
@@ -10,6 +12,7 @@ sys.path.insert(0, str(HERE))
 import harness  # noqa: E402
 
 DATA = Path(tempfile.mkdtemp(prefix='ams-life-basics-'))
+atexit.register(shutil.rmtree, DATA, ignore_errors=True)
 CLOCK = harness.prepare(DATA)
 import main  # noqa: E402
 import interpretation  # noqa: E402
