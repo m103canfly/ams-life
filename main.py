@@ -144,6 +144,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (甲): she decides herself whether to answer (off by default; off, AstrBot decides
         # as before: an @ of her, "/", every private message)
         self.self_decide = bool(self.config.get("self_decide", False))
+        self.reply_in_pieces = bool(self.config.get("reply_in_pieces", True))
         self.mood_events_enabled = bool(self.config.get("mood_events_enabled", False))
         # step 2 (丙): her stickers -- she keeps the ones she likes and sends them (off by default;
         # looking at pictures, image_caption, has to be on too)
@@ -839,6 +840,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
+        if getattr(self, "reply_in_pieces", True):
+            _compact = (_compact + "\n" + attention.PIECES_NOTE).strip()
         _offer = ""
         if self._stickers_on():
             # step 2 (丙): a few of her stickers to pick from (none is sent unless she names it)
@@ -877,7 +880,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         internal.py _save_to_history, from run_context.messages): make it hold what was sent
         -- the words said once more, not the first ones -- and none of the model's thinking."""
         if self.enabled:
-            if getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False):
+            if (getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False)
+                    or getattr(event, "_ams_reply_was_split", False)):
                 self._settle_history(event, run_context)
 
     @filter.on_llm_response()
@@ -920,7 +924,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _reply = _clean
         # step 2 (丙): the sticker she named ([表情包:n], only an offered one), sent after her words. Marks
         # are taken out with stickers off too: her history may hold [表情包：标签] from before
+        _sticker_source = _reply
         _reply, _sticker = self._sticker_named(event, response, _reply)
+        _before_check = _reply
         if not self._stickers_on():
             _sticker = ""
         if getattr(self, "self_decide", False) and attention.silent(_reply) \
@@ -942,21 +948,52 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 self._phone_queue(event).clear()
                 return
             # said once more: a mark in the new words is taken out too
+            if _reply != _before_check:
+                _sticker_source = _reply
+                _sticker = ""
             _reply, _again = self._sticker_named(event, response, _reply)
             _sticker = _sticker or (_again if self._stickers_on() else "")
             self._check_note(event)["sent"] = _reply
+        if getattr(self, "self_decide", False):
+            if attention.silent(_reply) and not (_sticker and attention.SILENT not in _reply):
+                self._check_note(event).update(sent="", outcome="silent")
+                self._phone_queue(event).clear()
+                self._stop(event)
+                return
+            _reply = _reply.replace(attention.SILENT, "")
+            if not getattr(self, "reply_in_pieces", True):
+                self._set_reply(response, _reply)
         if _sticker and not await self._sticker_cleared(event, _sticker):
-            _sticker = ""
+            self._phone_queue(event).clear()
+            self._check_note(event).update(sent="", outcome="held")
+            self._stop(event)
+            return
         _then = self._sticker_after(event, _sticker) if _sticker else None
         if _then is not None and not _reply.strip():
             # a sticker and no words: AstrBot sends nothing, the plugin sends the sticker
             self._stop(event)
             asyncio.create_task(self._after_words(_then))
-        elif _then is not None and not getattr(self, "self_decide", False):
+        elif _then is not None and not getattr(self, "reply_in_pieces", True):
             asyncio.create_task(self._after_words(_then))
-        if getattr(self, "self_decide", False) and _reply.strip():
-            # step 2 (甲): her messages as she wrote them -- QQ faces, several messages; a sticker last
-            _reply = self._shape_reply(event, response, _reply, then=_then)
+        if getattr(self, "reply_in_pieces", True) and _reply.strip():
+            # Her messages as she wrote them, with the sticker after its piece.
+            _sticker_part = None
+            if _then is not None:
+                _offered = getattr(event, "_ams_stickers_offered", None) or []
+                for _mark in stickers._MARK.finditer(_sticker_source):
+                    if stickers.pick_from_reply(_mark.group(), _offered)[1] == _sticker:
+                        _marked = stickers.pick_from_reply(
+                            _sticker_source[:_mark.start()] + "\ue000" + _sticker_source[_mark.end():],
+                            _offered)[0]
+                        _marked_parts = attention.split(_marked)
+                        _index = next((i for i, p in enumerate(_marked_parts) if "\ue000" in p), 0)
+                        _sticker_part = min(sum(bool(p.replace("\ue000", "").strip())
+                                                for p in _marked_parts[:_index + 1]) - 1,
+                                            len(attention.split(_reply)) - 1)
+                        _sticker_part = max(0, _sticker_part)
+                        break
+            _reply = self._shape_reply(event, response, _reply, then=_then, sticker_part=_sticker_part)
+            self._check_note(event)["sent"] = _reply
         if _sticker:
             # kept in her phone and AstrBot's history as what was sent
             _reply = (_reply + "\n" + stickers.phone_line(self._sticker_lib().rows.get(_sticker))).strip()

@@ -85,10 +85,10 @@ class Offered(unittest.TestCase):
         self.assertEqual(r['old_mark'], '好呀')                        # nor one copied from her history
         self.assertEqual(r['calls'], [])
 
-    def test_a_label_the_send_check_holds_back_the_words_still_go(self):
+    def test_a_label_the_send_check_holds_back_the_whole_reply(self):
         r = run_case('held')
         self.assertEqual(r['r']['text'], '好呀，你最棒')
-        self.assertFalse(r['r']['stopped'])
+        self.assertTrue(r['r']['stopped'])
         self.assertFalse(r['r']['sent_flag'])
         self.assertEqual(r['calls'], 0)                                # no call_action
         self.assertEqual(r['sent'], [])                                # and no plain picture either

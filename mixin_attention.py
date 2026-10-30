@@ -376,29 +376,39 @@ class AttentionMixin:
             chain.append(Face(id=value) if kind == "face" else Plain(value))
         return MessageChain(chain)
 
-    async def _send_rest(self, umo, parts, then=None) -> None:
+    async def _send_rest(self, event, umo, parts, then=None, sticker_part=None) -> None:
         """The second message on, to the same chat, a pause before each (as if typing); then
         `then` (a coroutine function: her sticker, step 2 丙), a pause before it too."""
-        for part in parts:
+        if then is not None and sticker_part == 0:
+            if not await self._after_words(then):
+                return
+        for index, part in enumerate(parts, 1):
             await asyncio.sleep(attention.typing_seconds(part))
             try:
                 await self.context.send_message(umo, self._chain_of(part))
+                self._note_sent(event, 1)
             except Exception as exc:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
                 return
-        if then is not None:
-            await self._after_words(then)
+            if then is not None and sticker_part == index:
+                if not await self._after_words(then):
+                    return
 
     @staticmethod
     async def _after_words(then) -> None:
         """A short pause, then `then()` (her sticker after her words)."""
         await asyncio.sleep(attention.typing_seconds(""))
         try:
-            await then()
+            sent = await then()
+            if sent is False:
+                logger.warning("[ams-life] the sticker was not sent")
+                return False
+            return True
         except Exception as exc:
             logger.warning("[ams-life] the sticker was not sent: %s", type(exc).__name__)
+            return False
 
-    def _shape_reply(self, event, response, reply, then=None) -> str:
+    def _shape_reply(self, event, response, reply, then=None, sticker_part=None) -> str:
         """Her reply as she picked it: the first message for AstrBot (words and faces), the rest
         sent after it. Returns what she said, as it is kept (the messages, one a line)."""
         parts = attention.split(reply)
@@ -409,14 +419,22 @@ class AttentionMixin:
             # a chain of the first message only: AstrBot sends the chain when there is one, and
             # reads the words from it (provider/entities.py 447-462; DeepSeek's answers come with a
             # chain, openai_source.py 875) -- setting the words alone would leave the whole reply
-            response.result_chain = self._chain_of(first)
+            from astrbot.api.message_components import At, Reply
+            previous = getattr(getattr(response, "result_chain", None), "chain", None) or []
+            prefix = [component for component in previous if isinstance(component, (Reply, At))]
+            shaped = self._chain_of(first)
+            shaped.chain = prefix + shaped.chain
+            response.result_chain = shaped
         except Exception as exc:
             logger.warning("[ams-life] the reply was not shaped: %s", exc)
             return reply
+        if len(parts) > 1:
+            setattr(event, "_ams_reply_was_split", True)
         if len(parts) > 1 or then is not None:
             umo = str(getattr(event, "unified_msg_origin", "") or "")
-            asyncio.create_task(self._send_rest(umo, parts[1:], then))
-        self._note_sent(event, len(parts))
+            asyncio.create_task(self._send_rest(event, umo, parts[1:], then,
+                                                sticker_part if sticker_part is not None else len(parts) - 1))
+        self._note_sent(event, 1)
         return "\n".join(parts)
 
     def _spend_for_panel(self) -> dict:

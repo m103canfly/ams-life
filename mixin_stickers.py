@@ -235,7 +235,7 @@ class StickersMixin:
         place = self._here(event)
 
         async def go():
-            await self._send_sticker(event, sid, umo, place)
+            return await self._send_sticker(event, sid, umo, place)
         return go
 
     # ------------------------------------------------------------------
