@@ -31,6 +31,28 @@ WEBRTC_INIT = """for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnecti
 _lock = asyncio.Lock()
 
 
+async def _launch_browser(playwright, shot_path=None):
+    browser = await playwright.chromium.launch(channel="msedge", headless=True,
+                                               chromium_sandbox=True,
+                                               args=["--disable-features=DnsOverHttps",
+                                                     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"])
+    try:
+        options = dict(accept_downloads=False, permissions=[], service_workers="block",
+                       ignore_https_errors=False, bypass_csp=False)
+        if shot_path is not None:
+            options["viewport"] = dict(SHOT_VIEWPORT)
+        context = await browser.new_context(**options)
+        try:
+            await context.add_init_script(WEBRTC_INIT)
+        except BaseException:
+            await context.close()
+            raise
+    except BaseException:
+        await browser.close()
+        raise
+    return browser, context
+
+
 async def _article_text(page, body):
     async def extract():
         html = await page.content()
@@ -72,6 +94,63 @@ def _strict_url(url, check):
         return False, "unresolved or invalid"
 
 
+async def _route_request(route, checked, on_block, on_redirect=None):
+    request = route.request
+    if request.method.upper() not in ("GET", "HEAD"):
+        on_block("method")
+        await route.abort()
+        return
+    ok, reason = await checked(request.url)
+    if not ok:
+        on_block(reason)
+        await route.abort()
+        return
+    response = None
+    try:
+        response = await route.fetch(max_redirects=0, timeout=OPEN_SECONDS * 1000)
+        if 300 <= response.status < 400:
+            if on_redirect:
+                on_redirect(request, response)
+            on_block("redirect")
+            await route.abort()
+        else:
+            await route.fulfill(response=response)
+    except Exception:
+        logger.info("[ams-life] browser: request failed")
+        await route.abort()
+    finally:
+        if response is not None:
+            await response.dispose()
+
+
+async def _navigate(context, page, address, checked, on_block):
+    for hop in range(MAX_HOPS + 1):
+        ok, reason = await checked(address)
+        if not ok:
+            on_block(reason)
+            return None
+        probe = await context.request.get(address, max_redirects=0, timeout=OPEN_SECONDS * 1000)
+        try:
+            status, location = probe.status, probe.headers.get("location")
+        finally:
+            await probe.dispose()
+        if 300 <= status < 400:
+            if not location or hop == MAX_HOPS:
+                return None
+            address = urljoin(address, location)
+            continue
+        if not 200 <= status < 300:
+            return None
+        return await page.goto(address, wait_until="domcontentloaded", timeout=OPEN_SECONDS * 1000)
+    return None
+
+
+async def _take_screenshot(page, path):
+    await asyncio.wait_for(page.screenshot(path=str(path), type="jpeg", quality=SHOT_QUALITY,
+                                           full_page=False, timeout=SHOT_SECONDS * 1000),
+                           timeout=SHOT_SECONDS)
+
+
 async def read_page(url, check, on_block=None):
     return await _visit(url, check, None, on_block)
 
@@ -101,36 +180,13 @@ async def _visit(url, check, shot_path, on_block):
             pending.add(task)
             task.add_done_callback(pending.discard)
 
-        async def route_request(route):
-            # Safety 3: every request must be public and read-only.
+        def note_block(reason):
             nonlocal blocked
-            request = route.request
-            if request.method.upper() not in ("GET", "HEAD"):
-                blocked += 1
-                logger.info("[ams-life] browser: blocked request (method)")
-                await route.abort()
-                return
-            ok, reason = await checked(request.url)
-            if not ok:
-                blocked += 1
-                logger.info("[ams-life] browser: blocked request (%s)", reason)
-                await route.abort()
-                return
-            response = None
-            try:
-                response = await route.fetch(max_redirects=0, timeout=OPEN_SECONDS * 1000)
-                if 300 <= response.status < 400:
-                    blocked += 1
-                    logger.info("[ams-life] browser: blocked request (redirect)")
-                    await route.abort()
-                else:
-                    await route.fulfill(response=response)
-            except Exception:
-                logger.info("[ams-life] browser: request failed")
-                await route.abort()
-            finally:
-                if response is not None:
-                    await response.dispose()
+            blocked += 1
+            logger.info("[ams-life] browser: blocked request (%s)", reason)
+
+        async def route_request(route):
+            await _route_request(route, checked, note_block)
 
         async def check_response(response):
             # Safety 4: redirects and all other responses are checked too.
@@ -155,33 +211,7 @@ async def _visit(url, check, shot_path, on_block):
             context.on("page", lambda new_page: track(new_page.close()))
             context.on("response", lambda response: track(check_response(response)))
 
-            async def navigate():
-                nonlocal blocked
-                address = url
-                for hop in range(MAX_HOPS + 1):
-                    ok, reason = await checked(address)
-                    if not ok:
-                        blocked += 1
-                        logger.info("[ams-life] browser: page refused (%s)", reason)
-                        return None
-                    probe = await context.request.get(address, max_redirects=0, timeout=OPEN_SECONDS * 1000)
-                    try:
-                        status, location = probe.status, probe.headers.get("location")
-                    finally:
-                        await probe.dispose()
-                    if 300 <= status < 400:
-                        if not location or hop == MAX_HOPS:
-                            logger.info("[ams-life] browser: redirect limit or missing location")
-                            return None
-                        address = urljoin(address, location)
-                        continue
-                    if not 200 <= status < 300:
-                        logger.info("[ams-life] browser: navigation failed")
-                        return None
-                    return await page.goto(address, wait_until="domcontentloaded", timeout=OPEN_SECONDS * 1000)
-                return None
-
-            response = await asyncio.wait_for(navigate(), timeout=OPEN_SECONDS)
+            response = await asyncio.wait_for(_navigate(context, page, url, checked, note_block), timeout=OPEN_SECONDS)
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
             if rejected:
@@ -215,9 +245,7 @@ async def _visit(url, check, shot_path, on_block):
                 logger.info("[ams-life] browser: verification page")
                 return None
             if shot_path is not None:
-                await asyncio.wait_for(page.screenshot(path=str(shot_path), type="jpeg", quality=SHOT_QUALITY,
-                                                       full_page=False, timeout=SHOT_SECONDS * 1000),
-                                       timeout=SHOT_SECONDS)
+                await _take_screenshot(page, shot_path)
                 final_url = page.url
             else:
                 body = await _article_text(page, body)
@@ -237,18 +265,8 @@ async def _visit(url, check, shot_path, on_block):
                 try:
                     # Safety 1: use Edge with its sandbox and a fresh, temporary context.
                     # Safety 3: disable the browser's encrypted DNS.
-                    browser = await playwright.chromium.launch(channel="msedge", headless=True,
-                                                               chromium_sandbox=True,
-                                                               args=["--disable-features=DnsOverHttps",
-                                                                     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"])
-                    # Safety 2: deny downloads, permissions and service workers; keep TLS and CSP checks.
-                    options = dict(accept_downloads=False, permissions=[], service_workers="block",
-                                   ignore_https_errors=False, bypass_csp=False)
-                    if shot_path is not None:
-                        options["viewport"] = dict(SHOT_VIEWPORT)
-                    context = await browser.new_context(**options)
-                    # Safety 3: prevent pages from creating WebRTC peer connections.
-                    await context.add_init_script(WEBRTC_INIT)
+                    # Safety 2 and 3: shared context settings and WebRTC prevention.
+                    browser, context = await _launch_browser(playwright, shot_path)
                     # Safety 7: the caller passes the result to browse.wrap as untrusted material.
                     result = await asyncio.wait_for(read(context), timeout=OPEN_SECONDS + SETTLE_SECONDS + 2 * TEXT_SECONDS + SHOT_SECONDS + EXTRACT_SECONDS)
                 finally:

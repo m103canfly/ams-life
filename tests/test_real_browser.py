@@ -208,6 +208,13 @@ class Browser(unittest.TestCase):
                     real_browser.read_page(URL, check, on_block=on_block))
             return asyncio.run(task)
 
+    def test_shared_launch_closes_resources_when_setup_fails(self):
+        fake = FakePlaywright()
+        fake.context.add_init_script = mock.AsyncMock(side_effect=RuntimeError('setup failed'))
+        with self.assertRaises(RuntimeError):
+            asyncio.run(real_browser._launch_browser(fake))
+        self.assertTrue(fake.context.closed and fake.closed)
+
     def test_article_extraction_uses_html_and_preserves_title(self):
         fake = FakePlaywright()
         fake.context.body = 'visible ' * 40
@@ -599,6 +606,7 @@ class Wiring(unittest.TestCase):
     def test_default_switch_is_off(self):
         schema = json.loads((ROOT / '_conf_schema.json').read_text('utf-8'))
         self.assertFalse(schema['browser_enabled']['default'])
+        self.assertFalse(schema['browser_interactive_enabled']['default'])
 
     def test_short_empty_and_script_prompts(self):
         self.assertTrue(mixin_browse.needs_browser(''))

@@ -153,6 +153,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (丁): her browser -- in a reply, two read-only tools of the plugin's own (off by default)
         self.browse_enabled = bool(self.config.get("browse_enabled", False))
         self.browser_enabled = bool(self.config.get("browser_enabled", False))
+        self.browser_interactive_enabled = bool(self.config.get("browser_interactive_enabled", False))
         self.browse_trips_enabled = bool(self.config.get("browse_trips_enabled", False))
         self.register_name_source(self._impression_names)
         try:
