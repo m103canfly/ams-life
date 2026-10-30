@@ -622,9 +622,17 @@ class LLMMixin:
             _used = set(parsed["evidence_refs"] or [])
             _sources = [s for m in marks if str(m.get("key") or m.get("type") or "") in _used
                         for s in (m.get("source_ids") or [])]
+            _source_origins = [discretion.origin_of(x) for x in self._read_window(self._here(event))["recent"]
+                               if discretion.is_about(discretion.origin_of(x), source_ids=_sources)]
+            _source_origins += [discretion.origin_of(x) for x in self._read_library().get("entries", [])
+                                if discretion.is_about(discretion.origin_of(x), source_ids=_sources)]
+            _source_origins += [discretion.origin_of(x) for x in self._event_archive(1000)
+                                if discretion.is_about(discretion.origin_of(x), source_ids=_sources)]
+            _visibility = (discretion.PRIVATE if any(o["visibility"] == discretion.PRIVATE
+                                                     for o in _source_origins) else None)
             items.append({"ts": time.time(), "text": parsed["narrative"],
                           "evidence_refs": parsed["evidence_refs"],
-                          "origin": discretion.make_origin(self._here(event), [_sid], _sources)})
+                          "origin": discretion.make_origin(self._here(event), [_sid], _sources, _visibility)})
             self.self_model["relationship_narratives"] = items[-5:]
             self._save_self_model()
             self._llm_v2_mark("relationship_narrative")

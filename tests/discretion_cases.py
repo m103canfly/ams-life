@@ -154,7 +154,119 @@ def run():
     out = {'turns': []}
     t = lambda *a, **k: out['turns'].append(turn(plugin, loop, *a, **k)) or out['turns'][-1]  # noqa: E731
 
-    if CASE == 'private':
+    if CASE == 'keep_in_group':
+        import impressions
+        async def fake_vectors(text, *args, **kwargs):
+            return harness.fake_vector(text)
+        plugin._embed_text = fake_vectors
+        hear(plugin, loop, 0, '较早以前的消息', '10001', '甲', A)
+        hear(plugin, loop, 121, '第四条不应收窄', '10001', '甲', A)
+        secret = hear(plugin, loop, 1, '青柠七号是今晚的暗号', '10001', '芒果', A)
+        loop.run_until_complete(plugin._remember(secret, secret.message_str, 'user', plugin._core(secret)))
+        sid = plugin._source_ids(secret)
+        origin = plugin._event_origin(secret)
+        main.EVENT_ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        main.EVENT_ARCHIVE_PATH.write_text(json.dumps({'id': 'event1', 'origin': origin}) + '\n', 'utf-8')
+        plugin.self_model['notebook'] = [{'text': '一条笔记', 'origin': dict(origin)}]
+        plugin._save_self_model()
+        store = plugin._impression_store()
+        data = store.load('group:' + A)
+        data['people']['10002'] = dict(impressions._record('group:' + A, '10002'), name='柠檬')
+        store.save('group:' + A, data)
+        hear(plugin, loop, 1, '第二个前文', '10001', '甲', A)
+        hear(plugin, loop, 1, '另一个人的消息', '10002', '乙', A)
+        hear(plugin, loop, 1, '另一个群的消息', '10001', '甲', B)
+        hear(plugin, loop, 1, '第三个前文', '10001', '甲', A)
+        marked = hear(plugin, loop, 1, '这件事别外传', '10001', '甲', A)
+        loop.run_until_complete(plugin._remember(marked, marked.message_str, 'user', plugin._core(marked)))
+        out['phone'] = plugin._read_window('group:' + A)['recent']
+        out['other_phone'] = plugin._read_window('group:' + B)['recent']
+        out['memory'] = plugin._read_library()['entries']
+        out['event'] = json.loads(main.EVENT_ARCHIVE_PATH.read_text('utf-8').splitlines()[0])
+        out['note'] = plugin.self_model['notebook'][0]
+        out['source_ids'] = sid
+        out['marked_ids'] = plugin._source_ids(marked)
+        other_impression = store.load('group:' + A)['people']['10002']
+        out['other_impression'] = other_impression
+        out['other_impression_elsewhere'] = impressions.view(other_impression, 'group:' + A,
+                                                             'group:' + B, present_here=True)
+        out['labels'] = {place: main.discretion.label(plugin._event_origin(marked), place, '10001')['may']
+                         for place in ('group:' + A, 'group:' + B, 'private:10001', 'private:10002')}
+        relation = {'relationship': {'we_memory': [{'text': '一件旧事'}], 'transactive_map': {'旧话题': 1}}}
+        out['private_user_view'] = plugin._user_view(harness.FakeEvent('问候', sender='10001'), relation)
+        for phrase in main.discretion.NOT_KEEP_IN_GROUP_PHRASES:
+            hear(plugin, loop, 1, phrase, '10003', '丙', A)
+        out['negated'] = plugin._read_window('group:' + A)['recent'][-len(main.discretion.NOT_KEEP_IN_GROUP_PHRASES):]
+        day_lines = plugin._read_window('group:' + A)['recent']
+        item = {'title': '代号', 'what': '一件群里的事'}
+        out['digest'] = plugin._digest_event('group:' + A, 'group:' + A, item, {}, day_lines,
+                                              ['10001'], sid, False, clock.now)
+        import time
+        day = time.strftime('%Y-%m-%d', time.localtime(clock.now))
+        impression_lines = [dict(lines, ts=clock.now + i) for i, lines in enumerate(
+            [next(x for x in day_lines if x['text'] == secret.message_str)] * 12)]
+        async def empty_answer(prompt):
+            return '{}'
+        store = plugin._impression_store()
+        loop.run_until_complete(impressions.nightly(store, 'group:' + A, impression_lines, empty_answer, day))
+        rec = store.load('group:' + A)['people']['10001']
+        out['impression'] = rec
+        out['impression_elsewhere'] = impressions.view(rec, 'group:' + A, 'private:10001')
+        clock.advance(1801)  # the speaker's earlier line in group B is no longer present
+        plugin.global_memory = True
+        ask = harness.FakeEvent('最近怎么样', sender='10004', name='丁', group=B)
+        out['present'] = sorted(plugin._present_people(ask))
+        out['without_recall'] = list(plugin._check_note(ask)['forbidden'])
+        original = next(x for x in out['memory'] if sid[0] in x['origin']['source_ids'])
+        real_score = plugin._memory_score
+        plugin._memory_score = lambda core, entry, cosine: 1.0
+        out['recalled'] = plugin._labeled_elsewhere(ask, original['vector'], plugin._core(ask), [])
+        plugin._memory_score = real_score
+        async def no_vectors(text, *args, **kwargs):
+            return None
+        plugin._embed_text = no_vectors
+        out['name_check'] = loop.run_until_complete(plugin._check_reply(ask, '芒果最近好像挺忙的'))
+        out['check'] = loop.run_until_complete(plugin._check_reply(ask, '青柠七号是今晚的暗号'))
+        out['forbidden'] = plugin._check_note(ask)['forbidden']
+        response = LLMResponse('青柠七号是今晚的暗号')
+        out['sent'] = loop.run_until_complete(plugin._look_at_reply(ask, response, response.completion_text))
+        plugin.global_memory = False
+        hear(plugin, loop, 0, '恰好两分钟前', '10005', '戊', '900003')
+        hear(plugin, loop, 120, '保密', '10005', '戊', '900003')
+        out['boundary'] = plugin._read_window('group:900003')['recent'][0]['origin']
+        calls = []
+        async def look(event, response, reply):
+            calls.append('look')
+            return reply
+        plugin._look_at_reply = look
+        plugin._note_allowed = lambda *args: calls.append('allowed')
+        plugin._settle_history = lambda *args: calls.append('history')
+        plain = harness.FakeEvent('随便聊聊', sender='10004', name='丁', group=B)
+        request = ProviderRequest(prompt=plain.message_str, system_prompt='小爱')
+        loop.run_until_complete(plugin.on_message(plain))
+        loop.run_until_complete(plugin.on_llm_request(plain, request))
+        answer = LLMResponse('芒果最近好像挺忙的')
+        loop.run_until_complete(plugin.on_llm_response(plain, answer))
+        loop.run_until_complete(plugin.on_agent_done(plain, object(), answer))
+        harness.drain(loop)
+        out['off_calls'] = calls
+        out['off_reply'] = answer.completion_text
+        async def epochs():
+            ready_a, ready_b, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            async def waiting(place, ready):
+                plugin._begin_job(place)
+                ready.set()
+                await release.wait()
+                return plugin._job_stale()
+            a = asyncio.create_task(waiting('group:' + A, ready_a))
+            b = asyncio.create_task(waiting('group:' + B, ready_b))
+            await ready_a.wait()
+            await ready_b.wait()
+            plugin._narrow_group_sources('group:' + A, sid)
+            release.set()
+            return [await a, await b]
+        out['epochs'] = loop.run_until_complete(epochs())
+    elif CASE == 'private':
         t(0, '小爱，我在偷偷准备一个惊喜蛋糕给大家', '10001', '芒果', reply='好呀，我帮你保密')
         t(30, '惊喜蛋糕的事你还记得吗', '10001', '芒果')                      # control: same chat
         t(60, '小爱，惊喜蛋糕是什么情况', '10002', '柠檬', A)

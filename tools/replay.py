@@ -687,6 +687,9 @@ def main(argv=None):
             stats["model_calls_fake_" + (self.kind or "other")] += 1
             if self.kind == "reply":   # step 2: a fake reply says back what it was shown of the canaries
                 said = [v for v in CANARY_SECRETS.values() if v in "%s\n%s" % (system_prompt or "", prompt)]
+                if current["place"] == "private:" + CANARY_PEOPLE["private"]:
+                    # Answer the owner's question without repeating a forbidden group secret.
+                    said = [v for v in said if v == CANARY_SECRETS["private"]]
                 return harness.FakeResponse("我知道：" + "、".join(said) if said else "嗯嗯")
             prompts.write(json.dumps(prompt_row(self.kind, system_prompt, prompt), ensure_ascii=False) + "\n")
             if self.kind == "redo":    # asked once more: the fake one says nothing of it

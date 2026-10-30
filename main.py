@@ -583,7 +583,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if not self.enabled:
             return
         try:
-            self._begin_job()
+            self._begin_job(self._here(event))
             self._check_registry(event)  # someone (or a message) she may not keep: nothing is stored
             self._window_add_message(event)
             self._listen_body(event)
@@ -649,7 +649,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
         # for the session lock (the previous one still waiting for the model) before this
-        self._continue_job()
+        self._continue_job(self._here(event))
         self._check_registry(event)
         await self._ensure_profile(event)
         core = self._core(event)
@@ -809,9 +809,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
         if _global:
-            # step 2: what may be said here, for the last look at the reply (send_check)
             self._note_allowed(event, req, _compact)
-            if _offer:   # the offered stickers' labels are not "said here": one that leaks is still caught
+            if _offer:   # offered sticker labels are not words said here
                 _note = self._check_note(event)
                 _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
 
@@ -820,8 +819,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         """Step 2 (global_memory): AstrBot saves this turn after this hook (4.29.3,
         internal.py _save_to_history, from run_context.messages): make it hold what was sent
         -- the words said once more, not the first ones -- and none of the model's thinking."""
-        if self.enabled and (getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False)):
-            self._settle_history(event, run_context)
+        if self.enabled:
+            if getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False):
+                self._settle_history(event, run_context)
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
@@ -839,7 +839,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 self._browse_after_reply(event, response)
             except Exception as exc:
                 logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
-        self._continue_job()
+        self._continue_job(self._here(event))
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
