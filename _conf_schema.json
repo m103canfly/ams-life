@@ -1,4 +1,44 @@
 {
+  "photo_enabled": {
+    "description": "她的手机：拍照（默认关）",
+    "type": "bool",
+    "default": false
+  },
+  "screenshot_enabled": {
+    "description": "她的手机：分享看过的网页（默认关）",
+    "type": "bool",
+    "default": false
+  },
+  "say_aloud_enabled": {
+    "description": "她的手机：语音（默认关）",
+    "type": "bool",
+    "default": false
+  },
+  "selfie_reference": {
+    "description": "自拍参考图文件名（selfie/refs 目录内）",
+    "type": "string",
+    "default": "her_base.png"
+  },
+  "phone_photo_retention": {
+    "description": "保留最近的手机照片数",
+    "type": "int",
+    "default": 50
+  },
+  "phone_voice_retention": {
+    "description": "保留最近的手机语音数",
+    "type": "int",
+    "default": 50
+  },
+  "phone_photo_price": {
+    "description": "每次出图费用（元，按服务价格填写）",
+    "type": "float",
+    "default": 0
+  },
+  "phone_voice_price": {
+    "description": "每次语音费用（元，本机服务填零）",
+    "type": "float",
+    "default": 0
+  },
   "enabled": {
     "description": "启用 BioCore",
     "hint": "关闭后不注入任何情绪状态，也不写 feedback。",

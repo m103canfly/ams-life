@@ -127,6 +127,8 @@ class DigestMixin:
                 called[qq] = known[0] if known else ""
         title = digest.named(item["title"], codes, called)
         what = digest.named(item["what"], codes, called)
+        used = [ln for ln in day_all if discretion.is_about(discretion.origin_of(ln), source_ids=ids)]
+        private = private or any(discretion.origin_of(ln)["visibility"] == discretion.PRIVATE for ln in used)
         origin = discretion.make_origin(place, people, ids, discretion.PRIVATE if private else discretion.PUBLIC)
         return {"id": "dig_" + _sha256("%s|%s|%s" % (place, now, title))[:16], "ts": now, "session": str(session),
                 "kind": "daily_digest", "title": title, "event": what, "big_summary": what,

@@ -735,7 +735,11 @@ class PagesMixin:
             # step 2: the last look before sending, today (numbers only; only with the switch on)
             **({"send_check": self._check_counts_today()} if getattr(self, "global_memory", False) else {}),
             # step 2 (甲): the money of the day (only with the switch on)
-            **({"spend": self._spend_for_panel()} if getattr(self, "self_decide", False) else {}),
+            **({"spend": self._spend_for_panel()} if getattr(self, "self_decide", False) or
+                any((self.config or {}).get(k) for k in
+                    ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
+            **({"phone_counts": self._phone_counts()} if any((self.config or {}).get(k) for k in
+                ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
             **({"mood_events": [{"kind": MOOD_EVENT_LABELS[x["kind"]], "ts": x["ts"]}
                                 for x in getattr(self.cores.get("her"), "mood_events", [])[-5:]
                                 if x.get("kind") in MOOD_EVENT_LABELS]}

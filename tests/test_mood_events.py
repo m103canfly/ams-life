@@ -75,22 +75,6 @@ class MoodEvents(unittest.TestCase):
         phone._sweep_windows()
         self.assertEqual(phone.core.mood_events[-1]['kind'], 'ignored')
 
-    def test_sent_selfie_counts_once_and_answer_prevents_loss(self):
-        event = type('Event', (), {'_mood_direct': True})()
-        silent, answered = MoodPhone(), MoodPhone()
-        for phone in (silent, answered):
-            phone._window_add_reply(event, '一句话')
-            phone._note_she_sent(event, 'selfie')
-            self.assertEqual(phone.win['recent'][-1]['text'], '[自拍]')
-            self.assertTrue(phone.win['recent'][-1]['mood_checked'])
-            self.assertTrue(phone.win['recent'][0]['mood_share'])
-        answered.win['recent'].append({'role': 'user', 'sender_id': '10005', 'ts': CLOCK() + 10})
-        CLOCK.advance(600)
-        silent._sweep_windows()
-        answered._sweep_windows()
-        self.assertEqual([x['kind'] for x in silent.core.mood_events], ['unanswered_share'])
-        self.assertFalse(getattr(answered.core, 'mood_events', []))
-
     def test_media_note_rejects_unknown_kind_and_off_switch(self):
         phone = MoodPhone()
         event = type('Event', (), {'_mood_direct': True})()
@@ -100,6 +84,21 @@ class MoodEvents(unittest.TestCase):
         phone._note_she_sent(event, 'selfie')
         self.assertEqual(len(phone.win['recent']), 1)
         self.assertNotIn('mood_share', phone.win['recent'][0])
+
+    def test_media_note_uses_phone_kinds_only(self):
+        event = type('Event', (), {'_mood_direct': True})()
+        for kind, label in [('selfie', '[自拍]'), ('snap', '[随手拍]'),
+                            ('screenshot', '[分享网页]'), ('voice', '[语音]')]:
+            phone = MoodPhone()
+            phone._window_add_reply(event, '一句话')
+            phone._note_she_sent(event, kind)
+            self.assertEqual(phone.win['recent'][-1]['text'], label)
+            self.assertTrue(phone.win['recent'][0]['mood_share'])
+        for kind in ('photo', 'web'):
+            phone = MoodPhone()
+            phone._window_add_reply(event, '一句话')
+            phone._note_she_sent(event, kind)
+            self.assertEqual(len(phone.win['recent']), 1)
 
     def test_brief_keeps_event_and_body_details(self):
         core = body.BioCore()
@@ -297,19 +296,47 @@ class MoodEvents(unittest.TestCase):
 
 
 class DecisionHearing(unittest.IsolatedAsyncioTestCase):
+    async def test_sent_selfie_counts_once_and_answer_prevents_loss(self):
+        class MediaPhone(mixin_selfie.SelfieMixin, MoodPhone):
+            async def _phone_clear(self, event, text): return True
+            async def _make_photo(self, kind, what): return Path('selfie.png')
+            def _phone_account(self, kind, sent=False): pass
+            def _phone_prune(self, kind): pass
+
+        class Event:
+            _mood_direct = True
+            def __init__(self): self.sent = []
+            async def send(self, chain): self.sent.append(chain)
+            def is_stopped(self): return False
+
+        async def no_wait(_): pass
+        silent, answered = MediaPhone(), MediaPhone()
+        with mock.patch.object(mixin_selfie.asyncio, 'sleep', no_wait):
+            for phone in (silent, answered):
+                event = Event()
+                phone._window_add_reply(event, '一句话')
+                await phone._media_after_reply(event, {'photo': ('selfie', '在家')})
+                self.assertEqual(len(event.sent), 1)
+                self.assertEqual(phone.win['recent'][-1]['text'], '[自拍]')
+                self.assertTrue(phone.win['recent'][-1]['mood_checked'])
+                self.assertTrue(phone.win['recent'][0]['mood_share'])
+        answered.win['recent'].append({'role': 'user', 'sender_id': '10005', 'ts': CLOCK() + 10})
+        CLOCK.advance(600)
+        silent._sweep_windows()
+        answered._sweep_windows()
+        self.assertEqual([x['kind'] for x in silent.core.mood_events], ['unanswered_share'])
+        self.assertFalse(getattr(answered.core, 'mood_events', []))
+
     async def test_media_send_success_and_failure_control_mood_note(self):
         class Sender(mixin_selfie.SelfieMixin):
-            def __init__(self, kind):
-                self.kind = kind
+            def __init__(self):
                 self.notes = []
-            def _media_settings(self):
-                return {'selfie_daily_limit': 0, 'voice_daily_limit': 0}
-            def _media_wanted(self, event, cfg, enabled_key, keywords_key):
-                return enabled_key == self.kind + '_enabled'
-            def _media_bump(self, kind): pass
+            async def _phone_clear(self, event, text): return True
+            def _phone_account(self, kind, sent=False): pass
+            def _phone_prune(self, kind): pass
             def _note_she_sent(self, event, kind): self.notes.append((event, kind))
             async def _make_voice(self, text): return Path('voice.wav')
-            async def _make_selfie(self, scene): return Path('selfie.png')
+            async def _make_photo(self, kind, what): return Path('photo.png')
 
         class Event:
             def __init__(self, fails): self.fails = fails
@@ -319,11 +346,15 @@ class DecisionHearing(unittest.IsolatedAsyncioTestCase):
 
         async def no_wait(_): pass
         with mock.patch.object(mixin_selfie.asyncio, 'sleep', no_wait):
-            for kind in ('selfie', 'voice'):
+            queues = {'selfie': {'photo': ('selfie', '在家')},
+                      'snap': {'photo': ('snap', '天空')},
+                      'screenshot': {'screenshot': ('https://example.invalid/', '网页', '分享')},
+                      'voice': {'voice': '一段话'}}
+            for kind, queue in queues.items():
                 for fails in (False, True):
                     with self.subTest(kind=kind, fails=fails):
-                        sender, event = Sender(kind), Event(fails)
-                        await sender._media_after_reply(event, '一段话')
+                        sender, event = Sender(), Event(fails)
+                        await sender._media_after_reply(event, queue)
                         self.assertEqual(sender.notes, [] if fails else [(event, kind)])
 
     async def test_on_message_counts_first_answer_per_reply(self):

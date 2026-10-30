@@ -589,7 +589,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if not self.enabled:
             return
         try:
-            self._begin_job()
+            self._begin_job(self._here(event))
             self._check_registry(event)  # someone (or a message) she may not keep: nothing is stored
             self._window_add_message(event)
             self._listen_body(event)
@@ -653,6 +653,21 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             req.func_tool = None
             logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
         else:
+            try:
+                _tools = getattr(req, "func_tool", None)
+                if _tools:
+                    for _name in ("take_photo", "share_screenshot", "say_aloud"):
+                        if _name in _tools.names():
+                            _tools.remove_tool(_name)
+                    if not _tools:
+                        req.func_tool = None
+                if self.enabled and any((self.config or {}).get(k) for k in
+                        ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")):
+                    await self._ensure_profile(event)
+                self._give_phone_tools(req, event)
+            except Exception as exc:
+                req.func_tool = None
+                logger.warning("[ams-life] phone tools unavailable: %s", type(exc).__name__)
             try:   # step 2 (丁): then her browser's two tools, only those (browse_enabled)
                 self._give_browse_tools(req, event)
             except Exception as exc:
@@ -661,7 +676,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
         # for the session lock (the previous one still waiting for the model) before this
-        self._continue_job()
+        self._continue_job(self._here(event))
         self._check_registry(event)
         await self._ensure_profile(event)
         core = self._core(event)
@@ -821,9 +836,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             else:
                 req.system_prompt = (_base + "\n\n" + _compact).strip()
         if _global:
-            # step 2: what may be said here, for the last look at the reply (send_check)
             self._note_allowed(event, req, _compact)
-            if _offer:   # the offered stickers' labels are not "said here": one that leaks is still caught
+            if _offer:   # offered sticker labels are not words said here
                 _note = self._check_note(event)
                 _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
 
@@ -832,8 +846,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         """Step 2 (global_memory): AstrBot saves this turn after this hook (4.29.3,
         internal.py _save_to_history, from run_context.messages): make it hold what was sent
         -- the words said once more, not the first ones -- and none of the model's thinking."""
-        if self.enabled and (getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False)):
-            self._settle_history(event, run_context)
+        if self.enabled:
+            if getattr(self, "global_memory", False) or getattr(event, "_ams_sticker_sent", False):
+                self._settle_history(event, run_context)
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
@@ -842,9 +857,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
 
     async def _reply_response(self, event: AstrMessageEvent, response: LLMResponse):
         if self._ignored_sender(event):   # nothing of an answer to him is kept
+            self._phone_queue(event).clear()
             event.stop_event()
             return
         if not self.enabled:
+            self._phone_queue(event).clear()
             return
         if getattr(self, "self_decide", False):
             self._note_spend("reply", response)   # step 2: the money of the day
@@ -853,7 +870,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 self._browse_after_reply(event, response)
             except Exception as exc:
                 logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
-        self._continue_job()
+        self._continue_job(self._here(event))
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
         _reply = str(getattr(response, "completion_text", "") or "")
@@ -881,6 +898,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             # step 2 (甲): she chose to say nothing (【不说】): nothing is sent, nothing kept
             logger.info("[ams-life] attention: she said nothing")
             self._check_note(event).update(sent="", outcome="silent")
+            self._phone_queue(event).clear()
             self._stop(event)
             return
         if getattr(self, "global_memory", False) and _reply.strip():
@@ -891,6 +909,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             except Exception as exc:
                 _reply = self._check_failed(event, exc, response)
             if not _reply:
+                self._phone_queue(event).clear()
                 return
             # said once more: a mark in the new words is taken out too
             _reply, _again = self._sticker_named(event, response, _reply)
@@ -947,8 +966,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             asyncio.create_task(self._maybe_relationship_narrative(event, core))
         except Exception:
             pass
-        # ams-life: 她说完话之后——要不要发一张自拍、要不要发一条语音（默认按关键词触发，每天有上限）
+        # Her queued media follows a cleared reply.
         try:
-            asyncio.create_task(self._media_after_reply(event, _reply))
+            _queue = self._phone_queue(event)
+            _stopped = bool(event.is_stopped()) if hasattr(event, "is_stopped") else False
+            if _queue and _reply.strip() and not attention.silent(_reply) and not _stopped:
+                asyncio.create_task(self._media_after_reply(event, dict(_queue)))
+            _queue.clear()
         except Exception:
             pass
