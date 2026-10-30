@@ -15,6 +15,7 @@ from test_body_heart import CLOCK as _CLOCK  # noqa: E402,F401
 import mixin_group_browse as groups  # noqa: E402
 import mixin_media  # noqa: E402
 import mixin_discretion  # noqa: E402
+import mixin_wishes  # noqa: E402
 import forget_registry  # noqa: E402
 
 
@@ -386,7 +387,7 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
 
 class RecentImageTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        class PictureDummy(Dummy, mixin_media.MediaMixin, mixin_discretion.DiscretionMixin):
+        class PictureDummy(Dummy, mixin_media.MediaMixin, mixin_discretion.DiscretionMixin, mixin_wishes.WishesMixin):
             image_llama_server = ''
             image_llama_model = ''
             image_service_port = 0
@@ -540,7 +541,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
         self.p._refresh_loop_pressure = lambda core: None
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            with patch.multiple(mixin_discretion, EVENT_ARCHIVE_PATH=root / 'events',
+            with patch.object(mixin_wishes, 'WISHES_PATH', root / 'wishes.json'), patch.multiple(mixin_discretion, EVENT_ARCHIVE_PATH=root / 'events',
                                 INSIGHT_ARCHIVE_PATH=root / 'insights', EVENT_SESSION_DIR=root / 'sessions',
                                 USER_DIR=root / 'users', EMBED_CACHE={}):
                 self.p._remember_images(self.ev(images=[ref(1)]))

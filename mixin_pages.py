@@ -401,6 +401,10 @@ class PagesMixin:
                          "the owner deletes one of her stickers")
                 register("/astrbot_plugin_ams_life/page/stickers/add", self.page_sticker_add, ["POST"],
                          "the owner adds a sticker (pictures only)")
+                register("/astrbot_plugin_ams_life/page/wishes", self.page_wishes, ["GET"],
+                         "her proposals without personal numbers")
+                register("/astrbot_plugin_ams_life/page/wishes/status", self.page_wishes_status, ["POST"],
+                         "the owner's decision on a proposal")
                 # ams-life: her avatar and art for the panel's look, from the data folder only (ui_look.py)
                 register("/astrbot_plugin_ams_life/page/look", self.page_look, ["GET"],
                          "her pictures for the panel, when the owner put them in (read-only)")

@@ -94,6 +94,10 @@ except ImportError:
     from mixin_stickers import StickersMixin
     import stickers
 try:
+    from .mixin_wishes import WishesMixin
+except ImportError:
+    from mixin_wishes import WishesMixin
+try:
     from .mixin_group_browse import GroupBrowseMixin
 except ImportError:
     from mixin_group_browse import GroupBrowseMixin
@@ -114,7 +118,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, GroupBrowseMixin, StickersMixin, BrowseMixin, SelfieMixin, SlangMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, GroupBrowseMixin, StickersMixin, BrowseMixin, SelfieMixin, SlangMixin, WishesMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -149,6 +153,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (丙): her stickers -- she keeps the ones she likes and sends them (off by default;
         # looking at pictures, image_caption, has to be on too)
         self.stickers_enabled = bool(self.config.get("stickers_enabled", False))
+        self.wishes_enabled = bool(self.config.get("wishes_enabled", False))
         self.browse_groups_enabled = bool(self.config.get("browse_groups_enabled", False))
         # step 2 (丁): her browser -- in a reply, two read-only tools of the plugin's own (off by default)
         self.browse_enabled = bool(self.config.get("browse_enabled", False))
@@ -673,7 +678,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             try:
                 _tools = getattr(req, "func_tool", None)
                 if _tools:
-                    for _name in ("take_photo", "share_screenshot", "say_aloud", "set_now"):
+                    for _name in ("take_photo", "share_screenshot", "say_aloud", "set_now", "wish"):
                         if _name in _tools.names():
                             _tools.remove_tool(_name)
                     if not _tools:

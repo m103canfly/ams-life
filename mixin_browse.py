@@ -239,6 +239,7 @@ class BrowseMixin:
             return NOT_SENT
         tool = self._builtin_web_tool("search")
         if tool is None:
+            getattr(self, "_wish_block", lambda _: None)("工具没有")
             return "现在搜不了。"
         try:
             raw = await tool.call(self._tool_context(event, self.context), query=q, count=browse.RESULTS_MAX)
@@ -267,14 +268,17 @@ class BrowseMixin:
             return browse.NO_MORE
         ok, why = await asyncio.to_thread(browse.check_url, url, resolve_host)
         if not ok:
+            getattr(self, "_wish_block", lambda _: None)("网址不能读")
             led.add(blocked_urls=1)
             logger.info("[ams-life] browse: a page refused (%s)", why)
             return "这个网址不能读。"
         if str(url).strip() not in self._browse_urls(event):
+            getattr(self, "_wish_block", lambda _: None)("网址不能读")
             led.add(blocked_urls=1)
             logger.info("[ams-life] browse: a page refused (not given by the message or a search)")
             return NOT_LISTED
         if not await self._may_go_out(event, unquote(str(url))):
+            getattr(self, "_wish_block", lambda _: None)("网址不能读")
             led.add(blocked_urls=1)
             logger.info("[ams-life] browse: a page held back by the send check")
             return NOT_SENT
@@ -282,16 +286,19 @@ class BrowseMixin:
             return browse.NO_MORE
         tool = self._builtin_web_tool("read")
         if tool is None:
+            getattr(self, "_wish_block", lambda _: None)("工具没有")
             return "现在读不了。"
         try:
             raw = await tool.call(self._tool_context(event, self.context), url=str(url).strip())
         except Exception as exc:
             led.add(fetches_failed=1)
+            getattr(self, "_wish_block", lambda _: None)("网址不能读")
             logger.warning("[ams-life] browse: a page failed (%s)", type(exc).__name__)
             return "没读到。"
         text = str(raw or "")
         if text.startswith("Error"):
             led.add(fetches_failed=1)
+            getattr(self, "_wish_block", lambda _: None)("网址不能读")
             return "没读到。"
         led.add(fetches=1)
         if self._browse_on() and getattr(self, "browser_enabled", False) and needs_browser(text):
@@ -310,6 +317,8 @@ class BrowseMixin:
                 logger.warning("[ams-life] browser: read failed (%s)", type(exc).__name__)
             finally:
                 led.add(**({"browser_reads": 1} if result else {"browser_reads_failed": 1}))
+                if not result:
+                    getattr(self, "_wish_block", lambda _: None)("网址不能读")
         page = page_of(str(url).strip(), text)
         page_url = str(url).strip()
         title = re.search(r"(?im)^\s*(?:title|标题)\s*[:：]\s*([^\r\n]+)", text)

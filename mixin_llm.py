@@ -476,6 +476,10 @@ class LLMMixin:
             text = ("%s：%s" % (str(e.get("title") or "一件事"), body)).strip("：")
             mats.append({"id": "m%d" % (len(mats) + 1), "text": "事件：" + text[:160],
                          "origin": origin, "names": discretion.names_in(e), "ref": str(e.get("id") or "")})
+        if getattr(self, "wishes_enabled", False):
+            for text in self._wish_materials(now):
+                mats.append({"id": "m%d" % (len(mats) + 1), "text": text,
+                             "origin": discretion.make_origin(discretion.SELF), "names": [], "ref": "wish"})
         return mats
 
     @staticmethod
@@ -553,9 +557,12 @@ class LLMMixin:
             changes = await self._llm_v2_call(
                 "notebook",
                 interpretation.notebook_prompt([(entries[i].get("text"), may) for i, may in shown], materials,
-                                               sitting != "group", NOTEBOOK_MAX, NOTEBOOK_CHARS, budget),
+                                               sitting != "group", NOTEBOOK_MAX, NOTEBOOK_CHARS, budget)
+                + ('\n你也可以补愿望：{"op":"wish","what":"想要什么（20–60字）","why":"为什么（100字以内）"}，这一轮最多两条。'
+                   if getattr(self, "wishes_enabled", False) else ""),
                 lambda raw: interpretation.parse_notebook_changes(
-                    raw, len(shown), [m["id"] for m in materials], NOTEBOOK_CHARS, budget),
+                    raw, len(shown), [m["id"] for m in materials], NOTEBOOK_CHARS, budget,
+                    getattr(self, "wishes_enabled", False)),
                 None, system_prompt=persona or None)
             if not changes or self._job_stale():
                 continue
@@ -565,6 +572,10 @@ class LLMMixin:
             entries = [x for x in (self.self_model.get("notebook") or []) if isinstance(x, dict)]
             gone = set()
             for change in changes:
+                if change["op"] == "wish":
+                    if await self._record_wish(None, change.get("what"), change.get("why"), "notebook") == "记下了":
+                        night["changes"] = int(night.get("changes", 0) or 0) + 1
+                    continue
                 mark = {"private_mark": change.get("private")}
                 # what she writes is kept like the rest: someone deleted is 某人
                 text = self._without_gone(change.get("text")) if change["op"] != "delete" else ""

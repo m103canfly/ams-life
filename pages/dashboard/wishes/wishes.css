@@ -1,0 +1,7 @@
+#list{display:grid;gap:14px;margin-top:16px}
+.wish{padding:18px 22px;border-radius:var(--r-l);background:var(--panel);border:1px solid var(--line);box-shadow:var(--sh-1)}
+.wish h2{font-size:17px;line-height:1.5;margin:0 0 8px;overflow-wrap:anywhere}
+.wish p{margin:6px 0;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere}
+.wish .meta{color:var(--muted);font-size:13px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.actions button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-strong)}

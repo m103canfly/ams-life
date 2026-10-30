@@ -250,7 +250,7 @@ class DiscretionMixin:
             for x in self._read_window(place)["recent"]:
                 self._note_name(x.get("sender_id"), x.get("sender_name"))
                 self._note_ats(x.get("text"))
-        for e in self._read_library()["entries"]:
+        for e in self._read_library(vectors=False)["entries"]:
             if not isinstance(e, dict):
                 continue
             self._note_name(e.get("sender_id"), e.get("sender_name"))
@@ -826,6 +826,7 @@ class DiscretionMixin:
         ids = [str(x) for x in (source_ids or []) if str(x or "").strip()]
         self._group_forget_queue(person, ids)
         self._forget_recent_images(person, ids)
+        self._forget_wishes(person, ids)
         entry_ids = {str(x) for x in (entry_ids or []) if str(x or "").strip()}
         if not person and not ids and not entry_ids:
             return {}

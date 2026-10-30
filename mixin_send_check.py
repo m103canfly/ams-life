@@ -14,6 +14,8 @@ Only reason codes, exception types and counts are logged; the counts per day
 (states/send_check.json) are for the panel.
 """
 from __future__ import annotations
+import hashlib
+import json
 
 try:
     from .common import *  # noqa: F401,F403
@@ -30,6 +32,65 @@ _SEGMENT = re.compile(r"\n|；(?=（)")
 
 
 class SendCheckMixin:
+    async def _check_for_owner(self, text) -> dict:
+        """Check a proposed wish against the library as seen in the owner's private chat."""
+        denied = {"leak": True, "ids": [], "why": {}, "close": [], "top": 0.0}
+        owner = str((self.config or {}).get("owner_qq", "") or "").strip()
+        if not owner:
+            return denied
+        try:
+            if MEMORY_LIBRARY_PATH.exists():
+                raw = json.loads(MEMORY_LIBRARY_PATH.read_text(encoding="utf-8"))
+                if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
+                    return denied
+            entries = [e for e in self._read_library(vectors=False).get("entries", [])
+                       if isinstance(e, dict) and not e.get("deleted")]
+            # Include content and names as well: edits/deletes can retain the same timestamp.
+            signature = (owner, len(entries), max((float(e.get("ts", 0) or 0) for e in entries), default=0.0),
+                         json.dumps(entries, ensure_ascii=False, sort_keys=True, default=str),
+                         repr(self._names_index()))
+            cache = getattr(self, "_owner_check_cache", None)
+            if not cache or cache[0] != signature:
+                forbidden = []
+                here = discretion.place_of("private:" + owner)
+                for e in entries:
+                    origin = discretion.origin_of(e)
+                    may = discretion.label(origin, here=here, speaker=owner, present=(),
+                                           said_by=self._said_by(e))["may"]
+                    if may not in (discretion.NO, discretion.HIDE, discretion.ANON):
+                        continue
+                    people = set(discretion.names_in(e))
+                    if e.get("sender_id"):
+                        people.add(str(e["sender_id"]))
+                    owner_names = set(self._known_names([owner]))
+                    names = [n for n in self._known_names([p for p in people if str(p) != owner])
+                             if n and not n.isdigit() and n not in owner_names]
+                    private = may in (discretion.NO, discretion.HIDE)
+                    body = str(e.get("text") or "") if private else ""
+                    digest = hashlib.sha256((str(e.get("id") or "") + "\0" + body).encode("utf-8")).hexdigest()
+                    forbidden.append({"id": "owner:" + digest, "text": body, "names": names,
+                                      "private": private, "vec": None})
+                self._owner_check_cache = (signature, forbidden)
+            else:
+                forbidden = cache[1]
+            vec = None
+            try:
+                vec = await self._embed_text(str(text))
+                vectors = getattr(self, "_check_vecs", None)
+                if not isinstance(vectors, dict):
+                    vectors = self._check_vecs = {}
+                for item in forbidden:
+                    if item["vec"] is None and item["text"]:
+                        if item["id"] not in vectors:
+                            vectors[item["id"]] = await self._embed_text(item["text"]) or []
+                        item["vec"] = vectors[item["id"]] or None
+            except Exception as exc:
+                logger.warning("[ams-life] owner check: no vectors (%s); local checks only", type(exc).__name__)
+            return send_check.check(text, forbidden, "", self._common_pieces(), vec)
+        except Exception as exc:
+            logger.warning("[ams-life] owner check failed (%s)", type(exc).__name__)
+            return denied
+
     # ------------------------------------------------------------------
     # what this reply may not bring up, noted while its prompt is built
     # ------------------------------------------------------------------
@@ -82,7 +143,7 @@ class SendCheckMixin:
 
     def _common_pieces(self) -> set:
         """send_check.common_pieces of all she keeps, worked out again when the library changes."""
-        lib = self._read_library()
+        lib = self._read_library(vectors=False)
         entries = [e for e in lib.get("entries") or [] if isinstance(e, dict) and not e.get("deleted")]
         sig = (len(entries), max((float(e.get("ts", 0) or 0) for e in entries), default=0.0))
         cached = getattr(self, "_common_cache", None)

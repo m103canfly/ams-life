@@ -102,13 +102,17 @@ async def _browser_screenshot(plugin, event, url):
     finally:
         led.add(**({"browser_shots": 1} if path else {"browser_shots_failed": 1}))
     if not path:
+        getattr(plugin, "_wish_block", lambda _: None)("看不到图")
         return None
     _prune_browser_shots(Path(path))
     provider = plugin._vision_provider_for(event, source="screenshot")
     if provider is None:
+        getattr(plugin, "_wish_block", lambda _: None)("看不到图")
         return None
     response = await provider.text_chat(prompt=interpretation.image_caption_prompt(), image_urls=[str(path)])
     description = interpretation.parse_image_caption(str(getattr(response, "completion_text", "") or ""))
+    if not description:
+        getattr(plugin, "_wish_block", lambda _: None)("看不到图")
     return (path, description) if description else None
 
 
@@ -194,12 +198,19 @@ class SelfieMixin:
         try:
             from astrbot.core.agent.tool import FunctionTool, ToolSet
         except ImportError:
+            getattr(self, "_wish_block", lambda _: None)("工具没有")
             logger.warning("[ams-life] phone tools unavailable")
             return
         context = self._phone_context(event) + COMMON_GUIDE
         tools = [FunctionTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 20},
             "doing": {"type": "string", "maxLength": 20}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
+        if getattr(self, "wishes_enabled", False):
+            tools.append(FunctionTool(name="wish", description="你有想要的功能或改变时，可以记一条愿望。",
+                parameters={"type": "object", "properties": {
+                    "what": {"type": "string", "minLength": 20, "maxLength": 60},
+                    "why": {"type": "string", "maxLength": 100}},
+                    "required": ["what", "why"]}, handler=self._tool_wish))
         if cfg.get("photo_enabled", False):
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]

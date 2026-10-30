@@ -1289,7 +1289,7 @@ def notebook_prompt(entries, materials, private_sitting=False, max_entries=20, m
             % (where, book, mats, max_edits, max_chars, max_entries))
 
 
-def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_edits=3) -> list:
+def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_edits=3, wishes_enabled=False) -> list:
     """At most `max_edits` valid changes; texts cut to `max_chars`; unknown numbers dropped.
     `uses` (only known material ids) and `private` (True / False / None) are kept as she
     wrote them, for reference; neither decides an entry's origin."""
@@ -1304,6 +1304,15 @@ def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_
         if not isinstance(item, dict):
             continue
         op = str(item.get("op") or "").strip().lower()
+        if op == "wish" and wishes_enabled:
+            try:
+                from .wishes import NOTEBOOK_WISH_MAX
+            except ImportError:
+                from wishes import NOTEBOOK_WISH_MAX
+            if sum(x["op"] == "wish" for x in out) < NOTEBOOK_WISH_MAX:
+                out.append({"op": "wish", "what": str(item.get("what") or ""),
+                            "why": str(item.get("why") or "")})
+            continue
         if op not in ("add", "edit", "delete"):
             continue
         change = {"op": op}

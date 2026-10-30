@@ -355,6 +355,8 @@ class MediaMixin:
                         if item.get('caption'):
                             lines.append('他%d秒前发的图：%s' % (max(0, int(time.time() - row['ts'])), item['caption']))
                     return "\n".join(lines)
+            if not result:
+                getattr(self, "_wish_block", lambda _: None)("看不到图")
             return result
         finally:
             delattr(event, '_ams_image_refs')
