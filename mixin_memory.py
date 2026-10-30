@@ -13,7 +13,13 @@ except ImportError:
     from body import *  # noqa: F401,F403
 
 
-class MemoryMixin:
+try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
+
+
+class MemoryMixin(PortsMixin):
     @staticmethod
     def _ipv4_json(url: str, headers: dict, payload: dict, timeout: float = 12.0) -> dict:
         parsed = urlparse(url)
@@ -853,9 +859,9 @@ class MemoryMixin:
                 if _summary_use_llm and provider is not None:
                     prompt = interpretation.memory_summary_prompt(texts)
                     try:
-                        resp = await provider.text_chat(prompt=prompt)
+                        reply = await self._model(provider).chat(prompt=prompt)
                         payload = interpretation.parse_memory_summary_payload(
-                            str(getattr(resp, "completion_text", "") or ""),
+                            reply.text,
                             getattr(self, "summary_max_chars", 0))
                     except Exception as exc:
                         logger.warning("[biocore] memory summary failed: %s", exc)

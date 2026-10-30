@@ -26,7 +26,13 @@ def _merged_origin(item, other) -> dict:
                                   both["source_ids"], both["visibility"])
 
 
-class EventsMixin:
+try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
+
+
+class EventsMixin(PortsMixin):
     def _summary_cap(self, text) -> str:
         value = str(text or "")
         try:
@@ -737,8 +743,8 @@ class EventsMixin:
                 provider = await self._provider_for("event_summary", None)
                 if provider is not None:
                     prompt = interpretation.event_summary_prompt(texts or [source_text])
-                    resp = await provider.text_chat(prompt=prompt)
-                    raw = str(getattr(resp, "completion_text", "") or "").strip()
+                    reply = await self._model(provider).chat(prompt=prompt)
+                    raw = reply.text.strip()
                     data = interpretation.parse_event_summary(
                         raw, getattr(self, "summary_max_chars", 0))
                     llm_big = str(data.get("big_summary") or "").strip()
@@ -1525,8 +1531,8 @@ class EventsMixin:
             if provider is None:
                 return False
             prompt = interpretation.insight_prompt(events[:6])
-            resp = await provider.text_chat(prompt=prompt)
-            raw = str(getattr(resp, "completion_text", "") or "").strip()
+            reply = await self._model(provider).chat(prompt=prompt)
+            raw = reply.text.strip()
             insight = interpretation.parse_insight(raw)
             if not insight:
                 return False
@@ -2298,8 +2304,8 @@ class EventsMixin:
             if provider is None:
                 return
             prompt = interpretation.event_summary_prompt(texts)
-            resp = await provider.text_chat(prompt=prompt)
-            raw = str(getattr(resp, "completion_text", "") or "").strip()
+            reply = await self._model(provider).chat(prompt=prompt)
+            raw = reply.text.strip()
             data = interpretation.parse_event_summary(raw, getattr(self, "summary_max_chars", 0))
             _llm_big = str(data.get("big_summary") or "").strip()
             _llm_small = str(data.get("small_summary") or "").strip()
