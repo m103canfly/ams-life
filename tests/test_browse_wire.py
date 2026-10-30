@@ -144,6 +144,18 @@ class Kept(unittest.TestCase):
 
 
 class Trip(unittest.TestCase):
+    def test_reply_browsing_does_not_enable_the_paused_trip_schedule(self):
+        # The owner's new direction pauses the fixed schedule independently of reply browsing.
+        r = run_case('trip_switch')
+        self.assertFalse(r['default_enabled'])
+        self.assertFalse(r['default_went'])
+        self.assertFalse(r['disabled_went'])
+        self.assertFalse(r['browser_off_went'])
+        self.assertFalse(r['should_not_go'])
+        self.assertTrue(r['should_go'])
+        self.assertEqual(r['decisions'], [False, True])
+        self.assertEqual(r['trip_count'], 1)
+
     def test_she_goes_when_curious_and_quiet_not_at_once_not_at_night(self):
         r = run_case('trip')
         self.assertFalse(r['not_curious'])

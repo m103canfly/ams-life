@@ -1,7 +1,12 @@
 # 2026-10-30 · browse-trips
 
 Her browser, second part (step 2, part 丁): what she keeps of a page, and her going out by herself. Stacked on
-`browse-wire` (PR #39); off unless `browse_enabled` is on (the golden traces are the same).
+`browse-wire` (PR #39); reply browsing needs `browse_enabled`, and scheduled trips need both
+`browse_enabled` and `browse_trips_enabled` (both default off; the golden traces are the same).
+
+PR #41's first revision adds `browse_trips_enabled` to keep the fixed trip schedule off by default for the
+owner's new direction, independently of reply browsing. The trip itself remains available for future callers;
+no unrelated behavior was changed by this revision.
 
 - **Web memories** (`BrowseMixin._remember_web`): one memory in the library for a page, made by `browse.web_memory`:
   role `web`, origin `web:<address>` (public, nobody in it), who had her look it up kept apart in `asked_in`.
@@ -33,4 +38,5 @@ Her browser, second part (step 2, part 丁): what she keeps of a page, and her g
 
 - `mixin_browse.py` (web memories, the reply's pages, trips), `mixin_autonomy.py` (the loop calls the trip),
   `main.py` (the reply's pages kept), `mixin_discretion.py` (asked_in on deleting; wishes swept)
-- `tests/browse_cases.py`, `tests/test_browse_wire.py` (16 tests now), `tests/test_basics.py` (+8 methods)
+- `_conf_schema.json`, `main.py` (the independently default-off trip switch)
+- `tests/browse_cases.py`, `tests/test_browse_wire.py` (the trip switch and existing browser tests), `tests/test_basics.py` (+8 methods)

@@ -408,7 +408,7 @@ class BrowseMixin:
 
     async def _maybe_go_browse(self) -> bool:
         """The 5-minute loop: one trip when browse.should_go says so."""
-        if not self._browse_on():
+        if not self._browse_on() or not getattr(self, "browse_trips_enabled", False):
             return False
         now = time.time()
         core = self._core(None)

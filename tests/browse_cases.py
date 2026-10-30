@@ -177,6 +177,8 @@ def trip_case(plugin, ctx, loop, calls, out):
 
 def run():
     config = {'browse_enabled': CASE != 'off', 'browse_yuan_per_day': 5, 'global_memory': CASE == 'leak'}
+    if CASE == 'trip':
+        config['browse_trips_enabled'] = True
     ctx = harness.FakeContext()
     calls = []
     ctx.get_llm_tool_manager = lambda: ToolManager(calls)
@@ -185,6 +187,35 @@ def run():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     out = {}
+    if CASE == 'trip_switch':
+        # Reply browsing must not enable the owner's paused fixed trip schedule.
+        decisions, trips = [], []
+        decision = [True]
+
+        def should_go(*args, **kwargs):
+            decisions.append(decision[0])
+            return decision[0], ''
+
+        async def trip(core, now):
+            trips.append(now)
+
+        browse.should_go = should_go
+        plugin._browse_trip = trip
+        out['default_enabled'] = plugin.browse_trips_enabled
+        out['default_went'] = loop.run_until_complete(plugin._maybe_go_browse())
+        plugin.browse_trips_enabled = False
+        out['disabled_went'] = loop.run_until_complete(plugin._maybe_go_browse())
+        plugin.browse_trips_enabled = True
+        plugin.browse_enabled = False
+        out['browser_off_went'] = loop.run_until_complete(plugin._maybe_go_browse())
+        plugin.browse_enabled = True
+        decision[0] = False
+        out['should_not_go'] = loop.run_until_complete(plugin._maybe_go_browse())
+        decision[0] = True
+        out['should_go'] = loop.run_until_complete(plugin._maybe_go_browse())
+        out['decisions'], out['trip_count'] = decisions, len(trips)
+        OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
+        return
     if CASE == 'money':
         plugin._browse_ledger().add(searches=1000000)   # far over today's 5 yuan
     if CASE == 'trip':
