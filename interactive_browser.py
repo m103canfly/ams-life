@@ -61,6 +61,7 @@ class BrowsingSession:
         self.typing_check, self.games_dir, self.on_block = typing_check, games_dir, on_block
         self.browser = self.context = self.page = self.playwright = self.manager = None
         self.pending, self.refs = set(), {}
+        self.page_links, self.last_read = set(), None
         self.ref_url = None
         self.redirect, self.popups = None, []
         self.rejected = False
@@ -73,7 +74,12 @@ class BrowsingSession:
     async def __aenter__(self):
         if not self.enabled:
             return self
-        await real_browser._lock.acquire()
+        try:
+            await asyncio.wait_for(real_browser._lock.acquire(), timeout=real_browser.LOCK_WAIT_SECONDS)
+        except asyncio.TimeoutError:
+            real_browser.logger.info("[ams-life] 浏览器正忙")
+            self.enabled = False
+            return self
         self.locked = True
         try:
             from playwright.async_api import async_playwright
@@ -94,6 +100,11 @@ class BrowsingSession:
         except ImportError:
             await self.close()
             self.enabled = False
+            return self
+        except Exception as exc:
+            await self.close()
+            self.enabled = False
+            real_browser.logger.info("[ams-life] browser: session unavailable (%s)", type(exc).__name__)
             return self
         except BaseException:
             await self.close()
@@ -209,6 +220,7 @@ class BrowsingSession:
             return LIMIT
         self.steps += 1
         self.refs.clear()
+        self.page_links.clear()
         try:
             if not self.games_dir or not isinstance(name, str) or Path(name).is_absolute():
                 return BLOCKED
@@ -230,6 +242,7 @@ class BrowsingSession:
             self.refs.clear()
             return LIMIT
         self.refs.clear()
+        self.page_links.clear()
         try:
             await self._run(self._drain())
             if not await self._run(self._valid_page()):
@@ -257,7 +270,14 @@ class BrowsingSession:
                 name = (name_match.group(1) if name_match else "")[:120]
                 number = len(self.refs) + 1
                 label = '[%d] %s “%s”' % (number, ROLES[role], name)
+                if role == "link":
+                    href = await self._run(self.page.get_by_ref(ref.group(1)).get_attribute("href"))
+                    address = urljoin(self.page.url, href) if href else ""
+                    if address and browse.check_url(address)[0]:
+                        label += " " + address[:2048]
+                        self.page_links.add(address)
                 if len(prefix) + sum(len(item) + 1 for item in lines) + len(label) > SNAPSHOT_CHARS:
+                    self.page_links.discard(address if role == "link" else "")
                     break
                 self.refs[number] = (ref.group(1), role, line.lower())
                 lines.append(label)
@@ -267,6 +287,7 @@ class BrowsingSession:
             return browse.wrap(self.page.url, text[:SNAPSHOT_CHARS], limit=SNAPSHOT_CHARS)
         except Exception:
             self.refs.clear()
+            self.page_links.clear()
             return BLOCKED
 
     async def _follow(self):
@@ -348,6 +369,7 @@ class BrowsingSession:
                     marker in (title + "\n" + body).lower() for marker in real_browser.CHALLENGE_MARKERS)):
                 return BLOCKED
             body = await real_browser._article_text(self.page, body)
+            self.last_read = {"url": self.page.url, "title": title, "text": body}
             return browse.wrap(self.page.url, "Title: %s\nContent: %s" % (title, body))
         elif name == "screenshot":
             path = action.get("path")

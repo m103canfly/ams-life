@@ -4,10 +4,12 @@ import asyncio
 import ipaddress
 import logging
 import socket
+from contextlib import asynccontextmanager
 from urllib.parse import urljoin, urlsplit
 
 logger = logging.getLogger(__name__)
 OPEN_SECONDS = 20
+LOCK_WAIT_SECONDS = 3
 # Limit redirect chains to bound work and reject loops.
 MAX_HOPS = 5
 # Script-driven pages may fetch their visible content after DOMContentLoaded.
@@ -29,6 +31,15 @@ WEBRTC_INIT = """for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnecti
     catch (_) { try { delete globalThis[name]; } catch (_) {} }
 }"""
 _lock = asyncio.Lock()
+
+
+@asynccontextmanager
+async def _timed_lock():
+    await asyncio.wait_for(_lock.acquire(), timeout=LOCK_WAIT_SECONDS)
+    try:
+        yield
+    finally:
+        _lock.release()
 
 
 async def _launch_browser(playwright, shot_path=None):
@@ -152,16 +163,24 @@ async def _take_screenshot(page, path):
 
 
 async def read_page(url, check, on_block=None):
-    return await _visit(url, check, None, on_block)
+    return await _safe_visit(url, check, None, on_block)
 
 
 async def screenshot(url, check, path, on_block=None):
-    return await _visit(url, check, path, on_block)
+    return await _safe_visit(url, check, path, on_block)
+
+
+async def _safe_visit(url, check, path, on_block):
+    try:
+        return await _visit(url, check, path, on_block)
+    except asyncio.TimeoutError:
+        logger.info("[ams-life] 浏览器正忙")
+        return None
 
 
 async def _visit(url, check, shot_path, on_block):
     # Safety 8: one browser page at a time, including other callers of this module.
-    async with _lock:
+    async with _timed_lock():
         try:
             from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
         except ImportError:

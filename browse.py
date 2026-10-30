@@ -264,6 +264,7 @@ class Ledger:
     FIELDS = ("trips", "searches", "searches_failed", "fetches", "fetches_failed", "reply_calls",
               "input_miss", "input_hit", "output", "blocked_urls", "browser_reads", "browser_reads_failed",
               "browser_shots", "browser_shots_failed", "browser_blocked_requests")
+    INTERACTIVE_FIELDS = ("interactive_steps", "interactive_clicks", "interactive_types", "interactive_blocked")
 
     def __init__(self, path, prices=None, yuan_per_day=YUAN_PER_DAY, trips_per_day=TRIPS_PER_DAY):
         self.path = Path(path)
@@ -285,7 +286,7 @@ class Ledger:
     def add(self, now=None, **counts) -> dict:
         r = self.row(now)
         for k, v in counts.items():
-            if k in self.FIELDS:
+            if k in self.FIELDS or k in self.INTERACTIVE_FIELDS:
                 r[k] = r.get(k, 0) + int(v or 0)
         r["yuan"] = round(self.spent(now), 6)
         self._save()

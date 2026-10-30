@@ -1,5 +1,11 @@
 # 2026-10-30 cx-clicky-browser: read article text with trafilatura
 
+The interactive browser uses Playwright's built-in `aria_snapshot(mode="ai")` and `get_by_ref`;
+the owner verified both in Playwright 1.64.1 and reported that playwright-mcp uses the same
+approach. browser-use is not used: the owner reported that it no longer uses Playwright, has over
+30 dependencies, and enables telemetry and cloud synchronization by default. Article extraction
+uses optional trafilatura (owner sign-off board item 83).
+
 The owner approved the recommendation on sign-off board item 83; trafilatura 2.3.1 was
 reported installed. Browser page reads now try to extract the article from the already loaded
 HTML, without comments and with tables, favoring precision. The title and the existing material
@@ -20,8 +26,8 @@ Offline tests added: `test_article_extraction_uses_html_and_preserves_title`,
 `test_article_extraction_only_on_read_not_screenshot`, and
 `test_trafilatura_never_fetches_or_extracts_from_url`.
 
-Second round: `interactive_browser.BrowsingSession` provides bounded actions and snapshots;
-the trip and accounting integration is left for the next round. The existing temporary browser
+Second round: `interactive_browser.BrowsingSession` provides bounded actions and snapshots.
+The existing temporary browser
 launch, request route, redirect probing and screenshot code in `real_browser.py` are shared.
 Both switches `browser_enabled` and `browser_interactive_enabled` must be on; the latter defaults
 to false. Open addresses must be supplied in the caller's allowlist, and typing is refused unless
@@ -41,8 +47,7 @@ mapping containing the image path and updated snapshot. Before sharing an image,
 apply the existing image-description and send checks.
 
 Files additionally changed: `interactive_browser.py` (new), `tests/test_interactive_browser.py`
-(new), `main.py`, `_conf_schema.json`. No trip, ledger, game content, or unrelated feature was
-added. `test_shared_launch_closes_resources_when_setup_fails` covers shared setup cleanup, and
+(new), `main.py`, `_conf_schema.json`. `test_shared_launch_closes_resources_when_setup_fails` covers shared setup cleanup, and
 `test_default_switch_is_off` checks the new default.
 
 Interactive offline tests: `test_snapshot_refs_and_refresh_after_each_action`,
@@ -59,3 +64,32 @@ Interactive offline tests: `test_snapshot_refs_and_refresh_after_each_action`,
 `test_disabled_switches_do_not_start_browser`, `test_challenge_is_not_read_or_screenshot`,
 `test_close_releases_browser_context_and_lock`, `test_no_file_upload_api`, and
 `test_interactive_switch_defaults_off`.
+
+Third round: the read-only browser and interactive sessions wait at most `LOCK_WAIT_SECONDS=3`
+for the shared lock; a busy read or screenshot returns failure to its existing accounting and
+fallback. With all three browsing switches enabled, the trip adds `ams_browser_action` for open,
+click, type, press, scroll, back, read and finish. Screenshot is intentionally absent from trips;
+sharing screenshots remains in the reply flow. Search and read tools remain available. Open is
+limited to search results, current snapshot links and addresses already allowed on the trip, with
+the existing outbound check. Typing goes through `clean_query` and the outbound check. Each model
+round performs at most one browser action; 30 session steps and 600 seconds end the action phase,
+release the browser and prompt for the existing JSON conclusion. Every model response's usage is
+charged to the browser ledger. Successful interactive reads join the trip's seen pages.
+
+The ledger and dashboard add `interactive_steps`, `interactive_clicks`, `interactive_types` and
+`interactive_blocked`. Steps count actions accepted by the session, clicks and types count their
+attempted session actions, and blocked counts include blocked requests and rejected actions without
+double counting a single rejected request. The new counters are optional in old ledger rows; default
+disabled status retains the previous panel shape. No game content or unrelated feature was added.
+Files additionally changed: `browse.py`, `mixin_browse.py`, `pages/dashboard/app.js`, and the
+second-round browser and tests above. `tests/test_basics.py` method count is unchanged.
+
+Third-round offline tests: `test_busy_session_limits_wait_for_read_screenshot_and_session`,
+`test_busy_browser_keeps_deepseek_text_and_counts_failed_read`,
+`test_snapshot_link_allowlist_tracks_current_snapshot`,
+`test_trip_interactive_tools_typing_accounting_and_memory`,
+`test_trip_opens_only_search_and_current_page_links`, `test_trip_link_open_also_passes_outbound_check`,
+`test_trip_switch_off_keeps_old_two_tools`,
+`test_trip_thirty_steps_forces_final_without_tools`, `test_trip_time_limit_closes_before_final`, and
+`test_trip_only_executes_one_browser_action_per_model_round`. Existing reply tool tests still cover
+the two-tool reply flow.

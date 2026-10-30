@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'tests'))
 sys.path.insert(0, str(ROOT / 'tests' / 'stubs'))
 import browse
 import interactive_browser as ib
+import mixin_browse
 import real_browser
 from test_real_browser import FakePlaywright, FakeResponse, FakePage, Route, URL
 
@@ -44,6 +45,8 @@ class Locator:
         self.page, self.ref = page, ref
 
     async def get_attribute(self, name):
+        if name == 'href':
+            return self.page.hrefs.get(self.ref)
         return self.page.types.get(self.ref)
 
     async def click(self, **kwargs):
@@ -63,7 +66,7 @@ class InteractivePage(FakePage):
         self.mouse = types.SimpleNamespace(wheel=mock.AsyncMock())
         self.aria = ('- link "Next" [ref=e1]\n- textbox "Search" [ref=e2]\n'
                      '- button "Go" [ref=e3] [cursor=pointer]')
-        self.types, self.clicked, self.filled = {}, [], []
+        self.types, self.hrefs, self.clicked, self.filled = {}, {}, [], []
         self.snapshots, self.click_route = 0, None
 
     async def goto(self, url, **kwargs):
@@ -143,6 +146,16 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
         page.url = 'https://example.com/changed'
         self.assertEqual(await self.session.act({'action': 'click', 'n': 1}), ib.BLOCKED)
         self.assertEqual(page.clicked, [])
+
+    async def test_snapshot_link_allowlist_tracks_current_snapshot(self):
+        page = self.fake.context.page
+        page.hrefs['e1'] = '/linked'
+        result = await self.session.open(URL)
+        self.assertIn('https://example.com/linked', result)
+        self.assertEqual(self.session.page_links, {'https://example.com/linked'})
+        page.aria = '- button "Go" [ref=e3]'
+        await self.session.snapshot()
+        self.assertEqual(self.session.page_links, set())
 
     async def test_only_allowed_actions_and_keys(self):
         page = await self.opened()
@@ -315,6 +328,46 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
             async with disabled:
                 self.assertEqual(await disabled.open(URL), ib.UNAVAILABLE)
 
+    async def test_busy_session_limits_wait_for_read_screenshot_and_session(self):
+        self.assertEqual(real_browser.LOCK_WAIT_SECONDS, 3)
+        with mock.patch.object(real_browser, '_lock', asyncio.Lock()), \
+             mock.patch.object(real_browser, 'LOCK_WAIT_SECONDS', 0.01):
+            owner = ib.BrowsingSession(lambda url: (True, ''), browser_enabled=True,
+                                       browser_interactive_enabled=True)
+            async with owner:
+                with self.assertLogs(real_browser.logger, level='INFO') as logs:
+                    self.assertIsNone(await real_browser.read_page(URL, lambda url: (True, '')))
+                    with tempfile.TemporaryDirectory() as tmp:
+                        self.assertIsNone(await real_browser.screenshot(URL, lambda url: (True, ''), Path(tmp) / 'shot.jpg'))
+                    other = ib.BrowsingSession(lambda url: (True, ''), browser_enabled=True,
+                                               browser_interactive_enabled=True)
+                    async with other:
+                        self.assertEqual(await other.open(URL), ib.UNAVAILABLE)
+        self.assertEqual(sum('浏览器正忙' in line for line in logs.output), 3)
+
+    async def test_busy_browser_keeps_deepseek_text_and_counts_failed_read(self):
+        class Tool:
+            async def call(self, *args, **kwargs): return 'short'
+        class Reader(mixin_browse.BrowseMixin):
+            enabled = browse_enabled = browser_enabled = True
+            context = None
+            def _browse_ledger(self): return ledger
+            def _builtin_web_tool(self, kind): return Tool()
+            async def _may_go_out(self, event, words): return True
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(real_browser, '_lock', asyncio.Lock()), \
+             mock.patch.object(real_browser, 'LOCK_WAIT_SECONDS', 0.01), \
+             mock.patch.object(mixin_browse, 'resolve_host', return_value=['93.184.216.34']):
+            ledger = browse.Ledger(Path(tmp) / 'ledger.json')
+            reader, event = Reader(), types.SimpleNamespace()
+            reader._browse_urls(event).add(URL)
+            owner = ib.BrowsingSession(lambda url: (True, ''), browser_enabled=True,
+                                       browser_interactive_enabled=True)
+            async with owner:
+                result = await reader._tool_read(event, URL)
+            self.assertEqual(result, browse.wrap(URL, 'short'))
+            self.assertEqual(ledger.row()['browser_reads_failed'], 1)
+
     async def test_challenge_is_not_read_or_screenshot(self):
         await self.opened()
         self.fake.context.body = 'Please verify you are human'
@@ -340,3 +393,225 @@ class SourceTests(unittest.TestCase):
     def test_interactive_switch_defaults_off(self):
         schema = json.loads((ROOT / '_conf_schema.json').read_text('utf-8'))
         self.assertFalse(schema['browser_interactive_enabled']['default'])
+
+
+class TripTool:
+    def __init__(self, name, description='', parameters=None, handler=None):
+        self.name, self.parameters, self.handler = name, parameters or {}, handler
+
+
+class TripTools:
+    def __init__(self, tools):
+        self.tools = list(tools)
+
+    def add_tool(self, tool):
+        self.tools.append(tool)
+
+
+class TripProvider:
+    def __init__(self, calls):
+        self.calls, self.rounds = calls, []
+
+    async def text_chat(self, contexts=None, func_tool=None, **kwargs):
+        self.rounds.append((list(contexts), func_tool))
+        index = len(self.rounds) - 1
+        calls = [self.calls[index]] if index < len(self.calls) and func_tool else []
+        return types.SimpleNamespace(
+            completion_text='' if calls else json.dumps({'notes': [{'url': URL, 'title': 'Example',
+                                                                      'said': 'A page'}], 'share': []}),
+            tools_call_name=[name for name, args in calls], tools_call_args=[args for name, args in calls],
+            tools_call_ids=['call%d' % n for n in range(len(calls))], reasoning_content=None,
+            usage={'input_other': 100, 'output': 10})
+
+
+class TripSession:
+    instances = []
+
+    def __init__(self, check, **kwargs):
+        self.instances.append(self)
+        self.typing_check, self.on_block = kwargs['typing_check'], kwargs['on_block']
+        self.allowed_urls, self.page_links = set(), set()
+        self.page = types.SimpleNamespace(url='about:blank')
+        self.game = self.finished = False
+        self.steps, self.started, self.last_read = 0, 1, None
+        self.typed = []
+
+    async def __aenter__(self): return self
+    async def __aexit__(self, *args): await self.close()
+    async def close(self): self.closed = True
+    def _remaining(self): return 600
+
+    async def act(self, action):
+        name = action['action']
+        if name == 'finish':
+            self.finished = True
+            return 'finished'
+        if self.steps >= ib.MAX_STEPS:
+            return ib.LIMIT
+        self.steps += 1
+        if name == 'open':
+            if action['url'] not in self.allowed_urls:
+                return ib.BLOCKED
+            self.page.url = action['url']
+            self.page_links = {'https://example.com/linked', 'https://example.com/blocked'}
+        if name == 'type':
+            cleaned = await self.typing_check(action['text'])
+            if cleaned is None:
+                return ib.BLOCKED
+            self.typed.append(cleaned)
+        if name == 'click':
+            self.on_block(1)
+            return ib.BLOCKED
+        if name == 'read':
+            self.last_read = {'url': self.page.url, 'title': 'Example', 'text': 'Article'}
+        return 'snapshot'
+
+
+class TripPlugin(mixin_browse.BrowseMixin):
+    enabled = browse_enabled = browser_enabled = browser_interactive_enabled = True
+    global_memory = True
+
+    def __init__(self, provider, ledger):
+        self.context = types.SimpleNamespace(get_using_provider_async=mock.AsyncMock(return_value=provider))
+        self.ledger, self.self_model, self.checked, self.notes = ledger, {}, [], []
+
+    def _browse_ledger(self): return self.ledger
+    def _browse_names(self): return ['Mango']
+    def _browse_topics(self): return ['fictional topic']
+    async def _persona_text(self, event): return ''
+    async def _may_go_out(self, event, words):
+        self.checked.append(words)
+        return 'blocked' not in words
+    async def _tool_search(self, event, query=''):
+        self._browse_urls(event).add(URL)
+        return 'search result'
+    async def _tool_read(self, event, url=''): return 'page'
+    async def _remember_web(self, note, trip, asked_in):
+        self.notes.append(note)
+        return 'memory'
+    def _save_self_model(self): pass
+
+
+class TripIntegration(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.ledger = browse.Ledger(Path(self.tmp.name) / 'ledger.json')
+        self.tool_module = types.ModuleType('astrbot.core.agent.tool')
+        self.tool_module.FunctionTool, self.tool_module.ToolSet = TripTool, TripTools
+        self.modules = mock.patch.dict(sys.modules, {'astrbot.core': types.ModuleType('astrbot.core'),
+                                                      'astrbot.core.agent': types.ModuleType('astrbot.core.agent'),
+                                                      'astrbot.core.agent.tool': self.tool_module})
+        self.modules.start()
+        TripSession.instances = []
+        self.session_patch = mock.patch.object(ib, 'BrowsingSession', TripSession)
+        self.session_patch.start()
+
+    async def asyncTearDown(self):
+        self.session_patch.stop()
+        self.modules.stop()
+        self.tmp.cleanup()
+
+    async def run_trip(self, calls, **switches):
+        provider = TripProvider(calls)
+        plugin = TripPlugin(provider, self.ledger)
+        for name, value in switches.items():
+            setattr(plugin, name, value)
+        core = types.SimpleNamespace(boredom=1.0, novelty_need=1.0)
+        result = await plugin._browse_trip(core, 1000)
+        return plugin, provider, result
+
+    async def test_trip_interactive_tools_typing_accounting_and_memory(self):
+        action = mixin_browse.INTERACTIVE_TOOL
+        calls = [(browse.SEARCH_TOOL, {'query': 'topic'}),
+                 (action, {'action': 'open', 'url': URL}),
+                 (action, {'action': 'type', 'n': 2, 'text': 'Mango 900001 hello'}),
+                 (action, {'action': 'type', 'n': 2, 'text': 'blocked'}),
+                 (action, {'action': 'click', 'n': 1}),
+                 (action, {'action': 'read'}), (action, {'action': 'finish'})]
+        plugin, provider, result = await self.run_trip(calls)
+        session = TripSession.instances[0]
+        self.assertEqual(session.typed, ['hello'])
+        self.assertIn('hello', plugin.checked)
+        self.assertIn('blocked', plugin.checked)
+        self.assertTrue(session.closed)
+        self.assertEqual(result['notes'], 1)
+        self.assertEqual(plugin.notes[0]['url'], URL)
+        row = self.ledger.row()
+        self.assertEqual([row[k] for k in ('interactive_steps', 'interactive_clicks', 'interactive_types',
+                                           'interactive_blocked', 'browser_blocked_requests')], [5, 1, 2, 2, 1])
+        self.assertEqual((row['input_miss'], row['output']), (800, 80))
+        panel = plugin._browse_for_panel()
+        self.assertEqual(panel['interactive_steps'], 5)
+        names = [tool.name for tool in provider.rounds[0][1].tools]
+        self.assertEqual(names, [browse.SEARCH_TOOL, browse.READ_TOOL, action])
+        action_tool = provider.rounds[0][1].tools[-1]
+        self.assertNotIn('screenshot', action_tool.parameters['properties']['action']['enum'])
+        self.assertIsNone(provider.rounds[-1][1])
+
+    async def test_trip_opens_only_search_and_current_page_links(self):
+        action = mixin_browse.INTERACTIVE_TOOL
+        calls = [(browse.SEARCH_TOOL, {'query': 'topic'}), (action, {'action': 'open', 'url': URL}),
+                 (action, {'action': 'open', 'url': 'https://example.com/linked'}),
+                 (action, {'action': 'open', 'url': 'https://example.com/unlisted'}),
+                 (action, {'action': 'finish'})]
+        _, _, result = await self.run_trip(calls)
+        self.assertEqual(TripSession.instances[0].page.url, 'https://example.com/linked')
+        self.assertEqual(self.ledger.row()['interactive_blocked'], 1)
+        self.assertEqual(result['notes'], 0)
+
+    async def test_trip_link_open_also_passes_outbound_check(self):
+        action = mixin_browse.INTERACTIVE_TOOL
+        calls = [(browse.SEARCH_TOOL, {'query': 'topic'}), (action, {'action': 'open', 'url': URL}),
+                 (action, {'action': 'open', 'url': 'https://example.com/blocked'}),
+                 (action, {'action': 'finish'})]
+        plugin, _, _ = await self.run_trip(calls)
+        self.assertIn('https://example.com/blocked', plugin.checked)
+        self.assertEqual(TripSession.instances[0].page.url, URL)
+        self.assertEqual(self.ledger.row()['interactive_blocked'], 1)
+
+    async def test_trip_switch_off_keeps_old_two_tools(self):
+        for switches in ({'browser_enabled': False}, {'browser_interactive_enabled': False},
+                         {'browse_enabled': False}):
+            with self.subTest(switches=switches):
+                _, provider, _ = await self.run_trip([], **switches)
+                self.assertEqual([t.name for t in provider.rounds[0][1].tools],
+                                 [browse.SEARCH_TOOL, browse.READ_TOOL])
+        self.assertEqual(TripSession.instances, [])
+
+    async def test_trip_thirty_steps_forces_final_without_tools(self):
+        action = mixin_browse.INTERACTIVE_TOOL
+        calls = [(action, {'action': 'press', 'key': 'ArrowDown'}) for _ in range(31)]
+        _, provider, result = await self.run_trip(calls)
+        self.assertEqual(TripSession.instances[0].steps, 30)
+        self.assertEqual(self.ledger.row()['interactive_steps'], 30)
+        self.assertIsNone(provider.rounds[-1][1])
+        self.assertTrue(result['final'])
+
+    async def test_trip_time_limit_closes_before_final(self):
+        action = mixin_browse.INTERACTIVE_TOOL
+        original = TripSession.act
+        async def expire(session, instruction):
+            result = await original(session, instruction)
+            session._remaining = lambda: 0
+            return result
+        with mock.patch.object(TripSession, 'act', new=expire):
+            _, provider, result = await self.run_trip([(action, {'action': 'press', 'key': 'ArrowDown'})])
+        self.assertTrue(TripSession.instances[0].closed)
+        self.assertIsNone(provider.rounds[-1][1])
+        self.assertTrue(result['final'])
+
+    async def test_trip_only_executes_one_browser_action_per_model_round(self):
+        class BatchProvider(TripProvider):
+            async def text_chat(self, contexts=None, func_tool=None, **kwargs):
+                self.rounds.append((list(contexts), func_tool))
+                if len(self.rounds) == 1:
+                    return types.SimpleNamespace(completion_text='',
+                        tools_call_name=[mixin_browse.INTERACTIVE_TOOL] * 2,
+                        tools_call_args=[{'action': 'press', 'key': 'ArrowDown'}] * 2,
+                        tools_call_ids=['a', 'b'], reasoning_content=None, usage={'input_other': 100})
+                return types.SimpleNamespace(completion_text='{}', tools_call_name=[], usage={'input_other': 100})
+        provider = BatchProvider([])
+        plugin = TripPlugin(provider, self.ledger)
+        await plugin._browse_trip(types.SimpleNamespace(boredom=1, novelty_need=1), 1000)
+        self.assertEqual(TripSession.instances[0].steps, 1)
+        self.assertEqual(self.ledger.row()['interactive_steps'], 1)

@@ -109,6 +109,145 @@ def page_of(url, text) -> dict:
     return {"url": str(url), "title": title[:80], "said": first}
 
 
+INTERACTIVE_TOOL = "ams_browser_action"
+INTERACTIVE_ACTIONS = ("open", "click", "type", "press", "scroll_down", "scroll_up", "back", "read", "finish")
+INTERACTIVE_PARAMS = {"type": "object", "properties": {
+    "action": {"type": "string", "enum": list(INTERACTIVE_ACTIONS), "description": "浏览器动作"},
+    "url": {"type": "string", "description": "open 用的地址"},
+    "n": {"type": "integer", "description": "当前快照里的元素编号"},
+    "text": {"type": "string", "description": "type 要输入的字"},
+    "key": {"type": "string", "description": "press 要按的键"}}, "required": ["action"]}
+
+
+async def _interactive_trip_rounds(plugin, provider, stand_in, led, contexts, persona, tools, run, FunctionTool):
+    try:
+        from . import interactive_browser
+    except ImportError:
+        import interactive_browser
+
+    blocked = 0
+
+    def on_block(count):
+        nonlocal blocked
+        blocked += count
+        led.add(browser_blocked_requests=count, interactive_blocked=count)
+
+    async def typing_check(text):
+        cleaned = browse.clean_query(text, names=plugin._browse_names())
+        if not cleaned or not await plugin._may_go_out(stand_in, cleaned):
+            return None
+        return cleaned
+
+    session = interactive_browser.BrowsingSession(
+        lambda address: browse.check_url(address, resolve_host), browser_enabled=True,
+        browser_interactive_enabled=True, typing_check=typing_check, on_block=on_block)
+
+    async with session:
+        async def action_tool(event, action="", n=None, text="", key="", url=""):
+            nonlocal blocked
+            if not led.money_left() and action != "finish":
+                return browse.NO_MORE
+            if action not in INTERACTIVE_ACTIONS:
+                led.add(interactive_blocked=1)
+                return interactive_browser.BLOCKED
+            if action == "open":
+                session.allowed_urls.update(plugin._browse_urls(stand_in))
+                session.allowed_urls.update(session.page_links)
+                if (not isinstance(url, str) or url not in session.allowed_urls
+                        or not await plugin._may_go_out(stand_in, unquote(url))):
+                    led.add(interactive_blocked=1)
+                    return interactive_browser.BLOCKED
+            before, before_blocked = session.steps, blocked
+            session.last_read = None
+            result = await session.act({"action": action, "n": n, "text": text, "key": key, "url": url})
+            steps = session.steps - before
+            if steps:
+                led.add(interactive_steps=steps, interactive_clicks=steps if action == "click" else 0,
+                        interactive_types=steps if action == "type" else 0)
+            if result == interactive_browser.BLOCKED and blocked == before_blocked:
+                led.add(interactive_blocked=1)
+            if action == "read" and session.last_read and result != interactive_browser.BLOCKED:
+                page = session.last_read
+                record = page_of(page["url"], "Title: %s\nContent: %s" % (page["title"], page["text"]))
+                pages = getattr(stand_in, READ_ATTR, None)
+                if pages is None:
+                    pages = []
+                    setattr(stand_in, READ_ATTR, pages)
+                pages.append(record)
+            if session.page and session.page.url and not session.game:
+                if browse.check_url(session.page.url)[0]:
+                    session.allowed_urls.add(session.page.url)
+            return result
+
+        tools.add_tool(FunctionTool(name=INTERACTIVE_TOOL,
+                                    description="浏览器动作：打开已找到的地址、点击、输入、按键、翻页、后退、读当前页或结束；编号以最新快照为准。",
+                                    parameters=INTERACTIVE_PARAMS, handler=action_tool))
+        run[INTERACTIVE_TOOL] = action_tool
+        contexts.append({"role": "user", "content": "可以用浏览器动作查看和操作网页；每次按最新快照的编号操作。结束后写原定 JSON。"})
+        final = ""
+        round_limit = interactive_browser.MAX_STEPS + browse.TRIP_SEARCHES + browse.TRIP_READS + 1
+        for n in range(round_limit):
+            last = (n == round_limit - 1 or not led.money_left() or session.finished
+                    or session.steps >= interactive_browser.MAX_STEPS
+                    or (session.started is not None and session._remaining() <= 0))
+            if last:
+                contexts.append({"role": "user", "content": "该收尾了，只输出 JSON。"})
+                await session.close()
+            try:
+                timeout = interactive_browser.ACTION_SECONDS if last or session.started is None else max(0.001, session._remaining())
+                resp = await asyncio.wait_for(provider.text_chat(contexts=list(contexts), func_tool=None if last else tools,
+                                                                 system_prompt=persona or None), timeout=timeout)
+            except asyncio.TimeoutError:
+                if not last and session.started is not None and session._remaining() <= 0:
+                    continue
+                logger.info("[ams-life] browse: a trip round timed out")
+                break
+            except Exception as exc:
+                logger.warning("[ams-life] browse: a trip round failed (%s)", type(exc).__name__)
+                break
+            led.add_usage(getattr(resp, "usage", None))
+            names = list(getattr(resp, "tools_call_name", None) or [])
+            if last or not names:
+                final = str(getattr(resp, "completion_text", "") or "")
+                break
+            ids = list(getattr(resp, "tools_call_ids", None) or [])
+            args = list(getattr(resp, "tools_call_args", None) or [])
+            calls = [{"id": ids[i] if i < len(ids) else "call_%d_%d" % (n, i), "type": "function",
+                      "function": {"name": name, "arguments": json.dumps(args[i] if i < len(args) else {},
+                                                                         ensure_ascii=False)}}
+                     for i, name in enumerate(names)]
+            said = {"role": "assistant", "content": str(getattr(resp, "completion_text", "") or ""), "tool_calls": calls}
+            thinking = getattr(resp, "reasoning_content", None)
+            if thinking:
+                said["reasoning_content"] = thinking
+            contexts.append(said)
+            acted = False
+            for call in calls:
+                fn = run.get(call["function"]["name"])
+                try:
+                    a = json.loads(call["function"]["arguments"] or "{}")
+                    allowed = ("action", "n", "text", "key", "url") if fn == action_tool else ("query", "url")
+                    ending = session.finished or session.steps >= interactive_browser.MAX_STEPS or (
+                        session.started is not None and session._remaining() <= 0)
+                    if fn == action_tool and acted:
+                        out = "每轮只能做一个浏览器动作，请看最新快照。"
+                    elif ending and not (fn == action_tool and a.get("action") == "finish"):
+                        out = interactive_browser.LIMIT
+                    else:
+                        if fn:
+                            pending = fn(stand_in, **{k: v for k, v in a.items() if k in allowed})
+                            out = (await asyncio.wait_for(pending, timeout=max(0.001, session._remaining()))
+                                   if session.started is not None else await pending)
+                        else:
+                            out = "没有这个工具。"
+                        if fn == action_tool:
+                            acted = True
+                except Exception as exc:
+                    out = "没成（%s）。" % type(exc).__name__
+                contexts.append({"role": "tool", "tool_call_id": call["id"], "content": str(out)})
+        return final
+
+
 class BrowseMixin:
     def _browse_on(self) -> bool:
         return bool(getattr(self, "enabled", False) and getattr(self, "browse_enabled", False))
@@ -341,7 +480,10 @@ class BrowseMixin:
                 "searches": int(row.get("searches", 0)), "fetches": int(row.get("fetches", 0)),
                 "trips": int(row.get("trips", 0)),
                 **{key: int(row.get(key, 0)) for key in ("browser_reads", "browser_reads_failed", "browser_shots",
-                                                           "browser_shots_failed", "browser_blocked_requests")}}
+                                                           "browser_shots_failed", "browser_blocked_requests")},
+                **({key: int(row.get(key, 0)) for key in browse.Ledger.INTERACTIVE_FIELDS}
+                   if getattr(self, "browser_interactive_enabled", False)
+                   or any(row.get(key, 0) for key in browse.Ledger.INTERACTIVE_FIELDS) else {})}
 
     # ------------------------------------------------------------------
     # what she keeps of a page
@@ -488,7 +630,15 @@ class BrowseMixin:
             pass
         contexts = [{"role": "user", "content": browse.trip_prompt(self._browse_topics(), getattr(stand_in, QUOTA_ATTR))}]
         final = ""
-        for n in range(browse.TRIP_ROUNDS):
+        interactive = bool(self._browse_on() and getattr(self, "browser_enabled", False)
+                           and getattr(self, "browser_interactive_enabled", False))
+        if interactive:
+            try:
+                final = await _interactive_trip_rounds(self, provider, stand_in, led, contexts, persona,
+                                                       tools, run, FunctionTool)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: interactive trip failed (%s)", type(exc).__name__)
+        for n in range(0 if interactive else browse.TRIP_ROUNDS):
             last = n == browse.TRIP_ROUNDS - 1 or not led.money_left()
             if last:
                 contexts.append({"role": "user", "content": "该收尾了：只输出 JSON。"})
@@ -525,6 +675,8 @@ class BrowseMixin:
                 contexts.append({"role": "tool", "tool_call_id": call["id"], "content": str(out)})
         seen = [p["url"] for p in getattr(stand_in, READ_ATTR, None) or []]
         got = browse.parse_trip(final, seen_urls=seen)
+        if interactive and not seen:
+            got = {"notes": [], "share": []}
         kept = 0
         for note in got["notes"]:
             if await self._remember_web(note, trip, browse.SELF_ASKED_IN):
