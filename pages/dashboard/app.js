@@ -1177,6 +1177,12 @@
       if(sp) spend.textContent="今天调模型花了约 "+Number(sp.spent||0).toFixed(2)+" 元，还剩 "+Number(sp.left||0).toFixed(2)+
         " 元（上限 "+Number(sp.hard||0)+" 元"+(sp.state==="soft"?"，快到了：只回主人的私聊":sp.state==="hard"?"，到了：今天不回了":"")+"）。";
     }
+    const vision=data&&data.vision;
+    if(spend && vision){
+      spend.hidden=false;
+      const count="今天看图 "+Number(vision.calls||0)+" 张。";
+      spend.textContent=sp ? spend.textContent+" "+count : count;
+    }
     // step 2 (global_memory): the last look before sending, today
     const send=$("sendNote"), sc=data&&data.send_check;
     if(send){
@@ -1795,7 +1801,7 @@
         const options = filtered.length ? filtered
           : (vision ? [] : provs.filter(p=>_providerKind(p)!=="vision"));
         const followLabel = vision ? "跟随图片 API（默认视觉 provider）" : "跟随主 LLM";
-        sel.innerHTML='<option value="follow_llm">'+followLabel+'</option>'+options.map(p=>'<option value="'+esc(String(p.id||""))+'">'+esc(String(p.model||p.id||""))+'</option>').join("");
+        sel.innerHTML='<option value="follow_llm">'+followLabel+'</option>'+(vision?'<option value="image_api">插件看图小通道</option>':'')+options.map(p=>'<option value="'+esc(String(p.id||""))+'">'+esc(String(p.model||p.id||""))+'</option>').join("");
         sel.value=String(cfg.provider||"follow_llm");
       }
     });

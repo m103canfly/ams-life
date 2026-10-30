@@ -382,6 +382,18 @@
     },
     "default": []
   },
+  "vision_image_api_model": {
+    "description": "插件看图小通道的模型名",
+    "hint": "默认空，不启用。在模型功能的 image_caption 提供方填写 image_api；地址和 Key 从插件 image 接口配置读取。",
+    "type": "string",
+    "default": ""
+  },
+  "vision_price_per_call": {
+    "description": "每次看图的价格（元）",
+    "hint": "留空按聊天模型价格计算；填 0 不计入每日花费，看图次数仍会记录。",
+    "type": "string",
+    "default": ""
+  },
   "image_cache_max_entries": {
     "description": "图片描述缓存上限",
     "hint": "同一张图片识别后复用描述，最多缓存多少条。",

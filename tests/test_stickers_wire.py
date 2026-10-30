@@ -90,18 +90,45 @@ class Looked(unittest.TestCase):
     def test_qq_stickers_in_passing_one_look_each_kept_by_the_program(self):
         r = run_case('look')
         self.assertEqual(len(r['looks']), 3)                          # at most three a message
-        self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png'])   # only the one she keeps
+        self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png', 'https://gchat.qpic.cn/a.png',
+                                        'https://gchat.qpic.cn/b.png', 'https://gchat.qpic.cn/c.png'])
+        self.assertEqual(len(r['content_cache']), 3)
         self.assertEqual(r['kept'], [['一只在笑的猫', '10001', 'group:900001', 'self']])
         # every look is noted with who sent it and where (deleting him deletes it)
         self.assertEqual(r['cache'], [['一只在笑的猫', '10001', 'group:900001'], ['一张证件照', '10001', 'group:900001'],
                                       ['写着群友名字的图', '10001', 'group:900001']])
         self.assertEqual(r['looks_after'], 3)                         # the same picture: no second look
-        self.assertEqual(r['spend_kinds'], ['calls', 'vision'])       # in the day's money, once
+        self.assertEqual(r['spend_kinds'], ['calls', 'vision', 'vision_calls'])       # in the day's money, once
 
     def test_someone_deleted_is_not_looked_at(self):
         r = run_case('look')
         self.assertEqual(r['kept_after_gone'], 1)
         self.assertEqual(r['looks_after_gone'], 3)
+
+
+class VisionStatus(unittest.TestCase):
+    def test_vision_shown_only_after_a_look_today(self):
+        r = run_case('vision_status')
+        self.assertFalse(r['off_empty'])
+        self.assertFalse(r['on_empty'])
+        self.assertEqual(r['on_used'], {'calls': 1})
+        self.assertEqual(r['off_used'], {'calls': 1})
+
+
+class VisionCounting(unittest.TestCase):
+    def test_three_paths_count_without_stopping_for_both_provider_types(self):
+        for case in ('count_astrbot', 'count_api'):
+            with self.subTest(provider=case):
+                r = run_case(case)
+                self.assertEqual(r['marks'], {'31': 31, '100': 100})
+                self.assertEqual(r['calls'], 102)
+                self.assertEqual(r['last_gift'], {'status': 'ok', 'labelled': True})
+                self.assertEqual(r['panel'], {'calls': 102})
+                self.assertEqual(r['panel_without_decide'], {'calls': 102})
+                self.assertEqual(r['spent'], 0)
+                self.assertFalse(r['panel_next_day'])
+                self.assertEqual(r['calls_next_day'], 103)
+                self.assertEqual(r['panel_after_next'], {'calls': 1})
 
 
 class OwnersPage(unittest.TestCase):

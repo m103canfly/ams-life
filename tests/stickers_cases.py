@@ -208,7 +208,8 @@ def run():
         out['fetched'] = list(fetched)
         out['kept'] = [(r['caption'], r['from_qq'], r['from_where'], r['source']) for r in lib.rows.values()]
         cache = json.loads((DATA / 'image_cache.json').read_text('utf-8'))
-        out['cache'] = sorted((v['caption'], v.get('from_qq'), v.get('where')) for v in cache.values())
+        out['cache'] = sorted((v['caption'], v.get('from_qq'), v.get('where')) for k, v in cache.items() if not k.startswith('content:'))
+        out['content_cache'] = sorted(v['caption'] for k, v in cache.items() if k.startswith('content:'))
         # the same again: no second look
         loop.run_until_complete(plugin.on_message(Event('再来', raw_images=['https://gchat.qpic.cn/a.png'])))
         harness.drain(loop)
@@ -265,6 +266,74 @@ def run():
         again = stickers.Library(DATA / 'stickers')
         out['keep_again'] = list(again.add(png(8, 8, 1), now, source='self', from_qq='10001'))
         out['owner_again'] = go(plugin.page_sticker_add({'picture': b64}))['status']
+    elif CASE == 'vision_status':
+        def status():
+            return loop.run_until_complete(plugin.page_status())['data']
+        plugin.llm_functions['image_caption']['enabled'] = False
+        out['off_empty'] = 'vision' in status()
+        plugin.llm_functions['image_caption']['enabled'] = True
+        out['on_empty'] = 'vision' in status()
+        event = Event('look', wake=True)
+        plugin._image_refs = lambda _event: ['https://gchat.qpic.cn/b.png']
+        loop.run_until_complete(plugin._image_context(event))
+        out['on_used'] = status().get('vision')
+        plugin.llm_functions['image_caption']['enabled'] = False
+        out['off_used'] = status().get('vision')
+    elif CASE in ('count_astrbot', 'count_api'):
+        import base64
+        import vision
+        from unittest.mock import patch
+
+        plugin.config.update(vision_price_per_call='0', vision_image_api_model='made-up-model')
+        calls = []
+        async def answer(*args, **kwargs):
+            calls.append((kwargs.get('image_urls') or [''])[0])
+            return harness.FakeResponse(json.dumps({'caption': 'a made-up picture', 'kind': 'photo', 'keep': False}))
+        ctx.provider.text_chat = answer
+        vision.ImageAPI.text_chat = answer
+        plugin._image_refs = lambda event: [event.vision_ref]
+        date = ['2026-10-30']
+        def fake_date(fmt, *args):
+            return date[0] if fmt == '%Y-%m-%d' else '00:00'
+        def go(coro):
+            return loop.run_until_complete(coro)
+        def reply_picture(index):
+            ev = Event('reply', wake=True)
+            ev.vision_ref = 'https://gchat.qpic.cn/reply%s.png' % index
+            return go(plugin._image_context(ev))
+        def passing_picture(index):
+            ref = 'https://gchat.qpic.cn/passing%s.png' % index
+            return go(plugin._look_at_sticker_in_passing(Event('talk', raw_images=[ref])))
+        def owner_picture(index):
+            data = base64.b64encode(png(3, 3, index + 100)).decode()
+            return go(plugin.page_sticker_add({'picture': data}))
+        with patch.object(vision.time, 'strftime', side_effect=fake_date):
+            offset = 1 if CASE == 'count_api' else 0
+            marks = {}
+            for i in range(34):
+                plugin.llm_functions['image_caption']['provider'] = 'image_api' if (i + offset) % 2 else 'follow_llm'
+                reply_picture(i)
+                if len(calls) in (31, 100):
+                    marks[str(len(calls))] = len(calls)
+                plugin.llm_functions['image_caption']['provider'] = 'follow_llm' if (i + offset) % 2 else 'image_api'
+                passing_picture(i)
+                if len(calls) in (31, 100):
+                    marks[str(len(calls))] = len(calls)
+                gift = owner_picture(i)
+                if len(calls) in (31, 100):
+                    marks[str(len(calls))] = len(calls)
+            out['marks'] = marks
+            out['calls'] = len(calls)
+            out['last_gift'] = {'status': gift['status'], 'labelled': gift['data']['labelled']}
+            out['panel'] = go(plugin.page_status())['data']['vision']
+            plugin.self_decide = False
+            out['panel_without_decide'] = go(plugin.page_status())['data']['vision']
+            out['spent'] = plugin._spent_today()
+            date[0] = '2026-10-31'
+            out['panel_next_day'] = 'vision' in go(plugin.page_status())['data']
+            reply_picture(35)
+            out['calls_next_day'] = len(calls)
+            out['panel_after_next'] = go(plugin.page_status())['data']['vision']
     elif CASE == 'forget':
         cache = {'k1': stickers.cache_entry('https://gchat.qpic.cn/m.png', {'caption': '芒果的图'}, '10001', 'group:' + A, now),
                  'k2': stickers.cache_entry('https://gchat.qpic.cn/l.png', {'caption': '柠檬的图'}, '10002', 'group:' + A, now)}

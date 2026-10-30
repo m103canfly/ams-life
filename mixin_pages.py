@@ -15,6 +15,10 @@ try:
     from . import ui_look
 except ImportError:
     import ui_look
+try:
+    from .vision import vision_for_panel
+except ImportError:
+    from vision import vision_for_panel
 
 
 class PagesMixin:
@@ -698,6 +702,7 @@ class PagesMixin:
                     })
                 except Exception:
                     continue
+        _vision = vision_for_panel(getattr(self, "config", {}) or {})
         return {"status": "ok", "data": {
             "enabled": self.enabled,
             "inject_intent": self.inject_intent,
@@ -736,6 +741,7 @@ class PagesMixin:
             **({"send_check": self._check_counts_today()} if getattr(self, "global_memory", False) else {}),
             # step 2 (甲): the money of the day (only with the switch on)
             **({"spend": self._spend_for_panel()} if getattr(self, "self_decide", False) else {}),
+            **({"vision": _vision} if _vision["calls"] > 0 else {}),   # only once she has looked today
             **({"browse": self._browse_for_panel()} if getattr(self, "_browse_on", None) and self._browse_on() else {}),
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,

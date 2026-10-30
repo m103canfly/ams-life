@@ -123,6 +123,9 @@ class AttentionMixin:
         """Add one model call to the day's spending (yuan, by kind). Never fails the call."""
         try:
             yuan = attention.cost(self._usage_of(resp), self._attention_cfg()["prices"])
+            price = (getattr(self, "config", {}) or {}).get("vision_price_per_call", "")
+            if kind == "vision" and str(price).strip():
+                yuan = max(0.0, float(price))
             data = _read_json(SPEND_PATH, {})
             day = data.setdefault(time.strftime("%Y-%m-%d"), {})
             day[str(kind)] = round(float(day.get(str(kind), 0) or 0) + yuan, 6)
@@ -137,7 +140,7 @@ class AttentionMixin:
 
     def _spent_today(self) -> float:
         day = _read_json(SPEND_PATH, {}).get(time.strftime("%Y-%m-%d")) or {}
-        return round(sum(float(v or 0) for k, v in day.items() if k != "calls"), 4)
+        return round(sum(float(v or 0) for k, v in day.items() if k not in ("calls", "vision_calls")), 4)
 
     # ------------------------------------------------------------------
     # who she knows (the owner, 10-29: by the dealings; he himself the closest)

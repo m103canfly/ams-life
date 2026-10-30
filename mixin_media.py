@@ -16,7 +16,6 @@ try:
 except ImportError:
     import stickers
 
-
 class MediaMixin:
     @staticmethod
     def _image_ref(img) -> str:
@@ -78,7 +77,12 @@ class MediaMixin:
             if IMAGE_CACHE_PATH.exists():
                 d = json.loads(IMAGE_CACHE_PATH.read_text(encoding="utf-8"))
                 if isinstance(d, dict):
-                    return d
+                    now = time.time()
+                    active = {k: v for k, v in d.items() if not k.startswith("content:") or
+                              (isinstance(v, dict) and 0 <= now - float(v.get("ts", 0) or 0) < 86400)}
+                    if len(active) != len(d):
+                        IMAGE_CACHE_PATH.write_text(json.dumps(active, ensure_ascii=False), encoding="utf-8")
+                    return active
         except Exception:
             pass
         return {}
@@ -87,6 +91,9 @@ class MediaMixin:
         if self._job_stale():
             return  # someone (or a message) she may not keep, or something forgotten meanwhile
         try:
+            # Calls may have added content entries while this address cache was in use.
+            current = self._load_image_cache()
+            cache.update({k: v for k, v in current.items() if k.startswith("content:") and k not in cache})
             if len(cache) > self.image_cache_max_entries:
                 items = sorted(cache.items(), key=lambda kv: float(kv[1].get("ts", 0) or 0), reverse=True)
                 cache = dict(items[:self.image_cache_max_entries])
@@ -236,7 +243,16 @@ class MediaMixin:
                 logger.warning("[biocore] local VLM unavailable; falling back to configured vision provider")
         self._image_last_used = time.time()
         cache = self._load_image_cache()
-        missing = [r for r in refs if _sha256(r) not in cache]
+        where = self._here(event)
+        sender = str(self._speaker(event)[0] or "")
+        for ref in refs:
+            item = cache.get(_sha256(ref))
+            if isinstance(item, dict) and (not item.get("where") or item.get("where") != where or
+                                           str(item.get("from_qq") or "") != sender or
+                                           time.time() - float(item.get("ts", 0) or 0) >= 86400):
+                cache.pop(_sha256(ref), None)
+        missing = [r for r in refs if _sha256(r) not in cache or
+                   time.time() - float(cache[_sha256(r)].get("ts", 0) or 0) >= 86400]
         if missing:
             try:
                 cfg = self.context.get_config()
@@ -264,7 +280,8 @@ class MediaMixin:
                                 ref, look, self._speaker(event)[0], self._here(event), time.time())
                             await self._maybe_keep(event, ref, look)
                         elif caption:
-                            cache[_sha256(ref)] = {"ref": ref, "caption": caption, "ts": time.time()}
+                            cache[_sha256(ref)] = {"ref": ref, "caption": caption, "ts": time.time(),
+                                                   "from_qq": self._speaker(event)[0], "where": self._here(event)}
                     self._save_image_cache(cache)
             except Exception as exc:
                 logger.warning("[biocore] image provider failed: %s", exc)
