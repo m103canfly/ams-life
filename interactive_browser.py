@@ -22,6 +22,8 @@ VISIBLE_CHARS = 3000
 SNAPSHOT_CHARS = 10000
 SNAPSHOT_DEPTH = 20
 ACTION_SECONDS = 20
+POPUP_WAIT_SECONDS = 3
+SNAPSHOT_URL_ATTEMPTS = 3
 ROLES = {"link": "链接", "button": "按钮", "textbox": "文本框", "searchbox": "搜索框",
          "combobox": "下拉框", "checkbox": "复选框", "tab": "标签"}
 TYPE_ROLES = frozenset(("textbox", "searchbox", "combobox"))
@@ -64,6 +66,7 @@ class BrowsingSession:
         self.page_links, self.last_read = set(), None
         self.ref_url = None
         self.redirect, self.popups = None, []
+        self.popup_events = {}
         self.rejected = False
         self.blocked_methods = 0
         self.steps, self.started = 0, None
@@ -124,11 +127,18 @@ class BrowsingSession:
 
     async def _popup(self, page):
         try:
-            if page.url and page.url != "about:blank":
-                self.popups.append(page.url)
+            event = self.popup_events.setdefault(page, asyncio.Event())
+            try:
+                await asyncio.wait_for(event.wait(), timeout=POPUP_WAIT_SECONDS)
+            except asyncio.TimeoutError:
+                if urlsplit(page.url).scheme.lower() in ("http", "https", "file"):
+                    self.popups.append(page.url)
             await page.close()
-        except Exception:
-            self.rejected = True
+        except Exception as exc:
+            if not real_browser._target_closed(exc):
+                self.rejected = True
+        finally:
+            self.popup_events.pop(page, None)
 
     async def _checked(self, address):
         return await asyncio.to_thread(real_browser._strict_url, address, self.check)
@@ -173,29 +183,43 @@ class BrowsingSession:
             pass
 
     async def _route(self, route):
+        counted = False
+
+        def record(reason):
+            nonlocal counted
+            counted = True
+            self._blocked(reason)
+
+        try:
+            await self._route_active(route, record)
+        except Exception as exc:
+            await real_browser._route_failed(route, exc, record, counted)
+
+    async def _route_active(self, route, on_block):
         request = route.request
         # Safety 4: a popup's first navigation must not reach the network before it is checked.
-        try:
-            if request.is_navigation_request() and request.frame.page != self.page:
-                if request.method.upper() not in ("GET", "HEAD"):
-                    self._blocked("method")
-                else:
-                    self.popups.append(request.url)
+        if request.is_navigation_request() and request.frame.page != self.page:
+            popup = request.frame.page
+            if request.method.upper() not in ("GET", "HEAD"):
+                on_block("method")
+            else:
+                self.popups.append(request.url)
+            try:
                 await route.abort()
-                return
-        except Exception:
-            pass
+            finally:
+                self.popup_events.setdefault(popup, asyncio.Event()).set()
+            return
         if self.game:
             if request.method.upper() in ("GET", "HEAD") and _file_in_games(request.url, self.games_dir):
                 await route.continue_()
             else:
                 if request.method.upper() not in ("GET", "HEAD"):
                     self._method_blocked(request)
-                self._blocked("method" if request.method.upper() not in ("GET", "HEAD") else "game")
+                on_block("method" if request.method.upper() not in ("GET", "HEAD") else "game")
                 await route.abort()
             return
         # Safety 2: the shared route rejects non-GET/HEAD methods and never follows redirects.
-        await real_browser._route_request(route, self._checked, self._blocked, self._redirected, self._method_blocked)
+        await real_browser._route_request(route, self._checked, on_block, self._redirected, self._method_blocked)
 
     def _remaining(self):
         return MAX_SECONDS - (time.monotonic() - self.started) if self.started is not None else 0
@@ -212,12 +236,15 @@ class BrowsingSession:
             return False
         return (await self._checked(self.page.url))[0]
 
-    async def _valid_page(self):
+    async def _valid_address(self, address):
         if self.rejected:
             return False
         if self.game:
-            return bool(self.games_dir and _file_in_games(self.page.url, self.games_dir))
-        return (await self._checked(self.page.url))[0]
+            return bool(self.games_dir and _file_in_games(address, self.games_dir))
+        return (await self._checked(address))[0]
+
+    async def _valid_page(self):
+        return await self._valid_address(self.page.url)
 
     async def _restore_page(self, address):
         if self.game:
@@ -266,7 +293,7 @@ class BrowsingSession:
         except Exception:
             return BLOCKED
 
-    async def snapshot(self):
+    async def snapshot(self, _attempt=0):
         if not self._can_act():
             return UNAVAILABLE
         if self._remaining() <= 0 or self.steps >= MAX_STEPS:
@@ -276,21 +303,27 @@ class BrowsingSession:
         self.page_links.clear()
         try:
             await self._run(self._drain())
-            if not await self._run(self._valid_page()):
+            for attempt in range(_attempt, SNAPSHOT_URL_ATTEMPTS):
+                address = self.page.url
+                if not await self._run(self._valid_address(address)):
+                    return BLOCKED
+                title = await self._run(self.page.title())
+                body = await self._run(self.page.locator("body").inner_text(timeout=real_browser.TEXT_SECONDS * 1000))
+                if len(body.strip()) < real_browser.CHALLENGE_MAX_CHARS and any(
+                        marker in (title + "\n" + body).lower() for marker in real_browser.CHALLENGE_MARKERS):
+                    return BLOCKED
+                raw = await self._run(self.page.aria_snapshot(mode="ai", depth=SNAPSHOT_DEPTH,
+                                                              timeout=real_browser.TEXT_SECONDS * 1000))
+                new_address = self.page.url
+                if not await self._run(self._valid_address(new_address)):
+                    return BLOCKED
+                if new_address == address and self.page.url == new_address:
+                    break
+            else:
                 return BLOCKED
-            address = self.page.url
-            title = await self._run(self.page.title())
-            body = await self._run(self.page.locator("body").inner_text(timeout=real_browser.TEXT_SECONDS * 1000))
-            if len(body.strip()) < real_browser.CHALLENGE_MAX_CHARS and any(
-                    marker in (title + "\n" + body).lower() for marker in real_browser.CHALLENGE_MARKERS):
-                return BLOCKED
-            raw = await self._run(self.page.aria_snapshot(mode="ai", depth=SNAPSHOT_DEPTH,
-                                                          timeout=real_browser.TEXT_SECONDS * 1000))
-            if self.page.url != address or not await self._run(self._valid_page()):
-                return BLOCKED
-            self.ref_url = self.page.url
+            self.ref_url = new_address
             prefix = "网址: %s\n标题: %s\n可见文字: %s\n元素:\n" % (
-                self.page.url[:400], title[:200], body[:VISIBLE_CHARS])
+                new_address[:400], title[:200], body[:VISIBLE_CHARS])
             lines = []
             for line in raw.splitlines():
                 match, ref = _LINE.match(line), _REF.search(line)
@@ -303,7 +336,7 @@ class BrowsingSession:
                 label = '[%d] %s “%s”' % (number, ROLES[role], name)
                 if role == "link":
                     href = await self._run(self.page.get_by_ref(ref.group(1)).get_attribute("href"))
-                    address = urljoin(self.page.url, href) if href else ""
+                    address = urljoin(new_address, href) if href else ""
                     if address and browse.check_url(address)[0]:
                         label += " " + address[:2048]
                         self.page_links.add(address)
@@ -315,7 +348,18 @@ class BrowsingSession:
                 if number >= MAX_ELEMENTS:
                     break
             text = prefix + "\n".join(lines)
-            return browse.wrap(self.page.url, text[:SNAPSHOT_CHARS], limit=SNAPSHOT_CHARS)
+            final_address = self.page.url
+            if not await self._run(self._valid_address(final_address)):
+                self.refs.clear()
+                self.page_links.clear()
+                return BLOCKED
+            if final_address != new_address or self.page.url != final_address:
+                self.refs.clear()
+                self.page_links.clear()
+                if attempt + 1 >= SNAPSHOT_URL_ATTEMPTS:
+                    return BLOCKED
+                return await self.snapshot(attempt + 1)
+            return browse.wrap(new_address, text[:SNAPSHOT_CHARS], limit=SNAPSHOT_CHARS)
         except Exception:
             self.refs.clear()
             self.page_links.clear()
@@ -351,8 +395,10 @@ class BrowsingSession:
                 return BLOCKED
         elif name in ("click", "type"):
             item = self.refs.get(action.get("n"))
-            if item is None or self.page.url != self.ref_url or not await self._valid_page():
+            if item is None or not await self._valid_page():
                 return BLOCKED
+            if self.page.url != self.ref_url:
+                return "页面地址已变化，请按最新快照重试。"
             title = await self.page.title()
             body = await self.page.locator("body").inner_text(timeout=real_browser.TEXT_SECONDS * 1000)
             if len(body.strip()) < real_browser.CHALLENGE_MAX_CHARS and any(
@@ -361,6 +407,19 @@ class BrowsingSession:
             ref, role, line = item
             locator = self.page.get_by_ref(ref)
             if name == "click":
+                if role == "link":
+                    href = await locator.get_attribute("href")
+                    target = (await locator.get_attribute("target") or "").strip().lower()
+                    if href and target and target not in ("_self", "_parent", "_top"):
+                        destination = urljoin(self.page.url, href)
+                        if self.game:
+                            if not _file_in_games(destination, self.games_dir):
+                                return BLOCKED
+                            await self.page.goto(destination, wait_until="domcontentloaded",
+                                                 timeout=real_browser.OPEN_SECONDS * 1000)
+                        elif not await self._goto(destination):
+                            return BLOCKED
+                        return None
                 before = self.blocked_methods
                 try:
                     await locator.click(timeout=ACTION_SECONDS * 1000)
@@ -477,7 +536,7 @@ class BrowsingSession:
                 return result + "\n" + snapshot
             if name == "screenshot" and result is not None:
                 return {"path": result, "snapshot": snapshot}
-            return snapshot
+            return str(result) + "\n" + snapshot if result is not None else snapshot
         except Exception:
             self.refs.clear()
             if name == "screenshot" and action.get("path"):
@@ -490,17 +549,25 @@ class BrowsingSession:
     async def close(self):
         self.finished = True
         try:
-            for task in list(self.pending):
-                task.cancel()
-            await self._drain()
             try:
-                if self.context:
-                    context, self.context = self.context, None
-                    await context.close()
+                try:
+                    if self.context:
+                        await self.context.unroute_all(behavior="ignoreErrors")
+                except Exception as exc:
+                    if not real_browser._target_closed(exc):
+                        raise
             finally:
-                if self.browser:
-                    browser, self.browser = self.browser, None
-                    await browser.close()
+                for task in list(self.pending):
+                    task.cancel()
+                await self._drain()
+                try:
+                    if self.context:
+                        context, self.context = self.context, None
+                        await context.close()
+                finally:
+                    if self.browser:
+                        browser, self.browser = self.browser, None
+                        await browser.close()
         finally:
             try:
                 if self.manager:

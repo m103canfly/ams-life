@@ -51,7 +51,7 @@ Files additionally changed: `interactive_browser.py` (new), `tests/test_interact
 `test_default_switch_is_off` checks the new default.
 
 Interactive offline tests: `test_snapshot_refs_and_refresh_after_each_action`,
-`test_snapshot_limits_elements_and_material`, `test_stale_reference_after_navigation_is_rejected`,
+`test_snapshot_limits_elements_and_material`, `test_stale_reference_after_navigation_refreshes_snapshot`,
 `test_only_allowed_actions_and_keys`,
 `test_open_requires_supplied_address`, `test_typing_requires_check_and_uses_cleaned_text`,
 `test_typing_rejects_password_login_and_non_text_roles`, `test_post_is_blocked_and_reported`,
@@ -112,3 +112,74 @@ Offline checks added: `test_background_post_is_counted_without_failing_action`,
 `test_proxy_lookup_failure_keeps_browser_available`, and
 `test_proxy_address_is_not_logged_on_browser_error`. The existing
 `test_post_is_blocked_and_reported` now accepts the recovered snapshot after the blocked message.
+
+The owner reported a further local Edge test: a search could reach its result page but still be
+reported blocked, a new-window link remained on the original page, and closing a session could
+produce route callback tracebacks. The previous snapshot code did reject any URL change across
+the snapshot, which could explain the first result; no trace established that it was the only
+possible cause. Snapshots now check each changed address and retry up to `SNAPSHOT_URL_ATTEMPTS=3`
+times to pair text and refs with a stable, checked address. If the address changes after a
+snapshot, an attempted click or type refreshes the snapshot instead of acting on stale refs.
+
+Links targeting a new window are opened through the checked navigation path in the current page.
+Script-created blank windows wait up to `POPUP_WAIT_SECONDS=3` for their first intercepted
+navigation, then close; the destination is checked before opening in the current page. Session
+closure calls `unroute_all(behavior="ignoreErrors")` before closing the context. Route callbacks
+quietly ignore target-closed errors. Other route errors are handled as described below. No new
+switch or unrelated feature was added.
+
+Offline tests added: `test_snapshot_retries_safe_url_change`,
+`test_snapshot_rejects_url_change_to_private_address`, `test_snapshot_retries_are_bounded_when_url_keeps_changing`,
+`test_snapshot_checks_url_changes_while_reading_links`,
+`test_stale_reference_to_private_address_is_rejected`, `test_blank_and_named_link_targets_open_in_current_page`,
+`test_blank_link_to_private_address_is_rejected`, `test_script_popup_waits_for_navigation_then_opens_current_page`,
+`test_click_waits_for_script_popup_before_returning_snapshot`,
+`test_script_popup_to_private_address_is_closed_and_rejected`, `test_blank_popup_is_closed_after_timeout`,
+`test_close_unroutes_before_closing_context`, `test_route_ignores_closed_and_contains_other_errors`,
+`test_unroute_closed_error_is_quiet_other_errors_propagate`, and
+`test_unroute_other_error_still_closes_resources`. The stale-reference and session-close tests were
+updated for the new behavior.
+
+The owner reported that a locally tested article loaded successfully, but a few proxied
+subrequests failed; the previous route callback re-raised their errors and caused the read to fail.
+The shared and interactive routes now treat a fetch, fulfill, or callback error as a failed request:
+they log only its exception type, count it once in the existing blocked-request accounting, and
+try to abort without letting an abort failure escape. Target-closed errors remain quiet. A failed
+main request still fails the page; a failed subrequest does not by itself fail the page. Handling
+the error at one boundary also avoids propagating the successive abort and fulfill exceptions.
+No switch or unrelated feature changed.
+
+Offline tests added: `test_subrequest_fetch_error_is_counted_and_page_is_read`,
+`test_main_request_fetch_error_returns_no_page`, `test_request_failure_and_abort_failure_do_not_escape`,
+`test_subrequest_fulfill_timeout_and_programming_error_are_contained`,
+`test_failed_abort_of_blocked_request_is_counted_once`,
+`test_interactive_subrequest_error_is_counted_and_snapshot_survives`, and
+`test_interactive_route_programming_error_and_abort_failure_are_contained`, plus
+`test_concurrent_route_failures_are_counted_independently`. The existing route
+error test was updated to check that non-closed errors are contained and counted.
+
+## 验证（10-30 晚，Codex调度）
+
+- 全套 954 项通过，金样没变（开关默认关）。
+- 抽查：
+  - 撤掉“抽不出就用 inner_text”：4 项失败；
+  - 撤掉“打字先过检查”：`test_typing_requires_check_and_uses_cleaned_text` 失败；
+  - 撤掉“点了以后的跳转（含新窗口）逐跳查”：5 项失败。
+- 本机真 Edge 实测（单独脚本，不碰正在跑的插件；查网址那一层包了一层，记下被问到的地址）：
+  1. 百度搜索框打字、回车：到了结果页，1519 字、15 个元素。必应在无头浏览器里结果页不出结果，换成百度；
+  2. 登录页：Username 框照规矩不打（看起来是登录的框）；点 Login，POST 被挡，留在登录页；
+  3. 表单提交：POST 被挡，回到原页；
+  4. 点会跳转的链接：检查依次被问到 /redirector、/redirect、/status_codes，每一跳都查过才去；
+  5. 选文件：0 个文件被选，点 Upload 被挡；
+  6. 开新窗口的链接：在当前页打开，没有多出来的窗口；
+  7. 跑完不留 Edge 进程、不留临时配置，主人的 Edge 配置没被碰；
+  8. 一页排出来的字：搜索结果页约 1500 字，按 Flash 价每步约几分钱以内。
+  - trafilatura：同一篇文章，抽出 5007 字，inner_text 13550 字，导航、侧栏去掉了。
+- 实测时发现、已修的：
+  - 后台的统计 POST 让整步“点不了”；
+  - 表单被挡后停在出错页；
+  - Playwright 自己的请求不走系统代理，海外网站打不开；
+  - 页面自己改地址栏被当成失败；
+  - 新窗口的网址没记下来；
+  - 经代理个别子请求连不上时，整页失败。
+- 残留风险：走代理时，代理那边会再解析一次域名，本机的检查不能证明代理最后连的是同一个地址（跟 DNS 重绑定那条一样，记着）。

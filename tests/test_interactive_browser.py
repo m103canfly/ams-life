@@ -46,7 +46,11 @@ class Locator:
 
     async def get_attribute(self, name):
         if name == 'href':
+            if self.page.href_change_url:
+                self.page.url, self.page.href_change_url = self.page.href_change_url, None
             return self.page.hrefs.get(self.ref)
+        if name == 'target':
+            return self.page.targets.get(self.ref)
         return self.page.types.get(self.ref)
 
     async def click(self, **kwargs):
@@ -56,6 +60,8 @@ class Locator:
             if self.page.error_on_blocked_navigation and self.page.click_route.result == 'abort':
                 self.page.url = 'chrome-error://chromewebdata/'
                 raise RuntimeError('navigation aborted')
+        if self.page.click_hook:
+            await self.page.click_hook()
 
     async def fill(self, text, **kwargs):
         self.page.filled.append((self.ref, text))
@@ -69,9 +75,12 @@ class InteractivePage(FakePage):
         self.mouse = types.SimpleNamespace(wheel=mock.AsyncMock())
         self.aria = ('- link "Next" [ref=e1]\n- textbox "Search" [ref=e2]\n'
                      '- button "Go" [ref=e3] [cursor=pointer]')
-        self.types, self.hrefs, self.clicked, self.filled = {}, {}, [], []
+        self.types, self.hrefs, self.targets, self.clicked, self.filled = {}, {}, {}, [], []
         self.snapshots, self.click_route = 0, None
         self.error_on_blocked_navigation = False
+        self.snapshot_urls = []
+        self.href_change_url = None
+        self.click_hook = None
 
     async def goto(self, url, **kwargs):
         route = InteractiveRoute(self, url)
@@ -85,6 +94,8 @@ class InteractivePage(FakePage):
     async def aria_snapshot(self, **kwargs):
         self.snapshots += 1
         self.snapshot_args = kwargs
+        if self.snapshot_urls:
+            self.url = self.snapshot_urls.pop(0)
         return self.aria
 
     def get_by_ref(self, ref):
@@ -148,10 +159,68 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.session.refs), ib.MAX_ELEMENTS)
         self.assertLess(len(result), ib.SNAPSHOT_CHARS + 300)
 
-    async def test_stale_reference_after_navigation_is_rejected(self):
+    async def test_stale_reference_after_navigation_refreshes_snapshot(self):
         page = await self.opened()
         page.url = 'https://example.com/changed'
+        result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertIn('请按最新快照重试', result)
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(page.clicked, [])
+
+    async def test_snapshot_retries_safe_url_change(self):
+        page = await self.opened()
+        new_url = 'https://example.com/page?changed=1'
+        page.snapshot_urls = [new_url]
+        result = await self.session.snapshot()
+        self.assertIn(new_url, result)
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(self.session.ref_url, new_url)
+        self.assertIn(new_url, [call.args[0] for call in real_browser._strict_url.call_args_list])
+
+    async def test_snapshot_rejects_url_change_to_private_address(self):
+        page = await self.opened()
+        page.snapshot_urls = ['http://private.invalid/']
+        self.assertEqual(await self.session.snapshot(), ib.BLOCKED)
+        self.assertEqual(self.session.refs, {})
+
+    async def test_snapshot_retries_are_bounded_when_url_keeps_changing(self):
+        page = await self.opened()
+        page.snapshot_urls = ['https://example.com/change%d' % n for n in range(ib.SNAPSHOT_URL_ATTEMPTS)]
+        self.assertEqual(await self.session.snapshot(), ib.BLOCKED)
+        self.assertEqual(self.session.refs, {})
+
+    async def test_snapshot_checks_url_changes_while_reading_links(self):
+        page = await self.opened()
+        page.href_change_url = 'https://example.com/new'
+        self.assertIn('https://example.com/new', await self.session.snapshot())
+        self.assertEqual(self.session.ref_url, 'https://example.com/new')
+        page.href_change_url = 'http://private.invalid/'
+        self.assertEqual(await self.session.snapshot(), ib.BLOCKED)
+        self.assertEqual(self.session.refs, {})
+
+    async def test_stale_reference_to_private_address_is_rejected(self):
+        page = await self.opened()
+        page.url = 'http://private.invalid/'
         self.assertEqual(await self.session.act({'action': 'click', 'n': 1}), ib.BLOCKED)
+        self.assertEqual(page.clicked, [])
+
+    async def test_blank_and_named_link_targets_open_in_current_page(self):
+        page = await self.opened()
+        page.hrefs['e1'] = '/next'
+        for target in ('_blank', 'other-window'):
+            with self.subTest(target=target):
+                page.targets['e1'] = target
+                result = await self.session.act({'action': 'click', 'n': 1})
+                self.assertIn('[1] 链接', result)
+                self.assertEqual(page.url, 'https://example.com/next')
+                self.assertEqual(page.clicked, [])
+        self.assertIn('https://example.com/next', [url for url, _ in self.fake.context.request.calls])
+
+    async def test_blank_link_to_private_address_is_rejected(self):
+        page = await self.opened()
+        page.hrefs['e1'], page.targets['e1'] = 'http://private.invalid/', '_blank'
+        self.assertEqual(await self.session.act({'action': 'click', 'n': 1}), ib.BLOCKED)
+        self.assertEqual(page.url, URL)
         self.assertEqual(page.clicked, [])
 
     async def test_snapshot_link_allowlist_tracks_current_snapshot(self):
@@ -306,11 +375,13 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
         page = await self.opened()
         popup = InteractivePage(self.fake.context)
         popup.url = 'https://example.com/new'
+        await self.session._route(InteractiveRoute(popup, popup.url))
         await self.session._popup(popup)
         self.assertTrue(popup.closed)
         self.assertTrue(await self.session._follow())
         self.assertEqual(page.url, popup.url)
         popup.url = 'http://private.invalid/'
+        await self.session._route(InteractiveRoute(popup, popup.url))
         await self.session._popup(popup)
         self.assertFalse(await self.session._follow())
 
@@ -345,6 +416,58 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(route.fetch_args)
         self.assertTrue(await self.session._follow())
         self.assertEqual(self.fake.context.page.url, 'https://example.com/new')
+
+    async def test_script_popup_waits_for_navigation_then_opens_current_page(self):
+        page = await self.opened()
+        popup = InteractivePage(self.fake.context)
+        popup.url = 'about:blank'
+        self.fake.context.handlers['page'](popup)
+        await asyncio.sleep(0)
+        self.assertFalse(popup.closed)
+        route = InteractiveRoute(popup, 'https://example.com/new')
+        await self.session._route(route)
+        self.assertTrue(await self.session._follow())
+        self.assertEqual(route.result, 'abort')
+        self.assertTrue(popup.closed)
+        self.assertEqual(page.url, 'https://example.com/new')
+
+    async def test_click_waits_for_script_popup_before_returning_snapshot(self):
+        page = await self.opened()
+        popup = InteractivePage(self.fake.context)
+        popup.url = 'about:blank'
+        route = InteractiveRoute(popup, 'https://example.com/new')
+        async def open_popup():
+            self.fake.context.handlers['page'](popup)
+            async def navigate():
+                await asyncio.sleep(0)
+                await self.session._route(route)
+            asyncio.create_task(navigate())
+        page.click_hook = open_popup
+        result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertIn('https://example.com/new', result)
+        self.assertTrue(popup.closed)
+        self.assertEqual(route.result, 'abort')
+
+    async def test_script_popup_to_private_address_is_closed_and_rejected(self):
+        page = await self.opened()
+        popup = InteractivePage(self.fake.context)
+        popup.url = 'about:blank'
+        self.fake.context.handlers['page'](popup)
+        await asyncio.sleep(0)
+        route = InteractiveRoute(popup, 'http://private.invalid/')
+        await self.session._route(route)
+        self.assertFalse(await self.session._follow())
+        self.assertEqual(route.result, 'abort')
+        self.assertTrue(popup.closed)
+        self.assertEqual(page.url, URL)
+
+    async def test_blank_popup_is_closed_after_timeout(self):
+        popup = InteractivePage(self.fake.context)
+        popup.url = 'about:blank'
+        with mock.patch.object(ib, 'POPUP_WAIT_SECONDS', 0.01):
+            await self.session._popup(popup)
+        self.assertTrue(popup.closed)
+        self.assertEqual(self.session.popups, [])
 
     async def test_popup_post_is_counted_and_not_replayed(self):
         page = await self.opened()
@@ -483,6 +606,116 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
     async def test_close_releases_browser_context_and_lock(self):
         await self.session.close()
         self.assertTrue(self.fake.closed and self.fake.context.closed)
+        self.assertFalse(self.session.locked)
+        self.assertEqual(self.fake.context.unroute_args, {'behavior': 'ignoreErrors'})
+
+    async def test_close_unroutes_before_closing_context(self):
+        order = []
+        async def unroute(**kwargs):
+            order.append(('unroute', kwargs))
+        async def close():
+            order.append(('close', {}))
+        self.fake.context.unroute_all = unroute
+        self.fake.context.close = close
+        await self.session.close()
+        self.assertEqual(order, [('unroute', {'behavior': 'ignoreErrors'}), ('close', {})])
+
+    async def test_route_ignores_closed_and_contains_other_errors(self):
+        class TargetClosedError(Exception):
+            pass
+        page = await self.opened()
+        with mock.patch.object(real_browser.logger, 'info') as log:
+            route = InteractiveRoute(page, method='POST', navigation=False)
+            route.abort = mock.AsyncMock(side_effect=TargetClosedError('closed'))
+            await self.session._route(route)
+            route = InteractiveRoute(page)
+            route.fulfill = mock.AsyncMock(side_effect=TargetClosedError('closed'))
+            await self.session._route(route)
+            log.assert_not_called()
+        counts = []
+        self.session.on_block = counts.append
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            route = InteractiveRoute(page, method='POST', navigation=False)
+            route.abort = mock.AsyncMock(side_effect=RuntimeError('other error'))
+            await self.session._route(route)
+            route = InteractiveRoute(page)
+            route.fulfill = mock.AsyncMock(side_effect=RuntimeError('other error'))
+            await self.session._route(route)
+        self.assertEqual(counts, [1, 1])
+        self.assertEqual(len(logs.output), 2)
+        self.assertTrue(all('RuntimeError' in line and 'other error' not in line for line in logs.output))
+
+    async def test_interactive_subrequest_error_is_counted_and_snapshot_survives(self):
+        class Error(Exception):
+            pass
+        page = await self.opened()
+        route = InteractiveRoute(page, url='https://example.com/resource', navigation=False)
+        route.fetch = mock.AsyncMock(side_effect=Error('fictional network failure'))
+        page.click_route = route
+        counts = []
+        self.session.on_block = counts.append
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(route.result, 'abort')
+        self.assertEqual(counts, [1])
+        self.assertEqual(self.session.blocked_methods, 0)
+        self.assertEqual(len(logs.output), 1)
+        self.assertNotIn('fictional network failure', logs.output[0])
+
+    async def test_interactive_route_programming_error_and_abort_failure_are_contained(self):
+        page = await self.opened()
+        route = InteractiveRoute(page, navigation=False)
+        route.request.is_navigation_request = mock.Mock(side_effect=TypeError('fictional error'))
+        route.abort = mock.AsyncMock(side_effect=RuntimeError('fictional abort'))
+        counts = []
+        self.session.on_block = counts.append
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            await self.session._route(route)
+        self.assertEqual(counts, [1])
+        self.assertEqual(route.abort.await_count, 1)
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('TypeError', logs.output[0])
+        self.assertNotIn('fictional', logs.output[0])
+
+    async def test_concurrent_route_failures_are_counted_independently(self):
+        page = await self.opened()
+        counts = []
+        self.session.on_block = counts.append
+        started, release = asyncio.Event(), asyncio.Event()
+        with tempfile.TemporaryDirectory() as tmp:
+            self.session.game = True
+            self.session.games_dir = Path(tmp)
+            failing = InteractiveRoute(page, url=(Path(tmp) / 'inside.js').as_uri(), navigation=False)
+            async def fail_later():
+                started.set()
+                await release.wait()
+                raise TypeError('fictional failure')
+            failing.continue_ = fail_later
+            with self.assertLogs(real_browser.logger, level='INFO'):
+                task = asyncio.create_task(self.session._route(failing))
+                await started.wait()
+                blocked = InteractiveRoute(page, method='POST', navigation=False)
+                await self.session._route(blocked)
+                release.set()
+                await task
+        self.assertEqual(counts, [1, 1])
+        self.assertEqual(failing.result, 'abort')
+        self.assertEqual(blocked.result, 'abort')
+
+    async def test_unroute_closed_error_is_quiet_other_errors_propagate(self):
+        class TargetClosedError(Exception):
+            pass
+        self.fake.context.unroute_all = mock.AsyncMock(side_effect=TargetClosedError('closed'))
+        await self.session.close()
+        self.assertTrue(self.fake.context.closed and self.fake.closed)
+        self.assertFalse(self.session.locked)
+
+    async def test_unroute_other_error_still_closes_resources(self):
+        self.fake.context.unroute_all = mock.AsyncMock(side_effect=RuntimeError('other error'))
+        with self.assertRaises(RuntimeError):
+            await self.session.close()
+        self.assertTrue(self.fake.context.closed and self.fake.closed)
         self.assertFalse(self.session.locked)
 
 

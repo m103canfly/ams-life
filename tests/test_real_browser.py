@@ -166,6 +166,9 @@ class FakeContext:
     def on(self, name, callback):
         self.handlers[name] = callback
 
+    async def unroute_all(self, **kwargs):
+        self.unroute_args = kwargs
+
     async def close(self):
         self.closed = True
 
@@ -363,6 +366,83 @@ class Browser(unittest.TestCase):
         self.run_browser(fake)
         self.assertEqual([r.result for r in fake.context.routes],
                          ['fulfill', 'fulfill', 'abort', 'abort', 'abort', 'abort'])
+
+    def test_subrequest_fetch_error_is_counted_and_page_is_read(self):
+        class Error(Exception):
+            pass
+        fake = FakePlaywright()
+        route = Route('https://example.com/image')
+        route.fetch = mock.AsyncMock(side_effect=Error('fictional connection failure'))
+        fake.context.routes = [route]
+        counts = []
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = self.run_browser(fake, on_block=counts.append)
+        self.assertEqual(result['text'], 'readable words')
+        self.assertEqual(route.result, 'abort')
+        self.assertEqual(counts, [1])
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('request failed (Error)', logs.output[0])
+        self.assertNotIn('fictional connection failure', logs.output[0])
+
+    def test_main_request_fetch_error_returns_no_page(self):
+        class Error(Exception):
+            pass
+        async def fail_fetch(route, **kwargs):
+            raise Error('fictional connection failure')
+        fake = FakePlaywright()
+        counts = []
+        with mock.patch.object(Route, 'fetch', new=fail_fetch):
+            self.assertIsNone(self.run_browser(fake, on_block=counts.append))
+        self.assertEqual(fake.context.main_route.result, 'abort')
+        self.assertEqual(counts, [1])
+
+    def test_request_failure_and_abort_failure_do_not_escape(self):
+        class Error(Exception):
+            pass
+        fake = FakePlaywright()
+        route = Route('https://example.com/image')
+        route.fetch = mock.AsyncMock(side_effect=Error('fetch detail'))
+        route.abort = mock.AsyncMock(side_effect=Error('abort detail'))
+        fake.context.routes = [route]
+        counts = []
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = self.run_browser(fake, on_block=counts.append)
+        self.assertEqual(result['text'], 'readable words')
+        self.assertEqual(counts, [1])
+        self.assertEqual(route.abort.await_count, 1)
+        self.assertEqual(len(logs.output), 1)
+        self.assertNotIn('fetch detail', logs.output[0])
+        self.assertNotIn('abort detail', logs.output[0])
+
+    def test_subrequest_fulfill_timeout_and_programming_error_are_contained(self):
+        for phase, error in (('fulfill', TimeoutError('fictional timeout')),
+                             ('fetch', TypeError('fictional coding error'))):
+            with self.subTest(phase=phase):
+                fake = FakePlaywright()
+                route = Route('https://example.com/resource')
+                setattr(route, phase, mock.AsyncMock(side_effect=error))
+                fake.context.routes = [route]
+                counts = []
+                with self.assertLogs(real_browser.logger, level='INFO') as logs:
+                    result = self.run_browser(fake, on_block=counts.append)
+                self.assertEqual(result['text'], 'readable words')
+                self.assertEqual(route.result, 'abort')
+                self.assertEqual(counts, [1])
+                self.assertEqual(len(logs.output), 1)
+                self.assertIn(type(error).__name__, logs.output[0])
+
+    def test_failed_abort_of_blocked_request_is_counted_once(self):
+        fake = FakePlaywright()
+        route = Route('https://example.com/resource', method='POST')
+        route.abort = mock.AsyncMock(side_effect=RuntimeError('fictional abort'))
+        fake.context.routes = [route]
+        counts = []
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = self.run_browser(fake, on_block=counts.append)
+        self.assertEqual(result['text'], 'readable words')
+        self.assertEqual(counts, [1])
+        self.assertEqual(route.abort.await_count, 2)
+        self.assertEqual(sum('request failed (RuntimeError)' in line for line in logs.output), 1)
 
     def test_main_redirect_to_private_is_checked_before_request(self):
         fake = FakePlaywright()

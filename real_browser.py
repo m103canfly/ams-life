@@ -117,7 +117,41 @@ def _strict_url(url, check):
         return False, "unresolved or invalid"
 
 
+def _target_closed(exc):
+    return (type(exc).__name__ == "TargetClosedError" or
+            (type(exc).__name__ == "Error" and "Target page, context or browser has been closed" in str(exc)))
+
+
 async def _route_request(route, checked, on_block, on_redirect=None, on_method_block=None):
+    counted = False
+
+    def record(reason):
+        nonlocal counted
+        counted = True
+        on_block(reason)
+
+    try:
+        await _route_request_active(route, checked, record, on_redirect, on_method_block)
+    except Exception as exc:
+        await _route_failed(route, exc, record, counted)
+
+
+async def _route_failed(route, exc, on_block, counted=False):
+    if _target_closed(exc):
+        return
+    logger.info("[ams-life] browser: request failed (%s)", type(exc).__name__)
+    if not counted:
+        try:
+            on_block("request failed")
+        except Exception:
+            pass
+    try:
+        await route.abort()
+    except Exception:
+        pass
+
+
+async def _route_request_active(route, checked, on_block, on_redirect=None, on_method_block=None):
     request = route.request
     if request.method.upper() not in ("GET", "HEAD"):
         if on_method_block:
@@ -140,12 +174,13 @@ async def _route_request(route, checked, on_block, on_redirect=None, on_method_b
             await route.abort()
         else:
             await route.fulfill(response=response)
-    except Exception:
-        logger.info("[ams-life] browser: request failed")
-        await route.abort()
     finally:
         if response is not None:
-            await response.dispose()
+            try:
+                await response.dispose()
+            except Exception as exc:
+                if not _target_closed(exc):
+                    raise
 
 
 async def _navigate(context, page, address, checked, on_block):
@@ -216,7 +251,8 @@ async def _visit(url, check, shot_path, on_block):
         def note_block(reason):
             nonlocal blocked
             blocked += 1
-            logger.info("[ams-life] browser: blocked request (%s)", reason)
+            if reason != "request failed":
+                logger.info("[ams-life] browser: blocked request (%s)", reason)
 
         async def route_request(route):
             await _route_request(route, checked, note_block)
