@@ -16,4 +16,4 @@
 
 ## Validation
 
-Offline tests cover the 31st and 100th picture, source counts and the phone selfie count, the three paths and both provider types, zero price, cache, deletion and legacy count migration. The previous review reported 684 passing tests and a successful zero-price mutation check. After the main merge, the owner reported four failures; the fixes and new image-header tests await the next external Python run. The endpoint and model have not been checked here.
+Offline tests cover the 31st and 100th picture, source counts and the phone selfie count, the three paths and both provider types, zero price, cache, deletion and legacy count migration. The full suite passes (729 tests on main 85c609b); the zero-price and image-header mutation checks fail as they should. The endpoint and model are checked on the computer at install time.

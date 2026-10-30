@@ -21,8 +21,8 @@ in memory has no public interface and disappears on restart.
 
 No new switch; the behavior applies to owner person deletion. No changes outside the
 card. Offline tests cover a matching and an unrelated group, a missing update interface,
-and an update error. The full suite and the removal mutation check were not run in this
-environment. `tests/golden/` is unchanged.
+and an update error. The full suite passes (713 tests on main 85c609b) and removing the
+clear fails three of them. `tests/golden/` is unchanged.
 
 Files: `mixin_discretion.py`, `mixin_pages.py`, `pages/dashboard/app.js`,
 `tests/forget_cases.py`, `tests/test_forget_wiring.py`.

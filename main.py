@@ -795,7 +795,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             _kb,
             _voice,
             memory_meta=_memory_meta,
-            open_loops=self._window_loops(event),
+            open_loops=[x for x in self._window_loops(event)
+                        if not self._here(event).startswith("group:") or
+                        (bool(_sid) and discretion.origin_of(x, self._here(event))["people"] == [str(_sid)])],
             answer_confidence=_memory_meta.get("answer_confidence"),
             continuity=_continuity,
             owner_rules=self._owner_rules(),
