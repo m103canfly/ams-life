@@ -1173,9 +1173,15 @@
     // step 2 (self_decide): the money of the day
     const spend=$("spendNote"), sp=data&&data.spend;
     if(spend){
-      spend.hidden=!sp;
+      const phone=data&&data.phone_counts;
+      spend.hidden=!sp&&!phone;
+      if(!sp) spend.textContent="";
       if(sp) spend.textContent="今天调模型花了约 "+Number(sp.spent||0).toFixed(2)+" 元，还剩 "+Number(sp.left||0).toFixed(2)+
         " 元（上限 "+Number(sp.hard||0)+" 元"+(sp.state==="soft"?"，快到了：只回主人的私聊":sp.state==="hard"?"，到了：今天不回了":"")+"）。";
+    }
+    if(spend && data && data.phone_counts){
+      const p=data.phone_counts;
+      spend.textContent+=(sp?" ":"")+"今天自拍 "+Number(p.selfie||0)+" 张，随手拍 "+Number(p.snap||0)+" 张，截图 "+Number(p.screenshot||0)+" 张，语音 "+Number(p.voice||0)+" 条。";
     }
     // step 2 (global_memory): the last look before sending, today
     const send=$("sendNote"), sc=data&&data.send_check;
