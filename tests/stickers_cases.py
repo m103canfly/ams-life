@@ -139,7 +139,7 @@ def run():
     out = {}
     lib = plugin._sticker_lib()
     now = time.time()
-    if CASE in ('reply', 'off', 'alone', 'fallback', 'forget', 'held', 'history'):
+    if CASE in ('reply', 'off', 'alone', 'fallback', 'forget', 'held', 'missing', 'history'):
         lib.add(png(3, 3, 7), now, source='self', from_qq='10001', from_where='group:' + A,
                 look={'caption': '一只在笑的猫', 'emotion': '开心', 'scene': '夸人'})
         lib.add(png(3, 3, 8), now, source='owner', from_qq=OWNER, note='主人给的兔子')
@@ -214,6 +214,21 @@ def run():
         # the send check is on; the sticker's label is about something that may not be said here
         bot = Bot()
         out['r'] = reply('好呀，你最棒\n[表情包:1]', bot, forbid='一只在笑的猫')
+        out['calls'] = len(bot.calls)
+        out['sent'] = sent
+    elif CASE == 'missing':
+        original_clear = plugin._sticker_cleared
+
+        async def missing_when_checked(event, sid):
+            row = lib.rows.pop(sid)
+            try:
+                return await original_clear(event, sid)
+            finally:
+                lib.rows[sid] = row
+
+        plugin._sticker_cleared = missing_when_checked
+        bot = Bot()
+        out['r'] = reply('one\ntwo[表情包:1]\nthree', bot)
         out['calls'] = len(bot.calls)
         out['sent'] = sent
     elif CASE == 'reply':

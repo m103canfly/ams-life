@@ -18,6 +18,7 @@ clock = harness.prepare(DATA)
 import main  # noqa: E402
 import attention  # noqa: E402
 import mixin_attention  # noqa: E402
+real_typing_seconds = attention.typing_seconds
 attention.typing_seconds = lambda text: 0.01   # quick
 from astrbot.api import logger  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
@@ -140,6 +141,179 @@ def run():
         out['soft_other_private'] = one(Event('小爱 你好', sender='10002', name='柠檬', group=None, wake=True))
         mixin_attention.SPEND_PATH.write_text(json.dumps({day: {'reply': 10.0}}), 'utf-8')
         out['hard_owner_private'] = one(Event('小爱 你好', sender='10009', name='主人', group=None, wake=True))
+    elif CASE == 'pieces':
+        plugin.self_decide = False
+
+        async def reply(text, enabled=True):
+            plugin.reply_in_pieces = enabled
+            event = Event('hello', wake=True)
+            response = LLMResponse(text)
+            await plugin.on_llm_response(event, response)
+            tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()
+                     and '_send_rest' in repr(t.get_coro())]
+            if tasks:
+                await asyncio.gather(*tasks)
+            chain = getattr(response, 'result_chain', None)
+            return {'chain': [(type(c).__name__, getattr(c, 'text', getattr(c, 'id', None)))
+                              for c in (chain.chain if chain else [])],
+                    'text': response.completion_text, 'stopped': event.stopped}
+
+        out['on'] = loop.run_until_complete(reply('one\ntwo[表情:微笑]\nthree'))
+        out['sent'] = list(sent)
+        out['off'] = loop.run_until_complete(reply('one\ntwo', False))
+        win = next(iter((DATA / 'phone').glob('group_*.json')))
+        out['phone'] = [x.get('text') for x in json.loads(win.read_text('utf-8'))['recent']
+                        if x.get('role') == 'assistant']
+        calls = []
+
+        async def fail_send(umo, chain):
+            calls.append(chain.get_plain_text())
+            raise RuntimeError('send failed')
+
+        ctx.send_message = fail_send
+        loop.run_until_complete(reply('first\nsecond\nthird'))
+        out['failed_calls'] = calls
+    elif CASE == 'pieces_contract':
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from astrbot.api.event import MessageChain
+        from astrbot.api.message_components import At, Plain, Reply
+
+        plugin.self_decide = False
+        events = []
+        delays = []
+
+        async def fake_sleep(seconds):
+            delays.append(seconds)
+
+        async def outlet(umo, chain):
+            events.append(['text', [(type(c).__name__, getattr(c, 'text', None)) for c in chain.chain]])
+
+        ctx.send_message = outlet
+
+        async def turn(text, chain=None, offered=None):
+            event = Event('hello', wake=True)
+            if offered is not None:
+                event._ams_stickers_offered = offered
+            response = LLMResponse(text, chain)
+            await plugin.on_llm_response(event, response)
+            first = [(type(c).__name__, getattr(c, 'text', None))
+                     for c in (response.result_chain.chain if response.result_chain else [])]
+            tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()
+                     and '_send_rest' in repr(t.get_coro())]
+            if tasks:
+                await asyncio.gather(*tasks)
+            return event, response, first
+
+        async def exercise():
+            attention.typing_seconds = real_typing_seconds
+            fake_asyncio = SimpleNamespace(sleep=fake_sleep, create_task=asyncio.create_task)
+            with patch.object(mixin_attention, 'asyncio', fake_asyncio):
+                initial = MessageChain([Reply(id='fake-message'), At(qq='10005'), Plain('first\nsecond\nthird')])
+                event, response, first = await turn('first\nsecond\nthird', initial)
+                out['first'], out['rest'], out['delays'] = first, list(events), list(delays)
+                part = lambda kind, text: SimpleNamespace(type=kind, text=text)
+                context = SimpleNamespace(messages=[SimpleNamespace(role='assistant',
+                                          content=[part('think', 'thinking'), part('text', 'first')])])
+                await plugin.on_agent_done(event, context, response)
+                out['history'] = [[p.type, p.text] for p in context.messages[0].content]
+
+                events.clear()
+                plugin.global_memory = True
+                async def hold(event, response, reply):
+                    plugin._stop(event)
+                    return ''
+                plugin._look_at_reply = hold
+                held, _, _ = await turn('first\nsecond')
+                plugin.global_memory = False
+                plugin.self_decide = True
+                silent, _, _ = await turn('【不说】')
+                out['held'] = [held.stopped, silent.stopped, list(events)]
+
+                plugin.self_decide = False
+                plugin._stickers_on = lambda: True
+                plugin._sticker_lib = lambda: SimpleNamespace(rows={'fake': {'caption': 'cat'}})
+                async def clear(event, sid):
+                    return True
+                plugin._sticker_cleared = clear
+                def after(event, sid):
+                    async def send():
+                        events.append(['sticker', sid])
+                        return True
+                    return send
+                plugin._sticker_after = after
+                events.clear()
+                sticker_event, _, sticker_first = await turn('first\nsecond[表情包:1]\nthird', offered=['fake'])
+                out['sticker_first'] = sticker_first
+                out['sticker_order'] = list(events)
+
+                def failed_after(event, sid):
+                    async def send():
+                        events.append(['sticker_failed', sid])
+                        return False
+                    return send
+                plugin._sticker_after = failed_after
+                events.clear()
+                _, _, first = await turn('first\nsecond[表情包:1]\nthird', offered=['fake'])
+                out['failed_sticker_first'] = first
+                out['failed_sticker_order'] = list(events)
+
+        loop.run_until_complete(exercise())
+    elif CASE == 'pieces_voice':
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import mixin_selfie
+
+        plugin.self_decide = False
+        order = []
+        gate = asyncio.Event()
+
+        async def wait_to_type(seconds):
+            await gate.wait()
+
+        async def delay_media(seconds):
+            order.append(['delay', seconds])
+
+        async def send_message(umo, chain):
+            order.append(['text', chain.get_plain_text()])
+
+        async def clear(event, text):
+            return True
+
+        async def voice(text):
+            return 'fake-voice'
+
+        ctx.send_message = send_message
+        plugin._phone_clear = clear
+        plugin._make_voice = voice
+        plugin._phone_account = lambda *args, **kwargs: None
+        plugin._note_she_sent = lambda *args, **kwargs: None
+        plugin._phone_prune = lambda *args, **kwargs: None
+
+        async def exercise_voice():
+            event = Event('hello', wake=True)
+            async def send_media(chain):
+                order.append(['voice', type(chain.chain[0]).__name__])
+            event.send = send_media
+            plugin._phone_queue(event)['voice'] = 'hello'
+            response = LLMResponse('first\nsecond\nthird')
+            attention_asyncio = SimpleNamespace(sleep=wait_to_type, create_task=asyncio.create_task)
+            selfie_asyncio = SimpleNamespace(sleep=delay_media)
+            with patch.object(mixin_attention, 'asyncio', attention_asyncio), \
+                    patch.object(mixin_selfie, 'asyncio', selfie_asyncio):
+                await plugin.on_llm_response(event, response)
+                order.append(['text', response.result_chain.get_plain_text()])
+                await asyncio.sleep(0)
+                await asyncio.sleep(0)
+                out['before_release'] = list(order)
+                gate.set()
+                tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()
+                         and ('_send_rest' in repr(t.get_coro()) or '_media_after_reply' in repr(t.get_coro()))]
+                if tasks:
+                    await asyncio.gather(*tasks)
+                out['order'] = list(order)
+
+        loop.run_until_complete(exercise_voice())
     elif CASE == 'replies':
         def reply(text, usage=None, chain=False):
             event = Event('小爱 周末去哪玩', wake=True)
