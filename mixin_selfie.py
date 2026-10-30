@@ -11,20 +11,30 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from asyncio import CancelledError, TimeoutError as AsyncTimeoutError, shield, wait_for
+from datetime import datetime, timedelta
 from pathlib import Path
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse
+    from . import tts, browse, daily
 except ImportError:
     from common import *  # noqa: F401,F403
     import tts
     import browse
+    import daily
 
 SELFIE_DIR = DATA_DIR / "selfie"
 REF_DIR = SELFIE_DIR / "refs"
 SPEND_PATH = STATE_DIR / "spend.json"
+NOW_PATH = STATE_DIR / "now.json"
+PHOTO_QUEUED = "照片和你配的那句会一起发出去，排在你的话后面；正文里别再提照片。"
+LINK_QUEUED = "链接和你配的那句会在你的话后面一起发出去，正文里别再提。"
 SEND_DELAY = 1.5
+# Allow a slow image service to finish, but do not hold queued media indefinitely.
+PHOTO_WAIT_SECONDS = 150
+# If earlier text is stuck, later media would arrive without its context.
+REST_WAIT_SECONDS = 60
 PHOTO_RETRIES = 3
 PHOTO_WAITING = 3
 SELFIE_PROMPT = ("真人质感的手机照片，真实皮肤和光影，有实感、有生活气息，不要动漫画风，不要塑料感，不要摆拍感。\n"
@@ -36,7 +46,7 @@ SNAP_PROMPT = ("普通人用手机随手拍的照片，真实，有生活气息�
                "画面里没有人脸，也没有人物正面；最多露出拍照人的一只手或袖口（浅色宽松毛衣袖子，手指纤细）。\n"
                "构图随意，可能有点歪、有点糊，光线就是当时的自然光，有手机照片的噪点。\n"
                "不要出现文字水印、门牌号、车牌、能认出具体地点的招牌。竖构图 3:4。\n拍的是：")
-PHOTO_GUIDE = ("拍照由你自己决定。自拍：新衣发型、节日、出门、心情好、被夸或熟人问近况时可以拍；"
+PHOTO_GUIDE = ("你像普通人一样在家、出门、吃饭，拍照由你自己决定。自拍：新衣发型、节日、出门、心情好、被夸或熟人问近况时可以拍；"
                "深夜、刚醒没收拾、心情很差或不熟的人索要时不拍，刚醒和极熟的人撒娇可例外。"
                "自拍的 what 须写清在哪、穿什么、角度姿势、在干什么；变换角度：四分之三侧、低头、回头、对镜、俯拍、朋友抓拍没看镜头。"
                "随手拍吃的、天空风景、猫、招牌、买的东西、游戏、节日装饰；避开别人脸和能认出住处的门牌车牌。")
@@ -64,6 +74,48 @@ def _write_json(path, data):
 
 
 class SelfieMixin:
+    def _set_now(self, where, doing, now=None):
+        now = now or datetime.now()
+        _write_json(NOW_PATH, {"where": where, "doing": doing,
+                               "start": now.isoformat(), "source": "her"})
+
+    def _now_line(self, event):
+        try:
+            now = datetime.now()
+            try:
+                state = json.loads(NOW_PATH.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                state = {}
+            if not isinstance(state, dict):
+                raise ValueError("invalid now state")
+            start = datetime.fromisoformat(state["start"]) if state.get("start") else None
+            valid = (start is not None and start <= now and state.get("source") in ("her", "schedule")
+                     and all(isinstance(state.get(k), str) and 0 < len(state[k]) <= 20 for k in ("where", "doing")))
+            if valid and state["source"] == "her":
+                valid = now < min(daily.next_period(start), start + timedelta(hours=daily.HER_MAX_HOURS))
+            elif valid:
+                valid = start == daily.period_start(now)
+            if not valid:
+                body = self._core(event).snapshot()
+                where, doing, start = daily.schedule(now, float(body["energy"]), float(body["v"]), float(body["stress"]))
+                state = {"where": where, "doing": doing, "start": start.isoformat(), "source": "schedule"}
+                _write_json(NOW_PATH, state)
+            return "此刻：在%s，正在%s（从%s开始）。" % (state["where"], state["doing"], start.strftime("%H:%M"))
+        except Exception as exc:
+            logger.debug("[ams-life] now unavailable: %s", type(exc).__name__)
+            return ""
+
+    async def _tool_set_now(self, event, where="", doing=""):
+        where, doing = str(where or "").strip(), str(doing or "").strip()
+        if not self.enabled or not where or not doing or len(where) > 20 or len(doing) > 20:
+            return "不能更新此刻"
+        try:
+            self._set_now(where, doing)
+            return "记下了"
+        except Exception as exc:
+            logger.debug("[ams-life] now update failed: %s", type(exc).__name__)
+            return "不能更新此刻"
+
     def _phone_context(self, event):
         try:
             familiar = self._familiarity(self._speaker(event)[0])
@@ -96,7 +148,7 @@ class SelfieMixin:
 
     def _give_phone_tools(self, req, event):
         cfg = self.config or {}
-        if not self.enabled or not any(cfg.get(k, False) for k in ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")):
+        if not self.enabled:
             return
         try:
             from astrbot.core.agent.tool import FunctionTool, ToolSet
@@ -104,11 +156,23 @@ class SelfieMixin:
             logger.warning("[ams-life] phone tools unavailable")
             return
         context = self._phone_context(event) + COMMON_GUIDE
-        tools = []
+        tools = [FunctionTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
+            parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 20},
+            "doing": {"type": "string", "maxLength": 20}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
-            tools.append(FunctionTool(name="take_photo", description=PHOTO_GUIDE + context,
+            try:
+                recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
+            except Exception:
+                recent = []
+            photo_context = "\n最近说的：" + " / ".join(recent) + "\n" + self._now_line(event)
+            photo_context += "\n只拍你此刻真在做的、跟你这轮说的对得上的；对不上就别拍。"
+            tools.append(FunctionTool(name="take_photo", description=PHOTO_GUIDE + context + photo_context,
                 parameters={"type": "object", "properties": {"kind": {"type": "string", "enum": ["selfie", "snap"]},
-                "what": {"type": "string", "description": "拍什么、在哪、光线，60字以内"}}, "required": ["kind", "what"]}, handler=self._tool_take_photo))
+                "what": {"type": "string", "description": "拍什么、在哪、光线，60字以内"},
+                "where": {"type": "string", "maxLength": 20, "description": "与此刻相符的地点"},
+                "doing": {"type": "string", "maxLength": 20, "description": "与此刻相符的事情"},
+                "caption": {"type": "string", "maxLength": 20, "description": "发照片时配的那一句"}},
+                "required": ["kind", "what", "where", "doing", "caption"]}, handler=self._tool_take_photo))
         if cfg.get("screenshot_enabled", False) and self._browse_on():
             tools.append(FunctionTool(name="share_screenshot", description=SCREEN_GUIDE + context,
                 parameters={"type": "object", "properties": {"url": {"type": "string"}, "caption": {"type": "string"}},
@@ -133,16 +197,24 @@ class SelfieMixin:
             queue = event._ams_phone_queue = {}
         return queue
 
-    async def _tool_take_photo(self, event, kind="", what=""):
+    async def _tool_take_photo(self, event, kind="", what="", where="", doing="", caption=""):
         queue = self._phone_queue(event)
         if "photo" in queue:
             return "这次已经有了"
         what = str(what or "").strip()
-        if not self.enabled or not self.config.get("photo_enabled") or kind not in ("selfie", "snap") or not what or len(what) > 60:
+        where, doing, caption = (str(x or "").strip() for x in (where, doing, caption))
+        if (not self.enabled or not self.config.get("photo_enabled") or kind not in ("selfie", "snap")
+                or not what or len(what) > 60 or any(not x or len(x) > 20 for x in (where, doing))
+                or len(caption) > 20):
             return "不能拍这张"
-        queue["photo"] = (kind, what)
+        try:
+            self._set_now(where, doing)
+        except Exception as exc:
+            logger.debug("[ams-life] now update failed: %s", type(exc).__name__)
+            return "不能拍这张"
+        queue["photo"] = (kind, what, caption)
         logger.info("[ams-life] phone photo queued")
-        return "排上了"
+        return PHOTO_QUEUED
 
     def _phone_seen_pages(self, event):
         """Only successful searches and reads in this reply, not merely allowed URLs."""
@@ -158,7 +230,7 @@ class SelfieMixin:
             return "只能分享看过的网页"
         queue["screenshot"] = (url, str(pages[url]), caption)
         logger.info("[ams-life] phone screenshot queued")
-        return "排上了"
+        return LINK_QUEUED
 
     async def _tool_say_aloud(self, event, text=""):
         queue = self._phone_queue(event)
@@ -337,32 +409,39 @@ class SelfieMixin:
         rest = getattr(event, "_ams_rest_task", None)
         if rest is not None:
             try:
-                await rest
-            except asyncio.CancelledError:
+                result = await wait_for(shield(rest), timeout=REST_WAIT_SECONDS)
+                if result is False:
+                    logger.info("[ams-life] phone: earlier reply was not sent")
+                    return
+            except AsyncTimeoutError:
+                logger.info("[ams-life] phone: reply wait timed out")
+                return
+            except CancelledError:
                 if not rest.cancelled():
                     raise
+                return
             except Exception as exc:
                 logger.warning("[ams-life] phone: reply wait failed (%s)", type(exc).__name__)
+                return
         await asyncio.sleep(SEND_DELAY)
         try:
             if hasattr(event, "is_stopped") and event.is_stopped():
                 return
             if "photo" in queue:
-                kind, what = queue["photo"]
-                if await self._phone_clear(event, what):
-                    path = await self._make_photo(kind, what)
+                kind, what = queue["photo"][:2]
+                caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
+                if await self._phone_clear(event, what) and (not caption or await self._phone_clear(event, caption)):
+                    try:
+                        path = await wait_for(self._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
+                    except AsyncTimeoutError:
+                        logger.info("[ams-life] phone: photo timed out")
+                        path = None
                     if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                        await event.send(MessageChain([Image.fromFileSystem(str(path))]))
+                        chain = ([Plain(caption)] if caption else []) + [Image.fromFileSystem(str(path))]
+                        await event.send(MessageChain(chain))
                         self._phone_account(kind, sent=True)
                         self._note_she_sent(event, kind)
                         self._phone_prune("photo")
-            if "screenshot" in queue:
-                url, title, caption = queue["screenshot"]
-                if (await self._phone_clear(event, caption) and await self._phone_clear(event, title + "\n" + url)
-                        and not (hasattr(event, "is_stopped") and event.is_stopped())):
-                    await event.send(MessageChain([Plain(title + "\n" + url + "\n" + caption)]))
-                    self._phone_account("screenshot", sent=True)
-                    self._note_she_sent(event, "screenshot")
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
                 path = await self._make_voice(queue["voice"])
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
@@ -370,5 +449,12 @@ class SelfieMixin:
                     self._phone_account("voice", sent=True)
                     self._note_she_sent(event, "voice")
                     self._phone_prune("voice")
+            if "screenshot" in queue:
+                url, title, caption = queue["screenshot"]
+                if (await self._phone_clear(event, caption) and await self._phone_clear(event, title + "\n" + url)
+                        and not (hasattr(event, "is_stopped") and event.is_stopped())):
+                    await event.send(MessageChain([Plain(title + "\n" + url + "\n" + caption)]))
+                    self._phone_account("screenshot", sent=True)
+                    self._note_she_sent(event, "screenshot")
         except Exception as exc:
             logger.warning("[ams-life] phone send failed: %s", type(exc).__name__)

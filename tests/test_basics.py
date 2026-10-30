@@ -129,7 +129,8 @@ class Split(unittest.TestCase):
         # Group browsing adds 13 mixin methods and one property, a reply wrapper and an image helper.
         # SlangMixin: seven methods, including its two panel endpoints.
         # Recent images and quote lookup add three media methods.
-        self.assertEqual(len(methods), 474)
+        # Shared daily state: _set_now, _now_line, _tool_set_now.
+        self.assertEqual(len(methods), 477)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

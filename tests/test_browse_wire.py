@@ -31,13 +31,14 @@ def run_case(case):
 
 class Given(unittest.TestCase):
     def test_only_her_two_tools_none_of_astrbots(self):
-        self.assertEqual(run_case('reply')['tools'], ['ams_web_search', 'ams_read_page'])
+        # set_now is always available while the plugin is enabled, independently of browsing.
+        self.assertEqual([x for x in run_case('reply')['tools'] if x != 'set_now'], ['ams_web_search', 'ams_read_page'])
 
     def test_off_or_no_money_left_no_tools(self):
-        self.assertIsNone(run_case('off')['tools'])
+        self.assertEqual([x for x in (run_case('off')['tools'] or []) if x != 'set_now'], [])
         self.assertEqual(run_case('off')['ledger_files'], [])           # off: nothing written
         r = run_case('money')
-        self.assertIsNone(r['tools'])
+        self.assertEqual([x for x in (r['tools'] or []) if x != 'set_now'], [])
         self.assertEqual(r['handler_says'], NO_MORE)                    # and the tool itself says so
 
 

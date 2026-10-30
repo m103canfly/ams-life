@@ -117,6 +117,8 @@ class ReplyProvenance(unittest.TestCase):
         self.plugin._window_lines = lambda event, n=6: [{'text': '已有窗口内容'}]
         req = ProviderRequest(prompt='现在')
         asyncio.run(self.plugin.on_llm_request(event, req))
+        # The owner's present activity is transient system context, not the phone window.
+        self.assertTrue(any(line.startswith('此刻：') for line in req.system_prompt.splitlines()))
         self.assertEqual(req.extra_user_content_parts, [])
 
     def test_forward_is_bounded_and_keeps_enclosing_origin(self):
