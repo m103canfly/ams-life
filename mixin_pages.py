@@ -15,6 +15,10 @@ try:
     from . import ui_look
 except ImportError:
     import ui_look
+try:
+    from .vision import vision_for_panel
+except ImportError:
+    from vision import vision_for_panel
 
 
 class PagesMixin:
@@ -698,6 +702,7 @@ class PagesMixin:
                     })
                 except Exception:
                     continue
+        _vision = vision_for_panel(getattr(self, "config", {}) or {})
         return {"status": "ok", "data": {
             "enabled": self.enabled,
             "inject_intent": self.inject_intent,
@@ -740,6 +745,7 @@ class PagesMixin:
                     ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
             **({"phone_counts": self._phone_counts()} if any((self.config or {}).get(k) for k in
                 ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
+            **({"vision": _vision} if _vision["calls"] > 0 else {}),   # only once she has looked today
             **({"mood_events": [{"kind": MOOD_EVENT_LABELS[x["kind"]], "ts": x["ts"]}
                                 for x in getattr(self.cores.get("her"), "mood_events", [])[-5:]
                                 if x.get("kind") in MOOD_EVENT_LABELS]}

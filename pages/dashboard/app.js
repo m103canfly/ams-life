@@ -1183,6 +1183,12 @@
       const p=data.phone_counts;
       spend.textContent+=(sp?" ":"")+"今天自拍 "+Number(p.selfie||0)+" 张，随手拍 "+Number(p.snap||0)+" 张，截图 "+Number(p.screenshot||0)+" 张，语音 "+Number(p.voice||0)+" 条。";
     }
+    const vision=data&&data.vision;
+    if(spend && vision){
+      spend.hidden=false;
+      const count="今天看图 "+Number(vision.calls||0)+" 张（回话 "+Number(vision.reply||0)+"，翻群和顺便看表情 "+Number(vision.browse||0)+"，主人加图 "+Number(vision.owner_add||0)+(vision.unattributed?"，之前未分类 "+Number(vision.unattributed):"")+"）。";
+      spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
+    }
     // step 2 (global_memory): the last look before sending, today
     const send=$("sendNote"), sc=data&&data.send_check;
     if(send){
@@ -1806,7 +1812,7 @@
         const options = filtered.length ? filtered
           : (vision ? [] : provs.filter(p=>_providerKind(p)!=="vision"));
         const followLabel = vision ? "跟随图片 API（默认视觉 provider）" : "跟随主 LLM";
-        sel.innerHTML='<option value="follow_llm">'+followLabel+'</option>'+options.map(p=>'<option value="'+esc(String(p.id||""))+'">'+esc(String(p.model||p.id||""))+'</option>').join("");
+        sel.innerHTML='<option value="follow_llm">'+followLabel+'</option>'+(vision?'<option value="image_api">插件看图小通道</option>':'')+options.map(p=>'<option value="'+esc(String(p.id||""))+'">'+esc(String(p.model||p.id||""))+'</option>').join("");
         sel.value=String(cfg.provider||"follow_llm");
       }
     });

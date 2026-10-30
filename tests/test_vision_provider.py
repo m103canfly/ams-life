@@ -1,4 +1,4 @@
-"""Which provider looks at pictures (step 2, 丙: the owner, 10-29: "用deepseek-flash"). AstrBot
+"""Which configured provider looks at pictures. AstrBot
 marks what a provider takes in its config (modalities: text, image, tool_use); a chat model that
 takes pictures is one that sees them. The old guess by name stays as a fallback. All ids are
 made up; no network, no model.

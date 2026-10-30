@@ -1133,6 +1133,11 @@ class DiscretionMixin:
             return 0
         cache = self._load_image_cache()
         gone = stickers.prune_cache(cache, time.time(), gone_people=[person])
+        shared = [k for k, v in cache.items() if k.startswith("content:") and isinstance(v, dict)
+                  and str(person) in (v.get("from_qqs") or [])]
+        for k in shared:
+            cache.pop(k, None)
+        gone += len(shared)
         if gone:
             IMAGE_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
         return gone

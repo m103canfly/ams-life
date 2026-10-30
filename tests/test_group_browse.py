@@ -49,7 +49,7 @@ class Dummy(groups.GroupBrowseMixin):
     def _spent_today(self): return self.spent
     def _familiarity(self, person): return .7
     def _core(self, event): return SimpleNamespace(v=0)
-    def _vision_provider_for(self, event): return object()
+    def _vision_provider_for(self, event, source='reply'): return object()
     def _load_image_cache(self): return dict(self.cache)
     def _save_image_cache(self, cache): self.cache = dict(cache)
     def _may_keep(self, people, place, stamp, sources):
