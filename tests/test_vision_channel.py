@@ -130,7 +130,23 @@ class VisionTests(unittest.TestCase):
             asyncio.run(gate.text_chat(prompt='describe', image_urls=['https://image.invalid/new']))
         ledger = json.loads((self.data / 'spend.json').read_text('utf-8'))
         self.assertEqual(ledger[day]['vision_calls'], 31)
+        shown = vision.vision_for_panel(plugin.config)
+        self.assertEqual((shown['reply'], shown['unattributed']), (1, 30))
         self.assertEqual(provider.calls, 1)
+
+    def test_browse_source_is_available_to_future_callers(self):
+        plugin = Plugin()
+        plugin.config['vision_image_api_model'] = 'made-up-model'
+        fake = FakeProvider()
+        async def answer(_provider, **kwargs):
+            return await fake.text_chat(**kwargs)
+        with patch.object(vision, '_bytes', return_value=b''), \
+                patch.object(vision.ImageAPI, 'text_chat', answer):
+            gate = plugin._vision_provider_for(object(), source='browse')
+            asyncio.run(gate.text_chat(prompt='describe', image_urls=['https://image.invalid/new']))
+        shown = vision.vision_for_panel(plugin.config)
+        self.assertEqual((shown['calls'], shown['reply'], shown['browse'], shown['owner_add']), (1, 0, 1, 0))
+        self.assertEqual(plugin._spent_today(), 0)
 
     def test_accounting_failure_does_not_block_vision(self):
         plugin = Plugin()

@@ -279,6 +279,34 @@ def run():
         out['on_used'] = status().get('vision')
         plugin.llm_functions['image_caption']['enabled'] = False
         out['off_used'] = status().get('vision')
+    elif CASE == 'vision_sources':
+        import base64
+        plugin.config.update(photo_enabled=True, vision_price_per_call='0')
+        calls = []
+        async def answer(*args, **kwargs):
+            calls.append((kwargs.get('image_urls') or [''])[0])
+            return harness.FakeResponse(json.dumps({'caption': 'a made-up picture', 'kind': 'photo', 'keep': False}))
+        ctx.provider.text_chat = answer
+        def go(coro):
+            return loop.run_until_complete(coro)
+        def status():
+            return go(plugin.page_status())['data']
+        reply = Event('reply', wake=True)
+        plugin._image_refs = lambda event: ['https://gchat.qpic.cn/source-reply.png']
+        go(plugin._image_context(reply))
+        out['after_reply'] = status()['vision']
+        passing = Event('talk', raw_images=['https://gchat.qpic.cn/source-browse.png'])
+        go(plugin._look_at_sticker_in_passing(passing))
+        out['after_browse'] = status()['vision']
+        picture = base64.b64encode(png(3, 3, 77)).decode()
+        out['gift'] = go(plugin.page_sticker_add({'picture': picture}))['status']
+        out['after_owner_add'] = status()['vision']
+        out['phone_before'] = status()['phone_counts'].get('selfie', 0)
+        plugin._phone_account('selfie', sent=True)
+        out['phone_after'] = status()['phone_counts'].get('selfie', 0)
+        ledger = json.loads(mixin_attention.SPEND_PATH.read_text('utf-8'))
+        out['vision_record'] = ledger[time.strftime('%Y-%m-%d') + '-vision']
+        out['calls'] = len(calls)
     elif CASE in ('count_astrbot', 'count_api'):
         import base64
         import vision

@@ -35,7 +35,12 @@ def vision_for_panel(config):
     count = today.get('vision_calls')
     if count is None:
         count = _legacy_counts(day).get('calls', 0)
-    return {'calls': int(count or 0)}
+    sources = ledger.get(day + '-vision') or {}
+    result = {kind: int(sources.get(kind, 0) or 0) for kind in ('reply', 'browse', 'owner_add')}
+    result['calls'] = int(count or 0)
+    result['unattributed'] = max(0, result['calls'] - sum(result[k] for k in ('reply', 'browse', 'owner_add')))
+    result['last'] = float(sources.get('last', 0) or 0)
+    return result
 
 
 def _response(text):
@@ -100,8 +105,9 @@ class ImageAPI:
 
 
 class VisionGate:
-    def __init__(self, plugin, provider, event):
+    def __init__(self, plugin, provider, event, source="reply"):
         self.plugin, self.provider, self.event = plugin, provider, event
+        self.source = source if source in ("reply", "browse", "owner_add") else "reply"
 
     def __getattr__(self, name):
         return getattr(self.provider, name)
@@ -136,7 +142,11 @@ class VisionGate:
                 ledger = mixin_attention._read_json(mixin_attention.SPEND_PATH, {})
                 today = ledger.setdefault(day, {})
                 used = int(today.get('vision_calls', counts.get('calls', 0)) or 0)
-                today['vision_calls'] = used + max(1, len(refs))
+                number = max(1, len(refs))
+                today['vision_calls'] = used + number
+                sources = ledger.setdefault(day + '-vision', {})
+                sources[self.source] = int(sources.get(self.source, 0) or 0) + number
+                sources['last'] = now
                 for old in sorted(ledger)[:-30]:
                     ledger.pop(old, None)
                 mixin_attention._write_json(mixin_attention.SPEND_PATH, ledger)

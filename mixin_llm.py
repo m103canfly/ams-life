@@ -651,14 +651,14 @@ class LLMMixin:
             return "image" in [str(m).strip().lower() for m in mods]
         return self._provider_kind(provider) == "vision"
 
-    def _vision_provider_for(self, event=None):
+    def _vision_provider_for(self, event=None, source="reply"):
         """Use the selected vision provider, then AstrBot defaults, then capable chat."""
         _cfg = self._function_cfg("image_caption")
         _override = _cfg["provider"]
         if _override == "image_api":
             if not str((getattr(self, "config", {}) or {}).get("vision_image_api_model") or "").strip():
                 return None
-            return VisionGate(self, _counted(self, "vision", ImageAPI(self)), event)
+            return VisionGate(self, _counted(self, "vision", ImageAPI(self)), event, source)
         _tried = []
         if _override and _override not in ("follow_llm", "main", "default", ""):
             _tried.append(_override)
@@ -677,7 +677,7 @@ class LLMMixin:
                 logger.warning("[biocore] vision provider lookup failed (%s): %s", _pid, exc)
                 continue
             if _vp is not None and self._sees_images(_vp):
-                return VisionGate(self, _counted(self, "vision", _vp), event) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _vp)
+                return VisionGate(self, _counted(self, "vision", _vp), event, source) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _vp)
             if _vp is not None:
                 logger.warning("[biocore] image_caption provider %s is not a vision provider; ignored", _pid)
         try:
@@ -686,7 +686,7 @@ class LLMMixin:
         except Exception:
             _chat = None
         if _chat is not None and self._sees_images(_chat):
-            return VisionGate(self, _counted(self, "vision", _chat), event) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _chat)
+            return VisionGate(self, _counted(self, "vision", _chat), event, source) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _chat)
         return None
 
     async def _compile_profile(self, event):

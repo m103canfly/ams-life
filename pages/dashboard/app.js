@@ -1186,7 +1186,7 @@
     const vision=data&&data.vision;
     if(spend && vision){
       spend.hidden=false;
-      const count="今天看图 "+Number(vision.calls||0)+" 张。";
+      const count="今天看图 "+Number(vision.calls||0)+" 张（回话 "+Number(vision.reply||0)+"，翻群和顺便看表情 "+Number(vision.browse||0)+"，主人加图 "+Number(vision.owner_add||0)+(vision.unattributed?"，之前未分类 "+Number(vision.unattributed):"")+"）。";
       spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
     }
     // step 2 (global_memory): the last look before sending, today

@@ -116,7 +116,7 @@ class StickersMixin:
                 return
         except Exception:
             pass
-        provider = self._vision_provider_for(event)
+        provider = self._vision_provider_for(event, source="browse")
         if provider is None:
             return
         cache = self._load_image_cache()
@@ -367,7 +367,7 @@ class StickersMixin:
         if not note and self._llm_allowed("image_caption"):
             # no line from the owner: one look for its labels (its money in the day's, as "vision")
             try:
-                provider = self._vision_provider_for(None)
+                provider = self._vision_provider_for(None, source="owner_add")
                 if provider is not None:
                     _caption, look = await self._look_once(provider, str(lib.path_of(sid)), None)
             except Exception as exc:

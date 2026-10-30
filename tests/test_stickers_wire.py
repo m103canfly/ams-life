@@ -111,11 +111,25 @@ class VisionStatus(unittest.TestCase):
         r = run_case('vision_status')
         self.assertFalse(r['off_empty'])
         self.assertFalse(r['on_empty'])
-        self.assertEqual(r['on_used'], {'calls': 1})
-        self.assertEqual(r['off_used'], {'calls': 1})
+        self.assertEqual(r['on_used']['calls'], 1)
+        self.assertEqual(r['on_used']['reply'], 1)
+        self.assertEqual(r['off_used'], r['on_used'])
 
 
 class VisionCounting(unittest.TestCase):
+    def test_each_vision_source_and_phone_selfie_are_shown(self):
+        r = run_case('vision_sources')
+        self.assertEqual([r['after_reply'][k] for k in ('reply', 'browse', 'owner_add')], [1, 0, 0])
+        self.assertEqual([r['after_browse'][k] for k in ('reply', 'browse', 'owner_add')], [1, 1, 0])
+        self.assertEqual([r['after_owner_add'][k] for k in ('reply', 'browse', 'owner_add')], [1, 1, 1])
+        self.assertEqual(r['after_owner_add']['calls'], 3)
+        self.assertEqual(r['gift'], 'ok')
+        self.assertEqual(r['phone_before'], 0)
+        self.assertEqual(r['phone_after'], 1)
+        self.assertEqual(r['calls'], 3)
+        self.assertEqual(set(r['vision_record']), {'reply', 'browse', 'owner_add', 'last'})
+        self.assertGreater(r['vision_record']['last'], 0)
+
     def test_three_paths_count_without_stopping_for_both_provider_types(self):
         for case in ('count_astrbot', 'count_api'):
             with self.subTest(provider=case):
@@ -123,12 +137,14 @@ class VisionCounting(unittest.TestCase):
                 self.assertEqual(r['marks'], {'31': 31, '100': 100})
                 self.assertEqual(r['calls'], 102)
                 self.assertEqual(r['last_gift'], {'status': 'ok', 'labelled': True})
-                self.assertEqual(r['panel'], {'calls': 102})
-                self.assertEqual(r['panel_without_decide'], {'calls': 102})
+                self.assertEqual(r['panel']['calls'], 102)
+                self.assertEqual([r['panel'][k] for k in ('reply', 'browse', 'owner_add')], [34, 34, 34])
+                self.assertEqual(r['panel_without_decide'], r['panel'])
                 self.assertEqual(r['spent'], 0)
                 self.assertFalse(r['panel_next_day'])
                 self.assertEqual(r['calls_next_day'], 103)
-                self.assertEqual(r['panel_after_next'], {'calls': 1})
+                self.assertEqual(r['panel_after_next']['calls'], 1)
+                self.assertEqual(r['panel_after_next']['reply'], 1)
 
 
 class OwnersPage(unittest.TestCase):
