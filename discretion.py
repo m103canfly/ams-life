@@ -30,12 +30,23 @@ except ImportError:
     import everyday_words
 
 PUBLIC, PRIVATE, SELF = "public", "private", "self"
+KEEP_IN_GROUP_PHRASES = ("别外传", "别传出去", "别告诉别人", "别跟别人说", "保密",
+                         "只在这说", "就在这说说", "出了这个群就别说了")
+NOT_KEEP_IN_GROUP_PHRASES = ("可以外传", "不用保密", "不是秘密", "随便说")
 FULL, ANON, DROP = "full", "anon", "drop"
 SOMEONE = "有人"
 SOMEBODY = "某人"   # someone deleted, or an @ with no name: in what she keeps
 NUMBER = "[号码]"   # a deleted person's number; a person's number brought up elsewhere
 _NOT_PEOPLE = {"", "self", "summary", "unknown", "她"}
 _KIND = re.compile(r"(FriendMessage|GroupMessage|GuildMessage|TempMessage|OtherMessage)")
+
+
+def keep_in_group(text) -> bool:
+    """Whether a message asks that its contents stay in the group."""
+    text = str(text or "")
+    for phrase in NOT_KEEP_IN_GROUP_PHRASES:
+        text = text.replace(phrase, "")
+    return any(phrase in text for phrase in KEEP_IN_GROUP_PHRASES)
 
 
 def place_of(session) -> str:

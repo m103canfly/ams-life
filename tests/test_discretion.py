@@ -45,6 +45,24 @@ def pieces(text, n=5):
 
 
 class Table(unittest.TestCase):
+    def test_keep_in_group_phrases_and_negations(self):
+        for phrase in d.KEEP_IN_GROUP_PHRASES:
+            with self.subTest(phrase=phrase):
+                self.assertTrue(d.keep_in_group('这件事，' + phrase))
+        for phrase in d.NOT_KEEP_IN_GROUP_PHRASES:
+            with self.subTest(phrase=phrase):
+                self.assertFalse(d.keep_in_group('这件事，' + phrase))
+        self.assertTrue(d.keep_in_group('不用保密旧事，但这件事别外传'))
+
+    def test_private_group_origin_stays_in_group(self):
+        origin = d.make_origin('group:10101', ['10001'], ['msg1'], d.PRIVATE)
+        for here in ('group:20202', 'private:10002', 'private:10001'):
+            with self.subTest(here=here):
+                self.assertEqual(d.label(origin, here, '10001')['may'], d.NO)
+                self.assertEqual(d.verdict(origin, here), d.DROP)
+        self.assertEqual(d.label(origin, 'group:10101', '10001')['may'], d.SAY)
+        self.assertEqual(d.verdict(origin, 'group:10101'), d.FULL)
+
     def test_places(self):
         self.assertEqual(d.place_of('default:GroupMessage:42'), 'group:42')
         self.assertEqual(d.place_of('ams-life_GroupMessage_42'), 'group:42')
@@ -96,6 +114,53 @@ class Table(unittest.TestCase):
 
 
 class PrivateStaysPrivate(unittest.TestCase):
+    def test_group_request_narrows_messages_and_derived_records(self):
+        r = run_case('keep_in_group')
+        lines = {x['text']: x for x in r['phone']}
+        for text in ('青柠七号是今晚的暗号', '第二个前文', '第三个前文', '这件事别外传'):
+            self.assertEqual(lines[text]['origin']['visibility'], d.PRIVATE, text)
+        for text in ('较早以前的消息', '第四条不应收窄', '另一个人的消息'):
+            self.assertEqual(lines[text]['origin']['visibility'], d.PUBLIC, text)
+        self.assertEqual(r['other_phone'][0]['origin']['visibility'], d.PUBLIC)
+        self.assertEqual(r['boundary']['visibility'], d.PRIVATE)
+        self.assertEqual(r['event']['origin']['visibility'], d.PRIVATE)
+        self.assertEqual(r['note']['origin']['visibility'], d.PRIVATE)
+        self.assertEqual(r['digest']['origin']['visibility'], d.PRIVATE)
+        self.assertEqual(r['impression']['origin']['visibility'], d.PUBLIC)
+        self.assertIsNotNone(r['impression_elsewhere'])
+        self.assertEqual(r['other_impression']['origin']['visibility'], d.PUBLIC)
+        self.assertIsNotNone(r['other_impression_elsewhere'])
+        memory = [x for x in r['memory'] if set(x['origin']['source_ids']) & set(r['source_ids'])]
+        self.assertTrue(memory)
+        self.assertTrue(all(x['origin']['visibility'] == d.PRIVATE for x in memory))
+        marked = [x for x in r['memory'] if set(x['origin']['source_ids']) & set(r['marked_ids'])]
+        self.assertTrue(marked)
+        self.assertTrue(all(x['origin']['visibility'] == d.PRIVATE for x in marked))
+        self.assertTrue(all(x['origin']['visibility'] == d.PUBLIC for x in r['negated']))
+        self.assertEqual(r['labels'], {'group:900001': d.SAY, 'group:900002': d.NO,
+                                       'private:10001': d.NO, 'private:10002': d.NO})
+        self.assertEqual(r['private_user_view']['relationship']['we_memory'], [])
+        self.assertEqual(r['private_user_view']['relationship']['transactive_map'], {})
+
+    def test_group_private_recall_forbids_words_not_name(self):
+        r = run_case('keep_in_group')
+        self.assertNotIn('10001', r['present'])
+        self.assertEqual(r['without_recall'], [])
+        self.assertTrue(r['recalled'][0])
+        self.assertFalse(r['name_check']['leak'])
+        self.assertTrue(r['check']['leak'])
+        self.assertTrue(any(x['private'] and '青柠七号' in x['text'] for x in r['forbidden']))
+        self.assertTrue(all(not x['names'] for x in r['forbidden']))
+        self.assertEqual(r['sent'], '')
+
+    def test_global_memory_off_skips_send_check(self):
+        r = run_case('keep_in_group')
+        self.assertEqual(r['off_calls'], [])
+        self.assertEqual(r['off_reply'], '芒果最近好像挺忙的')
+
+    def test_narrowing_only_invalidates_the_same_group(self):
+        self.assertEqual(run_case('keep_in_group')['epochs'], [True, False])
+
     def test_private_never_reaches_a_group_prompt(self):
         r = run_case('private')
         secret = set().union(*(pieces(t) for t in r['private_texts']))

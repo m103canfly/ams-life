@@ -105,7 +105,8 @@ class ImpressionsMixin:
             v = impressions.view(rec, place, here, present_here=True, private_text=said_here)
             if not v:
                 continue
-            found = [a for _p, r in records for a in (r.get("aliases") or [])] if not own else list(v["aliases"])
+            found = [a for p, r in records if discretion.verdict(discretion.origin_of(r, p), here) != discretion.DROP
+                     for a in (r.get("aliases") or [])] if not own else list(v["aliases"])
             v["aliases"] = self._aliases_of(who, found)
             if not own:   # the name he goes by here, not another group's card
                 v["name"] = (name if who == sid and name else next(
@@ -236,11 +237,13 @@ class ImpressionsMixin:
                 continue
             try:
                 lines = self._read_window(place)["recent"]
+                epoch = getattr(self, "_privacy_epochs", {}).get(place, 0)
                 done[place] = await impressions.nightly(self._impression_store(), place, lines, ask, day,
                                                         registry=self._registry(),
                                                         extra_names=self._material_names(place, lines),
                                                         red=self._red_lines_for("impressions"),
-                                                        judge=self._judgements_for("impressions"))
+                                                        judge=self._judgements_for("impressions"),
+                                                        still_current=lambda: getattr(self, "_privacy_epochs", {}).get(place, 0) == epoch)
             except Exception as exc:
                 logger.warning("[ams-life] impressions for %s failed: %s", place, exc)
         if any(r.get("called") for r in done.values()):
