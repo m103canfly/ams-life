@@ -88,7 +88,7 @@ class ImageAPI:
                 cfg = self.plugin.api_config.get('image') or {}
                 base = str(cfg.get('base_url') or '').rstrip('/')
                 key = str(cfg.get('api_key') or '')
-                model = str(self.plugin.config.get('vision_image_api_model') or '').strip()
+                model = str(self.plugin.config.get(kwargs.get('model_config', 'vision_image_api_model')) or '').strip()
                 if not base or not model:
                     raise ValueError()
                 content = [{'type': 'text', 'text': prompt}]

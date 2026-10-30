@@ -225,6 +225,11 @@ class AutonomyMixin:
                 except Exception as exc:
                     logger.warning("[ams-life] impressions failed: %s", exc)
                 try:
+                    self._begin_job()
+                    await self._maybe_slang()
+                except Exception:
+                    logger.warning("[ams-life] slang update failed")
+                try:
                     await self._group_browse_tick()
                 except Exception as exc:
                     logger.warning("[ams-life] group browse failed (%s)", type(exc).__name__)

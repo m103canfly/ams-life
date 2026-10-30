@@ -32,6 +32,7 @@ _EVENT_TEXT_FIELDS = ("title", "event", "central_details", "meaning_to_her", "re
 class DiscretionMixin:
     def _narrow_group_sources(self, place, source_ids):
         """Narrow already-written derivatives of the messages preceding a request."""
+        self._slang_withdraw(source_ids=source_ids, place=place)
         ids = {str(s) for s in source_ids if str(s or "")}
         if not ids:
             return
@@ -1176,6 +1177,7 @@ class DiscretionMixin:
         reg.owner_delete(person=person)
         reg.remember_names(person, names)
         counts = self._forget(person=person)
+        self._slang_withdraw(person=person)
         # what others said of him, wherever she keeps it: 某人, now (not at the next restart,
         # and with no copy made first)
         counts["named"] = self._remove_gone_everywhere(keep_copies=False)
@@ -1192,6 +1194,7 @@ class DiscretionMixin:
         o = discretion.origin_of(target)
         if o["source_ids"]:
             self._registry().owner_delete(source_ids=o["source_ids"], place=o["where"] or forget_registry.EVERYWHERE)
+        self._slang_withdraw(source_ids=o["source_ids"])
         return self._forget(source_ids=o["source_ids"], entry_ids=[entry_id])
 
     def _place_umos(self) -> dict:
