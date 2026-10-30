@@ -101,7 +101,34 @@ class PhoneMixin:
         any more does not keep old lines on disk (reading a window writes it back pruned)."""
         for place in self._window_places():
             try:
-                self._read_window(place)
+                win = self._read_window(place)
+                if getattr(self, "mood_events_enabled", False):
+                    changed = False
+                    recent = win["recent"]
+                    for i, line in enumerate(recent):
+                        if line.get("role") != "assistant" or line.get("mood_checked"):
+                            continue
+                        origin = line.get("origin") or {}
+                        people = origin.get("people") or []
+                        if not line.get("mood_direct") or len(people) != 1:
+                            continue
+                        person = str(people[0])
+                        familiarity = self._familiarity(person)
+                        delay = 600 if familiarity >= .8 else 1800 if familiarity >= .3 else 0
+                        if not delay:
+                            continue
+                        stamp = float(line.get("ts", 0) or 0)
+                        if any(x.get("role") != "assistant" and str(x.get("sender_id") or "") == person
+                               for x in recent[i + 1:]):
+                            line["mood_checked"] = True
+                            changed = True
+                        elif time.time() - stamp >= delay:
+                            kind = "unanswered_share" if line.get("mood_share") else "ignored"
+                            self._core(None).mood_event(kind, familiarity)
+                            line["mood_checked"] = True
+                            changed = True
+                    if changed:
+                        self._write_window(place, win)
             except Exception as exc:
                 logger.warning("[ams-life] window sweep failed: %s", exc)
 
@@ -294,9 +321,60 @@ class PhoneMixin:
             return
         win = self._read_window(here)
         text = self._without_gone(text, event)
-        win["recent"].append({"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS],
-                              "origin": self._event_origin(event)})
+        origin = self._event_origin(event)
+        line = {"ts": time.time(), "role": "assistant", "text": text[:WINDOW_LINE_CHARS], "origin": origin}
+        if getattr(self, "mood_events_enabled", False):
+            line["mood_direct"] = bool(getattr(event, "_mood_direct", False))
+        win["recent"].append(line)
         self._write_window(here, win)
+
+    def _mood_note_answer(self, event, why) -> bool:
+        """Mark the latest addressed reply once when its recipient answers it."""
+        here = self._here(event)
+        person = str(self._speaker(event)[0] or "")
+        if not here or not person or self._job_stale():
+            return False
+        win = self._read_window(here)
+        for line in reversed(win["recent"]):
+            if line.get("role") != "assistant" or line.get("mood_media"):
+                continue
+            people = [str(x) for x in (line.get("origin") or {}).get("people") or []]
+            if person not in people:
+                continue
+            age = time.time() - float(line.get("ts", 0) or 0)
+            if (line.get("mood_answered") or not 0 <= age <= 86400
+                    or not (why == "continue" or (why and (here.startswith("private:")
+                                                            or self._addresses_her(event))))):
+                return False
+            line["mood_answered"] = True
+            self._write_window(here, win)
+            return True
+        return False
+
+    def _note_she_sent(self, event, kind) -> None:
+        """Note a successfully sent medium and associate it with its written reply."""
+        labels = {"selfie": "[自拍]", "snap": "[随手拍]", "screenshot": "[分享网页]", "voice": "[语音]"}
+        if not getattr(self, "mood_events_enabled", False) or kind not in labels or self._job_stale():
+            return
+        here = self._here(event)
+        if not here:
+            return
+        try:
+            origin = self._event_origin(event)
+            refs = origin.get("source_ids") or []
+            win = self._read_window(here)
+            for line in reversed(win["recent"]):
+                if line.get("role") != "assistant" or line.get("mood_media"):
+                    continue
+                saved = line.get("origin") or {}
+                if refs and refs == saved.get("source_ids") and origin.get("people") == saved.get("people"):
+                    line["mood_share"] = True
+                    break
+            win["recent"].append({"ts": time.time(), "role": "assistant", "text": labels[kind],
+                                  "origin": origin, "mood_media": True, "mood_checked": True})
+            self._write_window(here, win)
+        except Exception as exc:
+            logger.warning("[ams-life] sent medium could not be noted: %s", type(exc).__name__)
 
     def _window_lines(self, event, n=6) -> list:
         """The last `n` lines (anyone's) of the window she is in now, before the current message."""

@@ -43,6 +43,20 @@ class Called(unittest.TestCase):
         self.assertEqual(at.called(False, False, '10001', now=now), '')
 
 
+class MoodAttention(unittest.TestCase):
+    def test_mood_threshold_and_wait_follow_state(self):
+        self.assertLess(at.mood_threshold('normal', 0.8, 0.8), at.threshold('normal'))
+        self.assertGreater(at.mood_threshold('normal', -0.8, 0.2), at.threshold('normal'))
+        self.assertLess(at.mood_wait(6, 0.8, 0.8), 6)
+        self.assertGreater(at.mood_wait(6, -0.8, 0.2), 6)
+
+    def test_mood_adjustments_are_bounded(self):
+        for valence in (-10, 0, 10):
+            for energy in (-10, 0, 10):
+                self.assertTrue(0.20 <= at.mood_threshold('normal', valence, energy) <= 0.75)
+                self.assertTrue(1.0 <= at.mood_wait(6, valence, energy) <= 10.0)
+
+
 class HerName(unittest.TestCase):
     def test_her_name_as_a_call(self):
         for t in ('小爱，在吗', '小爱 你看这个', '好吧 小爱', '小爱你好', '小爱', '爱弥斯？', '@小爱 来'):

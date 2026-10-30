@@ -740,6 +740,10 @@ class PagesMixin:
                     ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
             **({"phone_counts": self._phone_counts()} if any((self.config or {}).get(k) for k in
                 ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
+            **({"mood_events": [{"kind": MOOD_EVENT_LABELS[x["kind"]], "ts": x["ts"]}
+                                for x in getattr(self.cores.get("her"), "mood_events", [])[-5:]
+                                if x.get("kind") in MOOD_EVENT_LABELS]}
+               if getattr(self, "mood_events_enabled", False) else {}),
             **({"browse": self._browse_for_panel()} if getattr(self, "_browse_on", None) and self._browse_on() else {}),
             "last_memory_meta": {
                 "calibration_delta": 0.0, "calibration_sources": 0,

@@ -32,6 +32,7 @@ except ImportError:
 ATTENTION_PATH = STATE_DIR / "attention.json"
 TIES_PATH = STATE_DIR / "ties.json"
 SPEND_PATH = STATE_DIR / "spend.json"
+MOOD_NIGHT_PATH = STATE_DIR / "mood" / "night.json"
 WAIT_SECONDS = {"group": 6.0, "called": 2.0, "private": 3.0}
 # yuan a million tokens (deepseek-flash, the price page's numbers of 10-29 at its peak hours, at
 # 7.2 yuan a dollar; set in the config, checked again on install)
@@ -192,6 +193,34 @@ class AttentionMixin:
         named = attention.names_her(getattr(event, "message_str", ""), self._attention_cfg()["names"])
         return attention.called(self._addresses_her(event) or named, here.startswith("private:"), sid, ts, to)
 
+    def _hear_mood(self, event) -> None:
+        if not getattr(self, "mood_events_enabled", False):
+            return
+        sid = str(self._speaker(event)[0] or "")
+        self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+        if self_id and sid == self_id:
+            return
+        self._core(None).mood_hear(getattr(event, "message_str", ""), self._familiarity(sid) >= .3)
+
+    def _mood_clock(self, now=None) -> None:
+        if not getattr(self, "mood_events_enabled", False):
+            return
+        now = time.time() if now is None else float(now)
+        cfg = self._attention_cfg()
+        state = _read_json(MOOD_NIGHT_PATH, {})
+        night = attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        seen = float(state.get("night_seen", 0) or 0)
+        try:
+            if night and (not seen or now - seen >= 86400):
+                MOOD_NIGHT_PATH.parent.mkdir(parents=True, exist_ok=True)
+                _write_json(MOOD_NIGHT_PATH, {"night_seen": now})
+            elif not night and seen:
+                _write_json(MOOD_NIGHT_PATH, {})
+                if 0 <= now - seen < 86400:
+                    self._core(None).mood_event("sleep")
+        except (OSError, ValueError, TypeError):
+            logger.warning("[ams-life] mood night transition could not be saved")
+
     # ------------------------------------------------------------------
     # the decision
     # ------------------------------------------------------------------
@@ -207,8 +236,11 @@ class AttentionMixin:
         st = self._window_state(here)
         now = time.time()
         night = attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        if getattr(self, "mood_events_enabled", False):
+            self._mood_clock(now)
         if night:
             if not why:
+                self._hear_mood(event)
                 return None   # at night she never speaks up herself
             calls = [t for t in st.get("night_calls") or [] if now - float(t) < 3600] + [now]
             st["night_calls"] = calls
@@ -217,6 +249,8 @@ class AttentionMixin:
             self._save_attention()
             if woken:
                 self._woken_at = now   # (乙: woken up, a bit cross)
+                if getattr(self, "mood_events_enabled", False):
+                    self._core(None).mood_event("woken")
             if not answer:
                 self._stop(event)
                 return None
@@ -224,8 +258,15 @@ class AttentionMixin:
         st["seq"] = int(st.get("seq", 0) or 0) + 1
         st["called"] = st.get("called") or why
         mine = st["seq"]
-        await asyncio.sleep(WAIT_SECONDS["private" if private else "called" if why else "group"])
+        wait = WAIT_SECONDS["private" if private else "called" if why else "group"]
+        if getattr(self, "mood_events_enabled", False):
+            core = self._core(None)
+            core._decay_to_now()
+            wait = attention.mood_wait(wait, core.v, core.energy)
+        await asyncio.sleep(wait)
         if st.get("seq") != mine:
+            if not why:
+                self._hear_mood(event)
             self._stop(event)   # more came meanwhile; that one decides (kept all the same)
             return None
         why = st.pop("called", "") or why
@@ -234,10 +275,14 @@ class AttentionMixin:
         if state == "hard" or (state == "soft" and not (private and cfg["owner"] and sid == cfg["owner"])):
             logger.info("[ams-life] attention: the money of the day (%s), not answered", state)
             self._stop(event)
+            if not why:
+                self._hear_mood(event)
             return None
         if not private and not attention.hour_ok(st.get("sent") or [], now, cfg["group_hour_max"]):
             logger.info("[ams-life] attention: %d of hers in this group this hour, not answered", cfg["group_hour_max"])
             self._stop(event)
+            if not why:
+                self._hear_mood(event)
             return None
         if why:
             if getattr(event, "is_at_or_wake_command", False):
@@ -246,9 +291,15 @@ class AttentionMixin:
         if night or private:
             return None
         s = await self._score(event)
-        if s >= attention.threshold(cfg["level"]):
+        limit = attention.threshold(cfg["level"])
+        if getattr(self, "mood_events_enabled", False):
+            core = self._core(None)
+            core._decay_to_now()
+            limit = attention.mood_threshold(cfg["level"], core.v, core.energy)
+        if s >= limit:
             logger.info("[ams-life] attention: not called, %.2f over the threshold: asked", s)
             return await self._ask_for_reply(event)
+        self._hear_mood(event)
         return None
 
     @staticmethod

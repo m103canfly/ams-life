@@ -120,7 +120,9 @@ class Split(unittest.TestCase):
         # keep-in-group: +1 (_narrow_group_sources)
         # her phone tools replace the keyword media helpers: +9 overall
         # Search results and successful reads keep their titles for the phone: +1.
-        self.assertEqual(len(methods), 445)
+        # mood (step 2, 乙): +2 (hearing what she was not asked about, the night's end)
+        # Mood review: +2 (a reply is answered once; note a successfully sent medium).
+        self.assertEqual(len(methods), 449)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
