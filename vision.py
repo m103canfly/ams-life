@@ -35,9 +35,9 @@ def vision_for_panel(config):
     if count is None:
         count = _legacy_counts(day).get('calls', 0)
     sources = ledger.get(day + '-vision') or {}
-    result = {kind: int(sources.get(kind, 0) or 0) for kind in ('reply', 'browse', 'owner_add')}
+    result = {kind: int(sources.get(kind, 0) or 0) for kind in ('reply', 'browse', 'owner_add', 'screenshot')}
     result['calls'] = int(count or 0)
-    result['unattributed'] = max(0, result['calls'] - sum(result[k] for k in ('reply', 'browse', 'owner_add')))
+    result['unattributed'] = max(0, result['calls'] - sum(result[k] for k in ('reply', 'browse', 'owner_add', 'screenshot')))
     result['last'] = float(sources.get('last', 0) or 0)
     return result
 
@@ -118,7 +118,7 @@ class ImageAPI:
 class VisionGate:
     def __init__(self, plugin, provider, event, source="reply"):
         self.plugin, self.provider, self.event = plugin, provider, event
-        self.source = source if source in ("reply", "browse", "owner_add") else "reply"
+        self.source = source if source in ("reply", "browse", "owner_add", "screenshot") else "reply"
 
     def __getattr__(self, name):
         return getattr(self.provider, name)

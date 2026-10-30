@@ -262,7 +262,8 @@ class Ledger:
     """The browser's account, a day a row, in one JSON file of the plugin's data folder."""
 
     FIELDS = ("trips", "searches", "searches_failed", "fetches", "fetches_failed", "reply_calls",
-              "input_miss", "input_hit", "output", "blocked_urls")
+              "input_miss", "input_hit", "output", "blocked_urls", "browser_reads", "browser_reads_failed",
+              "browser_shots", "browser_shots_failed", "browser_blocked_requests")
 
     def __init__(self, path, prices=None, yuan_per_day=YUAN_PER_DAY, trips_per_day=TRIPS_PER_DAY):
         self.path = Path(path)
