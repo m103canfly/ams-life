@@ -141,6 +141,18 @@ from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 class FakeConversations:
     def __init__(self):
         self.deleted = []
+        self.histories = {'default:GroupMessage:' + G1: [{'role': 'user', 'content': 'first'}],
+                          'default:GroupMessage:' + G2: [{'role': 'user', 'content': 'second'}]}
+        self.fail = False
+
+    async def get_curr_conversation_id(self, umo):
+        return umo if umo in self.histories else None
+
+    async def update_conversation(self, umo, conversation_id=None, history=None):
+        if self.fail:
+            raise RuntimeError('synthetic failure')
+        assert conversation_id == umo
+        self.histories[umo] = history
 
     async def delete_conversations_by_user_id(self, umo):
         self.deleted.append(umo)
@@ -212,6 +224,18 @@ if CASE == 'registered':
     result['files'] = all_text()
     result['users'] = sorted(p.name for p in (DATA / 'users').glob('*.json')) if (DATA / 'users').exists() else []
 
+if CASE in ('group_missing_api', 'group_update_error'):
+    turn('hello', '10001', 'Person A', group=G1, reply='hello', msg_id='m-one')
+    if CASE == 'group_missing_api':
+        ctx.conversation_manager.update_conversation = None
+    else:
+        ctx.conversation_manager.fail = True
+    result['answer'] = loop.run_until_complete(plugin.page_forget_person('10001'))
+    result['after'] = all_text()
+    with plugin._registry() as reg:
+        result['registry'] = reg.rows()
+    result['history'] = ctx.conversation_manager.histories['default:GroupMessage:' + G1]
+
 if CASE in ('owner_person', 'owner_memory'):
     turn('小爱 我最近在学弹吉他', '10001', '芒果', group=G1, reply='好厉害！', msg_id='m-guitar')
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀，记得带水~', msg_id='m-hike')
@@ -223,7 +247,8 @@ if CASE in ('owner_person', 'owner_memory'):
         result['answer'] = out
         result['after'] = all_text()
         result['astrbot'] = {'conversations': ctx.conversation_manager.deleted,
-                             'history_left': [r.sender_id for r in ctx.message_history_manager.rows]}
+                             'history_left': [r.sender_id for r in ctx.message_history_manager.rows],
+                             'group_histories': ctx.conversation_manager.histories}
         turn('小爱 我又回来啦 还在学吉他', '10001', '芒果', group=G1, reply='欢迎回来', msg_id='m-back')
         result['later'] = all_text()
         bad = loop.run_until_complete(plugin.page_forget_person('芒果'))

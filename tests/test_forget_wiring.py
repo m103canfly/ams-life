@@ -55,10 +55,13 @@ class OwnerDeletes(unittest.TestCase):
         self.assertEqual((counts['memories'], counts['relationship'], counts['phone']), (4, 1, 4))
         self.assertEqual(counts['places'], ['group:900001', 'private:10001'])
         # what AstrBot keeps: his private conversation, his rows of the message history
-        self.assertEqual(counts['astrbot'], {'conversations': 1, 'message_history': 2})
+        self.assertEqual(counts['astrbot'], {'conversations': 1, 'message_history': 2, 'group_contexts': 1})
         self.assertEqual(counts['archived_copies'], 0)                  # nothing was migrated here
         self.assertEqual(r['astrbot']['conversations'], ['default:FriendMessage:10001'])
         self.assertEqual(r['astrbot']['history_left'], ['10002', '10004'])
+        self.assertEqual(r['astrbot']['group_histories']['default:GroupMessage:900001'], [])
+        self.assertEqual(r['astrbot']['group_histories']['default:GroupMessage:900002'],
+                         [{'role': 'user', 'content': 'second'}])
         # registered: what he says afterwards is not kept either
         self.assertEqual(r['registry'], [{'kind': 'qq', 'place': '*', 'qq': '10001', 'source_id': '',
                                           'note': 'owner:panel'}])
@@ -66,6 +69,21 @@ class OwnerDeletes(unittest.TestCase):
         # others untouched
         self.assertTrue(where(r['after'], ['周末去爬山', '晚上好呀'])['晚上好呀'])
         self.assertEqual(r['bad_person']['status'], 'error')
+
+    def test_group_context_missing_api_does_not_block_local_deletion(self):
+        self._group_context_failure('group_missing_api')
+
+    def test_group_context_error_does_not_block_local_deletion(self):
+        self._group_context_failure('group_update_error')
+
+    def _group_context_failure(self, case):
+        r = run_case(case)
+        self.assertEqual(r['answer']['status'], 'ok')
+        self.assertGreater(r['answer']['data']['counts']['phone'], 0)
+        self.assertEqual(r['answer']['data']['counts']['astrbot']['group_contexts'], 0)
+        self.assertTrue(any(row['qq'] == '10001' and row['kind'] == 'qq' for row in r['registry']))
+        self.assertEqual(where(r['after'], ['m-one']), {'m-one': []})
+        self.assertEqual(r['history'], [{'role': 'user', 'content': 'first'}])
 
     def test_one_memory_and_her_reply_to_it(self):
         r = run_case('owner_memory')

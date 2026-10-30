@@ -1203,17 +1203,29 @@ class DiscretionMixin:
                 out[place] = umo
         return out
 
-    async def _forget_in_astrbot(self, person, umos) -> dict:
+    async def _forget_in_astrbot(self, person, umos, group_places) -> dict:
         """What AstrBot itself keeps of a deleted person, through its public interfaces:
         the conversation of his private chat, and his rows in the platform message
         history (off by default). `umos`: place -> AstrBot's chat id, taken before the
-        phone was cleared. The group context buffer has no public interface and is not
-        touched (it holds at most the last messages of each group, in memory)."""
-        out = {"conversations": 0, "message_history": 0}
+        phone was cleared. Clear only the current conversation history in matching groups."""
+        out = {"conversations": 0, "message_history": 0, "group_contexts": 0}
         person = str(person or "").strip()
         if not person:
             return out
         conv = getattr(self.context, "conversation_manager", None)
+        failed = False
+        for umo in sorted({umos[p] for p in group_places if p in umos}):
+            try:
+                if conv is None:
+                    raise AttributeError("conversation manager unavailable")
+                cid = await conv.get_curr_conversation_id(umo)
+                if cid:
+                    await conv.update_conversation(umo, cid, history=[])
+                    out["group_contexts"] += 1
+            except Exception:
+                failed = True
+        if failed:
+            logger.warning("[ams-life] astrbot group context clear failed")
         for umo in [u for p, u in sorted(umos.items()) if p == "private:" + person]:
             try:
                 if conv is not None:
