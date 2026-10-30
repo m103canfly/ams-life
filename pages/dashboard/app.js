@@ -1196,6 +1196,9 @@
         " 次；截图 "+Number(web.browser_shots||0)+" 张，失败 "+Number(web.browser_shots_failed||0)+
         " 次；挡掉请求 "+Number(web.browser_blocked_requests||0)+" 个。";
       spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
+      if("interactive_steps" in web)
+        spend.textContent+=" 交互浏览 "+Number(web.interactive_steps||0)+" 步，点击 "+Number(web.interactive_clicks||0)+
+          " 次，打字 "+Number(web.interactive_types||0)+" 次，挡住 "+Number(web.interactive_blocked||0)+" 次。";
     }
     if(spend && data && Number(data.slang_calls||0)>0){
       spend.hidden=false;

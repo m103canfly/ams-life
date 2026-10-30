@@ -1,5 +1,6 @@
 """Offline browser and wiring checks: no browser, model or network."""
 import asyncio
+import ast
 import json
 import socket
 import sys
@@ -120,6 +121,10 @@ class FakePage:
     async def inner_text(self, **kwargs):
         return self.ctx.body
 
+    async def content(self):
+        self.ctx.content_calls += 1
+        return self.ctx.html
+
     async def screenshot(self, **kwargs):
         self.ctx.shot_args = kwargs
         Path(kwargs['path']).write_bytes(b'fictional jpeg')
@@ -137,6 +142,7 @@ class FakeContext:
     def __init__(self):
         self.handlers, self.routes, self.responses = {}, [], []
         self.final_url, self.body = None, 'readable words'
+        self.html, self.content_calls = '<html>page</html>', 0
         self.request = FakeRequest()
         self.main_response = FakeResponse()
         self.main_route_status = 200
@@ -159,6 +165,9 @@ class FakeContext:
 
     def on(self, name, callback):
         self.handlers[name] = callback
+
+    async def unroute_all(self, **kwargs):
+        self.unroute_args = kwargs
 
     async def close(self):
         self.closed = True
@@ -189,17 +198,152 @@ class FakePlaywright:
 
 
 class Browser(unittest.TestCase):
-    def run_browser(self, fake, shot=None, on_block=None):
+    def setUp(self):
+        proxy_patch = mock.patch.object(real_browser, 'getproxies', return_value={})
+        proxy_patch.start()
+        self.addCleanup(proxy_patch.stop)
+
+    def run_browser(self, fake, shot=None, on_block=None, extractor=None):
         api = types.ModuleType('playwright.async_api')
         api.async_playwright = lambda: fake
         api.TimeoutError = TimeoutError
         package = types.ModuleType('playwright')
         package.__path__ = []
-        with mock.patch.dict(sys.modules, {'playwright': package, 'playwright.async_api': api}), \
+        with mock.patch.dict(sys.modules, {'playwright': package, 'playwright.async_api': api,
+                                           'trafilatura': extractor}), \
              mock.patch.object(real_browser.socket, 'getaddrinfo', side_effect=resolver):
             task = (real_browser.screenshot(URL, check, shot, on_block=on_block) if shot is not None else
                     real_browser.read_page(URL, check, on_block=on_block))
             return asyncio.run(task)
+
+    def test_shared_launch_closes_resources_when_setup_fails(self):
+        fake = FakePlaywright()
+        fake.context.add_init_script = mock.AsyncMock(side_effect=RuntimeError('setup failed'))
+        with self.assertRaises(RuntimeError):
+            asyncio.run(real_browser._launch_browser(fake))
+        self.assertTrue(fake.context.closed and fake.closed)
+
+    def test_context_uses_system_https_proxy_and_bypass(self):
+        fake = FakePlaywright()
+        proxies = {'https': 'http://proxy.example.test', 'http': 'http://other.example.test',
+                   'no': 'localhost; .example.test'}
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertEqual(fake.context_args['proxy'], {'server': proxies['https'],
+                                                      'bypass': 'localhost,.example.test'})
+
+    def test_context_uses_http_proxy_or_omits_proxy(self):
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', return_value={'http': 'http://proxy.example.test'}):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
+        fake = FakePlaywright()
+        self.assertIsNotNone(self.run_browser(fake))
+        self.assertNotIn('proxy', fake.context_args)
+
+    def test_proxy_does_not_bypass_page_address_checks(self):
+        fake = FakePlaywright()
+        fake.context.routes = [Route('https://private.example.com/')]
+        with mock.patch.object(real_browser, 'getproxies', return_value={'https': 'http://proxy.example.test'}):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertEqual(fake.context.routes[0].result, 'abort')
+
+    def test_proxy_lookup_failure_keeps_browser_available(self):
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', side_effect=OSError('unavailable')):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertNotIn('proxy', fake.context_args)
+
+    def test_proxy_address_is_not_logged_on_browser_error(self):
+        fake = FakePlaywright()
+        address = 'http://proxy.example.test'
+        fake.context.add_init_script = mock.AsyncMock(side_effect=RuntimeError(address))
+        with mock.patch.object(real_browser, 'getproxies', return_value={'https': address}), \
+             self.assertLogs(real_browser.logger, level='INFO') as logs:
+            self.assertIsNone(self.run_browser(fake))
+        self.assertNotIn(address, '\n'.join(logs.output))
+
+    def test_article_extraction_uses_html_and_preserves_title(self):
+        fake = FakePlaywright()
+        fake.context.body = 'visible ' * 40
+        extractor = types.SimpleNamespace(extract=mock.Mock(return_value='article ' * 30))
+        result = self.run_browser(fake, extractor=extractor)
+        self.assertEqual((result['title'], result['text']), ('Example', 'article ' * 30))
+        extractor.extract.assert_called_once_with(fake.context.html, include_comments=False,
+                                                  include_tables=True, favor_precision=True)
+
+    def test_article_extraction_falls_back_for_empty_short_error_and_missing(self):
+        for extracted in (None, '', 'short', 'a' * 200, RuntimeError('failed')):
+            with self.subTest(extracted=extracted):
+                fake = FakePlaywright()
+                fake.context.body = 'visible ' * 200
+                method = mock.Mock(side_effect=extracted) if isinstance(extracted, Exception) else mock.Mock(return_value=extracted)
+                result = self.run_browser(fake, extractor=types.SimpleNamespace(extract=method))
+                self.assertEqual(result['text'], fake.context.body)
+        fake = FakePlaywright()
+        self.assertEqual(self.run_browser(fake)['text'], fake.context.body)
+
+    def test_article_extraction_timeout_falls_back(self):
+        fake = FakePlaywright()
+        original = asyncio.to_thread
+        async def slow_thread(*args, **kwargs):
+            if args[0] is real_browser._strict_url:
+                return await original(*args, **kwargs)
+            await asyncio.sleep(1)
+        with mock.patch.object(real_browser, 'EXTRACT_SECONDS', 0.01), \
+             mock.patch.object(real_browser.asyncio, 'to_thread', side_effect=slow_thread):
+            result = self.run_browser(fake, extractor=types.SimpleNamespace(extract=mock.Mock()))
+        self.assertEqual(result['text'], fake.context.body)
+
+    def test_article_html_is_limited_by_utf8_bytes(self):
+        fake = FakePlaywright()
+        fake.context.html = 'a' * (real_browser.HTML_MAX_BYTES - 1) + '中文字'
+        extractor = types.SimpleNamespace(extract=mock.Mock(return_value='article ' * 30))
+        self.run_browser(fake, extractor=extractor)
+        html = extractor.extract.call_args.args[0]
+        self.assertEqual(html, 'a' * (real_browser.HTML_MAX_BYTES - 1))
+        self.assertLessEqual(len(html.encode('utf-8')), real_browser.HTML_MAX_BYTES)
+
+    def test_article_extraction_only_on_read_not_screenshot(self):
+        extractor = types.SimpleNamespace(extract=mock.Mock(return_value='article ' * 30))
+        fake = FakePlaywright()
+        self.run_browser(fake, extractor=extractor)
+        self.assertEqual(fake.context.content_calls, 1)
+        extractor.extract.assert_called_once()
+        fake = FakePlaywright()
+        extractor.extract.reset_mock()
+        with tempfile.TemporaryDirectory() as tmp:
+            self.run_browser(fake, Path(tmp) / 'shot.jpg', extractor=extractor)
+        self.assertEqual(fake.context.content_calls, 0)
+        extractor.extract.assert_not_called()
+
+    def test_trafilatura_never_fetches_or_extracts_from_url(self):
+        forbidden = ('fetch_' + 'url', 'fetch_' + 'response', 'trafilatura.' + 'downloads')
+        for path in ROOT.rglob('*.py'):
+            if any(part in ('.git', 'venv', '.venv') for part in path.parts):
+                continue
+            source = path.read_text('utf-8')
+            for word in forbidden:
+                self.assertNotIn(word, source, str(path))
+            tree = ast.parse(source, filename=str(path))
+            modules = set()
+            functions = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    modules.update(alias.asname or alias.name for alias in node.names if alias.name == 'trafilatura')
+                elif isinstance(node, ast.ImportFrom) and node.module == 'trafilatura':
+                    functions.update(alias.asname or alias.name for alias in node.names
+                                     if alias.name in ('extract', 'bare_extraction'))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                direct = isinstance(fn, ast.Name) and fn.id in functions
+                member = (isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name)
+                          and fn.value.id in modules and fn.attr in ('extract', 'bare_extraction'))
+                if direct or member:
+                    self.assertLessEqual(len(node.args), 1, str(path))
+                    self.assertFalse(any(k.arg is None or k.arg == 'url' for k in node.keywords), str(path))
 
     def test_launch_and_context_are_temporary_and_sandboxed(self):
         fake = FakePlaywright()
@@ -222,6 +366,83 @@ class Browser(unittest.TestCase):
         self.run_browser(fake)
         self.assertEqual([r.result for r in fake.context.routes],
                          ['fulfill', 'fulfill', 'abort', 'abort', 'abort', 'abort'])
+
+    def test_subrequest_fetch_error_is_counted_and_page_is_read(self):
+        class Error(Exception):
+            pass
+        fake = FakePlaywright()
+        route = Route('https://example.com/image')
+        route.fetch = mock.AsyncMock(side_effect=Error('fictional connection failure'))
+        fake.context.routes = [route]
+        counts = []
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = self.run_browser(fake, on_block=counts.append)
+        self.assertEqual(result['text'], 'readable words')
+        self.assertEqual(route.result, 'abort')
+        self.assertEqual(counts, [1])
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('request failed (Error)', logs.output[0])
+        self.assertNotIn('fictional connection failure', logs.output[0])
+
+    def test_main_request_fetch_error_returns_no_page(self):
+        class Error(Exception):
+            pass
+        async def fail_fetch(route, **kwargs):
+            raise Error('fictional connection failure')
+        fake = FakePlaywright()
+        counts = []
+        with mock.patch.object(Route, 'fetch', new=fail_fetch):
+            self.assertIsNone(self.run_browser(fake, on_block=counts.append))
+        self.assertEqual(fake.context.main_route.result, 'abort')
+        self.assertEqual(counts, [1])
+
+    def test_request_failure_and_abort_failure_do_not_escape(self):
+        class Error(Exception):
+            pass
+        fake = FakePlaywright()
+        route = Route('https://example.com/image')
+        route.fetch = mock.AsyncMock(side_effect=Error('fetch detail'))
+        route.abort = mock.AsyncMock(side_effect=Error('abort detail'))
+        fake.context.routes = [route]
+        counts = []
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = self.run_browser(fake, on_block=counts.append)
+        self.assertEqual(result['text'], 'readable words')
+        self.assertEqual(counts, [1])
+        self.assertEqual(route.abort.await_count, 1)
+        self.assertEqual(len(logs.output), 1)
+        self.assertNotIn('fetch detail', logs.output[0])
+        self.assertNotIn('abort detail', logs.output[0])
+
+    def test_subrequest_fulfill_timeout_and_programming_error_are_contained(self):
+        for phase, error in (('fulfill', TimeoutError('fictional timeout')),
+                             ('fetch', TypeError('fictional coding error'))):
+            with self.subTest(phase=phase):
+                fake = FakePlaywright()
+                route = Route('https://example.com/resource')
+                setattr(route, phase, mock.AsyncMock(side_effect=error))
+                fake.context.routes = [route]
+                counts = []
+                with self.assertLogs(real_browser.logger, level='INFO') as logs:
+                    result = self.run_browser(fake, on_block=counts.append)
+                self.assertEqual(result['text'], 'readable words')
+                self.assertEqual(route.result, 'abort')
+                self.assertEqual(counts, [1])
+                self.assertEqual(len(logs.output), 1)
+                self.assertIn(type(error).__name__, logs.output[0])
+
+    def test_failed_abort_of_blocked_request_is_counted_once(self):
+        fake = FakePlaywright()
+        route = Route('https://example.com/resource', method='POST')
+        route.abort = mock.AsyncMock(side_effect=RuntimeError('fictional abort'))
+        fake.context.routes = [route]
+        counts = []
+        with self.assertLogs(real_browser.logger, level='INFO') as logs:
+            result = self.run_browser(fake, on_block=counts.append)
+        self.assertEqual(result['text'], 'readable words')
+        self.assertEqual(counts, [1])
+        self.assertEqual(route.abort.await_count, 2)
+        self.assertEqual(sum('request failed (RuntimeError)' in line for line in logs.output), 1)
 
     def test_main_redirect_to_private_is_checked_before_request(self):
         fake = FakePlaywright()
@@ -510,6 +731,7 @@ class Wiring(unittest.TestCase):
     def test_default_switch_is_off(self):
         schema = json.loads((ROOT / '_conf_schema.json').read_text('utf-8'))
         self.assertFalse(schema['browser_enabled']['default'])
+        self.assertFalse(schema['browser_interactive_enabled']['default'])
 
     def test_short_empty_and_script_prompts(self):
         self.assertTrue(mixin_browse.needs_browser(''))
