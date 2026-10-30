@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 
 try:
     from . import discretion
@@ -128,6 +129,20 @@ def body_brief(core) -> str:
     if core is None:
         return ""
 
+    events = getattr(core, "mood_events", None) or []
+    detail = ""
+    if events:
+        recent = events[-1]
+        try:
+            age = time.time() - float(recent.get("ts", 0))
+        except Exception:
+            age = float("inf")
+        if 0 <= age < 3600:
+            detail = {"criticism": "刚才被说得有点不高兴", "woken": "刚被吵醒，还有点迷糊，有点起床气",
+                      "ignored": "刚才没人理，有点失落", "unanswered_share": "刚才没人理，有点失落",
+                      "quarrel": "群里气氛有点紧"}.get(recent.get("kind"))
+            detail = detail or ""
+
     def num(name, default):
         try:
             return float(getattr(core, name, default))
@@ -146,7 +161,7 @@ def body_brief(core) -> str:
     elif v <= -0.12:
         first.append("心里有点发紧")
     elif v >= 0.40:
-        first.append("心情不错")
+        first.append("心情很好，话也多了起来" if events else "心情不错")
     else:
         first.append("心情平平")
     if a >= 0.65:
@@ -154,7 +169,7 @@ def body_brief(core) -> str:
     if stress >= 0.60:
         first.append("还带着点压力")
     if energy <= 0.25:
-        first.append("不太起劲")
+        first.append("有点困了" if events else "不太起劲")
     elif energy >= 0.60:
         first.append("挺有劲")
     second = []
@@ -177,6 +192,8 @@ def body_brief(core) -> str:
     out = "，".join(first) + "。"
     if second:
         out += "，".join(second) + "。"
+    if detail:
+        out = detail + "。" + out
     return out
 
 

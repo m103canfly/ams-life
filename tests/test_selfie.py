@@ -92,6 +92,9 @@ class Phone(phone.SelfieMixin):
     def _phone_seen_pages(self, event):
         return {'https://example.invalid/page': '虚构网页'}
 
+    def _note_she_sent(self, event, kind):
+        pass
+
 
 class PhoneTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

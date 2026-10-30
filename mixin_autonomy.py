@@ -205,6 +205,8 @@ class AutonomyMixin:
                 try:
                     self._sweep_windows()
                     self._core(None).set_ambient(self._ambient_level())
+                    if getattr(self, "mood_events_enabled", False):
+                        self._mood_clock()
                 except Exception:
                     pass
                 try:

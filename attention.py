@@ -163,6 +163,21 @@ def threshold(level="normal") -> float:
     return LEVELS.get(str(level or "normal"), LEVELS["normal"])
 
 
+def mood_threshold(level, valence, energy) -> float:
+    """Adjust the uncalled-message threshold by bounded mood and energy."""
+    v = max(-1.0, min(1.0, float(valence)))
+    e = max(0.0, min(1.0, float(energy)))
+    adjustment = -0.10 * v + 0.10 * max(0.0, 0.5 - e)
+    return max(0.20, min(0.75, threshold(level) + adjustment))
+
+
+def mood_wait(seconds, valence, energy) -> float:
+    """A bounded pause before deciding; this never changes the safety gates."""
+    v = max(-1.0, min(1.0, float(valence)))
+    e = max(0.0, min(1.0, float(energy)))
+    return max(1.0, min(10.0, float(seconds) - 2.0 * v + 4.0 * max(0.0, 0.5 - e)))
+
+
 # ------------------------------------------------------------------
 # the two safety nets
 # ------------------------------------------------------------------
