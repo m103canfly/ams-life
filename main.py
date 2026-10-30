@@ -70,9 +70,9 @@ try:
 except ImportError:
     from mixin_discretion import DiscretionMixin
 try:
-    from .mixin_phone import PhoneMixin
+    from .mixin_phone import PhoneMixin, _phone_line, _history_original, _expand_forward
 except ImportError:
-    from mixin_phone import PhoneMixin
+    from mixin_phone import PhoneMixin, _phone_line, _history_original, _expand_forward
 try:
     from .mixin_send_check import SendCheckMixin
 except ImportError:
@@ -672,7 +672,33 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 self._give_browse_tools(req, event)
             except Exception as exc:
                 logger.warning("[ams-life] browse: tools not given (%s)", type(exc).__name__)
-        if not self.enabled or not self.inject_intent:
+        if not self.enabled:
+            return
+        _forward = await _expand_forward(self, event)
+        _sid, _name = self._speaker(event)
+        _stamp = getattr(getattr(event, "message_obj", None), "timestamp", None) or time.time()
+        _plain_prompt = str(getattr(req, "prompt", "") or "")
+        _plain_history = next((item.get("content") for item in reversed(getattr(req, "contexts", []) or [])
+                               if isinstance(item, dict) and item.get("role") == "user"
+                               and isinstance(item.get("content"), str)), "")
+        _incoming = str(getattr(req, "prompt", "") or self._message_text(event))
+        if _forward:
+            _incoming += "\n" + _forward
+        req.prompt = self._for_model(_phone_line(self, event, {
+            "ts": _stamp, "role": "user", "sender_id": _sid,
+            "sender_name": _name, "text": _incoming}), event)
+        for _message in getattr(req, "contexts", None) or []:
+            if not isinstance(_message, dict) or _message.get("role") != "user":
+                continue
+            _content = _message.get("content")
+            if isinstance(_content, str):
+                _message["content"] = _history_original(_content)
+            elif isinstance(_content, list):
+                for _part in _content:
+                    if isinstance(_part, dict) and isinstance(_part.get("text"), str):
+                        _part["text"] = _history_original(_part["text"])
+        self._numbers_out_of_request(req, event)
+        if not self.inject_intent:
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
         # for the session lock (the previous one still waiting for the model) before this
@@ -691,14 +717,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         _prior_open_loops = [dict(x) for x in self._window_loops(event)]
         text = str(getattr(event, "message_str", "") or "").strip()
         if not text:
-            text = str(getattr(req, "prompt", "") or "")
+            text = _plain_prompt
         if not text:
-            for item in reversed(getattr(req, "contexts", []) or []):
-                if isinstance(item, dict) and item.get("role") == "user":
-                    c = item.get("content")
-                    if isinstance(c, str):
-                        text = c
-                        break
+            text = _plain_history
         # ams-life: what she keeps of it (memory, open loops), and what AstrBot sends the model
         # of this message, keep it as it was said -- "@名字(号码)", numbers too -- but someone
         # deleted is 某人 and an @ of her is her name (_without_gone). What AstrBot keeps in

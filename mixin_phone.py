@@ -37,6 +37,97 @@ _PART_NAMES = {"Image": "[图片]", "Face": "[表情]", "Record": "[语音]", "V
                "File": "[文件]", "Forward": "[聊天记录]", "Node": "[聊天记录]", "Nodes": "[聊天记录]",
                "Poke": "[戳一戳]", "Json": "[卡片]", "Share": "[分享]", "Location": "[位置]",
                "Music": "[音乐]", "Dice": "[骰子]", "RPS": "[猜拳]", "Contact": "[名片]"}
+
+FORWARD_MAX = 20
+FORWARD_LINE_CHARS = 160
+
+
+def _original(text):
+    """Keep every line of external text inside its actual speaker's turn."""
+    return "\n".join(line if line.startswith("（原文）") else "（原文）" + line
+                     for line in str(text or "").split("\n"))
+
+
+def _history_original(text):
+    """Mark legacy history once; keep already framed turns as they were saved."""
+    text = str(text or "")
+    label = "（历史消息，发言人和时间未核实）"
+    if text.startswith(label):
+        return label + _original(text[len(label):])
+    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:主人|非主人)）：(?=（原文）)", text)
+    if framed:
+        return text[:framed.end()] + _original(text[framed.end():])
+    return label + _original(text)
+
+
+def _phone_line(plugin, event, line):
+    sid = str(line.get("sender_id") or "")
+    owner = str((plugin.config or {}).get("owner_qq", "") or "").strip()
+    name = HER_NAME if line.get("role") == "assistant" else str(line.get("sender_name") or "某人")
+    name = re.sub(r"[\r\n：:]", " ", name).strip()[:40] or "某人"
+    if line.get("role") != "assistant" and sid and sid == owner:
+        name += "（主人）"
+    elif line.get("role") != "assistant":
+        name += "（非主人）"
+    try:
+        stamp = time.strftime("%m-%d %H:%M", time.localtime(float(line.get("ts") or time.time())))
+    except (ValueError, TypeError, OverflowError, OSError):
+        stamp = time.strftime("%m-%d %H:%M", time.localtime())
+    return "[%s] %s：%s" % (stamp, name, _original(line.get("text")))
+
+
+async def _expand_forward(plugin, event):
+    """Fetch only on a reply; retain the enclosing message's origin in its window."""
+    rendered = []
+    try:
+        for comp in event.get_messages() or []:
+            if type(comp).__name__ not in ("Forward", "Nodes", "Node"):
+                continue
+            fid = getattr(comp, "id", None) or getattr(comp, "res_id", None)
+            if not fid:
+                continue
+            result = await event.bot.api.call_action("get_forward_msg", id=str(fid))
+            if not isinstance(result, dict):
+                continue
+            data = result.get("data", result)
+            messages = data.get("messages", []) if isinstance(data, dict) else []
+            for node in messages[:FORWARD_MAX] if isinstance(messages, list) else []:
+                if not isinstance(node, dict):
+                    continue
+                content = node.get("message", node.get("content", []))
+                if isinstance(content, str):
+                    body = re.sub(r"\[CQ:[^\]]*\]", "", content)
+                elif isinstance(content, list):
+                    body = "".join(str((part.get("data") or {}).get("text") or "")
+                                   for part in content if isinstance(part, dict)
+                                   and part.get("type") == "text" and isinstance(part.get("data"), dict))
+                else:
+                    body = ""
+                sender = node.get("sender") or {}
+                name = str(sender.get("nickname") or sender.get("card") or "某人") if isinstance(sender, dict) else "某人"
+                name = re.sub(r"[\r\n：:]|\d{5,}", " ", name).strip()[:40] or "某人"
+                body = re.sub(r"\d{5,}", "某人", plugin._for_model(body, event))
+                if body.strip():
+                    rendered.append(name + "：" + body[:FORWARD_LINE_CHARS])
+            if rendered:
+                break
+    except Exception:
+        return ""
+    if not rendered:
+        return ""
+    expanded = "（转发来的聊天记录，出处与本消息相同）\n" + "\n".join(_original(x) for x in rendered)
+    here, mid = plugin._here(event), plugin._message_id(event)
+    try:
+        if here and mid and not plugin._job_stale():
+            win = plugin._read_window(here)
+            for line in reversed(win["recent"]):
+                if line.get("role") == "user" and str(line.get("msg_id") or "") == mid:
+                    line["forward_text"] = expanded
+                    plugin._write_window(here, win)
+                    break
+    except Exception:
+        pass
+    return expanded
 # Body fields of older state files that held text; they never come back into the body.
 _OLD_BODY_TEXT_KEYS = ("open_loops", "event_anchors", "autobiography", "self_timeline",
                        "core_self", "narrative_self")

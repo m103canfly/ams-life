@@ -16,6 +16,10 @@ try:
 except ImportError:
     import digest
 try:
+    from .mixin_phone import _phone_line
+except ImportError:
+    from mixin_phone import _phone_line
+try:
     from .vision import ImageAPI, VisionGate
 except ImportError:
     from vision import ImageAPI, VisionGate
@@ -328,11 +332,13 @@ class LLMMixin:
         if not self._llm_allowed("tom_probe") or not self._llm_v2_cooldown_ok("tom_probe"):
             return
         try:
-            recent = [str(h.get("text") or "") for h in self._window_lines(event, 6)]
+            recent = [self._for_model(_phone_line(self, event,
+                      dict(h, text=interpretation._hint(h.get("text"), 100))), event)
+                      for h in self._window_lines(event, 6)]
             refs = [str(x) for x in (memory_entries or []) if str(x)][:6]
             proposal = await self._llm_v2_call(
                 "tom_probe",
-                interpretation.tom_prompt(user_data, recent, memory_lines=refs),
+                interpretation.tom_prompt(user_data, recent, memory_lines=refs, recent_limit=200),
                 lambda raw: interpretation.parse_tom_update(raw, allowed_refs=refs),
                 event)
             if not proposal:
