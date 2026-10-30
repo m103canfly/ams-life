@@ -415,7 +415,8 @@ class DiscretionMixin:
     # relationship records): someone deleted is taken out of these, never out of ids
     _GONE_TEXT_KEYS = {"text", "latest_text", "title", "key", "event", "small_summary", "big_summary",
                    "meaning_to_her", "reflection", "summary", "insight", "lesson", "image_caption",
-                   "voice_text", "source_texts", "evidence", "narrative", "event_key", "merged_event_keys"}
+                   "voice_text", "source_texts", "evidence", "narrative", "event_key", "merged_event_keys",
+                   "what", "group_hint"}   # her wishes to tell a group (step 2, 丁: self_model["share_wishes"])
 
     def _without_gone_tree(self, obj, scrub, key=None):
         """`obj` with someone deleted taken out of its text fields (a new object; ids untouched)."""
@@ -860,6 +861,17 @@ class DiscretionMixin:
                 note(e)
         keep = [e for e in lib["entries"] if not entry_gone(e)]
         counts["memories"] = len(lib["entries"]) - len(keep)
+        # a web page someone deleted had her look up stays (it is public); who asked becomes the
+        # deleted mark, which may be told nowhere (step 2, 丁; the reviewer, 10-29)
+        asked_gone = 0
+        for e in keep:
+            asked = e.get("asked_in") if isinstance(e, dict) else None
+            if isinstance(asked, dict) and asked.get("where") != discretion.GONE and (
+                    discretion.is_about(asked, person, ids) or (person and asked.get("where") == "private:" + person)):
+                e["asked_in"] = discretion.gone_origin()
+                asked_gone += 1
+        if asked_gone:
+            counts["asked_in"] = asked_gone
         lib["entries"] = keep
         if person:
             lib["rooms"].pop("private:" + person, None)
@@ -869,7 +881,7 @@ class DiscretionMixin:
             if isinstance(room, dict) and isinstance(room.get("last_recall_trace"), list):
                 room["last_recall_trace"] = [x for x in room["last_recall_trace"]
                                              if not (isinstance(x, dict) and str(x.get("entry_id") or "") in gone)]
-        library_written = self._write_library(lib) if counts["memories"] or person else True
+        library_written = self._write_library(lib) if counts["memories"] or person or asked_gone else True
         if hasattr(self, "_forget_turns"):   # what each reply recalled (the brain map)
             counts["turns"] = self._forget_turns(gone, person)
 

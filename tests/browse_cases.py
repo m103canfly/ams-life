@@ -7,6 +7,7 @@ stand-ins (no Key, no network); the resolver is a stand-in too.
 import asyncio
 import json
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -60,6 +61,7 @@ for name, attrs in (('astrbot.core', {}), ('astrbot.core.agent', {}),
 
 import main  # noqa: E402
 import browse  # noqa: E402
+import mixin_attention  # noqa: E402
 import mixin_browse  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
@@ -101,9 +103,83 @@ class Usage:
         self.input_other, self.input_cached, self.output = miss, hit, out
 
 
+class TripResponse:
+    def __init__(self, text='', names=(), args=(), usage=None):
+        self.completion_text = text
+        self.tools_call_name, self.tools_call_args = list(names), list(args)
+        self.tools_call_ids = ['c%d' % i for i in range(len(names))]
+        self.usage = usage
+        self.reasoning_content = '想一想' if names else None
+
+
+class TripProvider:
+    """The model on a trip: searches, reads one page, then says what it saw (made up)."""
+
+    def __init__(self):
+        self.rounds = []
+
+    async def text_chat(self, contexts=None, func_tool=None, system_prompt=None, **kw):
+        self.rounds.append({'tools': [t.name for t in func_tool.tools] if func_tool else [],
+                            'last': (contexts or [{}])[-1].get('role'), 'n': len(contexts or [])})
+        n = len(self.rounds)
+        u = Usage(1000 * n, 0, 100)
+        if n == 1:
+            return TripResponse(names=['ams_web_search'], args=[{'query': '芒果 推荐的猫咖'}], usage=u)
+        if n == 2:
+            return TripResponse(names=['ams_read_page'], args=[{'url': 'https://news.example.org/cat'}], usage=u)
+        return TripResponse(json.dumps({
+            'notes': [{'url': 'https://news.example.org/cat', 'title': '猫咖开业', 'said': '看着挺可爱的'},
+                      {'url': 'https://never-read.example.com/', 'title': '没读过的', 'said': '编的'}],
+            'share': [{'url': 'https://news.example.org/cat', 'what': '新开了猫咖', 'group': '群1'}]},
+            ensure_ascii=False), usage=u)
+
+
+def trip_case(plugin, ctx, loop, calls, out):
+    trip = TripProvider()
+
+    async def using(umo=None):
+        return trip
+    ctx.get_using_provider_async = using
+    lt = time.localtime(clock.now)
+    clock.now = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 14, 0, 0, 0, 0, -1)) + 86400   # 2 p.m.
+    core = plugin._core(None)
+    # Mango is known by name; he spoke long ago (the chats are quiet)
+    loop.run_until_complete(plugin.on_message(harness.FakeEvent('大家好', sender='10001', name='芒果', group=A)))
+    clock.now += 3600
+    core.boredom, core.novelty_need, core.info_gap = 0.1, 0.1, 0.1
+    out['not_curious'] = loop.run_until_complete(plugin._maybe_go_browse())
+    core.boredom = 0.9
+    out['went'] = loop.run_until_complete(plugin._maybe_go_browse())
+    out['rounds'] = trip.rounds
+    out['calls'] = [c['args'] for c in calls]
+    out['tool_umo'] = sorted({c['umo'] for c in calls})
+    row = plugin._browse_ledger().row()
+    out['ledger'] = {k: row.get(k) for k in ('trips', 'searches', 'fetches', 'input_miss', 'output')}
+    web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']
+    out['web'] = [{'text': e['text'], 'asked_in': e['asked_in'], 'where': e['origin']['where']} for e in web]
+    out['wishes'] = [{k: w[k] for k in ('url', 'what', 'group_hint')} for w in plugin.self_model.get('share_wishes') or []]
+    out['boredom_after'] = round(core.boredom, 2)
+    out['again_at_once'] = loop.run_until_complete(plugin._maybe_go_browse())     # 40 minutes between
+    clock.now += 41 * 60
+    lt = time.localtime(clock.now)
+    clock.now = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 3, 0, 0, 0, 0, -1)) + 86400   # 3 a.m.
+    core.boredom = 0.9
+    out['at_night'] = loop.run_until_complete(plugin._maybe_go_browse())
+    out['chat_spend'] = (mixin_attention.SPEND_PATH.read_text('utf-8') if mixin_attention.SPEND_PATH.exists() else '')
+    # a wish that names Mango; Mango deleted: his name goes out of it (the self model is swept)
+    plugin.self_model['share_wishes'] = browse.add_wish(plugin.self_model.get('share_wishes'),
+                                                        {'url': 'https://news.example.org/cat', 'what': '芒果说过想去的猫咖',
+                                                         'group': ''}, clock.now, 'trip-x')
+    plugin._save_self_model()
+    loop.run_until_complete(plugin.page_forget_person('10001'))
+    out['wishes_after'] = [w['what'] for w in plugin.self_model.get('share_wishes') or []]
+
+
 def run():
     config = {'browse_enabled': CASE != 'off', 'browse_yuan_per_day': 5, 'global_memory': CASE == 'leak'}
     config['reply_groups'] = [A]
+    if CASE == 'trip':
+        config['browse_trips_enabled'] = True
     ctx = harness.FakeContext()
     calls = []
     ctx.get_llm_tool_manager = lambda: ToolManager(calls)
@@ -112,8 +188,41 @@ def run():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     out = {}
+    if CASE == 'trip_switch':
+        # Reply browsing must not enable the owner's paused fixed trip schedule.
+        decisions, trips = [], []
+        decision = [True]
+
+        def should_go(*args, **kwargs):
+            decisions.append(decision[0])
+            return decision[0], ''
+
+        async def trip(core, now):
+            trips.append(now)
+
+        browse.should_go = should_go
+        plugin._browse_trip = trip
+        out['default_enabled'] = plugin.browse_trips_enabled
+        out['default_went'] = loop.run_until_complete(plugin._maybe_go_browse())
+        plugin.browse_trips_enabled = False
+        out['disabled_went'] = loop.run_until_complete(plugin._maybe_go_browse())
+        plugin.browse_trips_enabled = True
+        plugin.browse_enabled = False
+        out['browser_off_went'] = loop.run_until_complete(plugin._maybe_go_browse())
+        plugin.browse_enabled = True
+        decision[0] = False
+        out['should_not_go'] = loop.run_until_complete(plugin._maybe_go_browse())
+        decision[0] = True
+        out['should_go'] = loop.run_until_complete(plugin._maybe_go_browse())
+        out['decisions'], out['trip_count'] = decisions, len(trips)
+        OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
+        return
     if CASE == 'money':
         plugin._browse_ledger().add(searches=1000000)   # far over today's 5 yuan
+    if CASE == 'trip':
+        trip_case(plugin, ctx, loop, calls, out)
+        OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
+        return
 
     # Mango is known by name (her phone keeps it), so his name never goes out in a search
     ev0 = harness.FakeEvent('大家好', sender='10001', name='芒果', group=A)
@@ -184,6 +293,14 @@ def run():
     req2 = ProviderRequest(prompt=event2.message_str, system_prompt='你是小爱。')
     go(plugin.on_llm_request(event2, req2))
     out['next_message'] = go(req2.func_tool.get_tool(browse.SEARCH_TOOL).handler(event2, query='猫咖'))[:20]
+    # what she kept of the pages she read: by the page, never by her reply; who asked kept apart
+    web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']
+    out['web'] = [{'text': e['text'], 'origin': e['origin'], 'asked_in': e['asked_in'], 'url': e['web']['url']} for e in web]
+    # Mango deleted: the pages stay, who asked becomes the deleted mark
+    got = go(plugin.page_forget_person('10001'))
+    out['forget_counts'] = (got.get('data') or {}).get('counts') if isinstance(got, dict) else got
+    web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']
+    out['web_after'] = [{'asked_in': e['asked_in'], 'url': e['web']['url']} for e in web]
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
 
 

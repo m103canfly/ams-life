@@ -152,6 +152,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         self.browse_groups_enabled = bool(self.config.get("browse_groups_enabled", False))
         # step 2 (丁): her browser -- in a reply, two read-only tools of the plugin's own (off by default)
         self.browse_enabled = bool(self.config.get("browse_enabled", False))
+        self.browse_trips_enabled = bool(self.config.get("browse_trips_enabled", False))
         self.register_name_source(self._impression_names)
         try:
             self.event_summary_delay_hours = max(0, int(self.config.get("event_summary_delay_hours", 6) or 6))
@@ -920,6 +921,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 self._browse_after_reply(event, response)
             except Exception as exc:
                 logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
+            try:   # and the pages she read, as web memories (who asked kept apart)
+                await self._browse_keep_reply(event)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
         self._continue_job(self._here(event))
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
