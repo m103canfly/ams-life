@@ -38,17 +38,19 @@ class MessageAdmission(unittest.IsolatedAsyncioTestCase):
     async def test_other_group_writes_phone_window_before_stop(self):
         event = harness.FakeEvent('sample', group='900002')
         window = {'recent': []}
+        stopped_at_write = []
         self.plugin._window_add_message = main.BioCorePlugin._window_add_message.__get__(self.plugin)
         with patch.object(self.plugin, '_job_stale', return_value=False), \
              patch.object(self.plugin, '_remember_images'), \
              patch.object(self.plugin, '_message_text', return_value='sample'), \
              patch.object(self.plugin, '_read_window', return_value=window), \
-             patch.object(self.plugin, '_write_window') as write, \
+             patch.object(self.plugin, '_write_window', side_effect=lambda *args: stopped_at_write.append(event.stopped)) as write, \
              patch.object(self.plugin, '_event_origin', return_value={}), \
              patch.object(self.plugin, '_reply_to', return_value=None), \
              patch.object(self.plugin, '_note_name'):
             self.assertEqual(await self.deliver(event), 0)
         self.assertTrue(event.stopped)
+        self.assertEqual(stopped_at_write, [False])
         self.assertEqual(window['recent'][0]['text'], 'sample')
         write.assert_called_once_with('group:900002', window)
 
@@ -64,6 +66,27 @@ class MessageAdmission(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.deliver(event), 0)
         self.assertFalse(event.stopped)
         self.assertIn(event, self.saved)
+
+    async def test_disabled_other_group_stops_without_storing(self):
+        self.plugin.enabled = False
+        for allow_called in (False, True):
+            self.plugin.config['reply_other_groups_when_called'] = allow_called
+            event = harness.FakeEvent('sample', group='900002')
+            self.assertEqual(await self.deliver(event), 0)
+            self.assertTrue(event.stopped)
+        for name in ('_begin_job', '_check_registry', '_window_add_message', '_listen_body',
+                     '_ensure_autonomy_task', '_group_heard', '_sticker_in_passing'):
+            getattr(self.plugin, name).assert_not_called()
+        self.assertEqual(self.saved, [])
+
+    async def test_disabled_allowed_group_continues_without_storing(self):
+        self.plugin.enabled = False
+        event = harness.FakeEvent('sample', group='900001')
+        self.assertEqual(await self.deliver(event), 1)
+        self.assertFalse(event.stopped)
+        for name in ('_begin_job', '_check_registry', '_window_add_message', '_listen_body',
+                     '_ensure_autonomy_task', '_group_heard', '_sticker_in_passing'):
+            getattr(self.plugin, name).assert_not_called()
 
     async def test_empty_reply_groups_stops_all_groups(self):
         self.plugin.config['reply_groups'] = []

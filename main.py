@@ -586,7 +586,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         messages are stopped before storage; other groups are stored before the speaking gate.
         (AstrBot stops an event whose handler raises, so nothing may escape here.)"""
         if not self._private_allowed(event):
-            logger.info("别人的私聊，没收")
+            logger.info("[ams-life] 别人的私聊，没收")
             event.stop_event()
             return
         if self._ignored_sender(event):
@@ -594,6 +594,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             event.stop_event()
             return
         if not self.enabled:
+            if not self._may_speak_in(self._here(event)):
+                event.stop_event()
             return
         try:
             self._begin_job(self._here(event))
