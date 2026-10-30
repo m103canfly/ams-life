@@ -2415,14 +2415,17 @@
   const BIO_REPO_SLUG = "m103canfly/ams-life";
   const GITEE_KEY = "bio_gitee_repo";
   let giteeRepo = String(storeGet(GITEE_KEY, "") || "").trim();
+  // ams-life: the repo buttons show their address to copy (repo_link.js); no new window in AstrBot's frame
+  const repoLink = window.BioRepoLink ? window.BioRepoLink.attach(document, navigator.clipboard) : { refresh(){} };
   function applyGiteeRepo(){
     const input = $("giteeRepo"), state = $("giteeState"), link = $("updateOpenGitee");
     if (input) input.value = giteeRepo;
     if (state) state.textContent = giteeRepo ? ("已配置 " + giteeRepo) : "未配置";
     if (link) {
       link.style.display = giteeRepo ? "" : "none";
-      if (giteeRepo) link.href = "https://gitee.com/" + giteeRepo;
+      link.dataset.repo = giteeRepo ? "https://gitee.com/" + giteeRepo : "";
     }
+    repoLink.refresh();
   }
   function _semverParts(v){
     return String(v || "").replace(/^v/i, "").split(/[.+-]/).slice(0, 3).map(n => parseInt(n, 10) || 0);
