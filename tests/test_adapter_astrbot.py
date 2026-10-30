@@ -101,6 +101,11 @@ class OneMessage(unittest.TestCase):
         self.assertEqual(one.image_refs, ('http://img.test/a.png', 'b.png'))
         self.assertNotIn('http://img.test/quoted.png', one.image_refs)
 
+    def test_an_image_with_a_url_and_a_file_takes_the_url(self):
+        # a picture from QQ often carries both: the url is the reference, as _image_ref prefers
+        ev = with_parts(event(), Plain('看'), Image(url='http://img.test/both.png', file='both.png'))
+        self.assertEqual(from_astrbot(ev).image_refs, ('http://img.test/both.png',))
+
     def test_a_face_a_voice_and_a_part_nobody_knows(self):
         class Sticker:
             pass
@@ -183,7 +188,9 @@ class SameAsThePlugin(unittest.TestCase):
         quoted_her = with_parts(event(), Reply(id='m-7001', sender_id=ME), Plain(' 嗯'))
         quoted_other = with_parts(event(), Reply(id='m-7002', sender_id=OTHER), Plain(' 嗯'))
         pictures = with_parts(event(), Image(url='http://img.test/a.png'), Image(file='b.png'))
-        cls.cases = [event('你好'), event('在吗', group=None), at_her, quoted_her, quoted_other, pictures]
+        both = with_parts(event(), Image(url='http://img.test/both.png', file='both.png'))
+        cls.cases = [event('你好'), event('在吗', group=None), at_her, quoted_her, quoted_other, pictures,
+                     both]
         for ev in cls.cases:
             ev.is_at_or_wake_command = False
 
