@@ -37,6 +37,9 @@ PHOTO_WAIT_SECONDS = 150
 REST_WAIT_SECONDS = 60
 PHOTO_RETRIES = 3
 PHOTO_WAITING = 3
+SHOT_DIR = DATA_DIR / "browser" / "shots"
+SHOT_RETENTION = 20
+SHOT_NAME = re.compile(r"^ams-browser-[0-9a-f]{32}\.jpg$")
 SELFIE_PROMPT = ("真人质感的手机照片，真实皮肤和光影，有实感、有生活气息，不要动漫画风，不要塑料感，不要摆拍感。\n"
                  "参考图1是她本人：不管什么角度，脸、发型、头饰都照参考图1，同一个人，不要增减头饰，不要加光环。\n"
                  "粉色长发，后脑勺高处扎一束很长的高马尾（只有一束，不是双马尾），头顶一小撮呆毛；琥珀色眼睛。\n"
@@ -71,6 +74,42 @@ def _write_json(path, data):
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     atomic_file.replace(tmp, path)
+
+
+def _prune_browser_shots(current):
+    try:
+        files = [p for p in SHOT_DIR.iterdir() if p.is_file() and SHOT_NAME.fullmatch(p.name) and p != current]
+        files.sort(key=lambda p: (p.stat().st_mtime_ns, p.name), reverse=True)
+        for path in files[SHOT_RETENTION - 1:]:
+            path.unlink()
+    except Exception as exc:
+        logger.warning("[ams-life] browser: screenshot retention failed (%s)", type(exc).__name__)
+
+
+async def _browser_screenshot(plugin, event, url):
+    try:
+        from . import real_browser, mixin_browse
+    except ImportError:
+        import real_browser
+        import mixin_browse
+    path = None
+    led = plugin._browse_ledger()
+    try:
+        SHOT_DIR.mkdir(parents=True, exist_ok=True)
+        target = SHOT_DIR / ("ams-browser-" + uuid.uuid4().hex + ".jpg")
+        path = await real_browser.screenshot(url, lambda address: browse.check_url(address, mixin_browse.resolve_host),
+                                             target, on_block=lambda n: led.add(browser_blocked_requests=n))
+    finally:
+        led.add(**({"browser_shots": 1} if path else {"browser_shots_failed": 1}))
+    if not path:
+        return None
+    _prune_browser_shots(Path(path))
+    provider = plugin._vision_provider_for(event, source="screenshot")
+    if provider is None:
+        return None
+    response = await provider.text_chat(prompt=interpretation.image_caption_prompt(), image_urls=[str(path)])
+    description = interpretation.parse_image_caption(str(getattr(response, "completion_text", "") or ""))
+    return (path, description) if description else None
 
 
 class SelfieMixin:
@@ -453,7 +492,19 @@ class SelfieMixin:
                 url, title, caption = queue["screenshot"]
                 if (await self._phone_clear(event, caption) and await self._phone_clear(event, title + "\n" + url)
                         and not (hasattr(event, "is_stopped") and event.is_stopped())):
-                    await event.send(MessageChain([Plain(title + "\n" + url + "\n" + caption)]))
+                    shot = None
+                    if getattr(self, "browser_enabled", False) and (self.config or {}).get("screenshot_enabled", False):
+                        try:
+                            shot = await wait_for(_browser_screenshot(self, event, url), timeout=PHOTO_WAIT_SECONDS)
+                        except Exception as exc:
+                            logger.info("[ams-life] browser: screenshot unavailable (%s)", type(exc).__name__)
+                    if shot and not await self._phone_clear(event, shot[1] + "\n" + title + "\n" + url + "\n" + caption):
+                        shot = None
+                    if hasattr(event, "is_stopped") and event.is_stopped():
+                        return
+                    chain = ([Plain(caption), Image.fromFileSystem(str(shot[0]))] if shot else
+                             [Plain(title + "\n" + url + "\n" + caption)])
+                    await event.send(MessageChain(chain))
                     self._phone_account("screenshot", sent=True)
                     self._note_she_sent(event, "screenshot")
         except Exception as exc:

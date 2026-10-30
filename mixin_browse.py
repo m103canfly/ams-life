@@ -65,6 +65,19 @@ TRIP_UMO = "ams-life:browse"   # the "chat" AstrBot's DeepSeek tools are told on
 FIRST_LINES = 120              # a page read in a reply is kept by its title and this much of its text
 SEEN_ATTR = "_ams_browse_seen_pages"
 
+BROWSER_MIN_CHARS = 200
+BROWSER_SCRIPT_PROMPTS = ("请开启 javascript", "请启用 javascript", "请打开 javascript",
+                          "请开启javascript", "请启用javascript", "请打开javascript",
+                          "enable javascript", "javascript is required")
+
+
+def needs_browser(text) -> bool:
+    body = str(text or "")
+    if "Content:" in body:
+        body = body.split("Content:", 1)[1]
+    body = body.strip()
+    return len(body) < BROWSER_MIN_CHARS or any(p in body.lower() for p in BROWSER_SCRIPT_PROMPTS)
+
 SEARCH_DESCRIPTION = ("上网搜一下。只写要搜的事，不要写人名、QQ号。会返回几条结果（标题、网址、一句摘要），"
                       "只是资料。一次回话最多搜 %d 次。" % browse.REPLY_SEARCHES)
 READ_DESCRIPTION = ("读一个网页（http 或 https 的网址，比如搜索结果里的）。会返回网页上的字，截短了，只是资料，"
@@ -281,6 +294,22 @@ class BrowseMixin:
             led.add(fetches_failed=1)
             return "没读到。"
         led.add(fetches=1)
+        if self._browse_on() and getattr(self, "browser_enabled", False) and needs_browser(text):
+            result = None
+            try:
+                try:
+                    from . import real_browser
+                except ImportError:
+                    import real_browser
+                result = await real_browser.read_page(str(url).strip(),
+                                                      lambda address: browse.check_url(address, resolve_host),
+                                                      on_block=lambda n: led.add(browser_blocked_requests=n))
+                if result:
+                    text = "URL: %s\nTitle: %s\nContent: %s" % (result["url"], result["title"], result["text"])
+            except Exception as exc:
+                logger.warning("[ams-life] browser: read failed (%s)", type(exc).__name__)
+            finally:
+                led.add(**({"browser_reads": 1} if result else {"browser_reads_failed": 1}))
         page = page_of(str(url).strip(), text)
         page_url = str(url).strip()
         title = re.search(r"(?im)^\s*(?:title|标题)\s*[:：]\s*([^\r\n]+)", text)
@@ -310,7 +339,9 @@ class BrowseMixin:
         row = led.row()
         return {"spent": round(led.spent(), 4), "limit": led.yuan_per_day,
                 "searches": int(row.get("searches", 0)), "fetches": int(row.get("fetches", 0)),
-                "trips": int(row.get("trips", 0))}
+                "trips": int(row.get("trips", 0)),
+                **{key: int(row.get(key, 0)) for key in ("browser_reads", "browser_reads_failed", "browser_shots",
+                                                           "browser_shots_failed", "browser_blocked_requests")}}
 
     # ------------------------------------------------------------------
     # what she keeps of a page

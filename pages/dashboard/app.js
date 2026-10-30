@@ -1186,7 +1186,15 @@
     const vision=data&&data.vision;
     if(spend && vision){
       spend.hidden=false;
-      const count="今天看图 "+Number(vision.calls||0)+" 张（回话 "+Number(vision.reply||0)+"，翻群和顺便看表情 "+Number(vision.browse||0)+"，主人加图 "+Number(vision.owner_add||0)+(vision.unattributed?"，之前未分类 "+Number(vision.unattributed):"")+"）。";
+      const count="今天看图 "+Number(vision.calls||0)+" 张（回话 "+Number(vision.reply||0)+"，翻群和顺便看表情 "+Number(vision.browse||0)+"，截图 "+Number(vision.screenshot||0)+"，主人加图 "+Number(vision.owner_add||0)+(vision.unattributed?"，之前未分类 "+Number(vision.unattributed):"")+"）。";
+      spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
+    }
+    const web=data&&data.browse;
+    if(spend && web){
+      spend.hidden=false;
+      const count="今天浏览器读了 "+Number(web.browser_reads||0)+" 页，失败 "+Number(web.browser_reads_failed||0)+
+        " 次；截图 "+Number(web.browser_shots||0)+" 张，失败 "+Number(web.browser_shots_failed||0)+
+        " 次；挡掉请求 "+Number(web.browser_blocked_requests||0)+" 个。";
       spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
     }
     if(spend && data && Number(data.slang_calls||0)>0){
