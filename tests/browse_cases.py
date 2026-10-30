@@ -177,6 +177,7 @@ def trip_case(plugin, ctx, loop, calls, out):
 
 def run():
     config = {'browse_enabled': CASE != 'off', 'browse_yuan_per_day': 5, 'global_memory': CASE == 'leak'}
+    config['reply_groups'] = [A]
     if CASE == 'trip':
         config['browse_trips_enabled'] = True
     ctx = harness.FakeContext()

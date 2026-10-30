@@ -38,6 +38,7 @@ class Dummy(groups.GroupBrowseMixin):
         self.block = None
 
     def _here(self, ev): return 'group:' + ev.group
+    def _may_speak_in(self, place): return True
     def _speaker(self, ev): return ev.sender, ''
     def _source_ids(self, ev): return [ev.source]
     def _message_id(self, ev): return ev.source

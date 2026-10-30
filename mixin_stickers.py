@@ -198,6 +198,8 @@ class StickersMixin:
 
     async def _send_sticker(self, event, sid, umo, place) -> bool:
         """Send it as a QQ sticker to this message's chat; else once as a plain picture."""
+        if not self._may_speak_in(place):
+            return False
         lib = self._sticker_lib()
         row = lib.rows.get(sid)
         if not row:

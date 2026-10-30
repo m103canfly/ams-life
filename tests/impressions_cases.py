@@ -73,6 +73,7 @@ if CASE == 'material':
     config = {'member_aliases': ['10001:芒芒']}
 if CASE == 'red_on':
     config = {'redline_filter': True}
+config.update(owner_qq='10001', reply_private=['10002', '10003', '10004', '10005', '10006'])
 plugin = main.BioCorePlugin(ctx, config=config)
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()

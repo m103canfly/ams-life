@@ -600,6 +600,26 @@
     "type": "string",
     "default": "normal"
   },
+  "reply_groups": {
+    "description": "可以开口的群",
+    "hint": "填写她可以开口的群号；名单外的群只看不说。空列表表示所有群都不开口。",
+    "type": "list",
+    "items": {"type": "string"},
+    "default": []
+  },
+  "reply_private": {
+    "description": "可以接收私聊的其他人",
+    "hint": "主人以外允许接收私聊的号码；主人号码未填写时所有私聊都不接收。",
+    "type": "list",
+    "items": {"type": "string"},
+    "default": []
+  },
+  "reply_other_groups_when_called": {
+    "description": "名单外群被叫时回话",
+    "hint": "默认关闭：名单外群只看不说。开启后被叫时可以回话。",
+    "type": "bool",
+    "default": false
+  },
   "owner_qq": {
     "description": "主人的 QQ 号",
     "hint": "只填在本机配置里，不进仓库。主人永远算最亲近的；钱快到上限时只回主人的私聊。",

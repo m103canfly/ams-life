@@ -165,6 +165,8 @@ class GroupBrowseMixin:
         mood = max(-1.0, min(1.0, float(getattr(self._core(None), 'v', 0) or 0)))
         choices = []
         for here, group in self._group_state().items():
+            if not self._may_speak_in(here):
+                continue
             unread = int(group.get('unread', 0) or 0)
             if not unread:
                 continue
@@ -187,7 +189,7 @@ class GroupBrowseMixin:
         action, here = self._group_action()
         if action == 'web':
             return  # Connect PR #41 after its scheduler and entry point are verified.
-        if action != 'group':
+        if action != 'group' or not self._may_speak_in(here):
             return
         batch = self._group_open(here)
         self._group_last_browse = time.time()

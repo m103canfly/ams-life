@@ -358,7 +358,7 @@ class DecisionHearing(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(sender.notes, [] if fails else [(event, kind)])
 
     async def test_on_message_counts_first_answer_per_reply(self):
-        plugin = main.BioCorePlugin(harness.FakeContext(), config={'mood_events_enabled': True})
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={'mood_events_enabled': True, 'owner_qq': '10005'})
         phone = MoodPhone()
         event = harness.FakeEvent('继续', sender='10005', name='测试者')
         event._mood_direct = True
@@ -383,7 +383,7 @@ class DecisionHearing(unittest.IsolatedAsyncioTestCase):
 
     async def test_message_through_decision_and_panel(self):
         plugin = main.BioCorePlugin(harness.FakeContext(), config={
-            'mood_events_enabled': True, 'self_decide': True, 'owner_qq': '10005'})
+            'mood_events_enabled': True, 'self_decide': True, 'owner_qq': '10005', 'reply_groups': ['900001']})
         event = harness.FakeEvent('今天真开心', sender='10005', name='测试者', group='900001')
         event.is_at_or_wake_command = False
         event.stop_event = lambda: None
@@ -419,6 +419,8 @@ class DecisionHearing(unittest.IsolatedAsyncioTestCase):
                         'soft': 8, 'hard': 10, 'owner': '', 'group_hour_max': 30}
 
             def _here(self, event): return 'group:900001'
+            def _private_allowed(self, event): return True
+            def _message_may_speak(self, event): return True
             def _speaker(self, event): return ('10005', '')
             def _why_called(self, event): return 'at' if self.called else ''
             def _note_tie(self, *args, **kwargs): pass

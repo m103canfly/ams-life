@@ -57,7 +57,7 @@ class Model(harness.FakeProvider):
 def new_plugin():
     ctx = harness.FakeContext()
     ctx.provider = Model()
-    plugin = main.BioCorePlugin(ctx, config={})
+    plugin = main.BioCorePlugin(ctx, config={'owner_qq': '10001', 'reply_private': ['10002', '10003', '10004', '10005']})
     plugin._ipv4_json = harness.fake_ipv4_json
     return plugin
 

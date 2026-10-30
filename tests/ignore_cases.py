@@ -25,6 +25,7 @@ from astrbot.api.message_components import At, Plain  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
 config = {'ignore_senders': [OTHER_BOT, ' 10098 ', 'not a number']} if CASE == 'listed' else {}
+config['reply_groups'] = [G1]
 plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()

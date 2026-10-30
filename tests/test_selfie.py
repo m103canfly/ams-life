@@ -249,7 +249,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_now_in_every_request_and_error_omits_line(self):
         for inject in (True, False):
-            plugin = main.BioCorePlugin(harness.FakeContext(), config={'inject_intent': inject})
+            plugin = main.BioCorePlugin(harness.FakeContext(), config={'inject_intent': inject, 'owner_qq': '10005', 'reply_groups': ['900001']})
             plugin._ipv4_json = harness.fake_ipv4_json
             for group in ('', '900001'):
                 event = Event()
@@ -682,7 +682,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(self.event.sent[1].chain[0], Record)
 
     async def test_request_keeps_only_enabled_phone_tool_and_allowed_tools(self):
-        plugin = main.BioCorePlugin(harness.FakeContext(), config={'photo_enabled': True, 'allowed_tools': ['kept']})
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={'photo_enabled': True, 'allowed_tools': ['kept'], 'owner_qq': '10005'})
         req = ProviderRequest(prompt='虚构消息', system_prompt='虚构人设')
         req.func_tool = ToolSet([FunctionTool('builtin'), FunctionTool('kept')])
         plugin._ipv4_json = harness.fake_ipv4_json

@@ -120,6 +120,7 @@ def run():
     on = CASE != 'off'
     config = {'self_decide': True, 'stickers_enabled': on, 'owner_qq': OWNER, 'attention_level': 'normal',
               'global_memory': CASE == 'held'}
+    config['reply_groups'] = [A]
     ctx = harness.FakeContext()
     ctx.provider = Provider()
     sent = []

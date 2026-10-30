@@ -199,6 +199,28 @@ class SettingsMixin:
         logger.info("[ams-life] tools taken out of the reply: %s", ", ".join(gone))
         return gone
 
+    def _may_speak_in(self, place) -> bool:
+        if not place.startswith("group:"):
+            return True
+        raw = (getattr(self, "config", None) or {}).get("reply_groups") or []
+        return isinstance(raw, (list, tuple)) and place[6:] in {str(x).strip() for x in raw}
+
+    def _private_allowed(self, event) -> bool:
+        if not self._here(event).startswith("private:"):
+            return True
+        cfg = getattr(self, "config", None) or {}
+        owner = str(cfg.get("owner_qq") or "").strip()
+        raw = cfg.get("reply_private") or []
+        listed = {str(x).strip() for x in raw} if isinstance(raw, (list, tuple)) else set()
+        sid = str(self._speaker(event)[0] or "")
+        return bool(owner and sid and (sid == owner or sid in listed))
+
+    def _message_may_speak(self, event) -> bool:
+        here = self._here(event)
+        return (self._may_speak_in(here) or
+                bool((getattr(self, "config", None) or {}).get("reply_other_groups_when_called", False)
+                     and self._addresses_her(event)))
+
     def _ignored_sender(self, event) -> bool:
         """Is the sender on the setting ignore_senders (one QQ number a line; the owner's,
         e.g. another bot)? What such a sender says is neither answered nor kept."""

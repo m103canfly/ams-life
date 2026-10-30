@@ -68,6 +68,7 @@ class Usage:
 
 def run():
     config = {'self_decide': CASE != 'off', 'owner_qq': '10009', 'attention_level': 'normal'}
+    config.update(reply_groups=[A], reply_private=['10001', '10002'])
     ctx = harness.FakeContext()
     ctx.conversation_manager = Conversations()
     sent = []
