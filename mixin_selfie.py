@@ -17,12 +17,16 @@ from pathlib import Path
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse, daily
+    from . import tts, browse, daily, discretion, events
+    from .mixin_ports import PortsMixin
 except ImportError:
     from common import *  # noqa: F401,F403
     import tts
     import browse
     import daily
+    import discretion
+    import events
+    from mixin_ports import PortsMixin
 
 SELFIE_DIR = DATA_DIR / "selfie"
 REF_DIR = SELFIE_DIR / "refs"
@@ -112,7 +116,7 @@ async def _browser_screenshot(plugin, event, url):
     return (path, description) if description else None
 
 
-class SelfieMixin:
+class SelfieMixin(PortsMixin):
     def _set_now(self, where, doing, now=None):
         now = now or datetime.fromtimestamp(time.time())
         _write_json(NOW_PATH, {"where": where, "doing": doing,
@@ -447,6 +451,7 @@ class SelfieMixin:
             return False
 
     async def _media_after_reply(self, event, queue):
+        here = discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
         rest = getattr(event, "_ams_rest_task", None)
         if rest is not None:
             try:
@@ -476,15 +481,17 @@ class SelfieMixin:
                         logger.info("[ams-life] phone: photo timed out")
                         path = None
                     if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                        chain = ([Plain(caption)] if caption else []) + [Image.fromFileSystem(str(path))]
-                        await event.send(MessageChain(chain))
+                        segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
+                        segments.append(events.Segment("image", {"path": str(path)}))
+                        await self._messenger(event, as_event=True).send(here, tuple(segments))
                         self._phone_account(kind, sent=True)
                         self._note_she_sent(event, kind)
                         self._phone_prune("photo")
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
                 path = await self._make_voice(queue["voice"])
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                    await event.send(MessageChain([Record.fromFileSystem(str(path))]))
+                    await self._messenger(event, as_event=True).send(
+                        here, (events.Segment("record", {"path": str(path)}),))
                     self._phone_account("voice", sent=True)
                     self._note_she_sent(event, "voice")
                     self._phone_prune("voice")
@@ -502,9 +509,12 @@ class SelfieMixin:
                         shot = None
                     if hasattr(event, "is_stopped") and event.is_stopped():
                         return
-                    chain = ([Plain(caption), Image.fromFileSystem(str(shot[0]))] if shot else
-                             [Plain(title + "\n" + url + "\n" + caption)])
-                    await event.send(MessageChain(chain))
+                    if shot:
+                        segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
+                        segments.append(events.Segment("image", {"path": str(shot[0])}))
+                    else:
+                        segments = [events.Segment("text", {"text": title + "\n" + url + "\n" + caption})]
+                    await self._messenger(event, as_event=True).send(here, tuple(segments))
                     self._phone_account("screenshot", sent=True)
                     self._note_she_sent(event, "screenshot")
         except Exception as exc:

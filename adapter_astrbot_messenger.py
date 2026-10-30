@@ -40,14 +40,20 @@ class AstrBotMessenger(messenger.Messenger):
     session of a place ("" when there is none); ``bot_of() -> bot or None`` gives the bot now.
     """
 
-    def __init__(self, context, umo_of, bot_of):
+    def __init__(self, context, umo_of, bot_of, event_send=None, event_place=""):
         self.context = context
         self.umo_of = umo_of
         self.bot_of = bot_of
+        self.event_send = event_send
+        self.event_place = event_place
 
     async def send(self, place: str, segments: tuple) -> messenger.Sent:
         """The whole message in one place, or nothing at all; a failed send raises as AstrBot does."""
         segments = messenger.check_segments(segments)
+        if self.event_send is not None and place == self.event_place:
+            from astrbot.api.event import MessageChain
+            await self.event_send(MessageChain([_component(segment) for segment in segments]))
+            return messenger.Sent(True, "")
         umo = str(self.umo_of(place) or "")
         if not umo:
             return messenger.Sent(False, "")

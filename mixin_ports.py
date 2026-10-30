@@ -26,10 +26,14 @@ class PortsMixin:
         except Exception:
             return ""
 
-    def _messenger(self, event=None):
+    def _messenger(self, event=None, *, as_event=False):
         """A messenger for this event and the plugin's context."""
+        send = getattr(event, "send", None)
+        kwargs = {}
+        if as_event and callable(send):
+            kwargs = {"event_send": send, "event_place": discretion.place_of(getattr(event, "unified_msg_origin", "") or "")}
         return adapter_astrbot_messenger.AstrBotMessenger(
-            getattr(self, "context", None), lambda place: self._umo_of(place, event), lambda: getattr(event, "bot", None))
+            getattr(self, "context", None), lambda place: self._umo_of(place, event), lambda: getattr(event, "bot", None), **kwargs)
 
     def _model(self, provider):
         """A model client over this provider."""
