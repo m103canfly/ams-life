@@ -32,7 +32,13 @@ def _counted(plugin, kind, provider):
     return count(kind, provider) if count else provider
 
 
-class LLMMixin:
+try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
+
+
+class LLMMixin(PortsMixin):
     def _load_profile(self):
         try:
             if PROFILE_PATH.exists():
@@ -175,10 +181,10 @@ class LLMMixin:
             return None
         try:
             if system_prompt:
-                resp = await provider.text_chat(prompt=prompt, system_prompt=system_prompt)
+                reply = await self._model(provider).chat(prompt=prompt, system=system_prompt)
             else:
-                resp = await provider.text_chat(prompt=prompt)
-            raw = str(getattr(resp, "completion_text", "") or "").strip()
+                reply = await self._model(provider).chat(prompt=prompt)
+            raw = reply.text.strip()
             if not raw:
                 return None
             return parser(raw)
@@ -728,8 +734,8 @@ class LLMMixin:
             # interpretation layer; this wiring only calls it.
             system = interpretation.persona_compile_system()
             prompt = interpretation.persona_compile_prompt(text)
-            resp = await provider.text_chat(prompt=prompt, system_prompt=system)
-            raw = str(getattr(resp, "completion_text", "") or "")
+            reply = await self._model(provider).chat(prompt=prompt, system=system)
+            raw = reply.text
             _compiled = interpretation.parse_persona_compile(raw, DEFAULT_PROFILE)
             self.profile = _compiled.get("profile") or dict(DEFAULT_PROFILE)
             self.schema_texts = list(_compiled.get("schema") or [])

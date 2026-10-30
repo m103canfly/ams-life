@@ -27,7 +27,13 @@ PEOPLE_DIR = DATA_DIR / "people"
 PEOPLE_IN_LINE = 5   # people described in one reply
 
 
-class ImpressionsMixin:
+try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
+
+
+class ImpressionsMixin(PortsMixin):
     def _impression_store(self):
         store = getattr(self, "_people_store", None)
         if store is None:
@@ -228,8 +234,8 @@ class ImpressionsMixin:
             return {}
 
         async def ask(prompt):
-            resp = await provider.text_chat(prompt=prompt)
-            return str(getattr(resp, "completion_text", "") or "")
+            reply = await self._model(provider).chat(prompt=prompt)
+            return reply.text
 
         done = {}
         for place in self._window_places():
