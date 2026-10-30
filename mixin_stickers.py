@@ -31,9 +31,10 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import attention, stickers
+    from . import attention, events, stickers
 except ImportError:
     import attention
+    import events
     import stickers
 
 STICKERS_DIR = DATA_DIR / "stickers"
@@ -214,15 +215,13 @@ class StickersMixin:
             try:
                 action, params = stickers.send_params(place, b64)
                 if stickers.allowed(action, params, place):
-                    await bot.call_action(action, **params)
+                    await self._messenger(event).call(action, **params)
                     sent = True
             except Exception as exc:
                 logger.warning("[ams-life] stickers: as a sticker failed (%s); as a picture", type(exc).__name__)
         if not sent:
             try:
-                from astrbot.api.event import MessageChain
-                from astrbot.api.message_components import Image as _Image
-                await self.context.send_message(umo, MessageChain([_Image.fromBase64(b64)]))
+                await self._messenger(event).send(place, (events.Segment("image", {"base64": b64}),))
                 sent = True
             except Exception as exc:
                 logger.warning("[ams-life] stickers: not sent (%s)", type(exc).__name__)
