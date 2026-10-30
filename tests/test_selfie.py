@@ -7,7 +7,7 @@ import tempfile
 import types
 import unittest
 import urllib.error
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -195,27 +195,57 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(other._ams_phone_queue['screenshot'][2], '看看')
 
     async def test_now_shared_expiry_and_failure(self):
-        class Clock(datetime):
-            value = datetime(2026, 10, 30, 9, 30)
-            @classmethod
-            def now(cls):
-                return cls.value
+        clock = harness.Clock(datetime(2026, 10, 30, 9, 30).timestamp())
         group = Event()
         group._group = '900001'
-        with patch.object(phone, 'datetime', Clock):
+        with patch.object(phone.time, 'time', clock):
             self.assertEqual(await self.p._tool_set_now(self.event, '学院', '上课'), '记下了')
             self.assertEqual(self.p._now_line(self.event), self.p._now_line(group))
             self.assertEqual(self.p._now_line(group), Phone()._now_line(group))
             self.assertEqual(await self.p._tool_set_now(group, '地' * 21, '上课'), '不能更新此刻')
-            Clock.value += timedelta(hours=3)
+            clock.advance(3 * 3600)
             self.assertNotIn('正在上课（从09:30', self.p._now_line(group))
-            Clock.value = datetime(2026, 10, 30, 11, 59)
+            clock.now = datetime(2026, 10, 30, 11, 59).timestamp()
             await self.p._tool_set_now(group, '街上', '逛街')
-            Clock.value += timedelta(minutes=1)
+            clock.now = datetime(2026, 10, 30, 14).timestamp()
             self.assertNotIn('正在逛街', self.p._now_line(self.event))
             with patch.object(phone.daily, 'schedule', side_effect=ValueError):
-                Clock.value = datetime(2026, 10, 30, 14)
+                clock.now = datetime(2026, 10, 30, 18).timestamp()
                 self.assertEqual(self.p._now_line(group), '')
+
+    async def test_now_follows_fake_clock_across_period_boundary(self):
+        clock = harness.Clock(datetime(2026, 10, 30, 11, 59).timestamp())
+        with patch.object(phone.time, 'time', clock):
+            before = self.p._now_line(self.event)
+            self.assertIn('从09:00开始', before)
+            clock.advance(120)
+            after = self.p._now_line(self.event)
+            self.assertIn('吃午饭', after)
+            self.assertIn('从12:00开始', after)
+            self.assertNotEqual(before, after)
+
+    async def test_her_now_lasts_minimum_hour_until_next_boundary(self):
+        clock = harness.Clock(datetime(2026, 10, 30, 11, 50).timestamp())
+        with patch.object(phone.time, 'time', clock):
+            self.assertEqual(await self.p._tool_set_now(self.event, '外面', '逛街'), '记下了')
+            for hour, minute in ((12, 30), (13, 30)):
+                clock.now = datetime(2026, 10, 30, hour, minute).timestamp()
+                self.assertIn('此刻：在外面，正在逛街（从11:50开始）', self.p._now_line(self.event))
+            clock.now = datetime(2026, 10, 30, 14).timestamp()
+            self.assertNotIn('从11:50开始', self.p._now_line(self.event))
+            self.assertEqual(json.loads(phone.NOW_PATH.read_text(encoding='utf-8'))['source'], 'schedule')
+            clock.now = datetime(2026, 10, 30, 14, 10).timestamp()
+            await self.p._tool_take_photo(self.event, 'snap', '天空', '外面', '散步', '')
+            clock.now = datetime(2026, 10, 30, 17, 9).timestamp()
+            self.assertIn('正在散步', self.p._now_line(self.event))
+            clock.advance(60)
+            self.assertNotIn('正在散步（从14:10', self.p._now_line(self.event))
+            clock.now = datetime(2026, 10, 31, 7).timestamp()
+            await self.p._tool_set_now(self.event, '外面', '散步')
+            clock.now = datetime(2026, 10, 31, 7, 59).timestamp()
+            self.assertIn('正在散步', self.p._now_line(self.event))
+            clock.advance(60)
+            self.assertNotIn('正在散步', self.p._now_line(self.event))
 
     async def test_now_in_every_request_and_error_omits_line(self):
         for inject in (True, False):
@@ -398,6 +428,15 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.event._ams_rest_task.set_result(False)
         self.p._make_photo = AsyncMock()
         await self.p._media_after_reply(self.event, {'photo': ('snap', '天空', '看看')})
+        self.p._make_photo.assert_not_awaited()
+        self.assertEqual(self.event.sent, [])
+
+    async def test_cancelled_remaining_text_sends_no_media(self):
+        self.event._ams_rest_task = asyncio.get_running_loop().create_future()
+        self.event._ams_rest_task.cancel()
+        self.p._make_photo = AsyncMock()
+        with self.assertRaises(asyncio.CancelledError):
+            await self.p._media_after_reply(self.event, {'photo': ('snap', '天空', '看看')})
         self.p._make_photo.assert_not_awaited()
         self.assertEqual(self.event.sent, [])
 

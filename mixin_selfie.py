@@ -75,13 +75,13 @@ def _write_json(path, data):
 
 class SelfieMixin:
     def _set_now(self, where, doing, now=None):
-        now = now or datetime.now()
+        now = now or datetime.fromtimestamp(time.time())
         _write_json(NOW_PATH, {"where": where, "doing": doing,
                                "start": now.isoformat(), "source": "her"})
 
     def _now_line(self, event):
         try:
-            now = datetime.now()
+            now = datetime.fromtimestamp(time.time())
             try:
                 state = json.loads(NOW_PATH.read_text(encoding="utf-8"))
             except FileNotFoundError:
@@ -92,7 +92,9 @@ class SelfieMixin:
             valid = (start is not None and start <= now and state.get("source") in ("her", "schedule")
                      and all(isinstance(state.get(k), str) and 0 < len(state[k]) <= 20 for k in ("where", "doing")))
             if valid and state["source"] == "her":
-                valid = now < min(daily.next_period(start), start + timedelta(hours=daily.HER_MAX_HOURS))
+                earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
+                boundary = daily.next_period(earliest - timedelta(microseconds=1))
+                valid = now < min(boundary, start + timedelta(hours=daily.HER_MAX_HOURS))
             elif valid:
                 valid = start == daily.period_start(now)
             if not valid:
@@ -417,9 +419,7 @@ class SelfieMixin:
                 logger.info("[ams-life] phone: reply wait timed out")
                 return
             except CancelledError:
-                if not rest.cancelled():
-                    raise
-                return
+                raise
             except Exception as exc:
                 logger.warning("[ams-life] phone: reply wait failed (%s)", type(exc).__name__)
                 return

@@ -18,6 +18,8 @@ PERIODS = (
 LOW_ENERGY = 0.25
 LOW_MOOD = -0.35
 HIGH_STRESS = 0.60
+# Her own update should last long enough to remain coherent across nearby meals.
+HER_MIN_MINUTES = 60
 HER_MAX_HOURS = 3
 
 
