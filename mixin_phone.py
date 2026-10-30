@@ -353,7 +353,7 @@ class PhoneMixin:
 
     def _note_she_sent(self, event, kind) -> None:
         """Note a successfully sent medium and associate it with its written reply."""
-        labels = {"selfie": "[自拍]", "photo": "[随手拍]", "voice": "[语音]", "web": "[分享网页]"}
+        labels = {"selfie": "[自拍]", "snap": "[随手拍]", "screenshot": "[分享网页]", "voice": "[语音]"}
         if not getattr(self, "mood_events_enabled", False) or kind not in labels or self._job_stale():
             return
         here = self._here(event)

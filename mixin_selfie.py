@@ -345,6 +345,7 @@ class SelfieMixin:
                     if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
                         await event.send(MessageChain([Image.fromFileSystem(str(path))]))
                         self._phone_account(kind, sent=True)
+                        self._note_she_sent(event, kind)
                         self._phone_prune("photo")
             if "screenshot" in queue:
                 url, title, caption = queue["screenshot"]
@@ -352,11 +353,13 @@ class SelfieMixin:
                         and not (hasattr(event, "is_stopped") and event.is_stopped())):
                     await event.send(MessageChain([Plain(title + "\n" + url + "\n" + caption)]))
                     self._phone_account("screenshot", sent=True)
+                    self._note_she_sent(event, "screenshot")
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
                 path = await self._make_voice(queue["voice"])
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
                     await event.send(MessageChain([Record.fromFileSystem(str(path))]))
                     self._phone_account("voice", sent=True)
+                    self._note_she_sent(event, "voice")
                     self._phone_prune("voice")
         except Exception as exc:
             logger.warning("[ams-life] phone send failed: %s", type(exc).__name__)
