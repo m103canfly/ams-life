@@ -1238,9 +1238,9 @@ def parse_humor_hint(raw) -> str:
     return tag if tag in _HUMOR_TAGS else ""
 
 
-def tom_prompt(user_data, recent_turns=None, memory_lines=None) -> str:
+def tom_prompt(user_data, recent_turns=None, memory_lines=None, recent_limit=100) -> str:
     user = _dict(user_data)
-    turns = "\n".join("- " + _hint(x, 100) for x in (recent_turns or [])[:6])
+    turns = "\n".join("- " + _hint(x, recent_limit) for x in (recent_turns or [])[:6])
     mem = "\n".join("- id=" + _hint(x, 40) for x in (memory_lines or [])[:6])
     return ("推断用户当前的信念/愿望/意图，只输出 JSON：\n"
             '{"beliefs":["≤3条，每条≤40字"],"desires":["≤3条"],'
