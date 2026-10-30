@@ -218,6 +218,16 @@ class MediaMixin:
             return ""
 
     async def _image_context(self, event) -> str:
+        refs = self._image_refs(event)
+        if getattr(self, "_stickers_on", None) and self._stickers_on():
+            refs = list(dict.fromkeys(refs + self._sticker_refs(event)))
+        if not refs or not self._llm_allowed("image_caption"):
+            return ""
+        cache = self._load_image_cache()
+        if all(_sha256(ref) in cache for ref in refs):
+            self._image_last_used = time.time()
+            return "\n".join(str(cache[_sha256(ref)].get("caption")) for ref in refs[:3]
+                             if cache[_sha256(ref)].get("caption"))
         self._group_reply_vision_active = getattr(self, '_group_reply_vision_active', 0) + 1
         try:
             async with self._group_image_lock():

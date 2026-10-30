@@ -36,6 +36,8 @@ cache entry remains; a different URL for the same image can cost another look.
 Each queued picture holds the vision lock for one look. A reply waiting for the
 lock takes priority; the unattempted pictures stay queued for the next opening,
 subject to the same expiry, capacity and forgetting rules.
+Replies with no image to look at, including cached images and images with captioning
+disabled, do not wait for the lock or interrupt the group look.
 An individual call may cross the daily limit and failed calls may incur provider
 charges that are unavailable in the response. Vision usage is recorded even when
 `self_decide` is off.

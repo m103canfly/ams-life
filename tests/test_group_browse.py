@@ -161,7 +161,7 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.p.looks, [ref(0), ref(1), ref(2)])
 
     async def test_reply_image_interrupts_batch_after_first_and_requeues_remaining(self):
-        class ReplyDummy(mixin_media.MediaMixin, Dummy):
+        class ReplyDummy(Dummy, mixin_media.MediaMixin):
             async def _image_context_locked(self, event):
                 self.order.append('reply')
                 self.reply_started.set()
@@ -189,7 +189,7 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
         reply = None
         try:
             await asyncio.wait_for(first_started.wait(), 1)
-            reply = asyncio.create_task(self.p._image_context(event('reply', wake=True)))
+            reply = asyncio.create_task(self.p._image_context(event('reply', wake=True, refs=[ref(4)])))
             await asyncio.sleep(0)
             self.assertEqual(self.p._group_reply_vision_active, 1)
             first_done.set()
@@ -209,14 +209,75 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.gather(reply, return_exceptions=True)
             await asyncio.gather(browse, return_exceptions=True)
 
+    async def test_text_reply_does_not_wait_or_interrupt_group_look(self):
+        class ReplyDummy(Dummy, mixin_media.MediaMixin):
+            async def _image_context_locked(self, event):
+                raise AssertionError('text must not acquire the vision lock')
+
+        self.p = ReplyDummy()
+        self.p.block = asyncio.Event()
+        self.add(event('old', refs=[ref(n) for n in range(3)]))
+        browse = asyncio.create_task(self.p._group_look('group:900001', self.p._group_open('group:900001')))
+        try:
+            await asyncio.sleep(0)
+            self.assertEqual(self.p.looks, [ref(0)])
+            self.assertEqual(await asyncio.wait_for(self.p._image_context(event('text', wake=True)), 1), '')
+            self.assertEqual(getattr(self.p, '_group_reply_vision_active', 0), 0)
+        finally:
+            self.p.block.set()
+            await asyncio.gather(browse, return_exceptions=True)
+        self.assertEqual(self.p.looks, [ref(0), ref(1), ref(2)])
+
+    async def test_cached_reply_image_does_not_wait_for_vision_lock(self):
+        class ReplyDummy(Dummy, mixin_media.MediaMixin):
+            async def _image_context_locked(self, event):
+                raise AssertionError('cached images must not acquire the vision lock')
+
+        self.p = ReplyDummy()
+        self.p.cache[groups._sha256(ref(4))] = {'caption': 'cached picture'}
+        self.assertEqual(self.p._load_image_cache()[groups._sha256(ref(4))]['caption'], 'cached picture')
+        async with self.p._group_image_lock():
+            result = await asyncio.wait_for(self.p._image_context(event('reply', refs=[ref(4)])), 1)
+        self.assertEqual(result, 'cached picture')
+        self.assertEqual(getattr(self.p, '_group_reply_vision_active', 0), 0)
+
+    async def test_disabled_image_caption_does_not_wait_for_vision_lock(self):
+        class ReplyDummy(Dummy, mixin_media.MediaMixin):
+            def _llm_allowed(self, name): return False
+
+        self.p = ReplyDummy()
+        async with self.p._group_image_lock():
+            result = await asyncio.wait_for(self.p._image_context(event('reply', refs=[ref(4)])), 1)
+        self.assertEqual(result, '')
+        self.assertEqual(getattr(self.p, '_group_reply_vision_active', 0), 0)
+
+    async def test_regular_image_rechecks_cache_after_waiting_for_lock(self):
+        class ReplyDummy(Dummy, mixin_media.MediaMixin):
+            image_llama_server = ''
+            image_llama_model = ''
+            image_service_port = 0
+            def _image_refs(self, event): return event.refs
+            def _stickers_on(self): return False
+
+        self.p = ReplyDummy()
+        async with self.p._group_image_lock():
+            reply = asyncio.create_task(self.p._image_context(event('reply', refs=[ref(4)])))
+            await asyncio.sleep(0)
+            self.assertFalse(reply.done())
+            self.assertEqual(self.p._group_reply_vision_active, 1)
+            self.p.cache[groups._sha256(ref(4))] = {'caption': 'cached while waiting'}
+            self.assertEqual(self.p._load_image_cache()[groups._sha256(ref(4))]['caption'], 'cached while waiting')
+        self.assertEqual(await asyncio.wait_for(reply, 1), 'cached while waiting')
+        self.assertEqual(self.p._group_reply_vision_active, 0)
+
     async def test_cancelled_reply_does_not_leave_priority_flag_set(self):
-        class ReplyDummy(mixin_media.MediaMixin, Dummy):
+        class ReplyDummy(Dummy, mixin_media.MediaMixin):
             async def _image_context_locked(self, event):
                 return ''
 
         self.p = ReplyDummy()
         async with self.p._group_image_lock():
-            reply = asyncio.create_task(self.p._image_context(event('reply', wake=True)))
+            reply = asyncio.create_task(self.p._image_context(event('reply', wake=True, refs=[ref(4)])))
             await asyncio.sleep(0)
             self.assertEqual(self.p._group_reply_vision_active, 1)
             reply.cancel()
