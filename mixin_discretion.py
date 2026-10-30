@@ -822,6 +822,7 @@ class DiscretionMixin:
         """
         person = str(person or "").strip()
         ids = [str(x) for x in (source_ids or []) if str(x or "").strip()]
+        self._group_forget_queue(person, ids)
         entry_ids = {str(x) for x in (entry_ids or []) if str(x or "").strip()}
         if not person and not ids and not entry_ids:
             return {}

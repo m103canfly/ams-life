@@ -72,8 +72,8 @@ class _Spending:
 
 class AttentionMixin:
     def _spending(self, kind, provider):
-        """With self_decide, every model call the plugin makes itself is counted (else as it was)."""
-        if provider is None or not getattr(self, "self_decide", False) or isinstance(provider, _Spending):
+        """Count vision always; with self_decide, count the other plugin calls too."""
+        if provider is None or (kind != "vision" and not getattr(self, "self_decide", False)) or isinstance(provider, _Spending):
             return provider
         return _Spending(self, kind, provider)
 
