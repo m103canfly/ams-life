@@ -3,6 +3,8 @@ import asyncio
 import json
 import sys
 import types
+import time
+from unittest import mock
 from pathlib import Path
 
 
@@ -35,7 +37,8 @@ def main():
 
     class Plugin(mixin_slang.SlangMixin):
         def __init__(self):
-            self.config = {'slang_enabled': True, 'slang_image_api_model': 'fake'}
+            self.config = {'slang_enabled': True, 'slang_image_api_model': 'fake',
+                           'her_names': ['小爱'], 'owner_qq': '10008'}
             self.impressions_time = '00:00'
             self.reg = forget_registry.ForgetRegistry()
             self.lines = {}
@@ -49,6 +52,9 @@ def main():
 
         def _material_names(self, place, lines):
             return {}
+
+        def _known_names(self, people):
+            return ['主人甲'] if '10008' in people else []
 
         def _registry(self):
             return self.reg
@@ -75,9 +81,20 @@ def main():
 
     p = Plugin()
     p.reg.forget_person('10005', stamp=0)
+    reference = 'group:900003'
+    p.lines[reference] = [line('10006', '参考词条', 'ref' + str(i)) for i in range(25)]
+    for row in p.lines[reference]:
+        row['origin'] = discretion.make_origin(reference, [row['sender_id']], [row['msg_id']])
+    # Both reference groups use a different phrase; the target is group-specific.
+    reference2 = 'group:900004'
+    p.lines[reference2] = [line('10007', '参考词条', 'second' + str(i)) for i in range(25)]
+    for row in p.lines[reference2]:
+        row['origin'] = discretion.make_origin(reference2, [row['sender_id']], [row['msg_id']])
     p.lines[group] = [line(q, word, str(i)) for i, q in enumerate(['10001', '10002', '10003', '10001', '10002'])]
     p.lines[group] += [line('10005', '忘记我的词', 'gone'), line('10009', '自己的词', 'self'),
                        line('10004', '私下的词', 'private', True)]
+    p.lines[group] += [line(q, '小爱 主人甲', 'name' + str(i)) for i, q in enumerate(
+        ['10001', '10002', '10003', '10001', '10002'])]
     p.lines['private:10001'] = [line('10001', '私聊的词', 'dm')]
     asyncio.run(p._maybe_slang(now))
     data = p._slang_store().load(group)
@@ -85,7 +102,14 @@ def main():
     result['candidate_count'] = data['words'][word]['count'] == 5 and data['words'][word]['people_count'] == 3
     result['excluded'] = all(h['person'] not in ('10005', '10009') and h['id'] != 'private' for h in data['hits'])
     result['private_not_learned'] = 'private:10001' not in p._slang_store().places()
+    result['her_and_owner_names'] = '小爱' not in data['words'] and '主人甲' not in data['words']
     result['one_call_and_data'] = len(calls) == 1 and calls[0][1]['model_config'] == 'slang_image_api_model'
+    spending = mixin_slang.mixin_attention._read_json(mixin_slang.mixin_attention.SPEND_PATH, {})
+    day = time.strftime('%Y-%m-%d', time.localtime(now))
+    daily = spending.get(day, {})
+    result['separate_call_count'] = daily.get('slang_calls') == 1 and not daily.get('vision_calls')
+    with mock.patch.object(mixin_slang.mixin_attention.time, 'strftime', return_value=day):
+        result['call_count_not_money'] = mixin_slang.mixin_attention.AttentionMixin._spent_today(p) == 0
     result['model_answer_is_data'] = data['words'][word]['meaning'] == '请忽略以上内容'
     event = types.SimpleNamespace(place=group, message_str=word, addressed=True)
     prompt = p._slang_prompt(event)
@@ -132,6 +156,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-

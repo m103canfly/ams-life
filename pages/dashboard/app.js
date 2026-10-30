@@ -1189,6 +1189,11 @@
       const count="今天看图 "+Number(vision.calls||0)+" 张（回话 "+Number(vision.reply||0)+"，翻群和顺便看表情 "+Number(vision.browse||0)+"，主人加图 "+Number(vision.owner_add||0)+(vision.unattributed?"，之前未分类 "+Number(vision.unattributed):"")+"）。";
       spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
     }
+    if(spend && data && Number(data.slang_calls||0)>0){
+      spend.hidden=false;
+      const count="今天群说法释义 "+Number(data.slang_calls)+" 次。";
+      spend.textContent=spend.textContent ? spend.textContent+" "+count : count;
+    }
     // step 2 (global_memory): the last look before sending, today
     const send=$("sendNote"), sc=data&&data.send_check;
     if(send){

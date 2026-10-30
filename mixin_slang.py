@@ -6,9 +6,10 @@ import time
 
 try:
     from .common import DATA_DIR
-    from . import discretion, impressions, mixin_attention, redline, slang, vision
+    from . import attention, discretion, impressions, mixin_attention, redline, slang, vision
 except ImportError:
     from common import DATA_DIR
+    import attention
     import discretion
     import impressions
     import mixin_attention
@@ -34,6 +35,7 @@ class SlangMixin:
             return
         day = time.strftime('%Y-%m-%d', local)
         store = self._slang_store()
+        pending = {}
         for place in sorted(set(self._window_places()) | set(store.places())):
             if not place.startswith('group:'):
                 continue
@@ -61,8 +63,23 @@ class SlangMixin:
                 for known_place in people_store.places():
                     for person in people_store.load(known_place)['people']:
                         names.setdefault(person, []).extend(self._impression_names(person))
+            cfg = getattr(self, 'config', {}) or {}
+            her_names = cfg.get('her_names') or attention.HER_NAMES
+            if isinstance(her_names, str):
+                her_names = re.split(r'[\s,，、]+', her_names)
+            names.setdefault('self', []).extend(her_names)
+            owner = str(cfg.get('owner_qq') or '')
+            if owner:
+                names.setdefault(owner, []).extend(getattr(self, '_known_names', lambda people: [])([owner]))
             name_set = {str(n) for ns in names.values() for n in ns if n}
             name_set.update(str(x.get('sender_name') or '') for x in lines if isinstance(x, dict))
+            # Reapply today's name and common-word filters to existing local data.
+            invalid = {w for w in {h['word'] for h in data['hits']} if w not in slang.phrases(w, name_set)}
+            invalid.update(w for w in data['words'] if w not in slang.phrases(w, name_set))
+            if invalid:
+                data['hits'] = [h for h in data['hits'] if h['word'] not in invalid]
+                for word in invalid:
+                    data['words'].pop(word, None)
             known = {(h['word'], h['id']) for h in data['hits']}
             her = {str(x) for x in (getattr(self, '_her_ids', None) or set())}
             for line in lines:
@@ -84,26 +101,34 @@ class SlangMixin:
                     if word not in data['blocked'] and (word, mid) not in known:
                         data['hits'].append({'word': word, 'person': who, 'id': mid, 'ts': stamp})
                         known.add((word, mid))
-            candidates = slang.refresh(data, now)
-            by_sources = {}
-            for w, hs in candidates.items():
-                by_sources.setdefault(tuple(sorted(h['id'] for h in hs)), []).append(w)
-            candidates = {w: hs for w, hs in candidates.items() if not any(
-                w != other and w in other for other in by_sources[tuple(sorted(h['id'] for h in hs))])}
-            new = {w: hs for w, hs in sorted(candidates.items()) if w not in data['blocked'] and (w not in data['words'] or data['words'][w].get('meaning') == slang.UNKNOWN)}
+            slang.refresh(data, now)
+            store.save(place, data)
+            pending[place] = (data, lines, names)
+        references = [store.load(place) for place in store.places()]
+        for place, (data, lines, names) in pending.items():
+            ranked = slang.rank_candidates(data, references, now)
+            eligible = [(word, hits) for word, hits, _score in ranked
+                        if word not in data['blocked'] and word not in data['words']]
+            new = dict(eligible[:slang.NEW_PER_NIGHT])
             for word, hits in new.items():
                 if word in data['words']:
                     continue
                 data['words'][word] = {'meaning': slang.UNKNOWN, 'since': now, 'last': max(h['ts'] for h in hits),
                                        'status': '新学的'}
             slang.refresh(data, now)
+            to_define = dict(new)
+            for word, hits, _score in ranked:
+                if len(to_define) >= slang.NEW_PER_NIGHT:
+                    break
+                if word in data['words'] and data['words'][word].get('meaning') == slang.UNKNOWN:
+                    to_define.setdefault(word, hits)
             data['tried'] = day
             store.save(place, data)
-            if not new or not str((self.config or {}).get('slang_image_api_model') or '').strip():
+            if not to_define or not str((self.config or {}).get('slang_image_api_model') or '').strip():
                 continue
             mask = impressions.masker({q: '某人' for q in names}, names)
             material = {}
-            for word, hits in new.items():
+            for word, hits in to_define.items():
                 ids = {h['id'] for h in hits}
                 material[word] = [re.sub(r'\d+', '#', slang.PARTS.sub(' ', mask(str(x.get('text') or ''))))[:80]
                                   for x in lines if isinstance(x, dict) and str(x.get('msg_id') or '') in ids
@@ -114,16 +139,16 @@ class SlangMixin:
             try:
                 ledger = mixin_attention._read_json(mixin_attention.SPEND_PATH, {})
                 today = ledger.setdefault(day, {})
-                today['vision_calls'] = int(today.get('vision_calls', vision._legacy_counts(day).get('calls', 0)) or 0) + 1
+                today['slang_calls'] = int(today.get('slang_calls', 0) or 0) + 1
                 mixin_attention._write_json(mixin_attention.SPEND_PATH, ledger)
                 response = await vision.ImageAPI(self).text_chat(prompt=prompt, model_config='slang_image_api_model')
-                self._note_spend('vision', response)
+                self._note_spend('slang', response)
                 answer = json.loads(str(response.completion_text))
                 if not isinstance(answer, dict) or self._job_stale():
                     continue
                 # Reload after the await: deletion and privacy narrowing may have happened.
                 data = store.load(place)
-                for word in new:
+                for word in to_define:
                     value = answer.get(word)
                     if (word in data['words'] and isinstance(value, str) and value.strip()
                             and len(value) <= 80 and not re.search(r'\d|https?://', value)
@@ -234,13 +259,3 @@ class SlangMixin:
             data['blocked'].append(word)
         store.save(place, data)
         return {'status': 'ok', 'data': {}}
-
-
-
-
-
-
-
-
-
-

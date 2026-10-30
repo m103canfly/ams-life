@@ -17,8 +17,10 @@ except ImportError:
     import ui_look
 try:
     from .vision import vision_for_panel
+    from . import mixin_attention
 except ImportError:
     from vision import vision_for_panel
+    import mixin_attention
 
 
 class PagesMixin:
@@ -714,6 +716,7 @@ class PagesMixin:
                 except Exception:
                     continue
         _vision = vision_for_panel(getattr(self, "config", {}) or {})
+        _slang_calls = int((mixin_attention._read_json(mixin_attention.SPEND_PATH, {}).get(time.strftime("%Y-%m-%d")) or {}).get("slang_calls", 0) or 0)
         return {"status": "ok", "data": {
             "enabled": self.enabled,
             "inject_intent": self.inject_intent,
@@ -757,6 +760,7 @@ class PagesMixin:
             **({"phone_counts": self._phone_counts()} if any((self.config or {}).get(k) for k in
                 ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
             **({"vision": _vision} if _vision["calls"] > 0 else {}),   # only once she has looked today
+            **({"slang_calls": _slang_calls} if _slang_calls else {}),
             **({"mood_events": [{"kind": MOOD_EVENT_LABELS[x["kind"]], "ts": x["ts"]}
                                 for x in getattr(self.cores.get("her"), "mood_events", [])[-5:]
                                 if x.get("kind") in MOOD_EVENT_LABELS]}
