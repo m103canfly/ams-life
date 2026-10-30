@@ -661,13 +661,12 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             try:
                 _tools = getattr(req, "func_tool", None)
                 if _tools:
-                    for _name in ("take_photo", "share_screenshot", "say_aloud"):
+                    for _name in ("take_photo", "share_screenshot", "say_aloud", "set_now"):
                         if _name in _tools.names():
                             _tools.remove_tool(_name)
                     if not _tools:
                         req.func_tool = None
-                if self.enabled and any((self.config or {}).get(k) for k in
-                        ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")):
+                if self.enabled:
                     await self._ensure_profile(event)
                 self._give_phone_tools(req, event)
             except Exception as exc:
@@ -704,6 +703,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                         _part["text"] = _history_original(_part["text"])
         self._numbers_out_of_request(req, event)
         if not self.inject_intent:
+            _now = self._now_line(event)
+            if _now:
+                # The system prompt is not stored in AstrBot's conversation history.
+                req.system_prompt = (str(getattr(req, "system_prompt", "") or "") + "\n\n" + _now).strip()
             return
         # the mark on_message set when the message came in: AstrBot may hold the message
         # for the session lock (the previous one still waiting for the model) before this
@@ -834,6 +837,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # ams-life: the names she wrote back framed ("「柠檬」") are kept so, for the owner to read;
         # the reply model sees them without the frames, so as not to take to writing them in QQ
         _compact = discretion.unframe(_compact)
+        _now = self._now_line(event)
+        if _now:
+            _compact = (_compact + "\n" + _now).strip()
         _slang = self._slang_prompt(event)
         if _slang:
             _compact = (_compact + "\n" + _slang).strip()
