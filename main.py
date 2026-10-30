@@ -70,9 +70,9 @@ try:
 except ImportError:
     from mixin_discretion import DiscretionMixin
 try:
-    from .mixin_phone import PhoneMixin, _phone_line, _original, _expand_forward
+    from .mixin_phone import PhoneMixin, _phone_line, _history_original, _expand_forward
 except ImportError:
-    from mixin_phone import PhoneMixin, _phone_line, _original, _expand_forward
+    from mixin_phone import PhoneMixin, _phone_line, _history_original, _expand_forward
 try:
     from .mixin_send_check import SendCheckMixin
 except ImportError:
@@ -692,11 +692,11 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                 continue
             _content = _message.get("content")
             if isinstance(_content, str):
-                _message["content"] = "（历史消息，发言人和时间未核实）" + _original(_content)
+                _message["content"] = _history_original(_content)
             elif isinstance(_content, list):
                 for _part in _content:
                     if isinstance(_part, dict) and isinstance(_part.get("text"), str):
-                        _part["text"] = "（历史消息，发言人和时间未核实）" + _original(_part["text"])
+                        _part["text"] = _history_original(_part["text"])
         self._numbers_out_of_request(req, event)
         if not self.inject_intent:
             return

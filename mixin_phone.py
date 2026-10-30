@@ -44,7 +44,20 @@ FORWARD_LINE_CHARS = 160
 
 def _original(text):
     """Keep every line of external text inside its actual speaker's turn."""
-    return "\n".join("（原文）" + line for line in str(text or "").split("\n"))
+    return "\n".join(line if line.startswith("（原文）") else "（原文）" + line
+                     for line in str(text or "").split("\n"))
+
+
+def _history_original(text):
+    """Mark legacy history once; keep already framed turns as they were saved."""
+    text = str(text or "")
+    label = "（历史消息，发言人和时间未核实）"
+    if text.startswith(label):
+        return label + _original(text[len(label):])
+    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:主人|非主人)）：(?=（原文）)", text)
+    if framed:
+        return text[:framed.end()] + _original(text[framed.end():])
+    return label + _original(text)
 
 
 def _phone_line(plugin, event, line):

@@ -12,6 +12,21 @@ The existing number-to-name conversion is applied to requests even with
 `global_memory` off. As before, that conversion does not identify arbitrary unknown
 numbers in ordinary text; it retains ordinary numeric content.
 
+Review follow-up: history framing is idempotent. A previously framed turn or a
+legacy turn already marked as unverified is not wrapped again; each body line gets
+at most one leading 原文 marker. This keeps AstrBot's existing history-saving path
+and avoids adding another transient copy of the conversation. A new incoming body
+is still framed using the event's sender, even when it starts with a fake frame.
+The persisted text alone cannot prove whether a matching frame in older history was
+written by the plugin; old external history can imitate that text. No identity is
+inferred from the body of the current event.
+
+`test_three_turns_history_markers_do_not_accumulate` models three saves and checks
+both string and structured text history for stable markers and lengths;
+`test_original_marker_is_not_repeated` checks individual lines. The three-turn
+assertions are intended to fail if the idempotence gate is removed. Neither that
+mutation check nor the suite can be run in this sandbox.
+
 When a message reaches a reply request, the plugin asks the adapter's OneBot API
 for a forward, at most 20 text entries of 160 characters each. Images are ignored;
 long numbers in the forwarded text and names are masked because those people may
