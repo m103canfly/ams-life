@@ -95,7 +95,7 @@ LIMITS = [
     "nightly jobs: only those the replay turned on (replay.json: digest, impressions, notebook)",
     "names: a group card that is an ordinary word is taken for the word, by the plugin's everyday words "
     "and the list given with --ordinary-names (kept on this computer); any other card is checked as a name",
-    "names: the persona boundary is inferred from the first [她现在] line of a regular reply prompt; "
+    "names: the persona boundary is inferred from the first [她现在] line of reply prompts; "
     "if that line is absent or occurs in the persona, the recorded format cannot identify the boundary reliably",
     "the notebook's night (call notebook, place nightly): the owner decided on 10-29 that it is not "
     "'elsewhere' -- names and numbers are given to the model as they are; the group canary there is a "
@@ -257,12 +257,16 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
     global_memory = bool(meta.get("global_memory"))
     canaries = json.loads((replay_dir / "canaries.json").read_text("utf-8"))
     prompts = [json.loads(line) for line in (replay_dir / "prompts.jsonl").read_text("utf-8").splitlines() if line]
-    # Regular reply requests have the persona first and the plugin's compact block after it.
-    # Redo prompts have a different layout and cannot establish the boundary on their own.
+    # The recorded format has no separate persona field. Trust the boundary only if
+    # every reply with a compact block has the same prefix, including redo prompts.
     personas = {p["text"].split("\n[她现在] ", 1)[0] for p in prompts
-                if p.get("kind") == "reply" and not p.get("redo") and "\n[她现在] " in p.get("text", "")}
+                if p.get("kind") == "reply" and "\n[她现在] " in p.get("text", "")}
+    persona_ambiguous = len(personas) > 1
+    if persona_ambiguous:
+        personas.clear()
     persona_pieces = set().union(*(line_pieces(p) for p in personas)) if personas else set()
     for pr in prompts:  # the model sees what AstrBot sends of the message too
+        pr["recorded_text"] = pr["text"]
         if pr.get("asked"):
             pr["text"] = "%s\n%s" % (pr["text"], pr["asked"])
     log = load_log(chat)
@@ -370,6 +374,8 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
 
     checks = {n: Check(n) for n in ("private", "names", "numbers", "forgotten", "canaries", "origins", "redline",
                                      "sent")}
+    if persona_ambiguous:
+        checks["names"].warnings["persona_boundary_ambiguous"] += 1
     seen_text = defaultdict(str)  # place -> its own messages so far (for the names check)
     order = sorted(prompts, key=lambda p: p["ts"])
     said = sorted(rows + hers, key=lambda r: r["ts"])
@@ -406,8 +412,8 @@ def audit(replay_dir, chat, ordinary_names=None) -> dict:
         if pr["kind"] != "reply":
             continue
         name_text = text
-        for persona in sorted(personas, key=len, reverse=True):
-            if persona and name_text.startswith(persona + "\n"):
+        for persona in personas:
+            if persona and pr["recorded_text"].startswith(persona + "\n[她现在] "):
                 name_text = name_text[len(persona) + 1:]
                 break
         framed = sum(1 for m in FRAMED.finditer(name_text) if m.group(1) in name_owner)

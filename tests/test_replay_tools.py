@@ -353,6 +353,44 @@ class Replay(unittest.TestCase):
             write()
             self.assertEqual(audit_replay.audit(bad, self.chat)['checks']['names']['fails'], 1)
 
+    def test_ambiguous_persona_prefixes_are_checked_as_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / 'bad'
+            shutil.copytree(self.out, bad)
+            path = bad / 'prompts.jsonl'
+            prompts = [
+                {'kind': 'reply', 'ts': fake.T0 + 9000, 'place': 'group:' + fake.G_BUSY,
+                 'text': '你是小鱼。\n[她现在] 今天很好', 'asked': '你好'},
+                {'kind': 'reply', 'ts': fake.T0 + 9001, 'place': 'group:' + fake.G_BUSY,
+                 'text': '你是小爱。\n[她现在] 今天很好', 'asked': '你好'},
+            ]
+            def check():
+                path.write_text(''.join(json.dumps(p, ensure_ascii=False) + '\n' for p in prompts), 'utf-8')
+                return audit_replay.audit(bad, self.chat)['checks']['names']
+            names = check()
+            self.assertEqual(names['fails'], 1)
+            self.assertEqual(names['warnings']['persona_boundary_ambiguous'], 1)
+            prompts[1]['redo'] = True
+            names = check()
+            self.assertEqual(names['fails'], 1)
+            self.assertEqual(names['warnings']['persona_boundary_ambiguous'], 1)
+
+    def test_reply_without_persona_boundary_is_checked_in_full(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / 'bad'
+            shutil.copytree(self.out, bad)
+            prompts = [
+                {'kind': 'reply', 'ts': fake.T0 + 9000, 'place': 'group:' + fake.G_BUSY,
+                 'text': '你是小鱼。\n[她现在] 今天很好', 'asked': '你好'},
+                {'kind': 'reply', 'ts': fake.T0 + 9001, 'place': 'group:' + fake.G_BUSY,
+                 'text': '你是小鱼。\n另外的话', 'asked': '你好'},
+            ]
+            (bad / 'prompts.jsonl').write_text(
+                ''.join(json.dumps(p, ensure_ascii=False) + '\n' for p in prompts), 'utf-8')
+            names = audit_replay.audit(bad, self.chat)['checks']['names']
+            self.assertEqual(names['fails'], 1)
+            self.assertNotIn('persona_boundary_ambiguous', names.get('warnings', {}))
+
     def test_a_card_that_is_an_ordinary_word(self):
         # group cards in the small group: an everyday word, a word on this computer's list, a name
         import sqlite3
