@@ -586,8 +586,17 @@ class PagesMixin:
             return {"status": "error", "message": "person must be a QQ number", "data": {}}
         try:
             umos = self._place_umos()
+            group_places = set()
+            for place in umos:
+                if not place.startswith("group:"):
+                    continue
+                lines = self._read_window(place)["recent"]
+                senders = {str(x.get("sender_id") or "") for x in lines if x.get("role") != "assistant"}
+                if person in senders or not senders or "" in senders:
+                    group_places.add(place)
             counts = self._owner_forget_person(person)
-            counts["astrbot"] = await self._forget_in_astrbot(person, umos)
+            group_places.update(p for p in counts.get("places", []) if p.startswith("group:"))
+            counts["astrbot"] = await self._forget_in_astrbot(person, umos, group_places)
             counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"person": person, "counts": counts}}
         except forget_registry.Unreadable:
