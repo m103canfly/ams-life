@@ -103,6 +103,7 @@ class Usage:
 
 def run():
     config = {'browse_enabled': CASE != 'off', 'browse_yuan_per_day': 5, 'global_memory': CASE == 'leak'}
+    config['reply_groups'] = [A]
     ctx = harness.FakeContext()
     calls = []
     ctx.get_llm_tool_manager = lambda: ToolManager(calls)

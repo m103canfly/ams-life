@@ -20,11 +20,12 @@ import fake_old_data as fake  # noqa: E402
 from tools import _guard, audit_replay, import_old  # noqa: E402
 
 
-def run_replay(chat, registry, out, *extra):
+def run_replay(chat, registry, out, *extra, admission_fixture=False):
     env = dict(os.environ, PYTHONHASHSEED='0')
     env.pop('AMS_LIFE_DATA_DIR', None)
     reg = ['--registry', str(registry)] if registry else []
-    proc = subprocess.run([sys.executable, '-I', str(ROOT / 'tools' / 'replay.py'), '--chat', str(chat),
+    script = HERE / 'replay_admission_fixture.py' if admission_fixture else ROOT / 'tools' / 'replay.py'
+    proc = subprocess.run([sys.executable, '-I', str(script), '--chat', str(chat),
                            *reg, '--out', str(out), *extra],
                           env=env, capture_output=True, text=True, encoding='utf-8', timeout=300)
     if proc.returncode != 0:
@@ -786,7 +787,8 @@ class ReplayOptions(unittest.TestCase):
             out = Path(tmp) / 'nightly'
             try:
                 run_replay(self.chat, Path(self.tmp.name) / 'bundle' / 'forget_registry.sqlite3', out, '--no-canaries',
-                           '--embed-url', stub.url, '--digest', '--impressions', '--notebook')
+                           '--embed-url', stub.url, '--digest', '--impressions', '--notebook',
+                           admission_fixture=True)
             finally:
                 stub.close()
             stats = json.loads((out / 'replay.json').read_text('utf-8'))['stats']

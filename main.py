@@ -582,11 +582,13 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         """ams-life: her phone. Every message that reaches the plugin goes into its own
-        chat window, whether it wakes her or not. Store only: no model, no vector
-        service, no reply, no body change; the event is never changed, and stopped only
-        for a sender on ignore_senders (the owner, 10-29: e.g. the old companion): then
-        nothing at all is done with it, and AstrBot calls no model for it.
+        chat window, whether it wakes her or not. Ignored senders and unapproved private
+        messages are stopped before storage; other groups are stored before the speaking gate.
         (AstrBot stops an event whose handler raises, so nothing may escape here.)"""
+        if not self._private_allowed(event):
+            logger.info("别人的私聊，没收")
+            event.stop_event()
+            return
         if self._ignored_sender(event):
             logger.info("[ams-life] a message from a sender on ignore_senders: not answered, not kept")
             event.stop_event()
@@ -620,13 +622,19 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._group_heard(event)
             self._sticker_in_passing(event)  # queue an uncalled QQ sticker for a later opening
         except Exception as exc:
-            logger.warning("[ams-life] window store failed: %s", exc)
+            logger.warning("[ams-life] window store failed (%s)", type(exc).__name__)
+        finally:
+            if not self._message_may_speak(event):
+                event.stop_event()
 
     @filter.event_message_type(filter.EventMessageType.ALL, priority=-5)
     async def on_message_decide(self, event: AstrMessageEvent):
         """Step 2 (甲, self_decide): after on_message has kept the message, she decides whether
         to answer it (mixin_attention._decide): a request for a reply, a stop, or nothing."""
         if not self.enabled or not getattr(self, "self_decide", False) or self._ignored_sender(event):
+            return
+        if not self._private_allowed(event) or not self._message_may_speak(event):
+            event.stop_event()
             return
         try:
             request = await self._decide(event)

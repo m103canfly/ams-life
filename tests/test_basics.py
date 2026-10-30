@@ -130,7 +130,8 @@ class Split(unittest.TestCase):
         # SlangMixin: seven methods, including its two panel endpoints.
         # Recent images and quote lookup add three media methods.
         # Shared daily state: _set_now, _now_line, _tool_set_now.
-        self.assertEqual(len(methods), 477)
+        # Message admission and group speaking policy: three helpers.
+        self.assertEqual(len(methods), 480)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

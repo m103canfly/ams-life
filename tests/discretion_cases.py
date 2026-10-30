@@ -147,6 +147,9 @@ def run():
         config = {'llm_only_reply_summary': False, 'memory_worthiness_enabled': False}
     if CASE.startswith('global_'):   # step 2: one memory everywhere, labelled
         config = {'global_memory': True}
+    config.update(owner_qq='10001', reply_private=['10002', '10003', '10004', '10005'])
+    if CASE == 'listen':
+        config['reply_groups'] = [A, B]
     plugin = main.BioCorePlugin(harness.FakeContext(), config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
     loop = asyncio.new_event_loop()

@@ -152,7 +152,10 @@ def run():
         reply = HINT
     ctx = harness.FakeContext()
     model = ctx.provider = Model(again)
-    plugin = main.BioCorePlugin(ctx, config={} if CASE in ('off', 'off_hint') else {'global_memory': True})
+    config = {} if CASE in ('off', 'off_hint') else {'global_memory': True}
+    config['owner_qq'] = '10001'
+    config['reply_groups'] = [A]
+    plugin = main.BioCorePlugin(ctx, config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

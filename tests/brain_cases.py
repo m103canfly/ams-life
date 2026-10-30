@@ -54,7 +54,7 @@ import brain_graph  # noqa: E402
 from astrbot.api.provider import ProviderRequest, LLMResponse  # noqa: E402
 
 ctx = harness.FakeContext()
-plugin = main.BioCorePlugin(ctx, config={})
+plugin = main.BioCorePlugin(ctx, config={'owner_qq': '10001', 'reply_private': ['10002', '10003', '10004', '10005']})
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)

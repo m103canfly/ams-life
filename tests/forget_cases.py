@@ -178,7 +178,7 @@ ctx.conversation_manager = FakeConversations()
 ctx.message_history_manager = FakeHistory()
 if CASE == 'recall_before':
     main.BioCorePlugin._migrate_memory_ids = lambda self: None   # the old layout, as it was
-plugin = main.BioCorePlugin(ctx, config={})
+plugin = main.BioCorePlugin(ctx, config={'owner_qq': '10001', 'reply_private': ['10002', '10003', '10004', '10005', '10006']})
 plugin._ipv4_json = harness.fake_ipv4_json
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)

@@ -112,7 +112,9 @@ def files_snapshot(root):
 
 def main_run():
     ctx = harness.FakeContext()
-    plugin = main.BioCorePlugin(ctx, config=dict(FULL_CONFIG) if MODE == 'full' else {})
+    config = dict(FULL_CONFIG) if MODE == 'full' else {}
+    config.update(owner_qq='10001', reply_groups=[GROUP_A, GROUP_B])
+    plugin = main.BioCorePlugin(ctx, config=config)
     plugin._ipv4_json = harness.fake_ipv4_json
     if MODE == 'full':
         plugin.llm_functions = {k: {'enabled': True, 'provider': 'follow_llm'} for k in main.LLM_FUNCTIONS}

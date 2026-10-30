@@ -230,6 +230,9 @@ class AttentionMixin:
     async def _decide(self, event):
         """None (nothing for the plugin to do: AstrBot answers, or nobody does) or a request
         for a reply (request_llm). Stops the event when she does not answer it."""
+        if not self._private_allowed(event) or not self._message_may_speak(event):
+            self._stop(event)
+            return None
         cfg = self._attention_cfg()
         here = self._here(event)
         sid = str(self._speaker(event)[0] or "")
