@@ -13,6 +13,11 @@ MAX_HOPS = 5
 # Script-driven pages may fetch their visible content after DOMContentLoaded.
 SETTLE_SECONDS = 8
 TEXT_SECONDS = 10
+EXTRACT_SECONDS = 5
+# Bound parser input and work by UTF-8 bytes, including for multibyte pages.
+HTML_MAX_BYTES = 2 * 1024 * 1024
+BROWSER_MIN_CHARS = 200
+EXTRACT_MIN_RATIO = 0.25
 SHOT_SECONDS = 10
 CHALLENGE_MAX_CHARS = 600
 SHOT_VIEWPORT = {"width": 390, "height": 844}
@@ -24,6 +29,26 @@ WEBRTC_INIT = """for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnecti
     catch (_) { try { delete globalThis[name]; } catch (_) {} }
 }"""
 _lock = asyncio.Lock()
+
+
+async def _article_text(page, body):
+    async def extract():
+        html = await page.content()
+        html = html.encode("utf-8")[:HTML_MAX_BYTES].decode("utf-8", errors="ignore")
+
+        def parse():
+            import trafilatura
+            return trafilatura.extract(html, include_comments=False, include_tables=True, favor_precision=True)
+
+        return await asyncio.to_thread(parse)
+
+    try:
+        text = await asyncio.wait_for(extract(), timeout=EXTRACT_SECONDS)
+        if isinstance(text, str) and len(text.strip()) >= max(BROWSER_MIN_CHARS, len(body.strip()) * EXTRACT_MIN_RATIO):
+            return text
+    except Exception:
+        pass
+    return body
 
 
 def _strict_url(url, check):
@@ -170,7 +195,7 @@ async def _visit(url, check, shot_path, on_block):
                                        timeout=SETTLE_SECONDS)
             except (asyncio.TimeoutError, PlaywrightTimeoutError):
                 pass
-            # Safety 6: only read title and visible body text; no interaction or injected script.
+            # Safety 6: read the title and visible text; no interaction or injected script.
             title = await asyncio.wait_for(page.title(), timeout=TEXT_SECONDS)
             body = await asyncio.wait_for(page.locator("body").inner_text(timeout=TEXT_SECONDS * 1000),
                                           timeout=TEXT_SECONDS)
@@ -194,6 +219,8 @@ async def _visit(url, check, shot_path, on_block):
                                                        full_page=False, timeout=SHOT_SECONDS * 1000),
                                        timeout=SHOT_SECONDS)
                 final_url = page.url
+            else:
+                body = await _article_text(page, body)
             # Stop further responses before deciding whether every response was safe.
             await context.close()
             while pending:
@@ -223,7 +250,7 @@ async def _visit(url, check, shot_path, on_block):
                     # Safety 3: prevent pages from creating WebRTC peer connections.
                     await context.add_init_script(WEBRTC_INIT)
                     # Safety 7: the caller passes the result to browse.wrap as untrusted material.
-                    result = await asyncio.wait_for(read(context), timeout=OPEN_SECONDS + SETTLE_SECONDS + 2 * TEXT_SECONDS + SHOT_SECONDS)
+                    result = await asyncio.wait_for(read(context), timeout=OPEN_SECONDS + SETTLE_SECONDS + 2 * TEXT_SECONDS + SHOT_SECONDS + EXTRACT_SECONDS)
                 finally:
                     for task in list(pending):
                         task.cancel()

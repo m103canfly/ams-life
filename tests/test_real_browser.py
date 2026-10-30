@@ -1,5 +1,6 @@
 """Offline browser and wiring checks: no browser, model or network."""
 import asyncio
+import ast
 import json
 import socket
 import sys
@@ -120,6 +121,10 @@ class FakePage:
     async def inner_text(self, **kwargs):
         return self.ctx.body
 
+    async def content(self):
+        self.ctx.content_calls += 1
+        return self.ctx.html
+
     async def screenshot(self, **kwargs):
         self.ctx.shot_args = kwargs
         Path(kwargs['path']).write_bytes(b'fictional jpeg')
@@ -137,6 +142,7 @@ class FakeContext:
     def __init__(self):
         self.handlers, self.routes, self.responses = {}, [], []
         self.final_url, self.body = None, 'readable words'
+        self.html, self.content_calls = '<html>page</html>', 0
         self.request = FakeRequest()
         self.main_response = FakeResponse()
         self.main_route_status = 200
@@ -189,17 +195,100 @@ class FakePlaywright:
 
 
 class Browser(unittest.TestCase):
-    def run_browser(self, fake, shot=None, on_block=None):
+    def run_browser(self, fake, shot=None, on_block=None, extractor=None):
         api = types.ModuleType('playwright.async_api')
         api.async_playwright = lambda: fake
         api.TimeoutError = TimeoutError
         package = types.ModuleType('playwright')
         package.__path__ = []
-        with mock.patch.dict(sys.modules, {'playwright': package, 'playwright.async_api': api}), \
+        with mock.patch.dict(sys.modules, {'playwright': package, 'playwright.async_api': api,
+                                           'trafilatura': extractor}), \
              mock.patch.object(real_browser.socket, 'getaddrinfo', side_effect=resolver):
             task = (real_browser.screenshot(URL, check, shot, on_block=on_block) if shot is not None else
                     real_browser.read_page(URL, check, on_block=on_block))
             return asyncio.run(task)
+
+    def test_article_extraction_uses_html_and_preserves_title(self):
+        fake = FakePlaywright()
+        fake.context.body = 'visible ' * 40
+        extractor = types.SimpleNamespace(extract=mock.Mock(return_value='article ' * 30))
+        result = self.run_browser(fake, extractor=extractor)
+        self.assertEqual((result['title'], result['text']), ('Example', 'article ' * 30))
+        extractor.extract.assert_called_once_with(fake.context.html, include_comments=False,
+                                                  include_tables=True, favor_precision=True)
+
+    def test_article_extraction_falls_back_for_empty_short_error_and_missing(self):
+        for extracted in (None, '', 'short', 'a' * 200, RuntimeError('failed')):
+            with self.subTest(extracted=extracted):
+                fake = FakePlaywright()
+                fake.context.body = 'visible ' * 200
+                method = mock.Mock(side_effect=extracted) if isinstance(extracted, Exception) else mock.Mock(return_value=extracted)
+                result = self.run_browser(fake, extractor=types.SimpleNamespace(extract=method))
+                self.assertEqual(result['text'], fake.context.body)
+        fake = FakePlaywright()
+        self.assertEqual(self.run_browser(fake)['text'], fake.context.body)
+
+    def test_article_extraction_timeout_falls_back(self):
+        fake = FakePlaywright()
+        original = asyncio.to_thread
+        async def slow_thread(*args, **kwargs):
+            if args[0] is real_browser._strict_url:
+                return await original(*args, **kwargs)
+            await asyncio.sleep(1)
+        with mock.patch.object(real_browser, 'EXTRACT_SECONDS', 0.01), \
+             mock.patch.object(real_browser.asyncio, 'to_thread', side_effect=slow_thread):
+            result = self.run_browser(fake, extractor=types.SimpleNamespace(extract=mock.Mock()))
+        self.assertEqual(result['text'], fake.context.body)
+
+    def test_article_html_is_limited_by_utf8_bytes(self):
+        fake = FakePlaywright()
+        fake.context.html = 'a' * (real_browser.HTML_MAX_BYTES - 1) + '中文字'
+        extractor = types.SimpleNamespace(extract=mock.Mock(return_value='article ' * 30))
+        self.run_browser(fake, extractor=extractor)
+        html = extractor.extract.call_args.args[0]
+        self.assertEqual(html, 'a' * (real_browser.HTML_MAX_BYTES - 1))
+        self.assertLessEqual(len(html.encode('utf-8')), real_browser.HTML_MAX_BYTES)
+
+    def test_article_extraction_only_on_read_not_screenshot(self):
+        extractor = types.SimpleNamespace(extract=mock.Mock(return_value='article ' * 30))
+        fake = FakePlaywright()
+        self.run_browser(fake, extractor=extractor)
+        self.assertEqual(fake.context.content_calls, 1)
+        extractor.extract.assert_called_once()
+        fake = FakePlaywright()
+        extractor.extract.reset_mock()
+        with tempfile.TemporaryDirectory() as tmp:
+            self.run_browser(fake, Path(tmp) / 'shot.jpg', extractor=extractor)
+        self.assertEqual(fake.context.content_calls, 0)
+        extractor.extract.assert_not_called()
+
+    def test_trafilatura_never_fetches_or_extracts_from_url(self):
+        forbidden = ('fetch_' + 'url', 'fetch_' + 'response', 'trafilatura.' + 'downloads')
+        for path in ROOT.rglob('*.py'):
+            if any(part in ('.git', 'venv', '.venv') for part in path.parts):
+                continue
+            source = path.read_text('utf-8')
+            for word in forbidden:
+                self.assertNotIn(word, source, str(path))
+            tree = ast.parse(source, filename=str(path))
+            modules = set()
+            functions = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    modules.update(alias.asname or alias.name for alias in node.names if alias.name == 'trafilatura')
+                elif isinstance(node, ast.ImportFrom) and node.module == 'trafilatura':
+                    functions.update(alias.asname or alias.name for alias in node.names
+                                     if alias.name in ('extract', 'bare_extraction'))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                direct = isinstance(fn, ast.Name) and fn.id in functions
+                member = (isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name)
+                          and fn.value.id in modules and fn.attr in ('extract', 'bare_extraction'))
+                if direct or member:
+                    self.assertLessEqual(len(node.args), 1, str(path))
+                    self.assertFalse(any(k.arg is None or k.arg == 'url' for k in node.keywords), str(path))
 
     def test_launch_and_context_are_temporary_and_sandboxed(self):
         fake = FakePlaywright()
