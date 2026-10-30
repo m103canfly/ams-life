@@ -195,6 +195,11 @@ class FakePlaywright:
 
 
 class Browser(unittest.TestCase):
+    def setUp(self):
+        proxy_patch = mock.patch.object(real_browser, 'getproxies', return_value={})
+        proxy_patch.start()
+        self.addCleanup(proxy_patch.stop)
+
     def run_browser(self, fake, shot=None, on_block=None, extractor=None):
         api = types.ModuleType('playwright.async_api')
         api.async_playwright = lambda: fake
@@ -214,6 +219,46 @@ class Browser(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             asyncio.run(real_browser._launch_browser(fake))
         self.assertTrue(fake.context.closed and fake.closed)
+
+    def test_context_uses_system_https_proxy_and_bypass(self):
+        fake = FakePlaywright()
+        proxies = {'https': 'http://proxy.example.test', 'http': 'http://other.example.test',
+                   'no': 'localhost; .example.test'}
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertEqual(fake.context_args['proxy'], {'server': proxies['https'],
+                                                      'bypass': 'localhost,.example.test'})
+
+    def test_context_uses_http_proxy_or_omits_proxy(self):
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', return_value={'http': 'http://proxy.example.test'}):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
+        fake = FakePlaywright()
+        self.assertIsNotNone(self.run_browser(fake))
+        self.assertNotIn('proxy', fake.context_args)
+
+    def test_proxy_does_not_bypass_page_address_checks(self):
+        fake = FakePlaywright()
+        fake.context.routes = [Route('https://private.example.com/')]
+        with mock.patch.object(real_browser, 'getproxies', return_value={'https': 'http://proxy.example.test'}):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertEqual(fake.context.routes[0].result, 'abort')
+
+    def test_proxy_lookup_failure_keeps_browser_available(self):
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', side_effect=OSError('unavailable')):
+            self.assertIsNotNone(self.run_browser(fake))
+        self.assertNotIn('proxy', fake.context_args)
+
+    def test_proxy_address_is_not_logged_on_browser_error(self):
+        fake = FakePlaywright()
+        address = 'http://proxy.example.test'
+        fake.context.add_init_script = mock.AsyncMock(side_effect=RuntimeError(address))
+        with mock.patch.object(real_browser, 'getproxies', return_value={'https': address}), \
+             self.assertLogs(real_browser.logger, level='INFO') as logs:
+            self.assertIsNone(self.run_browser(fake))
+        self.assertNotIn(address, '\n'.join(logs.output))
 
     def test_article_extraction_uses_html_and_preserves_title(self):
         fake = FakePlaywright()

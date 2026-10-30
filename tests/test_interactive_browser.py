@@ -53,6 +53,9 @@ class Locator:
         self.page.clicked.append(self.ref)
         if self.page.click_route:
             await self.page.ctx.route_handler(self.page.click_route)
+            if self.page.error_on_blocked_navigation and self.page.click_route.result == 'abort':
+                self.page.url = 'chrome-error://chromewebdata/'
+                raise RuntimeError('navigation aborted')
 
     async def fill(self, text, **kwargs):
         self.page.filled.append((self.ref, text))
@@ -68,6 +71,7 @@ class InteractivePage(FakePage):
                      '- button "Go" [ref=e3] [cursor=pointer]')
         self.types, self.hrefs, self.clicked, self.filled = {}, {}, [], []
         self.snapshots, self.click_route = 0, None
+        self.error_on_blocked_navigation = False
 
     async def goto(self, url, **kwargs):
         route = InteractiveRoute(self, url)
@@ -92,6 +96,8 @@ class InteractivePage(FakePage):
 
 class InteractiveTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        self.proxy_patch = mock.patch.object(real_browser, 'getproxies', return_value={})
+        self.proxy_patch.start()
         self.fake = FakePlaywright()
         self.fake.context.page = InteractivePage(self.fake.context)
         api = types.ModuleType('playwright.async_api')
@@ -112,6 +118,7 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
         await self.session.close()
         self.strict.stop()
         self.modules.stop()
+        self.proxy_patch.stop()
 
     @staticmethod
     def check(url, check):
@@ -199,8 +206,82 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
     async def test_post_is_blocked_and_reported(self):
         page = await self.opened()
         page.click_route = InteractiveRoute(page, method='POST')
-        self.assertEqual(await self.session.act({'action': 'click', 'n': 1}), ib.BLOCKED)
+        self.assertTrue((await self.session.act({'action': 'click', 'n': 1})).startswith(ib.BLOCKED))
         self.assertEqual(page.click_route.result, 'abort')
+
+    async def test_background_post_is_counted_without_failing_action(self):
+        page = await self.opened()
+        counts = []
+        self.session.on_block = counts.append
+        page.click_route = InteractiveRoute(page, method='POST', navigation=False)
+        result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(page.click_route.result, 'abort')
+        self.assertEqual(counts, [1])
+        self.assertEqual(self.session.blocked_methods, 0)
+
+    async def test_enter_navigation_survives_background_post(self):
+        page = await self.opened()
+        route = InteractiveRoute(page, method='POST', navigation=False)
+        counts = []
+        self.session.on_block = counts.append
+        async def press(key):
+            await self.session._route(route)
+            page.url = 'https://example.com/search?q=fictional'
+        page.keyboard.press = press
+        result = await self.session.act({'action': 'press', 'key': 'Enter'})
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(page.url, 'https://example.com/search?q=fictional')
+        self.assertEqual(route.result, 'abort')
+        self.assertEqual(counts, [1])
+
+    async def test_child_frame_post_is_blocked_without_failing_action(self):
+        page = await self.opened()
+        route = InteractiveRoute(page, method='POST')
+        route.request.frame = types.SimpleNamespace(page=page, child=True)
+        page.click_route = route
+        counts = []
+        self.session.on_block = counts.append
+        result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(route.result, 'abort')
+        self.assertEqual(counts, [1])
+
+    async def test_blocked_main_post_restores_page_and_fresh_snapshot(self):
+        page = await self.opened()
+        counts = []
+        self.session.on_block = counts.append
+        page.click_route = InteractiveRoute(page, method='POST')
+        page.error_on_blocked_navigation = True
+        result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertTrue(result.startswith(ib.BLOCKED))
+        self.assertIn('[1] 链接', result)
+        self.assertEqual(page.url, URL)
+        self.assertIn('[1] 链接', await self.session.snapshot())
+        self.assertEqual(counts, [1])
+
+    async def test_enter_blocked_main_post_also_restores_page(self):
+        page = await self.opened()
+        route = InteractiveRoute(page, method='POST')
+        async def press(key):
+            await self.session._route(route)
+            page.url = 'chrome-error://chromewebdata/'
+            raise RuntimeError('navigation aborted')
+        page.keyboard.press = press
+        result = await self.session.act({'action': 'press', 'key': 'Enter'})
+        self.assertTrue(result.startswith(ib.BLOCKED))
+        self.assertEqual(page.url, URL)
+        self.assertIn('[1] 链接', await self.session.snapshot())
+
+    async def test_failed_navigation_recovery_ends_session(self):
+        page = await self.opened()
+        page.click_route = InteractiveRoute(page, method='POST')
+        page.error_on_blocked_navigation = True
+        with mock.patch.object(self.session, '_goto', new=mock.AsyncMock(return_value=False)):
+            result = await self.session.act({'action': 'click', 'n': 1})
+        self.assertIn('浏览器已结束', result)
+        self.assertTrue(self.session.finished)
+        self.assertEqual(await self.session.snapshot(), ib.UNAVAILABLE)
 
     async def test_click_redirect_checked_per_hop_and_local_rejected(self):
         page = await self.opened()
@@ -264,6 +345,31 @@ class InteractiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(route.fetch_args)
         self.assertTrue(await self.session._follow())
         self.assertEqual(self.fake.context.page.url, 'https://example.com/new')
+
+    async def test_popup_post_is_counted_and_not_replayed(self):
+        page = await self.opened()
+        popup = InteractivePage(self.fake.context)
+        route = InteractiveRoute(popup, 'https://example.com/new', method='POST')
+        counts = []
+        self.session.on_block = counts.append
+        await self.session._route(route)
+        self.assertEqual(route.result, 'abort')
+        self.assertEqual(counts, [1])
+        self.assertEqual(self.session.popups, [])
+        self.assertTrue(await self.session._follow())
+        self.assertEqual(page.url, URL)
+
+    async def test_interactive_session_uses_shared_proxy_settings(self):
+        fake = FakePlaywright()
+        api = types.ModuleType('playwright.async_api')
+        api.async_playwright = lambda: fake
+        with mock.patch.object(real_browser, '_lock', asyncio.Lock()), \
+             mock.patch.object(real_browser, 'getproxies', return_value={'https': 'http://proxy.example.test'}), \
+             mock.patch.dict(sys.modules, {'playwright.async_api': api}):
+            session = ib.BrowsingSession(lambda url: (True, ''), browser_enabled=True,
+                                         browser_interactive_enabled=True)
+            async with session:
+                self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
 
     async def test_unsafe_response_stops_session_reads(self):
         await self.opened()

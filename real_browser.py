@@ -6,6 +6,7 @@ import logging
 import socket
 from contextlib import asynccontextmanager
 from urllib.parse import urljoin, urlsplit
+from urllib.request import getproxies
 
 logger = logging.getLogger(__name__)
 OPEN_SECONDS = 20
@@ -50,6 +51,17 @@ async def _launch_browser(playwright, shot_path=None):
     try:
         options = dict(accept_downloads=False, permissions=[], service_workers="block",
                        ignore_https_errors=False, bypass_csp=False)
+        try:
+            proxies = getproxies()
+        except Exception:
+            proxies = {}
+        server = proxies.get("https") or proxies.get("http")
+        if server:
+            proxy = {"server": server}
+            bypass = proxies.get("no", "")
+            if bypass:
+                proxy["bypass"] = ",".join(part.strip() for part in bypass.replace(";", ",").split(",") if part.strip())
+            options["proxy"] = proxy
         if shot_path is not None:
             options["viewport"] = dict(SHOT_VIEWPORT)
         context = await browser.new_context(**options)
@@ -105,9 +117,11 @@ def _strict_url(url, check):
         return False, "unresolved or invalid"
 
 
-async def _route_request(route, checked, on_block, on_redirect=None):
+async def _route_request(route, checked, on_block, on_redirect=None, on_method_block=None):
     request = route.request
     if request.method.upper() not in ("GET", "HEAD"):
+        if on_method_block:
+            on_method_block(request)
         on_block("method")
         await route.abort()
         return

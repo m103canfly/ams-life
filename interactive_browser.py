@@ -150,13 +150,18 @@ class BrowsingSession:
             self.rejected = True
 
     def _blocked(self, reason):
-        if reason == "method":
-            self.blocked_methods += 1
         if self.on_block:
             try:
                 self.on_block(1)
             except Exception:
                 pass
+
+    def _method_blocked(self, request):
+        try:
+            if request.is_navigation_request() and request.frame == self.page.main_frame:
+                self.blocked_methods += 1
+        except Exception:
+            pass
 
     def _redirected(self, request, response):
         # Safety 1: only the main frame's navigation may be followed after an abort.
@@ -172,7 +177,10 @@ class BrowsingSession:
         # Safety 4: a popup's first navigation must not reach the network before it is checked.
         try:
             if request.is_navigation_request() and request.frame.page != self.page:
-                self.popups.append(request.url)
+                if request.method.upper() not in ("GET", "HEAD"):
+                    self._blocked("method")
+                else:
+                    self.popups.append(request.url)
                 await route.abort()
                 return
         except Exception:
@@ -181,11 +189,13 @@ class BrowsingSession:
             if request.method.upper() in ("GET", "HEAD") and _file_in_games(request.url, self.games_dir):
                 await route.continue_()
             else:
+                if request.method.upper() not in ("GET", "HEAD"):
+                    self._method_blocked(request)
                 self._blocked("method" if request.method.upper() not in ("GET", "HEAD") else "game")
                 await route.abort()
             return
         # Safety 2: the shared route rejects non-GET/HEAD methods and never follows redirects.
-        await real_browser._route_request(route, self._checked, self._blocked, self._redirected)
+        await real_browser._route_request(route, self._checked, self._blocked, self._redirected, self._method_blocked)
 
     def _remaining(self):
         return MAX_SECONDS - (time.monotonic() - self.started) if self.started is not None else 0
@@ -208,6 +218,27 @@ class BrowsingSession:
         if self.game:
             return bool(self.games_dir and _file_in_games(self.page.url, self.games_dir))
         return (await self._checked(self.page.url))[0]
+
+    async def _restore_page(self, address):
+        if self.game:
+            if not self.games_dir or not _file_in_games(address, self.games_dir):
+                return False
+            await self.page.goto(address, wait_until="domcontentloaded", timeout=real_browser.OPEN_SECONDS * 1000)
+            return self.page.url == address and await self._valid_page()
+        return bool(address and await self._goto(address))
+
+    async def _recover_blocked_navigation(self, address):
+        try:
+            await self._run(self._drain())
+            self.redirect, self.popups = None, []
+            restored = await self._run(self._restore_page(address))
+            snapshot = await self.snapshot() if restored else BLOCKED
+        except Exception:
+            snapshot = BLOCKED
+        if snapshot == BLOCKED:
+            await self.close()
+            return BLOCKED + "，浏览器已结束"
+        return BLOCKED + "\n" + snapshot
 
     async def open(self, url):
         return await self.act({"action": "open", "url": url})
@@ -401,15 +432,37 @@ class BrowsingSession:
             return LIMIT
         self.steps += 1
         before = self.blocked_methods
+        previous_url = self.page.url
         self.redirect, self.popups = None, []
         try:
-            result = await self._run(self._action(action))
+            try:
+                result = await self._run(self._action(action))
+            except Exception:
+                if self.blocked_methods == before:
+                    raise
+                result = None
             self.refs.clear()
-            if not await self._run(self._follow()):
-                if name == "screenshot" and result and result != BLOCKED:
-                    Path(result).unlink(missing_ok=True)
-                return BLOCKED
             if self.blocked_methods != before:
+                if name == "screenshot" and result and result != BLOCKED:
+                    try:
+                        Path(result).unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                return await self._recover_blocked_navigation(previous_url)
+            try:
+                followed = await self._run(self._follow())
+            except Exception:
+                if self.blocked_methods != before:
+                    return await self._recover_blocked_navigation(previous_url)
+                raise
+            if self.blocked_methods != before:
+                if name == "screenshot" and result and result != BLOCKED:
+                    try:
+                        Path(result).unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                return await self._recover_blocked_navigation(previous_url)
+            if not followed:
                 if name == "screenshot" and result and result != BLOCKED:
                     Path(result).unlink(missing_ok=True)
                 return BLOCKED

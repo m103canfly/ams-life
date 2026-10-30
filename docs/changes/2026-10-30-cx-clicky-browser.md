@@ -93,3 +93,22 @@ Third-round offline tests: `test_busy_session_limits_wait_for_read_screenshot_an
 `test_trip_thirty_steps_forces_final_without_tools`, `test_trip_time_limit_closes_before_final`, and
 `test_trip_only_executes_one_browser_action_per_model_round`. Existing reply tool tests still cover
 the two-tool reply flow.
+
+The owner reported three findings from a local Edge test. First, background POST requests could
+make a successful GET navigation report that the action was blocked. All non-GET/HEAD requests
+are still blocked and counted, but only a blocked main-frame navigation marks the action as blocked.
+Second, a blocked form navigation could leave the page at a browser error URL. The session now
+reloads the previous page through the checked redirect path, returns a fresh snapshot with the
+blocked message, and closes if recovery fails. Third, Playwright's requests did not use the system
+proxy on that machine. Shared browser context setup now uses the system HTTPS or HTTP proxy and its
+bypass list when present; proxy addresses are not logged or passed to page checks.
+
+Offline checks added: `test_background_post_is_counted_without_failing_action`,
+`test_enter_navigation_survives_background_post`, `test_child_frame_post_is_blocked_without_failing_action`,
+`test_blocked_main_post_restores_page_and_fresh_snapshot`, `test_enter_blocked_main_post_also_restores_page`,
+`test_failed_navigation_recovery_ends_session`, `test_context_uses_system_https_proxy_and_bypass`,
+`test_context_uses_http_proxy_or_omits_proxy`, `test_proxy_does_not_bypass_page_address_checks`,
+`test_interactive_session_uses_shared_proxy_settings`, `test_popup_post_is_counted_and_not_replayed`,
+`test_proxy_lookup_failure_keeps_browser_available`, and
+`test_proxy_address_is_not_logged_on_browser_error`. The existing
+`test_post_is_blocked_and_reported` now accepts the recovered snapshot after the blocked message.
