@@ -1,6 +1,7 @@
 """Offline group-opening rules with a stand-in vision provider and forget registry."""
 import asyncio
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -13,6 +14,8 @@ sys.path.insert(0, str(HERE))
 from test_body_heart import CLOCK as _CLOCK  # noqa: E402,F401
 import mixin_group_browse as groups  # noqa: E402
 import mixin_media  # noqa: E402
+import mixin_discretion  # noqa: E402
+import forget_registry  # noqa: E402
 
 
 def event(source='m1', sender='10001', group='900001', refs=(), wake=False):
@@ -376,6 +379,226 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
         self.p._group_reply_after(current)
         await asyncio.sleep(0)
         self.assertEqual(self.p.looks, [])
+
+
+
+
+class RecentImageTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        class PictureDummy(Dummy, mixin_media.MediaMixin, mixin_discretion.DiscretionMixin):
+            image_llama_server = ''
+            image_llama_model = ''
+            image_service_port = 0
+            image_recognition_enabled = True
+            image_trigger_words = []
+            def _stickers_on(self): return False
+            def _here(self, ev): return ('private:' if ev.private else 'group:') + ev.group
+            def _vision_provider_for(self, ev, source='reply'):
+                self.sources.append(source)
+                return self.provider
+        self.p = PictureDummy()
+        self.p.sources = []
+        self.p.context = SimpleNamespace(get_config=lambda: {})
+        self.calls = []
+        async def caption(**kwargs):
+            self.calls.append(kwargs['image_urls'][0])
+            return SimpleNamespace(completion_text='a picture')
+        self.p.provider = SimpleNamespace(text_chat=caption)
+
+    def ev(self, source='m1', sender='10001', group='900001', images=(), wake=False,
+           private=False, quote=None, bot=None):
+        parts = [mixin_media.Image(url=url) for url in images]
+        if quote is not None:
+            parts.append(quote)
+        ev = event(source, sender, group, wake=wake)
+        ev.private = private
+        ev.is_private_chat = lambda: private
+        ev.get_messages = lambda: parts
+        ev.bot = bot
+        return ev
+
+    async def test_group_addressed_image_and_empty_trigger_words(self):
+        ev = self.ev(images=[ref(1)], wake=True)
+        self.assertEqual(await self.p._image_context(ev), 'a picture')
+        self.assertEqual(self.calls, [ref(1)])
+        self.assertEqual(self.p.sources, ['reply'])
+
+    async def test_unaddressed_group_image_is_not_seen(self):
+        ev = self.ev(images=[ref(1)])
+        self.p._remember_images(ev)
+        self.assertEqual(await self.p._image_context(ev), '')
+        self.assertEqual(self.calls, [])
+
+    async def test_embedded_quoted_image(self):
+        quote = mixin_media.Reply(chain=[mixin_media.Image(url=ref(2))])
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=quote)), 'a picture')
+        self.assertEqual(self.calls, [ref(2)])
+
+    async def test_quote_id_fetches_only_images(self):
+        calls = []
+        async def action(name, **kwargs):
+            calls.append((name, kwargs))
+            return {'data': {'message': [{'type': 'text', 'data': {'text': 'ignored'}},
+                                          {'type': 'image', 'data': {'url': ref(3)}}]}}
+        bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+        ev = self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)
+        self.assertEqual(await self.p._image_context(ev), 'a picture')
+        self.assertEqual(calls, [('get_msg', {'message_id': 'm2'})])
+        self.assertEqual(self.calls, [ref(3)])
+
+    async def test_embedded_quote_checks_forgotten_sender_and_message(self):
+        with forget_registry.ForgetRegistry() as registry:
+            self.p._registry = lambda: registry
+            self.p._may_keep = mixin_discretion.DiscretionMixin._may_keep.__get__(self.p)
+            registry.owner_delete(person='10002', source_ids=['deleted-message'])
+            for private in (False, True):
+                for sender, mid in (('10002', 'old-message'), ('10003', 'deleted-message')):
+                    quote = mixin_media.Reply(sender_id=sender, id=mid,
+                                              chain=[mixin_media.Image(url=ref(4))])
+                    self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), '')
+                quote = mixin_media.Reply(sender_id='10003', id='safe-message',
+                                          chain=[mixin_media.Image(url=ref(5))])
+                self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), 'a picture')
+            self.assertNotIn(ref(4), self.calls)
+
+    async def test_fetched_quote_checks_forgotten_sender_and_message(self):
+        with forget_registry.ForgetRegistry() as registry:
+            self.p._registry = lambda: registry
+            self.p._may_keep = mixin_discretion.DiscretionMixin._may_keep.__get__(self.p)
+            registry.owner_delete(person='10002', source_ids=['deleted-message'])
+            for private in (False, True):
+                for sender, mid, allowed in (('10002', 'old-message', False),
+                                              ('10003', 'deleted-message', False),
+                                              ('10003', 'safe-message', True)):
+                    async def action(name, **kwargs):
+                        return {'data': {'sender': {'user_id': sender},
+                                         'message': [{'type': 'image', 'data': {'url': ref(6 if allowed else 7)}}]}}
+                    bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+                    ev = self.ev(wake=True, private=private, quote=mixin_media.Reply(id=mid), bot=bot)
+                    self.assertEqual(bool(await self.p._image_context(ev)), allowed)
+            self.assertNotIn(ref(7), self.calls)
+
+    async def test_quote_unknown_sender_still_checks_message_registry(self):
+        # An unknown sender is omitted, so the registry can check only the known message ID.
+        with forget_registry.ForgetRegistry() as registry:
+            self.p._registry = lambda: registry
+            self.p._may_keep = mixin_discretion.DiscretionMixin._may_keep.__get__(self.p)
+            registry.owner_delete(person='10002', source_ids=['deleted-message'])
+            for mid, allowed in (('deleted-message', False), ('safe-message', True)):
+                quote = mixin_media.Reply(id=mid, chain=[mixin_media.Image(url=ref(8))])
+                self.assertEqual(bool(await self.p._image_context(self.ev(wake=True, quote=quote))), allowed)
+                async def action(name, **kwargs):
+                    return {'message': [{'type': 'image', 'data': {'url': ref(9)}}]}
+                bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+                ev = self.ev(wake=True, quote=mixin_media.Reply(id=mid), bot=bot)
+                self.assertEqual(bool(await self.p._image_context(ev)), allowed)
+
+    async def test_unreadable_registry_rejects_quoted_images(self):
+        def unreadable(*args): raise forget_registry.Unreadable('unavailable')
+        self.p._may_keep = unreadable
+        quote = mixin_media.Reply(sender_id='10003', id='m2', chain=[mixin_media.Image(url=ref(1))])
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=quote)), '')
+        async def action(name, **kwargs):
+            return {'sender': {'user_id': '10003'}, 'message': [{'type': 'image', 'data': {'url': ref(2)}}]}
+        bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)), '')
+        self.assertEqual(self.calls, [])
+
+    async def test_recent_image_has_age_and_is_removed_from_pending(self):
+        old = self.ev(images=[ref(1)])
+        self.p._remember_images(old)
+        self.p._recent_images['group:900001'][0]['ts'] -= 4
+        self.p._group_state()['group:900001'] = {'queue': [], 'pending': [[(ref(1), time.time(), '10001', 'm1')]]}
+        result = await self.p._image_context(self.ev('m2', wake=True))
+        self.assertRegex(result, r'他[45]秒前发的图')
+        self.assertEqual(self.calls, [ref(1)])
+        self.assertEqual(self.p._group_state()['group:900001']['pending'][0], [])
+        self.assertEqual(await self.p._image_context(self.ev('m3', wake=True)), '')
+
+    async def test_other_sender_and_other_place_are_isolated(self):
+        self.p._remember_images(self.ev(sender='10002', images=[ref(1)]))
+        self.p._remember_images(self.ev(group='900002', images=[ref(2)]))
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+        self.assertEqual(self.calls, [])
+
+    async def test_expired_image_is_not_seen(self):
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        self.p._recent_images['group:900001'][0]['ts'] -= 180
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+
+    async def test_forget_person_and_message_remove_images(self):
+        # Run the real deletion method with empty stores isolated in a temporary directory.
+        self.p.self_model = {}
+        self.p._known_names = lambda people: []
+        self.p._read_library = lambda: {'entries': [], 'rooms': {}}
+        self.p._write_library = lambda lib: True
+        self.p._window_places = lambda: []
+        self.p._forget_pictures = lambda refs: 0
+        self.p._forget_pictures_of = lambda person: 0
+        self.p._forget_dedupe_rows = lambda ids: None
+        self.p._refresh_loop_pressure = lambda core: None
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.multiple(mixin_discretion, EVENT_ARCHIVE_PATH=root / 'events',
+                                INSIGHT_ARCHIVE_PATH=root / 'insights', EVENT_SESSION_DIR=root / 'sessions',
+                                USER_DIR=root / 'users', EMBED_CACHE={}):
+                self.p._remember_images(self.ev(images=[ref(1)]))
+                self.p._forget(person='10001')
+                self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+                self.assertEqual(self.p._recent_images, {})
+                self.p._remember_images(self.ev('m3', images=[ref(2)]))
+                self.p._forget(source_ids=['m3'])
+                self.assertEqual(self.p._recent_images, {})
+                self.assertEqual(await self.p._image_context(self.ev('m4', wake=True)), '')
+
+    async def test_disabled_caption_preserves_unseen_image(self):
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        self.p._llm_allowed = lambda name: False
+        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
+        self.assertFalse(self.p._recent_images['group:900001'][0]['seen'])
+        self.assertEqual(self.calls, [])
+
+    async def test_private_success_is_not_repeated_and_failure_can_retry(self):
+        first = self.ev(images=[ref(1)], private=True)
+        self.p._remember_images(first)
+        self.assertEqual(await self.p._image_context(first), 'a picture')
+        self.assertEqual(await self.p._image_context(self.ev('m2', private=True)), '')
+        failed = self.ev('m3', images=[ref(2)], private=True)
+        self.p._remember_images(failed)
+        self.p._llm_allowed = lambda name: False
+        self.assertEqual(await self.p._image_context(failed), '')
+        self.p._llm_allowed = lambda name: True
+        self.assertIn('发的图', await self.p._image_context(self.ev('m4', private=True)))
+        self.assertEqual(self.calls, [ref(1), ref(2)])
+
+    async def test_recent_images_are_bounded_and_newest_first(self):
+        for n in range(12):
+            self.p._remember_images(self.ev('m%d' % n, images=[ref(n)]))
+        self.assertEqual(len(self.p._recent_images['group:900001']), 10)
+        await self.p._image_context(self.ev('next', wake=True))
+        self.assertEqual(self.calls, [ref(11), ref(10), ref(9)])
+
+    async def test_lookback_increments_reply_counter(self):
+        import vision
+        ledger = {}
+        provider = self.p.provider
+        self.p._vision_provider_for = lambda ev, source='reply': vision.VisionGate(self.p, provider, ev, source)
+        self.p._remember_images(self.ev(images=[ref(1)]))
+        with patch.object(vision, '_bytes', return_value=b'picture'), \
+             patch.object(vision, '_data_url', return_value='data:image/png;base64,AA=='), \
+             patch.object(vision, '_legacy_counts', return_value={}), \
+             patch.object(vision.mixin_attention, '_read_json', return_value=ledger), \
+             patch.object(vision.mixin_attention, '_write_json'):
+            await self.p._image_context(self.ev('m2', wake=True))
+            counts = vision.vision_for_panel({})
+        self.assertEqual(counts['reply'], 1)
+        self.assertEqual(counts['browse'], 0)
+        self.assertEqual(counts['calls'], 1)
+
+    async def test_quote_fetch_failure_is_ignored(self):
+        async def action(*args, **kwargs): raise RuntimeError('unavailable')
+        bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)), '')
 
 
 if __name__ == '__main__':

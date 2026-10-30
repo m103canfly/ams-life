@@ -377,6 +377,7 @@ class PhoneMixin:
             self_id = ""
         if self_id and str(sid) == self_id:
             return  # her own messages come in through on_llm_response
+        self._remember_images(event)
         text = self._message_text(event)
         if not text:
             return
