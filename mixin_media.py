@@ -238,6 +238,11 @@ class MediaMixin:
         self._group_reply_vision_active = getattr(self, '_group_reply_vision_active', 0) + 1
         try:
             async with self._group_image_lock():
+                cache = self._load_image_cache()
+                if all(_sha256(ref) in cache for ref in refs):
+                    self._image_last_used = time.time()
+                    return "\n".join(str(cache[_sha256(ref)].get("caption")) for ref in refs[:3]
+                                     if cache[_sha256(ref)].get("caption"))
                 return await self._image_context_locked(event)
         finally:
             self._group_reply_vision_active -= 1

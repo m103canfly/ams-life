@@ -3,7 +3,6 @@ import asyncio
 import base64
 import hashlib
 import json
-import mimetypes
 import time
 import types
 import urllib.error
@@ -50,15 +49,31 @@ def _response(text):
 def _bytes(ref):
     try:
         if ref.startswith('data:') and ';base64,' in ref:
-            return base64.b64decode(ref.split(',', 1)[1], validate=True)
-        if ref.startswith(('https://', 'http://')):
-            return stickers.fetch_picture(ref)
-        path = Path(ref)
-        if path.is_file() and path.stat().st_size <= stickers.MAX_BYTES:
-            return path.read_bytes()
+            data = base64.b64decode(ref.split(',', 1)[1], validate=True)
+        elif ref.startswith(('https://', 'http://')):
+            if not stickers.check_image_url(ref)[0]:
+                return b''
+            data = stickers.fetch_picture(ref)
+        else:
+            path = Path(ref)
+            if not path.is_file() or path.stat().st_size > stickers.MAX_BYTES:
+                return b''
+            with path.open('rb') as stream:
+                header = stream.read(16)
+                if not stickers.sniff(header):
+                    return b''
+                data = header + stream.read(stickers.MAX_BYTES + 1 - len(header))
+        return data if len(data) <= stickers.MAX_BYTES and stickers.sniff(data) else b''
     except Exception:
-        pass
-    return b''
+        return b''
+
+
+def _data_url(data):
+    kind = stickers.sniff(data)
+    if not kind or len(data) > stickers.MAX_BYTES:
+        raise ValueError('image unavailable')
+    mime = 'jpeg' if kind == 'jpg' else kind
+    return 'data:image/' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
 
 
 class ImageAPI:
@@ -78,14 +93,10 @@ class ImageAPI:
                     raise ValueError()
                 content = [{'type': 'text', 'text': prompt}]
                 for ref in image_urls or []:
-                    ref = str(ref)
-                    if not ref.startswith(('http://', 'https://', 'data:')):
-                        data = _bytes(ref)
-                        if not data:
-                            raise ValueError()
-                        mime = mimetypes.guess_type(ref)[0] or 'image/png'
-                        ref = 'data:' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
-                    content.append({'type': 'image_url', 'image_url': {'url': ref}})
+                    data = _bytes(str(ref))
+                    if not data:
+                        raise ValueError('image unavailable')
+                    content.append({'type': 'image_url', 'image_url': {'url': _data_url(data)}})
                 payload = json.dumps({'model': model, 'messages': [{'role': 'user', 'content': content}]}).encode('utf-8')
                 req = urllib.request.Request(base + '/chat/completions', data=payload, method='POST',
                                              headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
@@ -115,9 +126,14 @@ class VisionGate:
     async def text_chat(self, prompt='', image_urls=None, **kwargs):
         p = self.plugin
         refs = image_urls or []
+        images = []
+        for item in refs:
+            data = await asyncio.to_thread(_bytes, str(item))
+            if not data:
+                raise RuntimeError('image unavailable') from None
+            images.append((data, _data_url(data)))
         ref = str(refs[0]) if len(refs) == 1 else ''
-        data = await asyncio.to_thread(_bytes, ref) if ref else b''
-        digest = hashlib.sha256(data if data else ref.encode('utf-8')).hexdigest() if ref else ''
+        digest = hashlib.sha256(images[0][0]).hexdigest() if ref else ''
         sender = str(p._speaker(self.event)[0] or '') if self.event is not None else ''
         place = str(p._here(self.event) or '') if self.event is not None else 'owner'
         scope = hashlib.sha256(place.encode('utf-8')).hexdigest()
@@ -152,7 +168,7 @@ class VisionGate:
                 mixin_attention._write_json(mixin_attention.SPEND_PATH, ledger)
             except Exception:
                 logger.warning('[ams-life] vision count could not be saved')
-            resp = await self.provider.text_chat(prompt=prompt, image_urls=image_urls, **kwargs)
+            resp = await self.provider.text_chat(prompt=prompt, image_urls=[item[1] for item in images], **kwargs)
             raw = str(getattr(resp, 'completion_text', '') or '')
             caption = stickers.parse_look(raw).get('caption', '') if prompt == stickers.LOOK_PROMPT else raw.strip()[:1600]
             if digest and caption and not p._job_stale():

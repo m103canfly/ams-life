@@ -127,6 +127,13 @@ class Looked(unittest.TestCase):
         self.assertEqual(r['looks_after_gone'], 3)
 
 
+class ImageInput(unittest.TestCase):
+    def test_text_file_is_not_sent_and_reply_continues(self):
+        r = run_case('non_image_reply')
+        self.assertEqual(r['vision_calls'], 0)
+        self.assertEqual(r['text'], 'okay')
+
+
 class VisionStatus(unittest.TestCase):
     def test_vision_shown_only_after_a_look_today(self):
         r = run_case('vision_status')

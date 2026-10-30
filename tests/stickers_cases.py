@@ -5,6 +5,7 @@ All made up: group 900001, the owner 10009, Mango 10001, Lemon 10002; the pictur
 made here; the model, NapCat's client and QQ's picture server are stand-ins. No network.
 """
 import asyncio
+import base64
 import json
 import struct
 import sys
@@ -49,7 +50,7 @@ fetched = []
 
 def fake_fetch(url, timeout=15):
     fetched.append(url)
-    return PICTURES.get(url, b'') if stickers.check_image_url(url)[0] else b''
+    return PICTURES.get(url, png(3, 3, 0) + url.encode('utf-8')) if stickers.check_image_url(url)[0] else b''
 
 
 stickers.fetch_picture = fake_fetch
@@ -75,6 +76,9 @@ class Provider(harness.FakeProvider):
     async def text_chat(self, prompt='', system_prompt=None, **kwargs):
         if str(prompt).startswith('看看这张图'):
             ref = (kwargs.get('image_urls') or [''])[0]
+            if ref.startswith('data:'):
+                data = base64.b64decode(ref.split(',', 1)[1])
+                ref = next((url for url, picture in PICTURES.items() if picture == data), ref)
             self.looks.append(ref)
             return harness.FakeResponse(json.dumps(LOOKS.get(ref, {}), ensure_ascii=False))
         return await super().text_chat(prompt, system_prompt, **kwargs)
@@ -125,7 +129,7 @@ def run():
                                             str(getattr(c, 'file', ''))[:9]) for c in chain.chain]})
     ctx.send_message = send_message
     plugin = main.BioCorePlugin(ctx, config=config)
-    if CASE == 'look':
+    if CASE in ('look', 'vision_sources', 'count_astrbot', 'count_api'):
         plugin.browse_groups_enabled = True
     plugin._ipv4_json = harness.fake_ipv4_json
     plugin.llm_functions = dict(getattr(plugin, 'llm_functions', {}) or {})
@@ -312,6 +316,13 @@ def run():
         again = stickers.Library(DATA / 'stickers')
         out['keep_again'] = list(again.add(png(8, 8, 1), now, source='self', from_qq='10001'))
         out['owner_again'] = go(plugin.page_sticker_add({'picture': b64}))['status']
+    elif CASE == 'non_image_reply':
+        path = DATA / 'made-up-text.txt'
+        path.write_text('plain text, not an image', encoding='utf-8')
+        plugin._image_refs = lambda event: [str(path)]
+        result = reply('okay')
+        out['text'] = result['text']
+        out['vision_calls'] = len(ctx.provider.looks)
     elif CASE == 'vision_status':
         def status():
             return loop.run_until_complete(plugin.page_status())['data']
@@ -342,7 +353,8 @@ def run():
         go(plugin._image_context(reply))
         out['after_reply'] = status()['vision']
         passing = Event('talk', raw_images=['https://gchat.qpic.cn/source-browse.png'])
-        go(plugin._look_at_sticker_in_passing(passing))
+        plugin._group_queue_sticker(passing)
+        go(plugin._group_look('group:' + A, plugin._group_open('group:' + A)))
         out['after_browse'] = status()['vision']
         picture = base64.b64encode(png(3, 3, 77)).decode()
         out['gift'] = go(plugin.page_sticker_add({'picture': picture}))['status']
@@ -377,7 +389,8 @@ def run():
             return go(plugin._image_context(ev))
         def passing_picture(index):
             ref = 'https://gchat.qpic.cn/passing%s.png' % index
-            return go(plugin._look_at_sticker_in_passing(Event('talk', raw_images=[ref])))
+            plugin._group_queue_sticker(Event('talk', raw_images=[ref]))
+            return go(plugin._group_look('group:' + A, plugin._group_open('group:' + A)))
         def owner_picture(index):
             data = base64.b64encode(png(3, 3, index + 100)).decode()
             return go(plugin.page_sticker_add({'picture': data}))
