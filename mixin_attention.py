@@ -380,8 +380,7 @@ class AttentionMixin:
         """The second message on, to the same chat, a pause before each (as if typing); then
         `then` (a coroutine function: her sticker, step 2 丙), a pause before it too."""
         if then is not None and sticker_part == 0:
-            if not await self._after_words(then):
-                return
+            await self._after_words(then)
         for index, part in enumerate(parts, 1):
             await asyncio.sleep(attention.typing_seconds(part))
             try:
@@ -391,8 +390,7 @@ class AttentionMixin:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
                 return
             if then is not None and sticker_part == index:
-                if not await self._after_words(then):
-                    return
+                await self._after_words(then)
 
     @staticmethod
     async def _after_words(then) -> None:
@@ -432,8 +430,11 @@ class AttentionMixin:
             setattr(event, "_ams_reply_was_split", True)
         if len(parts) > 1 or then is not None:
             umo = str(getattr(event, "unified_msg_origin", "") or "")
-            asyncio.create_task(self._send_rest(event, umo, parts[1:], then,
-                                                sticker_part if sticker_part is not None else len(parts) - 1))
+            task = asyncio.create_task(
+                self._send_rest(event, umo, parts[1:], then,
+                                sticker_part if sticker_part is not None else len(parts) - 1))
+            if len(parts) > 1:
+                event._ams_rest_task = task
         self._note_sent(event, 1)
         return "\n".join(parts)
 

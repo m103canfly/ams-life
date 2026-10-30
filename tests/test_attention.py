@@ -209,6 +209,19 @@ class InThePlugin(unittest.TestCase):
         self.assertEqual(r['sticker_order'], [['text', [['Plain', 'second']]], ['sticker', 'fake'],
                                                ['text', [['Plain', 'third']]]])
 
+    def test_failed_sticker_does_not_stop_later_words(self):
+        r = run_case('pieces_contract')
+        self.assertEqual(r['failed_sticker_first'], [['Plain', 'first']])
+        self.assertEqual(r['failed_sticker_order'], [['text', [['Plain', 'second']]],
+                                                     ['sticker_failed', 'fake'],
+                                                     ['text', [['Plain', 'third']]]])
+
+    def test_voice_waits_until_all_reply_pieces_are_sent(self):
+        r = run_case('pieces_voice')
+        self.assertEqual(r['before_release'], [['text', 'first']])
+        self.assertEqual(r['order'], [['text', 'first'], ['text', 'second'], ['text', 'third'],
+                                      ['delay', 1.5], ['voice', 'Record']])
+
     def test_send_check_and_silence_hold_the_entire_reply(self):
         self.assertEqual(run_case('pieces_contract')['held'], [True, True, []])
 

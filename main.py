@@ -964,10 +964,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             if not getattr(self, "reply_in_pieces", True):
                 self._set_reply(response, _reply)
         if _sticker and not await self._sticker_cleared(event, _sticker):
-            self._phone_queue(event).clear()
-            self._check_note(event).update(sent="", outcome="held")
-            self._stop(event)
-            return
+            _sticker = ""
         _then = self._sticker_after(event, _sticker) if _sticker else None
         if _then is not None and not _reply.strip():
             # a sticker and no words: AstrBot sends nothing, the plugin sends the sticker

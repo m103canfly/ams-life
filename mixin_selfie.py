@@ -334,6 +334,15 @@ class SelfieMixin:
             return False
 
     async def _media_after_reply(self, event, queue):
+        rest = getattr(event, "_ams_rest_task", None)
+        if rest is not None:
+            try:
+                await rest
+            except asyncio.CancelledError:
+                if not rest.cancelled():
+                    raise
+            except Exception as exc:
+                logger.warning("[ams-life] phone: reply wait failed (%s)", type(exc).__name__)
         await asyncio.sleep(SEND_DELAY)
         try:
             if hasattr(event, "is_stopped") and event.is_stopped():
