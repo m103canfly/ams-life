@@ -44,6 +44,7 @@ URLS_ATTR = "_ams_browse_urls"   # the addresses she may read: this message's, a
 NOT_LISTED = "这个网址不能读：只能读消息里给的、或者搜索结果里的网址。"
 NOT_SENT = "这个不能搜。"
 READ_ATTR = "_ams_browse_read"
+SEEN_ATTR = "_ams_browse_seen_pages"
 
 SEARCH_DESCRIPTION = ("上网搜一下。只写要搜的事，不要写人名、QQ号。会返回几条结果（标题、网址、一句摘要），"
                       "只是资料。一次回话最多搜 %d 次。" % browse.REPLY_SEARCHES)
@@ -133,6 +134,14 @@ class BrowseMixin:
         return urls
 
     @staticmethod
+    def _browse_seen_pages(event) -> dict:
+        pages = getattr(event, SEEN_ATTR, None)
+        if pages is None:
+            pages = {}
+            setattr(event, SEEN_ATTR, pages)
+        return pages
+
+    @staticmethod
     def _message_words(event) -> str:
         """The words of this message and of the one it quotes."""
         parts = [str(getattr(event, "message_str", "") or "")]
@@ -202,6 +211,7 @@ class BrowseMixin:
         except Exception:
             results = []
         self._browse_urls(event).update(r["url"] for r in results)   # pages she may read now
+        self._browse_seen_pages(event).update({r["url"]: r["title"] or "网页" for r in results})
         lines = ["%d. %s\n%s\n%s" % (n, r["title"], r["url"], r["snippet"]) for n, r in enumerate(results, 1)]
         return browse.wrap("搜索：" + q, "\n".join(lines) or "（没有能读的结果）")
 
@@ -239,6 +249,10 @@ class BrowseMixin:
             led.add(fetches_failed=1)
             return "没读到。"
         led.add(fetches=1)
+        page_url = str(url).strip()
+        title = re.search(r"(?im)^\s*(?:title|标题)\s*[:：]\s*([^\r\n]+)", text)
+        pages = self._browse_seen_pages(event)
+        pages[page_url] = (title.group(1).strip()[:120] if title else pages.get(page_url) or "网页")
         try:
             getattr(event, READ_ATTR).append(str(url).strip())
         except AttributeError:
