@@ -376,6 +376,8 @@ class PagesMixin:
                          "the owner deletes a person everywhere")
                 register("/astrbot_plugin_ams_life/page/impressions/delete", self.page_impression_delete, ["POST"],
                          "the owner deletes what she thinks of someone")
+                register("/astrbot_plugin_ams_life/page/slang", self.page_slang, ["GET"], "group slang")
+                register("/astrbot_plugin_ams_life/page/slang/delete", self.page_slang_delete, ["POST"], "delete group slang")
                 # ams-life: the brain map (pages/starmap), read only (mixin_brain.py)
                 register("/astrbot_plugin_ams_life/page/brain", self.page_brain, ["GET"],
                          "her memory as a map: stars and lines, no words (read-only)")

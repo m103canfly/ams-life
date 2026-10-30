@@ -12946,6 +12946,8 @@
   "/astrbot_plugin_ams_life/page/memory/delete/<path:session>/<entry_id>",
   "/astrbot_plugin_ams_life/page/forget/person",
   "/astrbot_plugin_ams_life/page/impressions/delete",
+  "/astrbot_plugin_ams_life/page/slang",
+  "/astrbot_plugin_ams_life/page/slang/delete",
   "/astrbot_plugin_ams_life/page/brain",
   "/astrbot_plugin_ams_life/page/brain/node",
   "/astrbot_plugin_ams_life/page/brain/search",

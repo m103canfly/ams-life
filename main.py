@@ -101,6 +101,10 @@ try:
     from .mixin_selfie import SelfieMixin
 except ImportError:
     from mixin_selfie import SelfieMixin
+try:
+    from .mixin_slang import SlangMixin
+except ImportError:
+    from mixin_slang import SlangMixin
 
 
 # ams-life step 1-2: body fields of older state files that are gone.
@@ -110,7 +114,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, GroupBrowseMixin, StickersMixin, BrowseMixin, SelfieMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, GroupBrowseMixin, StickersMixin, BrowseMixin, SelfieMixin, SlangMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -806,6 +810,9 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # ams-life: the names she wrote back framed ("「柠檬」") are kept so, for the owner to read;
         # the reply model sees them without the frames, so as not to take to writing them in QQ
         _compact = discretion.unframe(_compact)
+        _slang = self._slang_prompt(event)
+        if _slang:
+            _compact = (_compact + "\n" + _slang).strip()
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
@@ -944,6 +951,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._window_add_reply(event, _reply)
         except Exception as exc:
             logger.warning("[ams-life] window write failed: %s", exc)
+        try:
+            self._slang_note_reply(event, _reply)
+        except Exception:
+            logger.warning("[ams-life] slang status update failed")
         try:
             core.record_talk(_reply)
         except Exception:

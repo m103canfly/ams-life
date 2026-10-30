@@ -422,6 +422,16 @@
     },
     "default": []
   },
+  "slang_enabled": {
+    "description": "学习群里的说法",
+    "type": "bool",
+    "default": false
+  },
+  "slang_image_api_model": {
+    "description": "群说法释义模型（空则不调用）",
+    "type": "string",
+    "default": ""
+  },
   "vision_image_api_model": {
     "description": "插件看图小通道的模型名",
     "hint": "默认空，不启用。在模型功能的 image_caption 提供方填写 image_api；地址和 Key 从插件 image 接口配置读取。",
