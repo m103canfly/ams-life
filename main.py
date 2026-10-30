@@ -94,6 +94,10 @@ except ImportError:
     from mixin_stickers import StickersMixin
     import stickers
 try:
+    from .mixin_group_browse import GroupBrowseMixin
+except ImportError:
+    from mixin_group_browse import GroupBrowseMixin
+try:
     from .mixin_selfie import SelfieMixin
 except ImportError:
     from mixin_selfie import SelfieMixin
@@ -106,7 +110,7 @@ _OLD_HOMEOSTASIS_FIELDS = ("body", "need_pyramid", "interoception", "last_metabo
 
 
 @register("astrbot_plugin_ams_life", "m103canfly", "ams-life：小爱的生命层（基于 BioCore）", "0.1.0")
-class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, StickersMixin, BrowseMixin, SelfieMixin, Star):
+class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMixin, ImpressionsMixin, DigestMixin, EventsMixin, BrainMixin, PagesMixin, MemoryMixin, DiscretionMixin, PhoneMixin, SendCheckMixin, AttentionMixin, GroupBrowseMixin, StickersMixin, BrowseMixin, SelfieMixin, Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
@@ -140,6 +144,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         # step 2 (丙): her stickers -- she keeps the ones she likes and sends them (off by default;
         # looking at pictures, image_caption, has to be on too)
         self.stickers_enabled = bool(self.config.get("stickers_enabled", False))
+        self.browse_groups_enabled = bool(self.config.get("browse_groups_enabled", False))
         # step 2 (丁): her browser -- in a reply, two read-only tools of the plugin's own (off by default)
         self.browse_enabled = bool(self.config.get("browse_enabled", False))
         self.register_name_source(self._impression_names)
@@ -607,7 +612,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                     if not getattr(self, "self_decide", False) and not _why:
                         self._hear_mood(event)
             self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
-            self._sticker_in_passing(event)  # step 2 (丙): a QQ sticker she was not called for, a look of its own
+            self._group_heard(event)
+            self._sticker_in_passing(event)  # queue an uncalled QQ sticker for a later opening
         except Exception as exc:
             logger.warning("[ams-life] window store failed: %s", exc)
 
@@ -639,6 +645,8 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
         if self._ignored_sender(event):   # on_message stopped it already; should it get this far
             event.stop_event()
             return
+        if self.enabled:
+            self._group_reply_open(event)
         try:   # no tools in her reply, whatever else is on (the owner, 10-29)
             self._reply_tools_off(req)
         except Exception as exc:   # failing, she gets none rather than all of them
@@ -844,6 +852,10 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
 
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, response: LLMResponse):
+        await self._reply_response(event, response)
+        self._group_reply_after(event)
+
+    async def _reply_response(self, event: AstrMessageEvent, response: LLMResponse):
         if self._ignored_sender(event):   # nothing of an answer to him is kept
             self._phone_queue(event).clear()
             event.stop_event()

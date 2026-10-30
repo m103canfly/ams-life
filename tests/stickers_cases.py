@@ -125,6 +125,8 @@ def run():
                                             str(getattr(c, 'file', ''))[:9]) for c in chain.chain]})
     ctx.send_message = send_message
     plugin = main.BioCorePlugin(ctx, config=config)
+    if CASE == 'look':
+        plugin.browse_groups_enabled = True
     plugin._ipv4_json = harness.fake_ipv4_json
     plugin.llm_functions = dict(getattr(plugin, 'llm_functions', {}) or {})
     plugin.llm_functions['image_caption'] = {'enabled': True, 'provider': 'follow_llm'}
@@ -133,7 +135,7 @@ def run():
     out = {}
     lib = plugin._sticker_lib()
     now = time.time()
-    if CASE in ('reply', 'off', 'alone', 'fallback', 'forget', 'held'):
+    if CASE in ('reply', 'off', 'alone', 'fallback', 'forget', 'held', 'history'):
         lib.add(png(3, 3, 7), now, source='self', from_qq='10001', from_where='group:' + A,
                 look={'caption': '一只在笑的猫', 'emotion': '开心', 'scene': '夸人'})
         lib.add(png(3, 3, 8), now, source='owner', from_qq=OWNER, note='主人给的兔子')
@@ -149,19 +151,57 @@ def run():
         if forbid:   # something labelled "这里不能讲" in this reply's prompt (made up)
             plugin._forbid(event, 'm-x', text=forbid, people=['10002'])
         prompt = '\n'.join(p.get('text') if isinstance(p, dict) else str(p) for p in req.extra_user_content_parts)
+        model_parts, kept_parts = harness.astrbot_user_message(req)
         offered = list(getattr(event, mixin_stickers.OFFERED_ATTR, None) or [])
         resp = LLMResponse(text)
         loop.run_until_complete(plugin.on_llm_response(event, resp))
         harness.drain(loop)
         chain = getattr(resp, 'result_chain', None)
         return {'offer_in_prompt': '[她的表情包]' in prompt, 'offered': [lib.rows[s]['caption'] for s in offered],
+                'model_parts': model_parts, 'kept_parts': kept_parts,
                 'prompt_offer': [ln for ln in prompt.splitlines() if ln[:2] in ('1.', '2.', '3.')],
                 'stopped': event.stopped, 'text': resp.completion_text,
                 'chain': [(type(c).__name__, getattr(c, 'text', getattr(c, 'id', None)))
                           for c in (chain.chain if chain is not None else [])],
                 'sent_flag': bool(getattr(event, '_ams_sticker_sent', False))}
 
-    if CASE == 'off':
+    if CASE in ('called_open', 'scored_open'):
+        plugin.browse_groups_enabled = True
+        old = Event('older', raw_images=list(PICTURES))
+        current = Event('current', wake=CASE == 'called_open')
+        async def opened_reply():
+            await plugin.on_message(old)
+            await plugin.on_message(current)
+            if CASE == 'scored_open':
+                async def score(_event):
+                    return 1.0
+                async def ask(_event):
+                    return 'asked'
+                plugin._score, plugin._ask_for_reply = score, ask
+                original_night = attention.is_night
+                attention.is_night = lambda *args, **kwargs: False
+                try:
+                    out['asked'] = await plugin._decide(current) == 'asked'
+                finally:
+                    attention.is_night = original_night
+            request = ProviderRequest(prompt=current.message_str, system_prompt='test')
+            await plugin.on_llm_request(current, request)
+            gate = asyncio.Event()
+            original = plugin._look_once
+            async def blocked(provider, ref, ev):
+                await gate.wait()
+                return await original(provider, ref, ev)
+            plugin._look_once = blocked
+            await plugin.on_llm_response(current, LLMResponse('ok'))
+            before = len(ctx.provider.looks)
+            gate.set()
+            return before
+        out['before'] = loop.run_until_complete(opened_reply())
+        harness.drain(loop)
+        out['after'] = len(ctx.provider.looks)
+    elif CASE == 'history':
+        out['turns'] = [reply('好呀') for _ in range(5)]
+    elif CASE == 'off':
         bot = Bot()
         out['r'] = reply('好呀[表情包:1]', bot)
         out['calls'] = bot.calls
@@ -203,6 +243,9 @@ def run():
         ev = Event('哈哈哈', raw_images=['https://gchat.qpic.cn/a.png', 'https://gchat.qpic.cn/b.png',
                                         'https://gchat.qpic.cn/c.png', 'https://evil.example/x.png'])
         loop.run_until_complete(plugin.on_message(ev))
+        out['looks_before_open'] = len(ctx.provider.looks)
+        batch = plugin._group_open('group:' + A)
+        loop.run_until_complete(plugin._group_look('group:' + A, batch))
         harness.drain(loop)
         out['looks'] = list(ctx.provider.looks)
         out['fetched'] = list(fetched)
@@ -215,7 +258,10 @@ def run():
         out['looks_after'] = len(ctx.provider.looks)
         out['spend_kinds'] = sorted(json.loads(mixin_attention.SPEND_PATH.read_text('utf-8'))[time.strftime('%Y-%m-%d')])
         # someone deleted: his stickers are not looked at for keeping
+        loop.run_until_complete(plugin.on_message(Event('before-delete', sender='10002',
+                                                        raw_images=['https://gchat.qpic.cn/d.png'])))
         loop.run_until_complete(plugin.page_forget_person('10002'))
+        out['queue_has_deleted'] = any(x[2] == '10002' for x in plugin._group_state()['group:' + A].get('queue', []))
         loop.run_until_complete(plugin.on_message(Event('嘿', sender='10002', name='柠檬',
                                                         raw_images=['https://gchat.qpic.cn/d.png'])))
         harness.drain(loop)
