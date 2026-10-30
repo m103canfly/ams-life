@@ -254,7 +254,7 @@ class GroupBrowseMixin:
                     event = _GroupEvent(here, sender, source)
                     event._ams_group_origin = ([sender] if sender else [], here, stamp,
                                                [source] if source else [])
-                    provider = self._vision_provider_for(event)
+                    provider = self._vision_provider_for(event, source="browse")
                     if provider is None:
                         break
                     attempted[key] = time.time()

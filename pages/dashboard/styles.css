@@ -205,6 +205,11 @@ input[type=range]{width:180px;accent-color:var(--accent)}
 .btn.mini{height:32px;padding:0 10px;font-size:var(--fs-note);white-space:nowrap}
 .api-note{font-size:var(--fs-note);color:var(--muted);margin:10px 0 0;line-height:1.5}
 .api-actions{display:flex;align-items:center;gap:12px;margin-top:6px}
+/* ams-life: the repo address to copy (repo_link.js) */
+.repo-addr{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:8px}
+.repo-addr[hidden]{display:none}
+.repo-addr input{flex:1 1 300px;min-width:0;max-width:460px;height:32px;box-sizing:border-box;padding:0 10px;font:var(--fs-note)/1 Consolas,"Cascadia Mono",monospace;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:4px}
+.repo-addr .api-note{flex-basis:100%;margin:0}
 #apiSaveState{font-size:var(--fs-note);color:var(--faint)}
 @media(max-width:900px){.api-grid{grid-template-columns:1fr}}
 

@@ -19,6 +19,10 @@ try:
     from .mixin_phone import _phone_line
 except ImportError:
     from mixin_phone import _phone_line
+try:
+    from .vision import ImageAPI, VisionGate
+except ImportError:
+    from vision import ImageAPI, VisionGate
 
 
 def _counted(plugin, kind, provider):
@@ -646,21 +650,21 @@ class LLMMixin:
             logger.warning("[biocore] relationship narrative failed: %s", exc)
 
     def _sees_images(self, provider) -> bool:
-        """Can this provider look at pictures? What AstrBot's config says it takes (modalities:
-        "image"; deepseek-flash, the owner's choice of 10-29, takes them); a provider whose config
-        says nothing is guessed by its name, as before (_provider_kind)."""
+        """Check configured modalities, or guess by name when they are absent."""
         cfg = getattr(provider, "provider_config", None)
         mods = cfg.get("modalities") if isinstance(cfg, dict) else None
         if isinstance(mods, (list, tuple)):
             return "image" in [str(m).strip().lower() for m in mods]
         return self._provider_kind(provider) == "vision"
 
-    def _vision_provider_for(self, event=None):
-        """Resolve the vision provider for image caption (never a model that cannot see): the
-        one set for the function, else AstrBot's default image provider, else the chat model
-        when it sees images (the owner, 10-29: "用deepseek-flash", the one she talks with)."""
+    def _vision_provider_for(self, event=None, source="reply"):
+        """Use the selected vision provider, then AstrBot defaults, then capable chat."""
         _cfg = self._function_cfg("image_caption")
         _override = _cfg["provider"]
+        if _override == "image_api":
+            if not str((getattr(self, "config", {}) or {}).get("vision_image_api_model") or "").strip():
+                return None
+            return VisionGate(self, _counted(self, "vision", ImageAPI(self)), event, source)
         _tried = []
         if _override and _override not in ("follow_llm", "main", "default", ""):
             _tried.append(_override)
@@ -679,7 +683,7 @@ class LLMMixin:
                 logger.warning("[biocore] vision provider lookup failed (%s): %s", _pid, exc)
                 continue
             if _vp is not None and self._sees_images(_vp):
-                return _counted(self, "vision", _vp)
+                return VisionGate(self, _counted(self, "vision", _vp), event, source) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _vp)
             if _vp is not None:
                 logger.warning("[biocore] image_caption provider %s is not a vision provider; ignored", _pid)
         try:
@@ -688,7 +692,7 @@ class LLMMixin:
         except Exception:
             _chat = None
         if _chat is not None and self._sees_images(_chat):
-            return _counted(self, "vision", _chat)
+            return VisionGate(self, _counted(self, "vision", _chat), event, source) if hasattr(self, "_load_image_cache") else _counted(self, "vision", _chat)
         return None
 
     async def _compile_profile(self, event):

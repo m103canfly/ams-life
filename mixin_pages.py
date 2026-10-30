@@ -15,6 +15,10 @@ try:
     from . import ui_look
 except ImportError:
     import ui_look
+try:
+    from .vision import vision_for_panel
+except ImportError:
+    from vision import vision_for_panel
 
 
 class PagesMixin:
@@ -586,8 +590,17 @@ class PagesMixin:
             return {"status": "error", "message": "person must be a QQ number", "data": {}}
         try:
             umos = self._place_umos()
+            group_places = set()
+            for place in umos:
+                if not place.startswith("group:"):
+                    continue
+                lines = self._read_window(place)["recent"]
+                senders = {str(x.get("sender_id") or "") for x in lines if x.get("role") != "assistant"}
+                if person in senders or not senders or "" in senders:
+                    group_places.add(place)
             counts = self._owner_forget_person(person)
-            counts["astrbot"] = await self._forget_in_astrbot(person, umos)
+            group_places.update(p for p in counts.get("places", []) if p.startswith("group:"))
+            counts["astrbot"] = await self._forget_in_astrbot(person, umos, group_places)
             counts["archived_copies"] = self._archived_library_copies()
             return {"status": "ok", "data": {"person": person, "counts": counts}}
         except forget_registry.Unreadable:
@@ -698,6 +711,7 @@ class PagesMixin:
                     })
                 except Exception:
                     continue
+        _vision = vision_for_panel(getattr(self, "config", {}) or {})
         return {"status": "ok", "data": {
             "enabled": self.enabled,
             "inject_intent": self.inject_intent,
@@ -740,6 +754,7 @@ class PagesMixin:
                     ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
             **({"phone_counts": self._phone_counts()} if any((self.config or {}).get(k) for k in
                 ("photo_enabled", "screenshot_enabled", "say_aloud_enabled")) else {}),
+            **({"vision": _vision} if _vision["calls"] > 0 else {}),   # only once she has looked today
             **({"mood_events": [{"kind": MOOD_EVENT_LABELS[x["kind"]], "ts": x["ts"]}
                                 for x in getattr(self.cores.get("her"), "mood_events", [])[-5:]
                                 if x.get("kind") in MOOD_EVENT_LABELS]}
