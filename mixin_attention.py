@@ -376,7 +376,7 @@ class AttentionMixin:
             chain.append(Face(id=value) if kind == "face" else Plain(value))
         return MessageChain(chain)
 
-    async def _send_rest(self, event, umo, parts, then=None, sticker_part=None) -> None:
+    async def _send_rest(self, event, umo, parts, then=None, sticker_part=None) -> bool:
         """The second message on, to the same chat, a pause before each (as if typing); then
         `then` (a coroutine function: her sticker, step 2 丙), a pause before it too."""
         if then is not None and sticker_part == 0:
@@ -388,9 +388,10 @@ class AttentionMixin:
                 self._note_sent(event, 1)
             except Exception as exc:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
-                return
+                return False
             if then is not None and sticker_part == index:
                 await self._after_words(then)
+        return True
 
     @staticmethod
     async def _after_words(then) -> None:
