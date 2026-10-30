@@ -28,6 +28,11 @@ try:
     from . import attention
 except ImportError:
     import attention
+try:
+    from . import discretion, messenger
+except ImportError:
+    import discretion
+    import messenger
 
 ATTENTION_PATH = STATE_DIR / "attention.json"
 TIES_PATH = STATE_DIR / "ties.json"
@@ -387,7 +392,7 @@ class AttentionMixin:
         for index, part in enumerate(parts, 1):
             await asyncio.sleep(attention.typing_seconds(part))
             try:
-                await self.context.send_message(umo, self._chain_of(part))
+                await self._messenger(event).send(discretion.place_of(umo), messenger.text_segments(part))
                 self._note_sent(event, 1)
             except Exception as exc:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)
