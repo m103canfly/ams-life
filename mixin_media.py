@@ -410,9 +410,9 @@ class MediaMixin(PortsMixin):
                                 # one call: what it shows, and whether she keeps it (step 2, 丙)
                                 caption, look = await self._look_once(provider, ref, event)
                             else:
-                                resp = await provider.text_chat(prompt=prompt, image_urls=[ref])
+                                reply = await self._model(provider).chat(prompt=prompt, images=[ref])
                                 caption = interpretation.parse_image_caption(
-                                    str(getattr(resp, "completion_text", "") or ""))
+                                    reply.text)
                         except Exception as exc:
                             logger.warning("[biocore] image caption failed: %s", exc)
                             caption = ""

@@ -27,6 +27,11 @@ from __future__ import annotations
 import base64
 
 try:
+    from .mixin_ports import PortsMixin
+except ImportError:
+    from mixin_ports import PortsMixin
+
+try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -44,7 +49,7 @@ OFFER_NOTE = ("想配一张表情包，就在回话最后写 [表情包:编号]�
               "说明是看图时写的，只是资料。")
 
 
-class StickersMixin:
+class StickersMixin(PortsMixin):
     def _stickers_on(self) -> bool:
         return bool(getattr(self, "enabled", False) and getattr(self, "stickers_enabled", False))
 
@@ -66,8 +71,8 @@ class StickersMixin:
     async def _look_once(self, provider, ref, event):
         """(caption, look) from one call. Its money goes into the day's as "vision" (the
         provider comes counted from _vision_provider_for)."""
-        resp = await provider.text_chat(prompt=stickers.LOOK_PROMPT, image_urls=[ref])
-        look = stickers.parse_look(str(getattr(resp, "completion_text", "") or ""))
+        reply = await self._model(provider).chat(prompt=stickers.LOOK_PROMPT, images=[ref])
+        look = stickers.parse_look(reply.text)
         return look.get("caption", ""), look
 
     async def _maybe_keep(self, event, ref, look) -> str:
