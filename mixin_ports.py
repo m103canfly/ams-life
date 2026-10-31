@@ -2,11 +2,12 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """The plugin's entry points to its ports."""
 try:
-    from . import adapter_astrbot, adapter_astrbot_messenger, adapter_astrbot_model, discretion
+    from . import adapter_astrbot, adapter_astrbot_messenger, adapter_astrbot_model, adapter_astrbot_turn, discretion
 except ImportError:
     import adapter_astrbot
     import adapter_astrbot_messenger
     import adapter_astrbot_model
+    import adapter_astrbot_turn
     import discretion
 
 
@@ -46,4 +47,4 @@ class PortsMixin:
 
     def _incoming(self, event):
         """The incoming message represented by this event."""
-        return adapter_astrbot.from_astrbot(event)
+        return adapter_astrbot_turn.incoming_of(event)

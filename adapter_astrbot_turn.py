@@ -11,6 +11,13 @@ except ImportError:
     import turn
 
 
+def incoming_of(event):
+    """The Incoming of one message: a TurnEvent's own, else built from AstrBot's event."""
+    if isinstance(event, turn.TurnEvent):
+        return event.incoming
+    return adapter_astrbot.from_astrbot(event)
+
+
 def request_from_astrbot(req) -> turn.TurnRequest:
     toolset = getattr(req, 'func_tool', None)
     parts = getattr(req, 'extra_user_content_parts', None)

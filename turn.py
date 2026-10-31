@@ -4,6 +4,21 @@
 from dataclasses import dataclass, field
 
 
+@dataclass(eq=False)
+class TurnEvent:
+    """One received message as the plugin handles it, apart from AstrBot: the Incoming, and
+    whether handling it stopped. The plugin may keep its own notes for this turn on it, as
+    attributes, as it does on AstrBot's event."""
+    incoming: object
+    stopped: bool = False
+
+    def stop_event(self):
+        self.stopped = True
+
+    def is_stopped(self):
+        return self.stopped
+
+
 @dataclass
 class TurnTool:
     name: str

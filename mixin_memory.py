@@ -4,6 +4,10 @@
 """BioCorePlugin methods moved out of main.py unchanged: embeddings, memory store, scoring, recall, consolidation, continuity opener."""
 from __future__ import annotations
 try:
+    from . import adapter_astrbot_turn
+except ImportError:
+    import adapter_astrbot_turn
+try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -254,7 +258,7 @@ class MemoryMixin(PortsMixin):
     # bookkeeping (working set, last recall trace, ...) lives in rooms[place].
     # ------------------------------------------------------------------
     def _here(self, event) -> str:
-        return discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
+        return adapter_astrbot_turn.incoming_of(event).place
 
     def _vector_store(self):
         store = getattr(self, "_vectors_db", None)

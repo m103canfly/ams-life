@@ -7,6 +7,10 @@ The memory library itself lives in mixin_memory; the table is in discretion.py.
 """
 from __future__ import annotations
 try:
+    from . import adapter_astrbot_turn
+except ImportError:
+    import adapter_astrbot_turn
+try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -329,7 +333,7 @@ class DiscretionMixin:
     def _note_her(self, event) -> None:
         """Her own number, as each message tells it (an @ of her becomes her name)."""
         try:
-            sid = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+            sid = adapter_astrbot_turn.incoming_of(event).self_id
         except Exception:
             sid = ""
         if sid:

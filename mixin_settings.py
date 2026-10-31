@@ -4,6 +4,10 @@
 """BioCorePlugin methods moved out of main.py unchanged: settings, API config, provider listing, speaker identity."""
 from __future__ import annotations
 try:
+    from . import adapter_astrbot_turn
+except ImportError:
+    import adapter_astrbot_turn
+try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -248,28 +252,5 @@ class SettingsMixin:
 
     def _speaker(self, event):
         """Return the current sender's (id, display name) if available."""
-        sid = ""
-        name = ""
-        try:
-            fn = getattr(event, "get_sender_id", None)
-            if callable(fn):
-                sid = str(fn() or "")
-        except Exception:
-            pass
-        try:
-            fn = getattr(event, "get_sender_name", None)
-            if callable(fn):
-                name = str(fn() or "")
-        except Exception:
-            pass
-        try:
-            obj = getattr(event, "message_obj", None)
-            sender = getattr(obj, "sender", None) if obj is not None else None
-            if sender is not None:
-                if not sid:
-                    sid = str(getattr(sender, "user_id", "") or "")
-                if not name:
-                    name = str(getattr(sender, "nickname", "") or "")
-        except Exception:
-            pass
-        return sid.strip(), name.strip()
+        incoming = adapter_astrbot_turn.incoming_of(event)
+        return incoming.sender_id, incoming.sender_name

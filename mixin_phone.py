@@ -20,6 +20,10 @@ forgetting finds them the same way.
 from __future__ import annotations
 import hashlib
 try:
+    from . import adapter_astrbot_turn
+except ImportError:
+    import adapter_astrbot_turn
+try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -339,18 +343,7 @@ class PhoneMixin(PortsMixin):
     @staticmethod
     def _addresses_her(event) -> bool:
         """Someone @-ed her, quoted her, or called her by name (AstrBot's wake check)."""
-        try:
-            self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
-            if self_id:
-                for comp in event.get_messages() or []:
-                    kind = type(comp).__name__
-                    if kind == "At" and str(getattr(comp, "qq", "") or "") == self_id:
-                        return True
-                    if kind == "Reply" and str(getattr(comp, "sender_id", "") or "") == self_id:
-                        return True
-            return bool(getattr(event, "is_at_or_wake_command", False))
-        except Exception:
-            return False
+        return adapter_astrbot_turn.incoming_of(event).at_me
 
     def _listen_body(self, event) -> None:
         """A message she only listened to: she was seen if it addresses her, and the chats'
@@ -376,7 +369,7 @@ class PhoneMixin(PortsMixin):
         except Exception:
             sid, name = "", ""
         try:
-            self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+            self_id = adapter_astrbot_turn.incoming_of(event).self_id
         except Exception:
             self_id = ""
         if self_id and str(sid) == self_id:

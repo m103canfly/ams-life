@@ -209,7 +209,7 @@ class AttentionMixin:
         if not getattr(self, "mood_events_enabled", False):
             return
         sid = str(self._speaker(event)[0] or "")
-        self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+        self_id = adapter_astrbot_turn.incoming_of(event).self_id
         if self_id and sid == self_id:
             return
         self._core(None).mood_hear(getattr(event, "message_str", ""), self._familiarity(sid) >= .3)
