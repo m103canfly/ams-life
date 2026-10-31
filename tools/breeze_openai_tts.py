@@ -65,6 +65,19 @@ def ref_ok(c):
         return False
 
 
+def select_reference(c, voice):
+    tones = c.get('tones')
+    if isinstance(tones, dict):
+        name = voice if isinstance(voice, str) and voice not in ('', 'alloy', 'v4') and voice in tones else '平静'
+        for tone in (name, '平静') if name != '平静' else (name,):
+            entries = tones.get(tone)
+            if isinstance(entries, list):
+                for entry in entries:
+                    if isinstance(entry, dict) and ref_ok(entry):
+                        return dict(c, ref_audio=entry['ref_audio'], ref_text=entry['ref_text'])
+    return c
+
+
 def multipart(fields, file_field, filename, data):
     boundary = uuid.uuid4().hex
     chunks = []
@@ -178,7 +191,7 @@ async def speech(request: Request):
     text = str(body.get('input') or '').strip()
     if not text:
         raise HTTPException(status_code=400, detail='input is empty')
-    c = conf()
+    c = select_reference(conf(), body.get('voice'))
     if not local_url(c.get('breeze_url')) or not ref_ok(c):
         raise HTTPException(status_code=503, detail='invalid local configuration')
     try:
