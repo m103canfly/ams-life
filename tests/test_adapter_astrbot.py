@@ -77,7 +77,8 @@ class OneMessage(unittest.TestCase):
         one = from_astrbot(ev)
         self.assertTrue(one.at_me)
         self.assertEqual(one.reply_to, 'm-7001')
-        self.assertEqual(one.segments[0], events.Segment('reply', {'id': 'm-7001', 'sender_id': ME}))
+        self.assertEqual(one.segments[0], events.Segment('reply', {'id': 'm-7001', 'sender_id': ME,
+                                                                  'chain': (), 'text': '', 'message_str': ''}))
 
     def test_a_quote_of_someone_else_is_reply_to_only(self):
         ev = with_parts(event(), Reply(id='m-7002', sender_id=OTHER), Plain(' 嗯'))
@@ -113,7 +114,7 @@ class OneMessage(unittest.TestCase):
         one = from_astrbot(with_parts(event(), Face(id='14'), Record(file='voice.amr'), Sticker()))
         self.assertEqual([seg.type for seg in one.segments], ['face', 'record', 'other'])
         self.assertEqual(one.segments[0].data, {'id': '14'})
-        self.assertEqual(one.segments[1].data, {'url': '', 'file': 'voice.amr'})
+        self.assertEqual(one.segments[1].data, {'url': '', 'file': 'voice.amr', 'path': ''})
         self.assertEqual(one.segments[2].data, {'kind': 'Sticker'})
 
     def test_her_own_message(self):

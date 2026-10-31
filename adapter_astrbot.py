@@ -144,9 +144,14 @@ def _segment_data(kind, comp) -> dict:
     if kind == "At":
         return {"qq": _attr(comp, "qq"), "name": _attr(comp, "name")}
     if kind == "Reply":
-        return {"id": _attr(comp, "id"), "sender_id": _attr(comp, "sender_id")}
+        try:
+            chain = _segments(getattr(comp, "chain", None) or [])
+        except Exception:
+            chain = ()
+        return {"id": _attr(comp, "id"), "sender_id": _attr(comp, "sender_id"),
+                "chain": chain, "text": _attr(comp, "text"), "message_str": _attr(comp, "message_str")}
     if kind in ("Image", "Record"):
-        return {"url": _attr(comp, "url"), "file": _attr(comp, "file")}
+        return {"url": _attr(comp, "url"), "file": _attr(comp, "file"), "path": _attr(comp, "path")}
     if kind in ("Face", "Forward"):
         return {"id": _attr(comp, "id")}
     return {"kind": type(comp).__name__}

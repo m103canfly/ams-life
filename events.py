@@ -12,10 +12,12 @@ What ``Segment.data`` holds, by type:
 
     text     {"text": the words}
     at       {"qq": number, "name": name or ""}
-    reply    {"id": quoted message id or "", "sender_id": quoted sender id or ""}
-    image    {"url": ..., "file": ...} (either may be "")
+    reply    {"id": quoted message id or "", "sender_id": quoted sender id or "",
+              "chain": the quoted message's own segments (tuple; its own quote not fetched),
+              "text": its words, "message_str": its words (AstrBot gives both)}
+    image    {"url": ..., "file": ..., "path": ...} (any may be "")
     face     {"id": face id}
-    record   {"url": ..., "file": ...}
+    record   {"url": ..., "file": ..., "path": ...}
     forward  {"id": forwarded message id}
     other    {"kind": the component's class name}
 """
