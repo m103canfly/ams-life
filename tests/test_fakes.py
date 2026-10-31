@@ -243,7 +243,7 @@ class FakeMessages(unittest.TestCase):
                                      name='柠檬', card='')
         self.assertEqual(event['post_type'], 'message')
         self.assertEqual(event['message_type'], 'group')
-        self.assertEqual(event['self_id'], '20002')
+        self.assertEqual(event['self_id'], 20002)
         self.assertEqual(event['user_id'], 10001)
         self.assertEqual(event['group_id'], 900001)
         self.assertEqual(event['sender'], {'user_id': 10001, 'nickname': '柠檬', 'card': ''})

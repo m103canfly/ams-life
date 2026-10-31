@@ -48,7 +48,7 @@ class FakeNapCat:
         self._scripted = {}  # action -> the answers to use first, in order
         self._known = {}     # message id -> the message event, for get_msg
         self._next_sent_id = 1        # the message ids the sends get, from 1 up
-        self._next_made_up_id = 900001   # the ids of the events a test sends
+        self._next_made_up_id = 800001   # the ids of the events a test sends
         self._session = None
         self._ws = None
         self._reader = None
@@ -159,10 +159,10 @@ class FakeNapCat:
         group = action == "send_group_msg"
         event = {"post_type": "message_sent",
                  "message_type": "group" if group else "private",
-                 "self_id": self.self_id,
-                 "user_id": self.self_id if group else params.get("user_id"),
+                 "self_id": _number(self.self_id),
+                 "user_id": _number(self.self_id) if group else params.get("user_id"),
                  "message_id": message_id,
-                 "sender": {"user_id": self.self_id, "nickname": "", "card": ""},
+                 "sender": {"user_id": _number(self.self_id), "nickname": "", "card": ""},
                  "message": list(params.get("message") or ())}
         if group:
             event["group_id"] = params.get("group_id")
@@ -184,7 +184,7 @@ class FakeNapCat:
         if message_id is None:
             message_id = self._next_made_up_id
             self._next_made_up_id += 1
-        event = {"post_type": "message", "message_type": kind, "self_id": self.self_id,
+        event = {"post_type": "message", "message_type": kind, "self_id": _number(self.self_id),
                  "user_id": _number(user), "message_id": message_id,
                  "sender": {"user_id": _number(user), "nickname": str(name), "card": str(card)},
                  "message": self._segments(text=text, at_me=at_me, reply_to=reply_to,

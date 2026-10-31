@@ -15,7 +15,9 @@ the shared ones that 5e and 6b use, so a test does not write one again.
   asked to send); `get_forward_msg` and any other action answer `failed`. `answer` scripts the
   answers to one action; a scripted answer is used once, in order. `group_message` and
   `private_message` build array-format events (at, reply, text, images); a message id is made up
-  when none is given. The url must be `127.0.0.1`, else `ValueError`. aiohttp is imported only
+  when none is given. A real NapCat sends `self_id` as a number, so the events carry a number
+  too; only the `X-Self-ID` header and an `at` segment's `qq` stay strings. The url must be
+  `127.0.0.1`, else `ValueError`. aiohttp is imported only
   when the connection opens, so the message builders work without it.
 - `tests/fake_deepseek.py`: `FakeDeepSeek` stands in for `openai.AsyncOpenAI`: `.chat` and
   `.chat.completions` are there, `create()` keeps its kwargs (`messages` copied) and gives back
