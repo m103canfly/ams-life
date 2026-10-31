@@ -20,6 +20,69 @@ class TurnMixin:
     Works on turn.TurnRequest only; AstrBot's hook converts to it and back (main.py).
     The reply works through a reply handle only."""
 
+    async def _on_message(self, event):
+        """ams-life: her phone. Every message that reaches the plugin goes into its own
+        chat window, whether it wakes her or not. Ignored senders and unapproved private
+        messages are stopped before storage; other groups are stored before the speaking gate.
+        (AstrBot stops an event whose handler raises, so nothing may escape here.)"""
+        if not self._private_allowed(event):
+            logger.info("[ams-life] 别人的私聊，没收")
+            event.stop_event()
+            return
+        if self._ignored_sender(event):
+            logger.info("[ams-life] a message from a sender on ignore_senders: not answered, not kept")
+            event.stop_event()
+            return
+        if not self.enabled:
+            if not self._may_speak_in(self._here(event)):
+                event.stop_event()
+            return
+        try:
+            self._begin_job(self._here(event))
+            self._check_registry(event)  # someone (or a message) she may not keep: nothing is stored
+            self._window_add_message(event)
+            self._listen_body(event)
+            if getattr(self, "mood_events_enabled", False):
+                self._mood_clock()
+                _sid = str(self._speaker(event)[0] or "")
+                _self_id = adapter_astrbot_turn.incoming_of(event).self_id
+                if not (_self_id and _sid == _self_id):
+                    _why = self._why_called(event)
+                    setattr(event, "_mood_direct", bool(_why))
+                    _core = self._core(None)
+                    for _kind in mood_kinds(adapter_astrbot_turn.incoming_of(event).text, bool(_why)):
+                        _familiar = self._familiarity(_sid)
+                        _weight = (.6 + .4 * _familiar) if _kind == "criticism" else 1.0
+                        if not _why and _familiar < .3:
+                            _weight *= MOOD_BYSTANDER_WEIGHT
+                        _core.mood_event(_kind, _weight)
+                    if self._mood_note_answer(event, _why):
+                        _core.mood_event("answered")
+                    if not getattr(self, "self_decide", False) and not _why:
+                        self._hear_mood(event)
+            self._ensure_autonomy_task()  # the 5-minute loop also sweeps her phone
+            self._group_heard(event)
+            self._sticker_in_passing(event)  # queue an uncalled QQ sticker for a later opening
+        except Exception as exc:
+            logger.warning("[ams-life] window store failed (%s)", type(exc).__name__)
+        finally:
+            if not self._message_may_speak(event):
+                event.stop_event()
+
+    async def _decide_turn(self, event):
+        """Step 2 (甲, self_decide): after _on_message has kept the message, whether she answers it:
+        "reply" or None. The platform asks for the reply itself (AstrBot: _ask_for_reply)."""
+        if not self.enabled or not getattr(self, "self_decide", False) or self._ignored_sender(event):
+            return None
+        if not self._private_allowed(event) or not self._message_may_speak(event):
+            event.stop_event()
+            return None
+        try:
+            return await self._decision(event)
+        except Exception as exc:   # the decision failing: as before, AstrBot decides
+            logger.warning("[ams-life] attention: the decision failed (%s)", type(exc).__name__)
+            return None
+
     async def _prepare_turn(self, event, turn_request) -> None:
         _forward = await _expand_forward(self, event)
         _sid, _name = self._speaker(event)

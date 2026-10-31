@@ -236,9 +236,9 @@ class AttentionMixin:
     # ------------------------------------------------------------------
     # the decision
     # ------------------------------------------------------------------
-    async def _decide(self, event):
-        """None (nothing for the plugin to do: AstrBot answers, or nobody does) or a request
-        for a reply (request_llm). Stops the event when she does not answer it."""
+    async def _decision(self, event):
+        """Whether she answers this message: "reply", or None (nothing for the plugin to do: the
+        platform answers, or nobody does). Stops the event when she does not answer it."""
         if not self._private_allowed(event) or not self._message_may_speak(event):
             self._stop(event)
             return None
@@ -302,7 +302,7 @@ class AttentionMixin:
         if why:
             if getattr(event, "is_at_or_wake_command", False):
                 return None   # AstrBot answers it as before
-            return await self._ask_for_reply(event)
+            return "reply"
         if night or private:
             return None
         s = await self._score(event)
@@ -313,8 +313,15 @@ class AttentionMixin:
             limit = attention.mood_threshold(cfg["level"], core.v, core.energy)
         if s >= limit:
             logger.info("[ams-life] attention: not called, %.2f over the threshold: asked", s)
-            return await self._ask_for_reply(event)
+            return "reply"
         self._hear_mood(event)
+        return None
+
+    async def _decide(self, event):
+        """None (nothing for the plugin to do: AstrBot answers, or nobody does) or a request
+        for a reply (request_llm). Stops the event when she does not answer it."""
+        if await self._decision(event) == "reply":
+            return await self._ask_for_reply(event)
         return None
 
     @staticmethod
