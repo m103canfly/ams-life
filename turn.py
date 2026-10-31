@@ -45,3 +45,24 @@ class TurnReply:
     usage: dict = field(default_factory=dict)
     reasoning: str = ''
     extras: dict = field(default_factory=dict)
+    first_message: list = None
+
+    def set_text(self, text):
+        self.text = str(text or '')
+
+    def map_words(self, fn):
+        self.text = fn(self.text)
+        return self.text
+
+    def spend_usage(self):
+        return dict(self.usage)
+
+    def reported_usage(self):
+        return dict(self.usage)
+
+    def shape_first(self, first_text):
+        try:
+            from . import messenger
+        except ImportError:
+            import messenger
+        self.first_message = list(self.chain_prefix) + list(messenger.text_segments(first_text))
