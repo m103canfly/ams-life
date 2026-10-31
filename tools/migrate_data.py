@@ -8,9 +8,10 @@
 Every file and every (also empty) folder is copied as it is (shutil.copy2), except the keys
 in api_config.json: they are left empty in the copy, to be filled again in the panel. The
 source is only read, never written. A copy is refused while AstrBot is still writing (a
-non-empty *-wal file in the source) or when the source holds a symbolic link. --verify only
-compares and writes nothing. Printed: counts and relative paths only, never a file's content
-and never a key. Exit: 0 all equal, 1 something differs, 2 not started.
+non-empty *-wal file in the source), when the source holds a symbolic link, or when the
+source's api_config.json cannot be read as JSON. --verify only compares and writes nothing.
+Printed: counts and relative paths only, never a file's content and never a key. Exit: 0 all
+equal, 1 something differs, 2 not started.
 """
 import argparse
 import hashlib
@@ -86,6 +87,13 @@ def quiet_reason(src) -> str:
         return "先停 AstrBot：数据目录里还有没写完的 WAL 文件（%s）" % "、".join(wal)
     if links:
         return "不跟符号链接：%s" % "、".join(links)
+    # A config we cannot read keeps its keys in the copy: read it now, copy nothing.
+    config = Path(src) / API_CONFIG
+    if config.is_file():
+        try:
+            read_config(config)
+        except (OSError, ValueError):
+            return "api_config.json 不是有效的 JSON（%s）：清不掉 Key，不复制" % API_CONFIG
     return ""
 
 
@@ -178,7 +186,16 @@ def print_problems(report) -> None:
         print("都对上了。")
 
 
+def _utf8() -> None:
+    """Chinese names print on a Windows console too; a redirected stream is already text."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8")
+
+
 def main(argv=None) -> int:
+    _utf8()
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--src", required=True, help="the plugin's data folder (read only)")
     parser.add_argument("--dst", required=True,

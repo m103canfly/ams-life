@@ -174,6 +174,19 @@ class Refuses(unittest.TestCase):
             self.assertEqual(code, 0, out + err)
             self.assertIn('forget_registry.sqlite3-wal', files(dst))
 
+    def test_a_broken_api_config_stops_everything(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            src = src_at(tmp)
+            half = '{"llm": {"api_key": "made-up-half-key"'   # not JSON: the file stops short
+            (src / API_CONFIG).write_text(half, 'utf-8')
+            dst = tmp / 'new' / 'data'
+            code, out, err = run('--src', str(src), '--dst', str(dst))
+            self.assertEqual(code, 2)
+            self.assertIn(API_CONFIG, err)                    # the path is printed
+            self.assertNotIn('made-up-half-key', out + err)   # its content is not
+            self.assertFalse(dst.exists())                    # and nothing is copied
+
     def test_the_guard_refuses_a_full_folder_and_a_live_data_folder(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)

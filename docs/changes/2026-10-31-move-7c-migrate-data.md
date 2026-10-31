@@ -10,12 +10,14 @@ The tool also searches the copy for the source's non-empty key strings (UTF-8 by
 prints only the relative path of a file that holds one; it never prints a key.
 
 Nothing is copied while AstrBot is still writing (a non-empty `*-wal` file in `--src`) or when
-a symbolic link is found; then nothing is made and the exit code is 2. The destination goes
-through `tools/_guard.output_dir`: new or empty, not in the repository, not in an AstrBot data
-folder. The source is only read, byte for byte. `--verify` only reads and writes nothing; it
-does not require the destination to be empty, since it runs on the finished copy. Printed:
-file count, total bytes, the kinds of key cleared, the files that differ (relative path and
-reason: missing, extra, size, hash) and the files that hold a key's plaintext. Exit: 0 all
+a symbolic link is found; then nothing is made and the exit code is 2. A `--src` whose
+`api_config.json` cannot be read as JSON stops the copy the same way, before anything is made:
+its keys could not be cleared in the copy, so they would stay in plain text there. The
+destination goes through `tools/_guard.output_dir`: new or empty, not in the repository, not in
+an AstrBot data folder. The source is only read, byte for byte. `--verify` only reads and writes
+nothing; it does not require the destination to be empty, since it runs on the finished copy.
+Printed: file count, total bytes, the kinds of key cleared, the files that differ (relative path
+and reason: missing, extra, size, hash) and the files that hold a key's plaintext. Exit: 0 all
 equal, 1 something differs, 2 not started. No file content is printed.
 
 `tests/test_migrate_data.py` uses only made-up folders inside its own temporary folder. It
@@ -40,4 +42,4 @@ stopped; this change and its tests only use made-up folders.
 
 Files: `tools/migrate_data.py`, `tests/test_migrate_data.py`, this note. No other file changed.
 
-Tests: `tests.test_migrate_data` passes outside the sandbox with `venv-ams-life` (11 tests). The full suite and the card's spot checks run once blocks 5 and 6 are written (the owner's rule, 10-31).
+Tests: `tests.test_migrate_data` passes outside the sandbox with `venv-ams-life` (12 tests). The full suite and the card's spot checks run once blocks 5 and 6 are written (the owner's rule, 10-31).
