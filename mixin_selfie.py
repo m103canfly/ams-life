@@ -184,7 +184,7 @@ class SelfieMixin(PortsMixin):
             parts = adapter_astrbot_turn.incoming_of(event).segments
             voice = any(x.type == "record" for x in parts)
             photo = any(x.type == "image" for x in parts)
-            private = event.is_private_chat()
+            private = adapter_astrbot_turn.incoming_of(event).is_private
         except Exception:
             voice, photo, private = False, False, False
         counts = self._phone_counts()

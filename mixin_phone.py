@@ -260,7 +260,7 @@ class PhoneMixin(PortsMixin):
     @staticmethod
     def _message_id(event) -> str:
         try:
-            return str(getattr(getattr(event, "message_obj", None), "message_id", "") or "")
+            return adapter_astrbot_turn.incoming_of(event).message_id
         except Exception:
             return ""
 

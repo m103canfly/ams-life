@@ -523,7 +523,7 @@ class BrowseMixin:
         if not pages:
             return 0
         asked_in = discretion.make_origin(self._here(event), [self._speaker(event)[0]], self._source_ids(event))
-        trip = "reply:" + str(getattr(getattr(event, "message_obj", None), "message_id", "") or "")
+        trip = "reply:" + adapter_astrbot_turn.incoming_of(event).message_id
         kept = 0
         for page in pages[:browse.REPLY_READS]:
             if await self._remember_web(page, trip, asked_in):

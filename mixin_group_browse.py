@@ -5,9 +5,10 @@ from __future__ import annotations
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import attention, stickers
+    from . import adapter_astrbot_turn, attention, stickers
 except ImportError:
     from common import *  # noqa: F401,F403
+    import adapter_astrbot_turn
     import attention
     import stickers
 
@@ -64,8 +65,7 @@ class GroupBrowseMixin:
         if not here.startswith('group:') or self._job_stale():
             return
         sid = str(self._speaker(event)[0] or '')
-        obj = getattr(event, 'message_obj', None)
-        if sid and sid == str(getattr(obj, 'self_id', '') or ''):
+        if sid and sid == adapter_astrbot_turn.incoming_of(event).self_id:
             return
         now = time.time()
         group = self._group_state().setdefault(here, {})

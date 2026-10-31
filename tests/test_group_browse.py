@@ -414,6 +414,8 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
         ev = event(source, sender, group, wake=wake)
         ev.private = private
         ev.is_private_chat = lambda: private
+        if private:
+            ev.unified_msg_origin = 'default:FriendMessage:' + sender
         ev.get_messages = lambda: parts
         ev.bot = bot
         return ev

@@ -49,7 +49,7 @@ class MediaMixin(PortsMixin):
         if not getattr(self, "image_recognition_enabled", True):
             return []
         try:
-            if not event.is_private_chat() and not self._addresses_her(event):
+            if not adapter_astrbot_turn.incoming_of(event).is_private and not self._addresses_her(event):
                 return []
             refs = []
             for msg in adapter_astrbot_turn.incoming_of(event).segments:
@@ -80,7 +80,7 @@ class MediaMixin(PortsMixin):
                 del state[place]
         here = self._here(event)
         sender = str(self._speaker(event)[0] or '')
-        self_id = str(getattr(getattr(event, 'message_obj', None), 'self_id', '') or '')
+        self_id = adapter_astrbot_turn.incoming_of(event).self_id
         if not here or not sender or sender == self_id or self._job_stale():
             return
         ids = self._source_ids(event)
@@ -293,7 +293,7 @@ class MediaMixin(PortsMixin):
         if not self._llm_allowed('image_caption'):
             return ''
         refs = self._image_refs(event)
-        private = bool(getattr(event, 'is_private_chat', lambda: False)())
+        private = adapter_astrbot_turn.incoming_of(event).is_private
         addressed = private or self._addresses_her(event)
         if addressed and getattr(self, 'image_recognition_enabled', True):
             refs = list(dict.fromkeys(refs + await self._quoted_image_refs(event)))

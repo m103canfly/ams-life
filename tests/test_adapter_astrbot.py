@@ -258,13 +258,20 @@ class SameAsThePlugin(unittest.TestCase):
                 pass
             return ""
 
+        # mixin_phone.py 262-265 at 8763a44.
+        def old_message_id(event):
+            try:
+                return str(getattr(getattr(event, "message_obj", None), "message_id", "") or "")
+            except Exception:
+                return ""
+
         for ev in self.cases:
             one = from_astrbot(ev)
             self.assertEqual(one.place, old_here(ev))
             self.assertEqual(one.at_me, old_addresses_her(ev))
             self.assertEqual((one.sender_id, one.sender_name), old_speaker(ev))
             self.assertEqual(one.reply_to, old_reply_to(ev))
-            self.assertEqual(one.message_id, self.phone._message_id(ev))
+            self.assertEqual(one.message_id, old_message_id(ev))
             self.assertEqual(one.image_refs,
                              tuple(self.media._image_ref(comp) for comp in ev.get_messages()
                                    if type(comp).__name__ == 'Image'))
