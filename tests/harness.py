@@ -5,11 +5,14 @@ safety net for refactoring: `tests/golden/*.json` holds the trace of the unmodif
 scenario in a fresh interpreter (fixed PYTHONHASHSEED) and compares.
 """
 import asyncio
+import atexit
+import gc
 import hashlib
 import json
 import math
 import os
 import random
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -17,6 +20,38 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 STUBS = HERE / 'stubs'
+_cleanup_dirs = []
+_cleanup_registered = False
+
+
+def cleanup_plugin_data(plugins, data_dir):
+    """Close cached databases before removing a test data directory."""
+    for plugin in plugins:
+        for name in ('_forget_reg', '_vectors_db'):
+            store = getattr(plugin, name, None)
+            close = getattr(store, 'close', None)
+            if callable(close):
+                close()
+                setattr(plugin, name, None)
+    shutil.rmtree(data_dir, ignore_errors=True)
+
+
+def register_atexit_data(data_dir):
+    global _cleanup_registered
+    if not _cleanup_registered:
+        atexit.register(cleanup_registered_plugin_data)
+        _cleanup_registered = True
+    if data_dir not in _cleanup_dirs:
+        _cleanup_dirs.append(data_dir)
+
+
+def cleanup_registered_plugin_data():
+    gc.collect()
+    main = sys.modules.get('main')
+    plugin_class = getattr(main, 'BioCorePlugin', None)
+    plugins = [obj for obj in gc.get_objects() if isinstance(obj, plugin_class)] if plugin_class else []
+    for data_dir in _cleanup_dirs:
+        cleanup_plugin_data(plugins, data_dir)
 
 
 class Clock:
