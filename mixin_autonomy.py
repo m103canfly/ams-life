@@ -11,9 +11,16 @@ try:
     from .body import *  # noqa: F401,F403
 except ImportError:
     from body import *  # noqa: F401,F403
+try:
+    from . import discretion, events
+    from .mixin_ports import PortsMixin
+except ImportError:
+    import discretion
+    import events
+    from mixin_ports import PortsMixin
 
 
-class AutonomyMixin:
+class AutonomyMixin(PortsMixin):
     def _is_private_event(self, event) -> bool:
         """Task-15: only private chats can ever trigger autonomy output."""
         try:
@@ -141,7 +148,8 @@ class AutonomyMixin:
                 core, self._relationship_of(user_data), now=current)
             if not text:
                 return False
-            await event.send(MessageChain([Plain(text)]))
+            here = discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
+            await self._messenger(event, as_event=True).send(here, (events.Segment("text", {"text": text}),))
             day = time.strftime("%Y-%m-%d", time.localtime(current))
             sent_count = int(state.get("sent_count", 0) or 0)
             if str(state.get("sent_day") or "") != day:
