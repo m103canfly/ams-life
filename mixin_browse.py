@@ -359,6 +359,18 @@ class BrowseMixin:
         return types.SimpleNamespace(context=types.SimpleNamespace(event=event, context=context))
 
     def _builtin_web_tool(self, kind):
+        if getattr(self, "_neutral_model", None) is not None:
+            try:
+                key = self._key_store.get("deepseek")
+                if not key:
+                    return None
+                try:
+                    from .deepseek_tools import BuiltinToolStandIn, DeepSeekTools
+                except ImportError:
+                    from deepseek_tools import BuiltinToolStandIn, DeepSeekTools
+                return BuiltinToolStandIn(DeepSeekTools(api_key=key), kind)
+            except Exception:
+                return None
         try:
             from astrbot.core.tools.web_search_tools import DeepSeekFetchWebPageTool, DeepSeekWebSearchTool
             cls = DeepSeekWebSearchTool if kind == "search" else DeepSeekFetchWebPageTool

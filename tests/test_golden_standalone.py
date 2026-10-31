@@ -103,10 +103,9 @@ for field in ('id', 'model', 'type'):
     A_B0.append((f'$["page_status"]["data"]["llm_providers"][0]["{field}"]', 'wiring',
                  'Only AstrBot exposes its chat provider.'))
 for index in range(24):
-    A_B0.append((f'$["log"][{index}][1]', 'wiring',
-                 'AstrBot reports unavailable phone tools; standalone reports its missing speech-provider context.'))
-for field in (0, 1):
-    A_B0.append((f'$["log"][24][{field}]', 'wiring', 'Standalone has no AstrBot knowledge-base manager.'))
+    for field in (0, 1):
+        A_B0.append((f'$["log"][{index}][{field}]', 'wiring',
+                     'Only AstrBot reports unavailable phone tools.'))
 
 B0_B = [(f'$["files"]["history.sqlite3"]["history"][{index}][{column}]', 'history',
          'Only standalone with history creates this conversation database.') for index in range(48) for column in range(10)]
@@ -181,14 +180,11 @@ class GoldenStandalone(unittest.TestCase):
                 problems.append(f'{stage}: extra paths: {extra}\nmissing paths: {missing}')
         # The approved log paths are limited to these messages, not arbitrary warnings.
         phone = '[ams-life] phone tools unavailable'
-        voice = "[biocore] voice context failed: 'RouteCollector' object has no attribute 'get_using_stt_provider_async'"
         for index in range(24):
-            if (a['log'][index] if index < len(a['log']) else None) != ['warning', phone] or \
-                    (b0['log'][index] if index < len(b0['log']) else None) != ['warning', voice]:
+            if (a['log'][index] if index < len(a['log']) else None) != ['warning', phone]:
                 problems.append(f'A -> B0: unexpected log entry at index {index}')
-        kb = "[biocore] kb list failed: 'RouteCollector' object has no attribute 'kb_manager'"
-        if len(a['log']) != 24 or len(b0['log']) != 25 or b0['log'][24] != ['warning', kb]:
-            problems.append('A -> B0: unexpected knowledge-base warning or log length')
+        if len(a['log']) != 24 or b0['log']:
+            problems.append('A -> B0: unexpected log length')
         self.assertFalse(problems, '\n'.join(problems))
 
     def test_basic(self):
@@ -224,8 +220,6 @@ def render(value):
 
 def classify(stage, path, want, got):
     values = str(want) + str(got)
-    if stage == 'A → B0' and 'voice context failed' in values and 'get_using_stt_provider_async' in values:
-        return '接线', 'mixin_media.py:270-275 handles the missing AstrBot speech provider and uses the QQ path below.'
     if stage == 'A → B0' and path.endswith('["session"]'):
         return '接线', 'scenario_standalone.py uses the AstrBot session in A and her._here(event) in B0; mixin_memory.py:260-261 returns the place.'
     if stage == 'A → B0' and path.startswith('$["sent"]'):
