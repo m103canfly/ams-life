@@ -49,9 +49,10 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_tools, atomic_file, browse, turn
+    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, browse, turn
 except ImportError:
     import adapter_astrbot_tools
+    import adapter_astrbot_turn
     import atomic_file
     import browse
     import turn
@@ -472,7 +473,7 @@ class BrowseMixin:
         calls = quota.calls() if quota is not None else 0
         if not calls:
             return
-        est = browse.reply_estimate(calls, getattr(response, "usage", None))
+        est = browse.reply_estimate(calls, adapter_astrbot_turn.reply_handle(response).reported_usage())
         self._browse_ledger().add(reply_calls=calls, **est)
 
     def _browse_for_panel(self) -> dict:

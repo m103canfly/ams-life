@@ -21,8 +21,9 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 try:
-    from . import send_check
+    from . import adapter_astrbot_turn, send_check
 except ImportError:
+    import adapter_astrbot_turn
     import send_check
 
 SEND_CHECK_PATH = STATE_DIR / "send_check.json"
@@ -196,20 +197,8 @@ class SendCheckMixin:
 
     @staticmethod
     def _set_reply(response, text) -> None:
-        response.completion_text = text
-        chain = getattr(response, "result_chain", None)
-        if chain is not None and getattr(chain, "chain", None):
-            first = True
-            kept = []
-            for comp in chain.chain:
-                if hasattr(comp, "text"):
-                    if first:
-                        comp.text = text
-                        kept.append(comp)
-                        first = False
-                    continue   # the other text parts were the old words
-                kept.append(comp)
-            chain.chain = kept
+        """Her words replaced, through the reply handle (AstrBotReply.set_text keeps the old body)."""
+        adapter_astrbot_turn.reply_handle(response).set_text(text)
 
     def _settle_history(self, event, run_context) -> None:
         """on_agent_done: what AstrBot saves of this turn is what was sent. The last assistant

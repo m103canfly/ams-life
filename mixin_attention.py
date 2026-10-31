@@ -25,9 +25,11 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 try:
-    from . import attention
+    from . import adapter_astrbot_turn, attention, turn
 except ImportError:
+    import adapter_astrbot_turn
     import attention
+    import turn
 try:
     from . import discretion, messenger
 except ImportError:
@@ -114,6 +116,8 @@ class AttentionMixin:
     def _usage_of(resp) -> dict:
         """Tokens of one answer: DeepSeek's own cache numbers when the raw answer has them, else
         AstrBot's; with neither, every input token counts as not cached (more, not less)."""
+        if isinstance(resp, (adapter_astrbot_turn.AstrBotReply, turn.TurnReply)):
+            return resp.spend_usage()
         raw = getattr(getattr(resp, "raw_completion", None), "usage", None)
         hit = getattr(raw, "prompt_cache_hit_tokens", None) if raw is not None else None
         miss = getattr(raw, "prompt_cache_miss_tokens", None) if raw is not None else None
@@ -377,12 +381,7 @@ class AttentionMixin:
     @staticmethod
     def _chain_of(text):
         """One message as a chain: words and QQ faces (attention.pieces)."""
-        from astrbot.api.event import MessageChain
-        from astrbot.api.message_components import Face, Plain
-        chain = []
-        for kind, value in attention.pieces(text):
-            chain.append(Face(id=value) if kind == "face" else Plain(value))
-        return MessageChain(chain)
+        return adapter_astrbot_turn.chain_of(text)
 
     async def _send_rest(self, event, umo, parts, then=None, sticker_part=None) -> bool:
         """The second message on, to the same chat, a pause before each (as if typing); then
@@ -426,12 +425,7 @@ class AttentionMixin:
             # a chain of the first message only: AstrBot sends the chain when there is one, and
             # reads the words from it (provider/entities.py 447-462; DeepSeek's answers come with a
             # chain, openai_source.py 875) -- setting the words alone would leave the whole reply
-            from astrbot.api.message_components import At, Reply
-            previous = getattr(getattr(response, "result_chain", None), "chain", None) or []
-            prefix = [component for component in previous if isinstance(component, (Reply, At))]
-            shaped = self._chain_of(first)
-            shaped.chain = prefix + shaped.chain
-            response.result_chain = shaped
+            adapter_astrbot_turn.reply_handle(response).shape_first(first)
         except Exception as exc:
             logger.warning("[ams-life] the reply was not shaped: %s", exc)
             return reply
