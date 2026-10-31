@@ -468,7 +468,17 @@ class SameAsAstrBot(unittest.TestCase):
         self.assertEqual(events.plain_text(one), events.plain_text(other), case)
         self.assertEqual([seg.type for seg in one.segments],
                          [seg.type for seg in other.segments], case)
-        self.assertEqual([seg.data for seg in one.segments],
+        def astrbot_data(seg):
+            data = dict(seg.data)
+            if seg.type == 'image':
+                data.pop('sub_type', None)
+                data.pop('summary', None)
+            elif seg.type == 'reply':
+                data['chain'] = tuple(events.Segment(child.type, astrbot_data(child))
+                                      for child in data['chain'])
+            return data
+
+        self.assertEqual([astrbot_data(seg) for seg in one.segments],
                          [seg.data for seg in other.segments], case)
 
     def test_a_plain_message(self):

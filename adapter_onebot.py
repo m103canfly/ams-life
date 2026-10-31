@@ -163,7 +163,9 @@ def _segments(parts, self_id, quoted, names) -> tuple:
         elif kind == "image":
             out.append(events.Segment(type="image", data={"url": _text(data.get("url")),
                                                           "file": _text(data.get("file")),
-                                                          "path": _text(data.get("path"))}))
+                                                          "path": _text(data.get("path")),
+                                                          "sub_type": _text(data.get("sub_type")),
+                                                          "summary": _text(data.get("summary"))}))
         elif kind == "face":
             out.append(events.Segment(type="face", data={"id": _text(data.get("id"))}))
         elif kind == "record":
