@@ -136,6 +136,9 @@ class LLMMixin(PortsMixin):
         provider_id is looked up via get_provider_by_id; if it is missing we log
         a warning and fall back to the main LLM instead of failing the feature.
         """
+        neutral = getattr(self, "_neutral_model", None)
+        if neutral is not None:   # the new program's own model (5e-5), no AstrBot to ask
+            return _counted(self, kind, neutral)
         _cfg = self._function_cfg(kind)
         _override = _cfg["provider"]
         _umo = str(getattr(event, "unified_msg_origin", "") or "") if event is not None else ""
