@@ -23,7 +23,8 @@ _SECURITY_HEADERS = {'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DE
 
 
 class PanelServer:
-    def __init__(self, *, root, keys, host='127.0.0.1', port=0, key_names=('deepseek', 'vision')):
+    def __init__(self, *, root, keys, host='127.0.0.1', port=0, key_names=('deepseek', 'vision'),
+                 api_routes=(), start_page=None, max_body=1024 ** 2):
         if host not in ('127.0.0.1', '::1'):
             raise ValueError('host must be loopback')
         self.root = Path(root).resolve()
@@ -31,6 +32,12 @@ class PanelServer:
         self.host = host
         self.port = port
         self.key_names = tuple(key_names)
+        self.api_routes = tuple(tuple(route) for route in api_routes)
+        for _method, path, _handler in self.api_routes:
+            if not str(path).startswith('/api/page/'):
+                raise ValueError('an api route must be under /api/page/')
+        self.start_page = start_page
+        self.max_body = max_body
         self._token = secrets.token_urlsafe(32)
         self._runner = None
 
@@ -62,19 +69,22 @@ class PanelServer:
             except web.HTTPMethodNotAllowed:
                 response = web.Response(status=404)
             except web.HTTPException as error:
-                response = error
+                error.headers.update(_SECURITY_HEADERS)
+                raise        # aiohttp warns when a handler returns an exception: raise it instead
             except Exception:
                 response = web.Response(status=500)
         response.headers.update(_SECURITY_HEADERS)
         return response
 
     async def start(self):
-        app = web.Application(middlewares=[self._security])
+        app = web.Application(middlewares=[self._security], client_max_size=self.max_body)
         app.router.add_get('/', self._index, allow_head=False)
         app.router.add_get('/static/{path:.*}', self._static, allow_head=False)
         app.router.add_get('/api/keys', self._get_keys, allow_head=False)
         app.router.add_post('/api/keys', self._set_key)
         app.router.add_delete('/api/keys/{name}', self._delete_key)
+        for method, path, handler in self.api_routes:
+            app.router.add_route(method, path, handler)
         self._runner = web.AppRunner(app, access_log=None)
         try:
             await self._runner.setup()
@@ -106,7 +116,11 @@ class PanelServer:
         return path
 
     async def _index(self, request):
-        path = self._file('index.html')
+        if self.start_page:
+            raise web.HTTPFound('/static/' + self.start_page)
+        return self._html(self._file('index.html'))
+
+    def _html(self, path):
         try:
             html = path.read_text(encoding='utf-8')
         except (OSError, UnicodeError):
@@ -117,9 +131,13 @@ class PanelServer:
     async def _static(self, request):
         raw = unquote(request.raw_path.split('?', 1)[0])
         name = raw[len('/static/'):]
+        if name and name.endswith('/'):
+            name += 'index.html'      # a folder of the panel page: its own index.html
         path = self._file(name)
         if path.suffix.lower() not in _SUFFIXES:
             raise web.HTTPNotFound()
+        if path.suffix.lower() == '.html':
+            return self._html(path)
         return web.FileResponse(path)
 
     async def _get_keys(self, request):

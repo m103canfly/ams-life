@@ -71,4 +71,4 @@ for one test and taken out again, and no file is written):
   `FunctionTool` or `ToolSet`.
 
 Tests: `tests.test_turn_tools` and `tests.test_basics` pass outside the sandbox with `venv-ams-life` (21 tests).
-`tests/test_basics.py` counts the four new methods (494 -> 498). The full suite and the card's spot checks run once blocks 5 and 6 are written (the owner's rule, 10-31).
+`tests/test_basics.py` counts the four new methods (494 -> 498 on this branch; 499 with 5b, #93, merged in). The full suite and the card's spot checks run once blocks 5 and 6 are written (the owner's rule, 10-31).
