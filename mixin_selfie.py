@@ -225,7 +225,8 @@ class SelfieMixin(PortsMixin):
                 "required": ["url", "caption"]}, handler=self._tool_share_screenshot))
         if cfg.get("say_aloud_enabled", False):
             tools.append(FunctionTool(name="say_aloud", description=VOICE_GUIDE + context,
-                parameters={"type": "object", "properties": {"text": {"type": "string", "description": "要说的一句话，100字以内"}},
+                parameters={"type": "object", "properties": {"text": {"type": "string", "description": "要说的一句话，100字以内"},
+                "tone": {"type": "string", "enum": list(tts.TONES), "description": "语气，可以不填：不填就按你现在的心情"}},
                 "required": ["text"]}, handler=self._tool_say_aloud))
         if not tools:
             return
@@ -278,7 +279,7 @@ class SelfieMixin(PortsMixin):
         logger.info("[ams-life] phone screenshot queued")
         return LINK_QUEUED
 
-    async def _tool_say_aloud(self, event, text=""):
+    async def _tool_say_aloud(self, event, text="", tone=""):
         queue = self._phone_queue(event)
         if "voice" in queue:
             return "这次已经有了"
@@ -289,6 +290,8 @@ class SelfieMixin(PortsMixin):
         if not text:
             return "这句话不能说"
         queue["voice"] = text
+        if tone in tts.TONES:
+            queue["voice_tone"] = tone
         logger.info("[ams-life] phone voice queued")
         return "排上了"
 
@@ -406,7 +409,7 @@ class SelfieMixin(PortsMixin):
         finally:
             self._phone_photo_pending -= 1
 
-    async def _make_voice(self, text):
+    async def _make_voice(self, text, tone=""):
         try:
             lock = getattr(self, "_phone_voice_lock", None)
             if lock is None:
@@ -416,8 +419,15 @@ class SelfieMixin(PortsMixin):
                 base = str(api.get("base_url") or "").rstrip("/")
                 if not base:
                     return None
+                if not tone:
+                    try:
+                        core = self._core(None)
+                        core._decay_to_now()
+                        tone = tts.tone_for(core.v, core.energy, core.stress)
+                    except Exception:
+                        tone = tts.DEFAULT_TONE
                 raw, ctype = await self._post_json(base + "/audio/speech", {"model": api.get("model") or "", "input": text,
-                    "voice": api.get("voice") or "", "response_format": api.get("format") or "wav"}, api.get("api_key"), timeout=90)
+                    "voice": tone, "response_format": api.get("format") or "wav"}, api.get("api_key"), timeout=90)
                 self._phone_account("voice", self._phone_price("voice"))
                 if not raw:
                     return None
@@ -489,7 +499,10 @@ class SelfieMixin(PortsMixin):
                         self._note_she_sent(event, kind)
                         self._phone_prune("photo")
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
-                path = await self._make_voice(queue["voice"])
+                if queue.get("voice_tone"):
+                    path = await self._make_voice(queue["voice"], tone=queue["voice_tone"])
+                else:
+                    path = await self._make_voice(queue["voice"])
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
                     await self._messenger(event, as_event=True).send(
                         here, (events.Segment("record", {"path": str(path)}),))
