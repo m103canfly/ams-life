@@ -149,7 +149,8 @@ class Split(unittest.TestCase):
         # move 1e: +4 (mixin_ports: _umo_of, _messenger, _model, _incoming)
         # move 5f: +2 (mixin_discretion: _history_store, _history_gate)
         # move 5b: +1 (_prepare_turn)
-        self.assertEqual(len(methods), 495)
+        # move 5i-1: +4 (_phone_tools, _browse_tools, _tools_not_allowed, _turn_tools_off)
+        self.assertEqual(len(methods), 499)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
