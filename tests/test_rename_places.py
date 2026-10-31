@@ -222,6 +222,66 @@ class Stops(unittest.TestCase):
             self.assertNotIn(COLON, out + err)         # its words are not
 
 
+class SameAccount(unittest.TestCase):
+    def test_group_folders_merge_and_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / 'data'
+            root = data / 'archives' / 'sessions'
+            for prefix, ident in [('default', 'evt_1'), ('other', 'evt_2')]:
+                session = prefix + ':GroupMessage:' + GROUP
+                write_jsonl(root / (prefix + '_GroupMessage_' + GROUP) / 'events.jsonl',
+                            [event(ident, 1.0, session)])
+            code, out, err = run('--data', str(data), '--same-account', 'other,default')
+            self.assertEqual(code, 0, out + err)
+            self.assertEqual([p.name for p in root.iterdir()], ['group_900001'])
+            rows = read_jsonl(root / 'group_900001' / 'events.jsonl')
+            self.assertEqual({row['id'] for row in rows}, {'evt_1', 'evt_2'})
+            self.assertTrue(all(row['session'] == NEUTRAL for row in rows))
+            code, out, err = run('--data', str(data), '--check',
+                                 '--same-account', 'other,default')
+            self.assertEqual(code, 0, out + err)
+
+    def test_unlisted_prefix_stops_without_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / 'data'
+            write_jsonl(data / 'archives' / 'events.jsonl', [
+                event('evt_' + prefix, 1.0, prefix + ':GroupMessage:' + GROUP)
+                for prefix in ('default', 'other', 'third')])
+            before = hashes(data)
+            for check in ((), ('--check',)):
+                code, out, err = run('--data', str(data), '--same-account',
+                                     'other,default', *check)
+                self.assertEqual(code, 2, out + err)
+                self.assertIn('third', err)
+                self.assertEqual(hashes(data), before)
+
+    def test_single_unlisted_prefix_stops_without_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / 'data'
+            write_jsonl(data / 'archives' / 'events.jsonl',
+                        [event('evt_1', 1.0, 'third:GroupMessage:' + GROUP)])
+            before = hashes(data)
+            code, out, err = run('--data', str(data), '--same-account', 'other,default')
+            self.assertEqual(code, 2, out + err)
+            self.assertIn('third', err)
+            self.assertEqual(hashes(data), before)
+
+    def test_private_folders_merge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / 'data'
+            root = data / 'archives' / 'sessions'
+            for prefix, ident in [('default', 'evt_1'), ('other', 'evt_2')]:
+                session = prefix + ':FriendMessage:' + OTHER
+                write_jsonl(root / (prefix + '_FriendMessage_' + OTHER) / 'events.jsonl',
+                            [event(ident, 1.0, session)])
+            code, out, err = run('--data', str(data), '--same-account', 'other,default')
+            self.assertEqual(code, 0, out + err)
+            self.assertEqual([p.name for p in root.iterdir()], ['private_10001'])
+            rows = read_jsonl(root / 'private_10001' / 'events.jsonl')
+            self.assertEqual({row['id'] for row in rows}, {'evt_1', 'evt_2'})
+            self.assertTrue(all(row['session'] == 'private:10001' for row in rows))
+
+
 class Guard(unittest.TestCase):
     def test_a_live_data_folder_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
