@@ -175,7 +175,7 @@ class Calls:
             future = self._waiting.pop(frame.get("echo"), None)
         except TypeError:   # an echo that cannot be a key is nobody's
             return False
-        if future is None:
+        if future is None or future.done():
             return False
         future.set_result(frame)
         return True
