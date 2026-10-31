@@ -8,9 +8,11 @@ The scenario now supports three paths: AstrBot with self-decision, standalone wi
 
 All three paths import the panel and aiohttp before the harness seeds unseeded random generators, so import order cannot shift the body's test seed. The AstrBot fixture now includes an At segment when a scripted turn wakes her, as a real AstrBot chain does.
 
+The fake reply model drains background tasks before answering, matching the time available during a real network request for event archival.
+
 ## Allowed differences
 
-The table below groups repeated list positions; the test lists the individual turn, send, log and history positions. Event and prompt paths are provisional until the changed fixtures are run outside the sandbox.
+The table below groups repeated list positions; the test lists the individual paths from report7.
 
 - Golden to A, `asked_uncalled`: A records uncalled model requests.
 - Golden to A, `sent`: the golden trace has no send record.
@@ -20,13 +22,10 @@ The table below groups repeated list positions; the test lists the individual tu
 - Golden to A, `files.states/spend.json` calls, event_summary, reply, persona_compile and tom_probe: A counts enabled model calls.
 - Golden to A, `page_status.data.spend` hard, left, level, soft, spent and state: A exposes spending state.
 - Golden to A, each phone `recent[*].text`: A includes the At segment.
-- Golden to A, archive event, big_summary, small_summary, title, event_key and source_texts: addressed text can change event summaries.
-- Golden to A, `page_status.data.events` event, big_summary, small_summary, title, event_key and source_texts: the panel exposes those events.
-- Golden to A, `provider_prompts[24]` and `[26]`: addressed text can change event prompts.
+- Golden to A, archive and panel events' `appraisal.goal_relevance`, `event`, `big_summary`, `small_summary`, `source_check.length_ratio` and specific `source_texts` entries: addressed text changes event sources and their derived values.
 - A to B0, `turns[*].session`: AstrBot sessions and neutral places differ.
 - A to B0, each `sent` place, segment type and text: standalone records delivery.
 - A to B0, each phone `umo`: only AstrBot keeps its session string.
-- A to B0, `files.states/spend.json` calls: the two model routes count calls differently.
 - A to B0, `files.api_config.json.embedding` api_key, base_url, model and source: standalone configures the fake embedding provider.
 - A to B0, `page_status.data.api_config.embedding` enabled, provider_id and source: the panel reports the selected provider.
 - A to B0, `page_status.data.astrbot_embedding` base_url, has_key, model and provider_id: only AstrBot exposes that provider.
@@ -37,11 +36,11 @@ The table below groups repeated list positions; the test lists the individual tu
 
 ## Test results
 
-- `tests.test_golden`: `Ran 2 tests in 4.438s | OK`.
+- `tests.test_golden`: `Ran 2 tests in 4.385s | OK`.
 - The revised AstrBot route now imports aiohttp before the harness too, so none of the three routes can run in this sandbox without that dependency.
 
 The full suite and the card's spot checks run once blocks 5 and 6 are written (the owner's rule, 10-31).
 
 ## Appendix: difference report
 
-The three comparisons have not yet been generated. Run `python tests/test_golden_standalone.py --report docs/changes/2026-10-31-move-6b-golden-standalone.md` with the test Python in an environment containing `aiohttp`. The report replaces this appendix and preserves the sections above. The A-to-B0 differences, including protected reply, injection and memory paths, require source-level investigation after the traces are available.
+Report7 records 85, 139 and 480 differing paths in basic, and 132, 139 and 480 in full. The allowed table now follows those paths; the three-route test still needs to run in an environment containing `aiohttp`.

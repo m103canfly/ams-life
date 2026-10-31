@@ -56,6 +56,15 @@ class FakeModel(model_client.ModelClient):
 
     async def chat(self, *, prompt=None, system=None, messages=None, images=None, tools=None):
         if messages is not None and prompt is None:
+            # A real reply waits on the network while the request's background work runs.
+            current = asyncio.current_task()
+            for _ in range(20):
+                pending = [task for task in asyncio.all_tasks()
+                           if task is not current and not task.done()
+                           and getattr(task.get_coro(), '__name__', '') not in harness.FOREVER]
+                if not pending:
+                    break
+                await asyncio.gather(*pending, return_exceptions=True)
             if self.reply is None:
                 self.asked_uncalled.append(self.index)
                 text = ''

@@ -53,26 +53,36 @@ for name, indexes in zip(PHONE_FILES, ((0, 2, 4, 6, 8), (0, 2), (0, 2, 4, 6, 8))
         GOLDEN_A.append((f'$["files"]["{name}"]["recent"][{index}]["text"]', 'wiring',
                          'A now includes the addressed At segment in the phone text.'))
 
-FULL_ONLY = [('$["provider_prompts"][24]', 'wiring', 'Addressed phone text can change event prompts.'),
-             ('$["provider_prompts"][26]', 'wiring', 'Addressed phone text can change event prompts.')]
+FULL_ONLY = []
 for field in ('persona_compile', 'tom_probe'):
     FULL_ONLY.append((f'$["files"]["states/spend.json"]["2026-10-31"]["{field}"]', 'self-decision',
                       'A counts this enabled model function.'))
 
-# These event fields are provisional until the post-At trace is produced.
-EVENT_FIELDS = ('event', 'big_summary', 'small_summary', 'title', 'event_key', 'source_texts')
-for name in ('archives/events.jsonl', 'archives/sessions/group_900001/events.jsonl',
-             'archives/sessions/private_10001/events.jsonl'):
-    for field in EVENT_FIELDS:
-        suffix = '[*]' if field == 'source_texts' else ''
-        FULL_ONLY.append((f'$["files"]["{name}"][*]["{field}"]{suffix}', 'wiring',
-                         'The addressed phone text can change event summaries.'))
-for field in EVENT_FIELDS:
-    suffix = '[*]' if field == 'source_texts' else ''
-    FULL_ONLY.append((f'$["page_status"]["data"]["events"][*]["{field}"]{suffix}', 'wiring',
-                     'The panel exposes events derived from the addressed phone text.'))
+def add_event_differences(root, index, *, appraisal=False, summary=False, sources=()):
+    prefix = f'{root}[{index}]'
+    reason = 'The addressed At segment changes the event source and its derived summary.'
+    if appraisal:
+        FULL_ONLY.append((prefix + '["appraisal"]["goal_relevance"]', 'wiring', reason))
+    if summary:
+        for field in ('big_summary', 'event', 'small_summary'):
+            FULL_ONLY.append((prefix + f'["{field}"]', 'wiring', reason))
+        FULL_ONLY.append((prefix + '["source_check"]["length_ratio"]', 'wiring', reason))
+    for source in sources:
+        FULL_ONLY.append((prefix + f'["source_texts"][{source}]', 'wiring', reason))
 
-A_B0 = [('$["files"]["states/spend.json"]["2026-10-31"]["calls"]', 'wiring', 'The two model routes count calls differently.')]
+
+add_event_differences('$["files"]["archives/events.jsonl"]', 0, appraisal=True, summary=True, sources=(0, 2, 4))
+add_event_differences('$["files"]["archives/events.jsonl"]', 1, appraisal=True)
+add_event_differences('$["files"]["archives/events.jsonl"]', 2, summary=True, sources=(0, 2))
+add_event_differences('$["files"]["archives/sessions/group_900001/events.jsonl"]', 0, summary=True, sources=(0, 2))
+add_event_differences('$["files"]["archives/sessions/private_10001/events.jsonl"]', 0,
+                      appraisal=True, summary=True, sources=(0, 2, 4))
+add_event_differences('$["files"]["archives/sessions/private_10001/events.jsonl"]', 1, appraisal=True)
+add_event_differences('$["page_status"]["data"]["events"]', 2, summary=True, sources=(0, 2))
+add_event_differences('$["page_status"]["data"]["events"]', 3, appraisal=True)
+add_event_differences('$["page_status"]["data"]["events"]', 4, appraisal=True, summary=True, sources=(0, 2, 4))
+
+A_B0 = []
 for index in range(24):
     A_B0.extend([(f'$["turns"][{index}]["session"]', 'wiring', 'AstrBot sessions and neutral places differ.'),
                  (f'$["sent"][{index}][0]', 'wiring', 'The standalone messenger records the destination.'),
@@ -248,7 +258,8 @@ def report(path):
             lines.extend(f'- Allowed `{pattern}` | {category} | {why}' for pattern, category, why in table)
             lines.append('')
             for location, want, actual in found:
-                kind, why = classify(stage, location, want, actual)
+                row = next((item for item in table if matches(item[0], location)), None)
+                kind, why = (row[1], row[2]) if row else classify(stage, location, want, actual)
                 lines.append(f'- `{location}` | {kind} | left: {render(want)} | right: {render(actual)} | {why}')
             lines.append('')
     target = Path(path)
