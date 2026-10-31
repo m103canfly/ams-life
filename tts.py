@@ -11,10 +11,39 @@ never waits on this before the words go out.
 from __future__ import annotations
 
 import json
+import math
 import re
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+TONES = ("开心", "平静", "温柔", "认真", "难过")
+DEFAULT_TONE = "平静"
+# Mood thresholds agreed in the voice materials discussion, 2026-10-31.
+SAD_V = -0.30
+SERIOUS_STRESS = 0.60
+HAPPY_V = 0.35
+HAPPY_ENERGY = 0.55
+GENTLE_V = 0.10
+
+
+def tone_for(v, energy, stress) -> str:
+    """Her tone from her mood now. v in [-1, 1], energy and stress in [0, 1]."""
+    try:
+        v, energy, stress = float(v), float(energy), float(stress)
+        if not all(math.isfinite(value) for value in (v, energy, stress)):
+            return DEFAULT_TONE
+    except (TypeError, ValueError, OverflowError):
+        return DEFAULT_TONE
+    if v <= SAD_V:
+        return "难过"
+    if stress >= SERIOUS_STRESS:
+        return "认真"
+    if v >= HAPPY_V and energy >= HAPPY_ENERGY:
+        return "开心"
+    if v >= GENTLE_V:
+        return "温柔"
+    return DEFAULT_TONE
 
 # the shortest useful line: below this it is not worth a voice message
 MIN_CHARS = 1
