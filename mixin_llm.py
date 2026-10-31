@@ -670,6 +670,8 @@ class LLMMixin(PortsMixin):
         """Use the selected vision provider, then AstrBot defaults, then capable chat."""
         _cfg = self._function_cfg("image_caption")
         _override = _cfg["provider"]
+        if getattr(self, "_neutral_model", None) is not None:   # the new program: no AstrBot to ask
+            _override = "image_api"
         if _override == "image_api":
             if not str((getattr(self, "config", {}) or {}).get("vision_image_api_model") or "").strip():
                 return None
