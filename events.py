@@ -56,3 +56,10 @@ class Incoming:
 def plain_text(incoming) -> str:
     """Only the text segments joined in order; nothing else (no @, no placeholders)."""
     return "".join(str(seg.data.get("text", "") or "") for seg in incoming.segments if seg.type == "text")
+
+
+def image_ref(segment) -> str:
+    """The image's url, file, or path, stripped; empty for other segments."""
+    if segment.type != 'image':
+        return ''
+    return str(segment.data.get('url') or segment.data.get('file') or segment.data.get('path') or '').strip()

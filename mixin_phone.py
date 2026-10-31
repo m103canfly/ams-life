@@ -88,10 +88,10 @@ async def _expand_forward(plugin, event):
     """Fetch only on a reply; retain the enclosing message's origin in its window."""
     rendered = []
     try:
-        for comp in event.get_messages() or []:
-            if type(comp).__name__ not in ("Forward", "Nodes", "Node"):
+        for comp in adapter_astrbot_turn.incoming_of(event).segments:
+            if comp.type != "forward":
                 continue
-            fid = getattr(comp, "id", None) or getattr(comp, "res_id", None)
+            fid = comp.data.get("id")
             if not fid:
                 continue
             result = await plugin._messenger(event).call("get_forward_msg", id=str(fid))
@@ -276,13 +276,7 @@ class PhoneMixin(PortsMixin):
     @staticmethod
     def _reply_to(event) -> str:
         """The id of the message this one quotes, if any. Kept apart: forgetting never reads it."""
-        try:
-            for comp in event.get_messages() or []:
-                if type(comp).__name__ == "Reply":
-                    return str(getattr(comp, "id", "") or "")[:80]
-        except Exception:
-            pass
-        return ""
+        return adapter_astrbot_turn.incoming_of(event).reply_to
 
     def _message_text(self, event) -> str:
         """The message as text; pictures, stickers and the like become a short placeholder.
@@ -292,24 +286,24 @@ class PhoneMixin(PortsMixin):
         self._note_her(event)
         her, gone = getattr(self, "_her_ids", None) or set(), self._gone_people()
         try:
-            for comp in event.get_messages() or []:
-                kind = type(comp).__name__
-                if kind == "Plain":
-                    parts.append(str(getattr(comp, "text", "") or ""))
-                elif kind == "At":
-                    qq, name = str(getattr(comp, "qq", "") or ""), str(getattr(comp, "name", "") or "").strip()
+            for comp in adapter_astrbot_turn.incoming_of(event).segments:
+                kind = comp.type
+                if kind == "text":
+                    parts.append(str(comp.data.get("text", "") or ""))
+                elif kind == "at":
+                    qq, name = str(comp.data.get("qq", "") or ""), str(comp.data.get("name", "") or "").strip()
                     if qq in gone and name:
                         self.__dict__.setdefault("_gone_names", {}).setdefault(qq, set()).add(name)
                     elif qq and qq not in her:
                         self._note_at(qq, name)   # someone @'d who may never write: his number is known
                     parts.append("@" + (HER_NAME if qq in her else discretion.SOMEBODY if qq in gone
                                         else "%s(%s)" % (name, qq) if qq else name or discretion.SOMEBODY))
-                elif kind == "AtAll":
+                elif kind == "other" and comp.data.get("kind") == "AtAll":
                     parts.append("@全体成员")
-                elif kind == "Reply":
+                elif kind == "reply":
                     continue
                 else:
-                    parts.append(_PART_NAMES.get(kind, "[消息]"))
+                    parts.append(_PART_NAMES.get({"image": "Image", "face": "Face", "record": "Record", "forward": "Forward"}.get(kind, comp.data.get("kind", "")), "[消息]"))
         except Exception:
             parts = []
         text = "".join(parts).strip()

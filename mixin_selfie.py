@@ -18,7 +18,7 @@ from pathlib import Path
 try:
     from .common import *  # noqa: F401,F403
     from . import tts, browse, daily, discretion, events, mixin_ports
-    from . import adapter_astrbot_tools, turn
+    from . import adapter_astrbot_tools, adapter_astrbot_turn, turn
     from .mixin_ports import PortsMixin
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -29,6 +29,7 @@ except ImportError:
     import events
     import mixin_ports
     import adapter_astrbot_tools
+    import adapter_astrbot_turn
     import turn
     from mixin_ports import PortsMixin
 
@@ -180,9 +181,9 @@ class SelfieMixin(PortsMixin):
         except Exception:
             mood_text, energy_text = "心情未知", "困倦程度未知"
         try:
-            parts = event.get_messages() or []
-            voice = any(isinstance(x, Record) for x in parts)
-            photo = any(isinstance(x, Image) for x in parts)
+            parts = adapter_astrbot_turn.incoming_of(event).segments
+            voice = any(x.type == "record" for x in parts)
+            photo = any(x.type == "image" for x in parts)
             private = event.is_private_chat()
         except Exception:
             voice, photo, private = False, False, False

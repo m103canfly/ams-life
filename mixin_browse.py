@@ -333,10 +333,10 @@ class BrowseMixin:
         """The words of this message and of the one it quotes."""
         parts = [adapter_astrbot_turn.incoming_of(event).text]
         try:
-            for comp in event.get_messages() or []:
-                for x in [comp] + list(getattr(comp, "chain", None) or []):
-                    for attr in ("text", "message_str"):
-                        v = getattr(x, attr, None)
+            for comp in adapter_astrbot_turn.incoming_of(event).segments:
+                for x in [comp] + list(comp.data.get("chain") or [] if comp.type == "reply" else []):
+                    for attr in (("text", "message_str") if x.type == "reply" else ("text",) if x.type == "text" else ()):
+                        v = x.data.get(attr)
                         if isinstance(v, str):
                             parts.append(v)
         except Exception:

@@ -12,10 +12,11 @@ try:
 except ImportError:
     from body import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_turn, digest
+    from . import adapter_astrbot_turn, digest, events
 except ImportError:
     import adapter_astrbot_turn
     import digest
+    import events
 
 
 def _merged_origin(item, other) -> dict:
@@ -1695,13 +1696,13 @@ class EventsMixin(PortsMixin):
     def _attachments_from_messages(self, event) -> list:
         out = []
         try:
-            for m in event.get_messages() or []:
-                if isinstance(m, Image):
-                    ref = str(getattr(m, "url", "") or getattr(m, "file", "") or getattr(m, "path", "") or "").strip()
+            for m in adapter_astrbot_turn.incoming_of(event).segments:
+                if m.type == "image":
+                    ref = events.image_ref(m)
                     if ref:
                         out.append({"type": "image", "ref": ref[:500]})
-                elif isinstance(m, Record):
-                    ref = str(getattr(m, "url", "") or getattr(m, "file", "") or "").strip()
+                elif m.type == "record":
+                    ref = str(m.data.get("url") or m.data.get("file") or "").strip()
                     if ref:
                         out.append({"type": "voice", "ref": ref[:500]})
         except Exception:

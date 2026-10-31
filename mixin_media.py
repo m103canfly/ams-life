@@ -12,8 +12,10 @@ try:
 except ImportError:
     from body import *  # noqa: F401,F403
 try:
-    from . import stickers
+    from . import adapter_astrbot_turn, events, stickers
 except ImportError:
+    import adapter_astrbot_turn
+    import events
     import stickers
 try:
     from .mixin_ports import PortsMixin
@@ -35,8 +37,8 @@ class MediaMixin(PortsMixin):
     def _text_from_components(self, event) -> str:
         parts = []
         try:
-            for msg in event.get_messages() or []:
-                text = getattr(msg, "text", None)
+            for msg in adapter_astrbot_turn.incoming_of(event).segments:
+                text = msg.data.get("text") if msg.type in ("text", "reply") else None
                 if isinstance(text, str):
                     parts.append(text)
         except Exception:
@@ -50,19 +52,19 @@ class MediaMixin(PortsMixin):
             if not event.is_private_chat() and not self._addresses_her(event):
                 return []
             refs = []
-            for msg in event.get_messages() or []:
-                if isinstance(msg, Image):
-                    refs.append(self._image_ref(msg))
-                elif isinstance(msg, Reply):
-                    sender = str(getattr(msg, 'sender_id', '') or '').strip()
-                    mid = str(getattr(msg, 'id', '') or '').strip()
+            for msg in adapter_astrbot_turn.incoming_of(event).segments:
+                if msg.type == "image":
+                    refs.append(events.image_ref(msg))
+                elif msg.type == "reply":
+                    sender = str(msg.data.get('sender_id', '') or '').strip()
+                    mid = str(msg.data.get('id', '') or '').strip()
                     try:
                         allowed = self._may_keep([sender] if sender else [], self._here(event), None,
                                                  [mid] if mid else [])
                     except Exception:
                         allowed = False
                     if allowed:
-                        refs.extend(self._image_ref(child) for child in (getattr(msg, "chain", None) or []))
+                        refs.extend(events.image_ref(child) for child in (msg.data.get("chain") or []))
             return list(dict.fromkeys(ref for ref in refs if ref))
         except Exception:
             return []
@@ -88,12 +90,12 @@ class MediaMixin(PortsMixin):
         except Exception:
             return
         try:
-            messages = event.get_messages() or []
+            messages = adapter_astrbot_turn.incoming_of(event).segments
         except Exception:
             return
         rows = state.setdefault(here, [])
         for msg in messages:
-            ref = self._image_ref(msg)
+            ref = events.image_ref(msg)
             if ref and not any(row['ref'] == ref and row['id'] == (ids[0] if ids else '') for row in rows):
                 rows.append({'ref': ref, 'sender': sender, 'id': ids[0] if ids else '', 'ts': now, 'seen': False})
         del rows[:-RECENT_IMAGE_LIMIT]
@@ -111,10 +113,10 @@ class MediaMixin(PortsMixin):
 
     async def _quoted_image_refs(self, event):
         refs = []
-        for msg in getattr(event, 'get_messages', lambda: [])() or []:
-            if not isinstance(msg, Reply) or any(self._image_ref(c) for c in (getattr(msg, 'chain', None) or [])):
+        for msg in adapter_astrbot_turn.incoming_of(event).segments:
+            if msg.type != 'reply' or any(events.image_ref(c) for c in (msg.data.get('chain') or [])):
                 continue
-            mid = getattr(msg, 'id', None) or getattr(msg, 'message_id', None)
+            mid = msg.data.get('id')
             if not mid:
                 continue
             try:
@@ -270,10 +272,10 @@ class MediaMixin(PortsMixin):
             if provider is None:
                 return ""
             texts = []
-            for m in event.get_messages() or []:
-                if not isinstance(m, Record):
+            for m in adapter_astrbot_turn.incoming_of(event).segments:
+                if m.type != "record":
                     continue
-                ref = str(getattr(m, "url", "") or getattr(m, "file", "") or getattr(m, "path", "") or "").strip()
+                ref = str(m.data.get("url") or m.data.get("file") or m.data.get("path") or "").strip()
                 if not ref:
                     continue
                 try:

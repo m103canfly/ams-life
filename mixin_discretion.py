@@ -386,11 +386,11 @@ class DiscretionMixin:
         if event is not None:
             self._note_her(event)
             try:  # the message's own @ parts: their numbers are known, their "@名字(号码)" exact
-                for comp in event.get_messages() or []:
-                    if type(comp).__name__ == "At":
-                        qq = str(getattr(comp, "qq", "") or "")
+                for comp in adapter_astrbot_turn.incoming_of(event).segments:
+                    if comp.type == "at":
+                        qq = str(comp.data.get("qq", "") or "")
                         if qq.isdigit():
-                            ats.append((str(getattr(comp, "name", "") or "").strip(), qq))
+                            ats.append((str(comp.data.get("name", "") or "").strip(), qq))
             except Exception:
                 pass
         gone = self._gone_people()
