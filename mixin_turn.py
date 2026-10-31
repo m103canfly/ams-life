@@ -15,6 +15,28 @@ except ImportError:
     import stickers
 
 
+def _has_non_sticker_image(event):
+    """Whether this message or its quote contains an image other than a QQ sticker."""
+    segments = adapter_astrbot_turn.incoming_of(event).segments
+    raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
+    raw_stickers = stickers.stickers_in_raw(raw) if raw is not None else []
+
+    def is_image(segment, check_raw=False):
+        if segment.type != "image" or stickers.stickers_in_segments((segment,)):
+            return False
+        if check_raw:
+            data = segment.data
+            for item in raw_stickers:
+                if any(data.get(key) and data.get(key) == item.get(key) for key in ("url", "file")):
+                    return False
+        return True
+
+    return any(is_image(segment, True) or
+               (segment.type == "reply" and any(is_image(child) for child in
+                                                 (segment.data.get("chain") or ())))
+               for segment in segments)
+
+
 class TurnMixin:
     """Getting one turn ready: what she knows, feels and recalls, put into the request.
     Works on turn.TurnRequest only; AstrBot's hook converts to it and back (main.py).
@@ -280,6 +302,8 @@ class TurnMixin:
         _slang = self._slang_prompt(event)
         if _slang:
             _compact = (_compact + "\n" + _slang).strip()
+        if not _img.replace("[BioCore Image]", "").strip() and _has_non_sticker_image(event):
+            _compact = (_compact + "\n[图] " + attention.UNSEEN_IMAGE_NOTE).strip()
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
