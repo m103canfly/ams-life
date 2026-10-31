@@ -36,8 +36,9 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import attention, events, stickers
+    from . import adapter_astrbot_turn, attention, events, stickers
 except ImportError:
+    import adapter_astrbot_turn
     import attention
     import events
     import stickers
@@ -113,7 +114,9 @@ class StickersMixin(PortsMixin):
         """The pictures of this message QQ marks as stickers (their addresses)."""
         try:
             raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
-            return [s["url"] for s in stickers.stickers_in_raw(raw) if s.get("url")]
+            found = (stickers.stickers_in_raw(raw) if raw is not None else
+                     stickers.stickers_in_segments(adapter_astrbot_turn.incoming_of(event).segments))
+            return [s["url"] for s in found if s.get("url")]
         except Exception:
             return []
 

@@ -226,6 +226,18 @@ def stickers_in_raw(raw) -> list:
     return out
 
 
+def stickers_in_segments(segments) -> list:
+    """The pictures in neutral segments QQ marks as stickers."""
+    out = []
+    for seg in segments:
+        if seg.type != "image":
+            continue
+        data = seg.data
+        if str(data.get("sub_type", "")).strip() == "1" or data.get("summary") == STICKER_SUMMARY:
+            out.append({"url": str(data.get("url") or ""), "file": str(data.get("file") or "")})
+    return out
+
+
 # ----------------------------------------------------------------------
 # One look at a picture
 # ----------------------------------------------------------------------
