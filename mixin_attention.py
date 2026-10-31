@@ -25,10 +25,11 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 try:
-    from . import adapter_astrbot_turn, attention, turn
+    from . import adapter_astrbot_turn, attention, model_client, turn
 except ImportError:
     import adapter_astrbot_turn
     import attention
+    import model_client
     import turn
 try:
     from . import discretion, messenger
@@ -77,11 +78,25 @@ class _Spending:
         return resp
 
 
+class _SpendingModel(model_client.ModelClient):
+    """Our own model client whose answers are counted into the day's spending, as _Spending
+    counts AstrBot's provider."""
+    def __init__(self, plugin, kind, model):
+        self._plugin, self._kind, self._model = plugin, str(kind or "other"), model
+
+    async def chat(self, **kwargs):
+        reply = await self._model.chat(**kwargs)
+        self._plugin._note_spend(self._kind, reply)
+        return reply
+
+
 class AttentionMixin:
     def _spending(self, kind, provider):
         """Count vision always; with self_decide, count the other plugin calls too."""
-        if provider is None or (kind != "vision" and not getattr(self, "self_decide", False)) or isinstance(provider, _Spending):
+        if provider is None or (kind != "vision" and not getattr(self, "self_decide", False)) or isinstance(provider, (_Spending, _SpendingModel)):
             return provider
+        if isinstance(provider, model_client.ModelClient):
+            return _SpendingModel(self, kind, provider)
         return _Spending(self, kind, provider)
 
     # ------------------------------------------------------------------
@@ -118,6 +133,10 @@ class AttentionMixin:
         AstrBot's; with neither, every input token counts as not cached (more, not less)."""
         if isinstance(resp, (adapter_astrbot_turn.AstrBotReply, turn.TurnReply)):
             return resp.spend_usage()
+        if isinstance(resp, model_client.ModelReply):
+            u = resp.usage or {}
+            return {"input_hit": int(u.get("input_hit", 0) or 0), "input_miss": int(u.get("input_miss", 0) or 0),
+                    "output": int(u.get("output", 0) or 0)}
         raw = getattr(getattr(resp, "raw_completion", None), "usage", None)
         hit = getattr(raw, "prompt_cache_hit_tokens", None) if raw is not None else None
         miss = getattr(raw, "prompt_cache_miss_tokens", None) if raw is not None else None

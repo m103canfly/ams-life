@@ -125,10 +125,12 @@ class SendCheckMixin:
         req = note.get("req")
         if req is None:
             return None
-        try:
-            provider = self.context.get_using_provider(str(getattr(event, "unified_msg_origin", "") or ""))
-        except Exception:
-            provider = None
+        provider = getattr(self, "_neutral_model", None)
+        if provider is None:
+            try:
+                provider = self.context.get_using_provider(str(getattr(event, "unified_msg_origin", "") or ""))
+            except Exception:
+                provider = None
         if provider is None:
             return None
         system = getattr(req, "system_prompt", None)
@@ -138,18 +140,16 @@ class SendCheckMixin:
         prompt = "\n\n".join(x for x in (compact, str(getattr(req, "prompt", "") or ""), send_check.REDO_NOTE) if x)
         self._count_check("redo_calls")
         try:
-            resp = await provider.text_chat(prompt=prompt, contexts=list(getattr(req, "contexts", None) or []),
-                                            system_prompt=system,
-                                            image_urls=list(getattr(req, "image_urls", None) or []))
+            reply = await self._model(self._spending("redo", provider)).chat(
+                prompt=prompt, messages=list(getattr(req, "contexts", None) or []), system=system,
+                images=list(getattr(req, "image_urls", None) or []))
         except Exception as exc:
             logger.warning("[ams-life] send check: asking once more failed: %s", type(exc).__name__)
             return None
-        if getattr(self, "self_decide", False):
-            self._note_spend("redo", resp)
-        usage = getattr(resp, "usage", None)
-        if usage is not None:
-            self._count_check("redo_tokens", int(getattr(usage, "total", 0) or 0))
-        text = interpretation.strip_state_tags(str(getattr(resp, "completion_text", "") or "")).strip()
+        tokens = sum(int(v or 0) for v in reply.usage.values())
+        if tokens:
+            self._count_check("redo_tokens", tokens)
+        text = interpretation.strip_state_tags(reply.text).strip()
         return text or None
 
     async def _look_at_reply(self, event, response, reply) -> str:

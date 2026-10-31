@@ -2,17 +2,20 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """The plugin's entry points to its ports."""
 try:
-    from . import adapter_astrbot, adapter_astrbot_messenger, adapter_astrbot_model, adapter_astrbot_turn, discretion
+    from . import adapter_astrbot, adapter_astrbot_messenger, adapter_astrbot_model, adapter_astrbot_turn, discretion, model_client
 except ImportError:
     import adapter_astrbot
     import adapter_astrbot_messenger
     import adapter_astrbot_model
     import adapter_astrbot_turn
     import discretion
+    import model_client
 
 
 def model_for(provider):
-    """A model client over this provider."""
+    """A model client over this provider: one already (ours, e.g. DeepSeekModel), as it is."""
+    if isinstance(provider, model_client.ModelClient):
+        return provider
     return adapter_astrbot_model.AstrBotModel(provider)
 
 
