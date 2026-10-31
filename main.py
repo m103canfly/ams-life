@@ -623,7 +623,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
                     _why = self._why_called(event)
                     setattr(event, "_mood_direct", bool(_why))
                     _core = self._core(None)
-                    for _kind in mood_kinds(getattr(event, "message_str", ""), bool(_why)):
+                    for _kind in mood_kinds(adapter_astrbot_turn.incoming_of(event).text, bool(_why)):
                         _familiar = self._familiarity(_sid)
                         _weight = (.6 + .4 * _familiar) if _kind == "criticism" else 1.0
                         if not _why and _familiar < .3:

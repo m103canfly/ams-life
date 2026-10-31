@@ -15,6 +15,7 @@ Two things AstrBot looks up itself are passed in by the caller instead:
 from __future__ import annotations
 
 import time
+from itertools import groupby
 
 try:
     from . import events
@@ -104,6 +105,28 @@ def _parts(payload) -> tuple:
         except Exception:
             continue
     return tuple(out)
+
+
+def _text_of(parts, self_id, names) -> str:
+    """The words AstrBot 4.29.3 makes, after the wake check strips them."""
+    words = ""
+    for kind, group in groupby(parts, key=lambda part: part.get("type")):
+        data = [part.get("data") or {} for part in group]
+        if kind == "text":
+            words += "".join(_text(item.get("text")) for item in data).strip()
+        elif kind == "at":
+            first_self = False
+            for item in data:
+                qq = _text(item.get("qq"))
+                if qq == "all":
+                    continue
+                if qq == self_id and not first_self:
+                    first_self = True
+                else:
+                    words += " @%s(%s) " % (_at_name(qq, names), qq)
+        elif kind == "markdown":
+            words += "".join(_text(item.get("markdown")) or _text(item.get("content")) for item in data)
+    return words.strip()
 
 
 def _segments(parts, self_id, quoted, names) -> tuple:
@@ -227,4 +250,5 @@ def from_onebot(payload, *, quoted=None, names=None) -> events.Incoming | None:
         is_private=place.startswith("private:"),
         is_self=bool(sender_id) and sender_id == self_id,
         ts=time.time(),
+        text=_text_of(parts, self_id, names),
     )

@@ -12,8 +12,9 @@ try:
 except ImportError:
     from body import *  # noqa: F401,F403
 try:
-    from . import digest
+    from . import adapter_astrbot_turn, digest
 except ImportError:
+    import adapter_astrbot_turn
     import digest
 
 
@@ -1264,7 +1265,7 @@ class EventsMixin(PortsMixin):
         events = sorted(events, key=lambda e: float(e.get("importance", 0.0) or 0.0) *
                         (0.5 + 0.5 * float(e.get("centrality", 0.5) or 0.5)), reverse=True)[:3]
         events += self._visible_events(event, digest.for_reply(
-            str(getattr(event, "message_str", "") or ""), archive, self._here(event)))
+            adapter_astrbot_turn.incoming_of(event).text, archive, self._here(event)))
         if not events:
             return ""
         lines = []
@@ -1306,7 +1307,7 @@ class EventsMixin(PortsMixin):
                     continue
                 n_no += 1
             picked.append((ev, lab))
-        for ev in digest.for_reply(str(getattr(event, "message_str", "") or ""), archive, self._here(event)):
+        for ev in digest.for_reply(adapter_astrbot_turn.incoming_of(event).text, archive, self._here(event)):
             if isinstance(ev, dict):
                 lab = self._label_for(ev, event, present=present)
                 if lab["may"] != discretion.HIDE:

@@ -201,6 +201,32 @@ def astrbot_parts(payload, *, names=None, quoted=None):
     return out
 
 
+def astrbot_message_str(payload, names):
+    """AstrBot 4.29.3 aiocqhttp_platform_adapter.py 231-422 and waking_check/stage.py 79-81."""
+    from itertools import groupby
+
+    parts = [p for p in payload.get('message', [])
+             if isinstance(p, dict) and isinstance(p.get('data'), dict)]
+    words = ''
+    for kind, group in groupby(parts, key=lambda p: p.get('type')):
+        data = [p['data'] for p in group]
+        if kind == 'text':
+            words += ''.join(str(d.get('text') or '') for d in data).strip()
+        elif kind == 'at':
+            seen_self = False
+            for d in data:
+                qq = str(d.get('qq') or '')
+                if qq == 'all':
+                    continue
+                if qq == str(payload.get('self_id') or '') and not seen_self:
+                    seen_self = True
+                else:
+                    words += ' @%s(%s) ' % (_at_name(qq, names), qq)
+        elif kind == 'markdown':
+            words += ''.join(str(d.get('markdown') or d.get('content') or '') for d in data)
+    return words.strip()
+
+
 def astrbot_event(payload, *, names=None, quoted=None):
     """A harness.FakeEvent holding the same message, with AstrBot's own parts."""
     sender = payload.get('sender') if isinstance(payload.get('sender'), dict) else {}
@@ -209,6 +235,7 @@ def astrbot_event(payload, *, names=None, quoted=None):
     name = str(sender.get('card') or sender.get('nickname') or '')
     ev = harness.FakeEvent('', sender=user, name=name, group=group,
                            self_id=str(payload.get('self_id', '')))
+    ev.message_str = astrbot_message_str(payload, names)
     ev.unified_msg_origin = ('default:GroupMessage:%s' % group if group is not None
                              else 'default:FriendMessage:%s' % user)
     ev.message_obj = type('Obj', (), {
@@ -427,7 +454,7 @@ class SameAsAstrBot(unittest.TestCase):
         self.assertIsNotNone(one, case)
         other = adapter_astrbot.from_astrbot(astrbot_event(payload, names=names, quoted=quoted))
         for field in ('place', 'sender_id', 'sender_name', 'message_id', 'self_id', 'at_me',
-                      'reply_to', 'image_refs'):
+                      'reply_to', 'image_refs', 'text'):
             self.assertEqual(getattr(one, field), getattr(other, field), '%s: %s' % (case, field))
         self.assertEqual(events.plain_text(one), events.plain_text(other), case)
         self.assertEqual([seg.type for seg in one.segments],

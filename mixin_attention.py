@@ -202,7 +202,7 @@ class AttentionMixin:
         here = self._here(event)
         sid = str(self._speaker(event)[0] or "")
         ts, to = self._last_reply_here(here)
-        named = attention.names_her(getattr(event, "message_str", ""), self._attention_cfg()["names"])
+        named = attention.names_her(adapter_astrbot_turn.incoming_of(event).text, self._attention_cfg()["names"])
         return attention.called(self._addresses_her(event) or named, here.startswith("private:"), sid, ts, to)
 
     def _hear_mood(self, event) -> None:
@@ -212,7 +212,7 @@ class AttentionMixin:
         self_id = adapter_astrbot_turn.incoming_of(event).self_id
         if self_id and sid == self_id:
             return
-        self._core(None).mood_hear(getattr(event, "message_str", ""), self._familiarity(sid) >= .3)
+        self._core(None).mood_hear(adapter_astrbot_turn.incoming_of(event).text, self._familiarity(sid) >= .3)
 
     def _mood_clock(self, now=None) -> None:
         if not getattr(self, "mood_events_enabled", False):
@@ -334,7 +334,7 @@ class AttentionMixin:
         her = sum(1 for x in recent if x.get("role") == "assistant")
         last, _to = self._last_reply_here(here)
         quiet = (now - last) / 60.0 if last else 600.0
-        text = str(getattr(event, "message_str", "") or "")
+        text = adapter_astrbot_turn.incoming_of(event).text
         topic, quarrel = 0.0, False
         try:
             vec = await self._embed_text(text) if text.strip() else None
