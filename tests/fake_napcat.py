@@ -5,10 +5,11 @@
 It connects to 2d's ``OneBotServer`` on this machine, sends the events a test builds, and
 answers every ``{action, params, echo}`` frame the server sends back. Each call is recorded in
 ``calls``; ``send_group_msg`` and ``send_private_msg`` are also recorded in ``sent`` and get a
-message id from 1 up; ``get_msg`` finds a message it sent out; ``get_forward_msg`` and any other
-action answer ``failed``. ``answer`` scripts the answers to one action: they are used once each,
-in order. aiohttp is imported when the connection opens, so the message builders work without
-it. Nothing here touches a real account or a real message.
+message id from 1 up; ``get_msg`` finds a message it sent out; ``fetch_ptt_text`` answers QQ's
+words for a voice (one string field, ``text``); ``get_forward_msg`` and any other action answer
+``failed``. ``answer`` scripts the answers to one action: they are used once each, in order.
+aiohttp is imported when the connection opens, so the message builders work without it. Nothing
+here touches a real account or a real message.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from urllib.parse import urlsplit
 
 SEND_ACTIONS = ("send_group_msg", "send_private_msg")
 FAILED = {"status": "failed", "retcode": 1404, "data": None}
+PTT_TEXT = "明天几点出门"   # made up: QQ's own words for a voice
 
 
 def _number(value):
@@ -152,6 +154,10 @@ class FakeNapCat:
             found = self._known.get(_id_text(params.get("message_id")))
             if found is not None:
                 return {"status": "ok", "retcode": 0, "data": found}
+        if action == "fetch_ptt_text":
+            # NapCat's return schema for QQ's own speech-to-text: one field, the words.
+            if _id_text(params.get("message_id")):
+                return {"status": "ok", "retcode": 0, "data": {"text": PTT_TEXT}}
         return dict(FAILED)
 
     def _sent_event(self, action, params, message_id) -> dict:

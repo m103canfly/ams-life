@@ -269,24 +269,57 @@ class MediaMixin(PortsMixin):
         try:
             provider = await self.context.get_using_stt_provider_async(
                 getattr(event, "unified_msg_origin", "") or "")
-            if provider is None:
-                return ""
-            texts = []
-            for m in adapter_astrbot_turn.incoming_of(event).segments:
-                if m.type != "record":
-                    continue
-                ref = str(m.data.get("url") or m.data.get("file") or m.data.get("path") or "").strip()
-                if not ref:
-                    continue
-                try:
-                    txt = await provider.get_text(ref)
-                    if str(txt or "").strip():
-                        texts.append(str(txt).strip()[:300])
-                except Exception as exc:
-                    logger.warning("[biocore] voice transcribe failed: %s", exc)
-            return "；".join(texts)[:600]
         except Exception as exc:
+            # No such method without AstrBot (or asking failed): QQ's own words below.
             logger.warning("[biocore] voice context failed: %s", exc)
+            provider = None
+        if provider is not None:
+            try:
+                texts = []
+                for m in adapter_astrbot_turn.incoming_of(event).segments:
+                    if m.type != "record":
+                        continue
+                    ref = str(m.data.get("url") or m.data.get("file") or m.data.get("path") or "").strip()
+                    if not ref:
+                        continue
+                    try:
+                        txt = await provider.get_text(ref)
+                        if str(txt or "").strip():
+                            texts.append(str(txt).strip()[:300])
+                    except Exception as exc:
+                        logger.warning("[biocore] voice transcribe failed: %s", exc)
+                return "；".join(texts)[:600]
+            except Exception as exc:
+                logger.warning("[biocore] voice context failed: %s", exc)
+                return ""
+        # No speech-to-text provider from AstrBot: ask QQ itself about this voice.
+        try:
+            incoming = adapter_astrbot_turn.incoming_of(event)
+            if not any(m.type == "record" for m in incoming.segments):
+                return ""
+            mid = str(incoming.message_id or "").strip()
+            if not mid:
+                return ""
+            try:
+                answer = await self._messenger(event).call("fetch_ptt_text", message_id=mid)
+            except Exception as exc:
+                logger.warning("[biocore] voice text from QQ failed: %s", type(exc).__name__)
+                return ""
+            words = ""
+            if isinstance(answer, str):
+                words = answer
+            elif isinstance(answer, dict):
+                for key in ("text", "content", "result"):
+                    value = answer.get(key)
+                    if isinstance(value, str) and value.strip():
+                        words = value
+                        break
+            words = words.strip()[:300]
+            if not words:
+                logger.warning("[biocore] voice text from QQ: no words")
+            return words[:600]
+        except Exception as exc:
+            logger.warning("[biocore] voice context failed: %s", type(exc).__name__)
             return ""
 
     async def _image_context(self, event) -> str:
