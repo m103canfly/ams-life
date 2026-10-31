@@ -1,6 +1,4 @@
 """Import, identity and licence checks that need no conversation."""
-import atexit
-import shutil
 import sys
 import tempfile
 import unittest
@@ -12,10 +10,22 @@ sys.path.insert(0, str(HERE))
 import harness  # noqa: E402
 
 DATA = Path(tempfile.mkdtemp(prefix='ams-life-basics-'))
-atexit.register(shutil.rmtree, DATA, ignore_errors=True)
+harness.register_atexit_data(DATA)
 CLOCK = harness.prepare(DATA)
 import main  # noqa: E402
 import interpretation  # noqa: E402
+
+PLUGINS = []
+
+
+def make_plugin(context):
+    plugin = main.BioCorePlugin(context, config={})
+    PLUGINS.append(plugin)
+    return plugin
+
+
+def tearDownModule():
+    harness.cleanup_plugin_data(PLUGINS, DATA)
 
 
 class Identity(unittest.TestCase):
@@ -27,12 +37,12 @@ class Identity(unittest.TestCase):
 
     def test_routes_use_new_name(self):
         ctx = harness.FakeContext()
-        main.BioCorePlugin(ctx, config={})
+        make_plugin(ctx)
         self.assertTrue(ctx.web_routes)
         self.assertTrue(all(r.startswith('/astrbot_plugin_ams_life/page/') for r in ctx.web_routes), ctx.web_routes)
 
     def test_group_browsing_defaults_off(self):
-        plugin = main.BioCorePlugin(harness.FakeContext(), config={})
+        plugin = make_plugin(harness.FakeContext())
         self.assertFalse(plugin.browse_groups_enabled)
 
     def test_metadata(self):
