@@ -184,11 +184,17 @@ def astrbot_parts(payload, *, names=None, quoted=None):
             qq = str(data.get('qq'))
             out.append(At(qq=qq, name=_at_name(qq, names)))
         elif kind == 'reply':
-            out.append(Reply(id=str(data.get('id')), sender_id=_quoted_sender(quoted)))
+            # aiocqhttp_platform_adapter.py 303-343 fetches one quoted chain without nested fetches.
+            words = astrbot_message_str(quoted, names, wake=False) if isinstance(quoted, dict) else ''
+            chain = astrbot_parts(quoted, names=names) if isinstance(quoted, dict) else []
+            out.append(Reply(id=str(data.get('id')), sender_id=_quoted_sender(quoted),
+                             chain=chain, text=words, message_str=words))
         elif kind == 'image':
-            out.append(Image(url=str(data.get('url') or ''), file=str(data.get('file') or '')))
+            out.append(Image(url=str(data.get('url') or ''), file=str(data.get('file') or ''),
+                             path=str(data.get('path') or '')))
         elif kind == 'record':
-            out.append(Record(url=str(data.get('url') or ''), file=str(data.get('file') or '')))
+            out.append(Record(url=str(data.get('url') or ''), file=str(data.get('file') or ''),
+                              path=str(data.get('path') or '')))
         elif kind == 'face':
             out.append(Face(id=str(data.get('id'))))
         elif kind == 'forward':
@@ -201,7 +207,7 @@ def astrbot_parts(payload, *, names=None, quoted=None):
     return out
 
 
-def astrbot_message_str(payload, names):
+def astrbot_message_str(payload, names, *, wake=True):
     """AstrBot 4.29.3 aiocqhttp_platform_adapter.py 231-422 and waking_check/stage.py 79-81."""
     from itertools import groupby
 
@@ -224,7 +230,7 @@ def astrbot_message_str(payload, names):
                     words += ' @%s(%s) ' % (_at_name(qq, names), qq)
         elif kind == 'markdown':
             words += ''.join(str(d.get('markdown') or d.get('content') or '') for d in data)
-    return words.strip()
+    return words.strip() if wake else words
 
 
 def astrbot_event(payload, *, names=None, quoted=None):
@@ -321,19 +327,22 @@ class OneMessage(unittest.TestCase):
                           quoted=quoted_from(ME))
         self.assertTrue(one.at_me)
         self.assertEqual(one.reply_to, 'm-7101')
-        self.assertEqual(one.segments[0], events.Segment('reply', {'id': 'm-7101', 'sender_id': ME}))
+        self.assertEqual(one.segments[0], events.Segment('reply', {'id': 'm-7101', 'sender_id': ME,
+                                                                  'chain': (), 'text': '', 'message_str': ''}))
 
     def test_a_quote_of_someone_else_is_not_her(self):
         one = from_onebot(message(part('reply', id='m-7102'), part('text', text=' 嗯')),
                           quoted=quoted_from(OTHER))
         self.assertFalse(one.at_me)
-        self.assertEqual(one.segments[0].data, {'id': 'm-7102', 'sender_id': OTHER})
+        self.assertEqual(one.segments[0].data, {'id': 'm-7102', 'sender_id': OTHER,
+                                                'chain': (), 'text': '', 'message_str': ''})
 
     def test_a_quote_without_the_quoted_message_keeps_the_id_only(self):
         one = from_onebot(message(part('reply', id='m-7103'), part('text', text=' 嗯')))
         self.assertFalse(one.at_me)
         self.assertEqual(one.reply_to, 'm-7103')
-        self.assertEqual(one.segments[0].data, {'id': 'm-7103', 'sender_id': ''})
+        self.assertEqual(one.segments[0].data, {'id': 'm-7103', 'sender_id': '',
+                                                'chain': (), 'text': '', 'message_str': ''})
 
     def test_a_long_quoted_id_is_cut_to_eighty(self):
         one = from_onebot(message(part('reply', id='x' * 100), part('text', text=' 嗯')))
@@ -363,7 +372,7 @@ class OneMessage(unittest.TestCase):
         self.assertEqual([seg.type for seg in one.segments],
                          ['face', 'record', 'forward', 'text', 'other', 'other'])
         self.assertEqual(one.segments[0].data, {'id': '14'})
-        self.assertEqual(one.segments[1].data, {'url': 'http://v.test/a.amr', 'file': ''})
+        self.assertEqual(one.segments[1].data, {'url': 'http://v.test/a.amr', 'file': '', 'path': ''})
         self.assertEqual(one.segments[2].data, {'id': 'm-7201'})
         self.assertEqual(one.segments[3].data, {'text': ' # 标题 '})   # as it is: no strip, no join
         self.assertEqual(one.segments[4].data, {'kind': 'Video'})
@@ -459,6 +468,8 @@ class SameAsAstrBot(unittest.TestCase):
         self.assertEqual(events.plain_text(one), events.plain_text(other), case)
         self.assertEqual([seg.type for seg in one.segments],
                          [seg.type for seg in other.segments], case)
+        self.assertEqual([seg.data for seg in one.segments],
+                         [seg.data for seg in other.segments], case)
 
     def test_a_plain_message(self):
         self.check(message(part('text', text='你好')), case='plain')
@@ -479,6 +490,13 @@ class SameAsAstrBot(unittest.TestCase):
         self.check(message(part('reply', id='m-7103'), part('text', text=' 嗯')), case='no quoted')
         self.check(message(part('reply', id='x' * 100), part('text', text=' 嗯')),
                    quoted=quoted_from(OTHER), case='long id')
+
+    def test_quote_with_content_and_nested_reply(self):
+        quoted = quoted_from(OTHER)
+        quoted['message'] = [part('text', text=' 看 '), part('image', path='image.png'),
+                             part('at', qq=OTHER), part('reply', id='m-inner')]
+        self.check(message(part('reply', id='m-7104')), names={OTHER: '柠檬'},
+                   quoted=quoted, case='quote with content')
 
     def test_images(self):
         self.check(message(part('image', url='http://img.test/a.png'), part('text', text='和'),

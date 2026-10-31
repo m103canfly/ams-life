@@ -9,8 +9,8 @@ no I/O, no logging, and it never raises. A part it cannot read is left out; a pa
 one message event gives None.
 
 Two things AstrBot looks up itself are passed in by the caller instead:
-``quoted`` (the data of ``get_msg`` for the first quoted message) and ``names``
-(``{qq: name}`` for the @ segments).
+``quoted`` (the data of ``get_msg`` for the first quoted message, including its parts and
+words) and ``names`` (``{qq: name}`` for the @ segments).
 """
 from __future__ import annotations
 
@@ -107,8 +107,8 @@ def _parts(payload) -> tuple:
     return tuple(out)
 
 
-def _text_of(parts, self_id, names) -> str:
-    """The words AstrBot 4.29.3 makes, after the wake check strips them."""
+def _text_of(parts, self_id, names, *, wake=True) -> str:
+    """The words AstrBot 4.29.3 makes, optionally stripped by the wake check."""
     words = ""
     for kind, group in groupby(parts, key=lambda part: part.get("type")):
         data = [part.get("data") or {} for part in group]
@@ -126,7 +126,7 @@ def _text_of(parts, self_id, names) -> str:
                     words += " @%s(%s) " % (_at_name(qq, names), qq)
         elif kind == "markdown":
             words += "".join(_text(item.get("markdown")) or _text(item.get("content")) for item in data)
-    return words.strip()
+    return words.strip() if wake else words
 
 
 def _segments(parts, self_id, quoted, names) -> tuple:
@@ -154,16 +154,22 @@ def _segments(parts, self_id, quoted, names) -> tuple:
             out.append(events.Segment(type="at", data={"qq": _text(data.get("qq")),
                                                        "name": _at_name(data.get("qq"), names)}))
         elif kind == "reply":
+            quoted_parts = _parts(quoted) if isinstance(quoted, dict) else ()
+            words = _text_of(quoted_parts, self_id, names, wake=False)
             out.append(events.Segment(type="reply", data={"id": _text(data.get("id")),
-                                                          "sender_id": _quoted_sender(quoted)}))
+                                                          "sender_id": _quoted_sender(quoted),
+                                                          "chain": _segments(quoted_parts, self_id, None, names),
+                                                          "text": words, "message_str": words}))
         elif kind == "image":
             out.append(events.Segment(type="image", data={"url": _text(data.get("url")),
-                                                          "file": _text(data.get("file"))}))
+                                                          "file": _text(data.get("file")),
+                                                          "path": _text(data.get("path"))}))
         elif kind == "face":
             out.append(events.Segment(type="face", data={"id": _text(data.get("id"))}))
         elif kind == "record":
             out.append(events.Segment(type="record", data={"url": _text(data.get("url")),
-                                                           "file": _text(data.get("file"))}))
+                                                           "file": _text(data.get("file")),
+                                                           "path": _text(data.get("path"))}))
         elif kind == "forward":
             out.append(events.Segment(type="forward", data={"id": _text(data.get("id"))}))
         elif kind == "markdown":

@@ -132,7 +132,8 @@ class TurnTests(unittest.TestCase):
         chain = MessageChain([Reply(id='m1', sender_id='10001'), Plain('hello'),
                               At(qq='10003', name='Alex')])
         result = adapter.reply_from_astrbot(LLMResponse(result_chain=chain))
-        self.assertEqual(result.chain_prefix, [events.Segment('reply', {'id': 'm1', 'sender_id': '10001'}),
+        self.assertEqual(result.chain_prefix, [events.Segment('reply', {'id': 'm1', 'sender_id': '10001',
+                                                                       'chain': (), 'text': '', 'message_str': ''}),
                                                events.Segment('at', {'qq': '10003', 'name': 'Alex'})])
 
     def test_reply_tool_calls_usage_and_reasoning(self):
