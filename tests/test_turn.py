@@ -89,7 +89,7 @@ class TurnTests(unittest.TestCase):
         with FakeTools() as fake:
             req = ProviderRequest()
             adapter.request_into_astrbot(adapter.request_from_astrbot(req), req)
-            self.assertIsNone(req.func_tool)
+            self.assertFalse(hasattr(req, 'func_tool'))
             req.func_tool = fake.ToolSet([fake.FunctionTool('a')])
             converted = adapter.request_from_astrbot(req)
             converted.remove_tool('a')
@@ -170,7 +170,7 @@ class TurnTests(unittest.TestCase):
             request = adapter.request_from_astrbot(obj)
             self.assertEqual((request.prompt, request.system_prompt, request.contexts,
                               request.image_urls, request.extra_user_content_parts, request.tools),
-                             ('', '', [], [], [], []))
+                             ('', '', [], [], None, []))
             reply = adapter.reply_from_astrbot(obj)
             self.assertEqual((reply.text, reply.chain_prefix, reply.tool_calls, reply.reasoning),
                              ('', [], (), ''))

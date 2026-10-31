@@ -11,6 +11,7 @@ except ImportError:
 
 def request_from_astrbot(req) -> turn.TurnRequest:
     toolset = getattr(req, 'func_tool', None)
+    parts = getattr(req, 'extra_user_content_parts', None)
     tools = [turn.TurnTool(name=getattr(tool, 'name', '') or '',
                            description=getattr(tool, 'description', '') or '',
                            parameters=getattr(tool, 'parameters', None) or {},
@@ -21,16 +22,31 @@ def request_from_astrbot(req) -> turn.TurnRequest:
         system_prompt=getattr(req, 'system_prompt', '') or '',
         contexts=list(getattr(req, 'contexts', None) or []),
         image_urls=list(getattr(req, 'image_urls', None) or []),
-        extra_user_content_parts=list(getattr(req, 'extra_user_content_parts', None) or []),
+        extra_user_content_parts=list(parts) if isinstance(parts, list) else None,
         tools=tools)
 
 
 def request_into_astrbot(turn_request, req) -> None:
-    req.prompt = turn_request.prompt
-    req.system_prompt = turn_request.system_prompt
-    req.contexts = turn_request.contexts
-    req.image_urls = turn_request.image_urls
-    req.extra_user_content_parts = turn_request.extra_user_content_parts
+    """Write changed fields back, preserving unchanged objects and missing fields."""
+    for name in ('prompt', 'system_prompt'):
+        value = getattr(turn_request, name)
+        if (getattr(req, name, None) or '') != value:
+            setattr(req, name, value)
+    for name in ('contexts', 'image_urls', 'extra_user_content_parts'):
+        value = getattr(turn_request, name)
+        if value is None:
+            continue
+        original = getattr(req, name, None)
+        if isinstance(original, list):
+            if original != value:
+                original[:] = value
+        elif value:
+            setattr(req, name, value)
+    original_tools = getattr(getattr(req, 'func_tool', None), 'tools', None) or []
+    if (len(turn_request.tools) == len(original_tools) and
+            all(tool.native is not None and tool.native is native
+                for tool, native in zip(turn_request.tools, original_tools))):
+        return
     if not turn_request.tools:
         req.func_tool = None
         return
