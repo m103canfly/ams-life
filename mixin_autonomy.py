@@ -12,9 +12,10 @@ try:
 except ImportError:
     from body import *  # noqa: F401,F403
 try:
-    from . import discretion, events
+    from . import adapter_astrbot_turn, discretion, events
     from .mixin_ports import PortsMixin
 except ImportError:
+    import adapter_astrbot_turn
     import discretion
     import events
     from mixin_ports import PortsMixin
@@ -27,10 +28,7 @@ class AutonomyMixin(PortsMixin):
             umo = str(getattr(event, "unified_msg_origin", "") or "")
             if "GroupMessage" in umo or "GuildMessage" in umo:
                 return False
-            check = getattr(event, "is_private_chat", None)
-            if callable(check):
-                return bool(check())
-            return False
+            return adapter_astrbot_turn.incoming_of(event).is_private
         except Exception:
             return False
 

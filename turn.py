@@ -8,9 +8,15 @@ from dataclasses import dataclass, field
 class TurnEvent:
     """One received message as the plugin handles it, apart from AstrBot: the Incoming, and
     whether handling it stopped. The plugin may keep its own notes for this turn on it, as
-    attributes, as it does on AstrBot's event."""
+    attributes, as it does on AstrBot's event.
+
+    AstrBot's session string for this chat, as AstrBot gives it
+    ("<platform id>:GroupMessage:<group>" / "<platform id>:FriendMessage:<qq>"). Her stored data
+    is keyed by it (memory sessions, window umo, file names), so whoever builds a TurnEvent must
+    give the very string AstrBot gave for the same chat."""
     incoming: object
     stopped: bool = False
+    unified_msg_origin: str = ""
 
     def stop_event(self):
         self.stopped = True
