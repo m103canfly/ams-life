@@ -650,7 +650,7 @@ def _relationship_rows(user_dir: Path, *, max_users: int = 50,
             "last_seen": last_seen,
             # task-55: session keys from the user file feed the dashboard
             # session dropdown union (memory + events + relations + live).
-            "sessions": [str(x) for x in (data.get("sessions") or [])][:20],
+            "sessions": list(dict.fromkeys(canonical_session_key(x) for x in (data.get("sessions") or []) if str(x)))[:20],
             "relationship": {
                 "state": {key: state.get(key) for key in
                           ("trust", "closeness", "conflict", "repair", "predictability")},

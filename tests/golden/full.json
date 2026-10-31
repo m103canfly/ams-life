@@ -8014,7 +8014,7 @@
    "sender_id": "10001",
    "sender_name": "芒果",
    "sessions": [
-    "default:FriendMessage:10001"
+    "private:10001"
    ],
    "trust": 0.5
   },
@@ -8191,7 +8191,7 @@
    "sender_id": "10002",
    "sender_name": "柠檬",
    "sessions": [
-    "default:GroupMessage:900001"
+    "group:900001"
    ],
    "trust": 0.5
   },
@@ -8367,7 +8367,7 @@
    "sender_id": "10003",
    "sender_name": "阿星",
    "sessions": [
-    "default:GroupMessage:900001"
+    "group:900001"
    ],
    "trust": 0.5
   },
@@ -8503,7 +8503,7 @@
    "sender_id": "10004",
    "sender_name": "桃子",
    "sessions": [
-    "default:GroupMessage:900002"
+    "group:900002"
    ],
    "trust": 0.5
   },
@@ -8609,7 +8609,7 @@
    "sender_id": "10005",
    "sender_name": "路人",
    "sessions": [
-    "default:GroupMessage:900001"
+    "group:900001"
    ],
    "trust": 0.5
   }
@@ -12333,7 +12333,7 @@
      "sender_id": "10003",
      "sender_name": "阿星",
      "sessions": [
-      "default:GroupMessage:900001"
+      "group:900001"
      ],
      "trust": 0.5
     },
@@ -12564,7 +12564,7 @@
      "sender_id": "10001",
      "sender_name": "芒果",
      "sessions": [
-      "default:FriendMessage:10001"
+      "private:10001"
      ],
      "trust": 0.5
     },
@@ -12735,7 +12735,7 @@
      "sender_id": "10002",
      "sender_name": "柠檬",
      "sessions": [
-      "default:GroupMessage:900001"
+      "group:900001"
      ],
      "trust": 0.5
     },
@@ -12865,7 +12865,7 @@
      "sender_id": "10004",
      "sender_name": "桃子",
      "sessions": [
-      "default:GroupMessage:900002"
+      "group:900002"
      ],
      "trust": 0.5
     },
@@ -12965,7 +12965,7 @@
      "sender_id": "10005",
      "sender_name": "路人",
      "sessions": [
-      "default:GroupMessage:900001"
+      "group:900001"
      ],
      "trust": 0.5
     }

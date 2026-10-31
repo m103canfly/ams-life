@@ -176,10 +176,10 @@ class PeopleMixin:
             d["absence"] = relationship_meta.absence_state(_prev_last_seen, _now_seen)
             d["last_seen"] = _now_seen
             d.setdefault("first_seen", time.time())
-            _session_key = str(getattr(event, "unified_msg_origin", "") or "").strip()
+            _session_key = self._here(event)
             if _session_key:
                 _sessions = d.get("sessions") if isinstance(d.get("sessions"), list) else []
-                _sessions = [str(x) for x in _sessions if str(x) and str(x) != _session_key]
+                _sessions = [str(x) for x in _sessions if str(x) and canonical_session_key(x) != _session_key]
                 d["sessions"] = (_sessions[-19:] + [_session_key])[-20:]
             try:
                 _ct = float(getattr(core, "trust", 0.5)) if core is not None else 0.5
