@@ -198,10 +198,60 @@ class SameAsThePlugin(unittest.TestCase):
             ev.is_at_or_wake_command = False
 
     def test_the_fields_follow_the_plugin(self):
+        import discretion
+
+        # mixin_memory.py 257 at 6568a29.
+        def old_here(event):
+            return discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
+
+        # mixin_settings.py 251-275 at 6568a29.
+        def old_speaker(event):
+            sid = ""
+            name = ""
+            try:
+                fn = getattr(event, "get_sender_id", None)
+                if callable(fn):
+                    sid = str(fn() or "")
+            except Exception:
+                pass
+            try:
+                fn = getattr(event, "get_sender_name", None)
+                if callable(fn):
+                    name = str(fn() or "")
+            except Exception:
+                pass
+            try:
+                obj = getattr(event, "message_obj", None)
+                sender = getattr(obj, "sender", None) if obj is not None else None
+                if sender is not None:
+                    if not sid:
+                        sid = str(getattr(sender, "user_id", "") or "")
+                    if not name:
+                        name = str(getattr(sender, "nickname", "") or "")
+            except Exception:
+                pass
+            return sid.strip(), name.strip()
+
+        # mixin_phone.py 342-353 at 6568a29.
+        def old_addresses_her(event):
+            try:
+                self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+                if self_id:
+                    for comp in event.get_messages() or []:
+                        kind = type(comp).__name__
+                        if kind == "At" and str(getattr(comp, "qq", "") or "") == self_id:
+                            return True
+                        if kind == "Reply" and str(getattr(comp, "sender_id", "") or "") == self_id:
+                            return True
+                return bool(getattr(event, "is_at_or_wake_command", False))
+            except Exception:
+                return False
+
         for ev in self.cases:
             one = from_astrbot(ev)
-            self.assertEqual(one.place, self.memory._here(ev))
-            self.assertEqual(one.at_me, self.phone._addresses_her(ev))
+            self.assertEqual(one.place, old_here(ev))
+            self.assertEqual(one.at_me, old_addresses_her(ev))
+            self.assertEqual((one.sender_id, one.sender_name), old_speaker(ev))
             self.assertEqual(one.reply_to, self.phone._reply_to(ev))
             self.assertEqual(one.message_id, self.phone._message_id(ev))
             self.assertEqual(one.image_refs,

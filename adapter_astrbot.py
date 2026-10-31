@@ -92,7 +92,7 @@ def _speaker(event) -> tuple:
                 name = _text(getattr(sender, "nickname", ""))
     except Exception:
         pass
-    return sid, name
+    return sid.strip(), name.strip()
 
 
 def _at_me(event) -> bool:

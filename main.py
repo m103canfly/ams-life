@@ -618,7 +618,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             if getattr(self, "mood_events_enabled", False):
                 self._mood_clock()
                 _sid = str(self._speaker(event)[0] or "")
-                _self_id = str(getattr(getattr(event, "message_obj", None), "self_id", "") or "")
+                _self_id = adapter_astrbot_turn.incoming_of(event).self_id
                 if not (_self_id and _sid == _self_id):
                     _why = self._why_called(event)
                     setattr(event, "_mood_direct", bool(_why))
