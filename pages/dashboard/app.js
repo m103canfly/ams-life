@@ -170,12 +170,21 @@
     const k=String(label||"").trim();
     return INTERO_LABELS[k]||k||"—";
   }
-  // AstrBot session keys look like "default:FriendMessage:<QQ号>"
-  // (event archive) or "default_FriendMessage_<QQ号>" (memory file stem).
-  // Render them as Chinese labels: 私聊 · <名字> / 群聊 · <群号>.
+  // ams-life move 5j: her data is keyed by the neutral place, "group:<群号>" /
+  // "private:<QQ号>" (Python discretion.place_of). Old AstrBot session keys,
+  // "default:FriendMessage:<QQ号>" (event archive) or "default_FriendMessage_<QQ号>"
+  // (memory file stem), still come from data not yet renamed and old backups.
+  // Render both as Chinese labels: 私聊 · <名字> / 群聊 · <群号>.
   const SESSION_TYPE_LABELS={FriendMessage:"私聊",GroupMessage:"群聊",GuildMessage:"频道",TempMessage:"临时会话",OtherMessage:"其他"};
+  const SESSION_KIND=/(FriendMessage|GroupMessage|GuildMessage|TempMessage|OtherMessage)/;
+  function _isNeutralPlace(text){
+    return text==="self"||["group:","private:","web:","other:"].some(p=>text.startsWith(p));
+  }
   function parseSessionKey(key){
     const raw=String(key||"").trim();
+    if(raw.startsWith("group:")) return {platform:"",type:"GroupMessage",id:raw.slice(6)};
+    if(raw.startsWith("private:")) return {platform:"",type:"FriendMessage",id:raw.slice(8)};
+    if(_isNeutralPlace(raw)) return {platform:"",type:"",id:raw};
     const norm=raw.replace(/:/g,"_");
     const m=norm.match(/^(.*?)_(FriendMessage|GroupMessage|GuildMessage|TempMessage|OtherMessage)_(.+)$/);
     if(m) return {platform:m[1],type:m[2],id:m[3]};
@@ -199,14 +208,21 @@
     if(!name) name=p.id||String(key||"");
     return name?(typeLabel+" · "+name):typeLabel;
   }
-  // task-55: one real session may be stored under ":" and "_" variants
-  // (events use colons, memory files use underscores). Canonical form unifies
-  // them as platform:Type:id, so dropdowns/cards never duplicate a person and
-  // both raw variants match one selection.
+  // task-55: one real session may be stored under ":" and "_" variants, and
+  // since move 5j also under its neutral place. The canonical form is the
+  // neutral place, worked out exactly as Python's canonical_session_key
+  // (discretion.place_of), so dropdowns/cards never duplicate a person and
+  // every raw variant matches one selection.
   function canonicalSessionKey(key){
-    const p=parseSessionKey(key);
-    if(p&&p.type) return (p.platform||"default")+":"+p.type+":"+p.id;
-    return String(key||"").trim().replace(/_/g,":");
+    const text=String(key||"").trim();
+    if(!text) return "";
+    if(_isNeutralPlace(text)) return text;
+    const m=SESSION_KIND.exec(text);
+    if(!m) return "other:"+text;
+    const id=text.slice(m.index+m[0].length).replace(/^[:_]+|[:_]+$/g,"");
+    if(m[1]==="GroupMessage"||m[1]==="GuildMessage") return "group:"+id;
+    if(m[1]==="FriendMessage"||m[1]==="TempMessage") return "private:"+id;
+    return "other:"+id;
   }
   function sessionTypeLabel(key){
     const p=parseSessionKey(key);
