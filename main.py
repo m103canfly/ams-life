@@ -629,7 +629,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             self._group_reply_open(event)
         try:
             turn_request = adapter_astrbot_turn.request_from_astrbot(req)
-        except Exception as exc:
+        except Exception as exc:   # failing, she gets none rather than all of them (PR #27)
             req.func_tool = None
             logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
             turn_request = adapter_astrbot_turn.request_from_astrbot(req)
@@ -645,7 +645,7 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             adapter_astrbot_turn.request_into_astrbot(turn_request, req, tools=False)
             try:
                 adapter_astrbot_turn.tools_into_astrbot(turn_request, req)
-            except Exception as exc:
+            except Exception as exc:   # failing, she gets none rather than all of them (PR #27)
                 req.func_tool = None
                 logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
             # Asking once more uses AstrBot's request, after it prepares the images.
