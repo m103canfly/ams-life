@@ -134,6 +134,20 @@ class Load(TempFolder):
         self.assertIsInstance(config['price'], float)
         self.assertEqual(problems, [])
 
+    def test_a_file_astrbot_wrote_with_a_bom_is_read(self):
+        data = {'is_on': True, 'count': 7, 'price': 1.5, 'name': 'hello',
+                'words': ['a', 'b']}
+        with open(self.path, 'w', encoding='utf-8-sig') as file:
+            json.dump(data, file)
+        self.assertTrue(self.path.read_bytes().startswith(b'\xef\xbb\xbf'))
+        config, problems = load(self.path, SCHEMA)
+        self.assertIs(config['is_on'], True)
+        self.assertEqual(config['count'], 7)
+        self.assertEqual(config['price'], 1.5)
+        self.assertEqual(config['name'], 'hello')
+        self.assertEqual(config['words'], ['a', 'b'])
+        self.assertEqual(problems, [])
+
     def test_a_key_outside_the_schema_is_kept(self):
         self.write({'count': 4, 'a_new_setting': {'inner': [1, 2]}})
         config, problems = load(self.path, SCHEMA)

@@ -42,6 +42,13 @@ leave keys this version does not know. Dropping them would quietly undo her sett
 the next save, so they are kept as they are (and written back, after the schema keys) and
 only noted as `unknown: <key>`.
 
+## Why a byte-order mark is accepted
+
+AstrBot writes its configuration with `utf-8-sig`, so the file may start with a byte-order
+mark, and reading that mark as data would make the whole file `unreadable` and drop every
+setting to its default. `load` therefore reads with `utf-8-sig` too, while `save` keeps
+writing plain UTF-8 with no mark.
+
 ## Why a problem never holds a value
 
 Lists and prices are the least public part of her configuration, and a problem ends up in

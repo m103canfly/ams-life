@@ -52,7 +52,7 @@ def load(path, schema) -> tuple:
     """
     config = defaults(schema)
     try:
-        with open(path, encoding='utf-8') as file:
+        with open(path, encoding='utf-8-sig') as file:
             data = json.load(file)
     except FileNotFoundError:
         return config, []
