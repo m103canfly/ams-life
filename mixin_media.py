@@ -431,10 +431,13 @@ class MediaMixin(PortsMixin):
                    time.time() - float(cache[_sha256(r)].get("ts", 0) or 0) >= 86400]
         if missing:
             try:
-                cfg = self.context.get_config()
-                provider_settings = cfg.get("provider_settings", {}) if isinstance(cfg, dict) else {}
-                prompt = interpretation.image_caption_prompt(
-                    provider_settings.get("image_caption_prompt"))
+                try:
+                    cfg = self.context.get_config()
+                    provider_settings = cfg.get("provider_settings", {}) if isinstance(cfg, dict) else {}
+                    prompt = interpretation.image_caption_prompt(
+                        provider_settings.get("image_caption_prompt"))
+                except Exception:
+                    prompt = interpretation.image_caption_prompt("")
                 # Image caption always uses the vision provider, never a text LLM.
                 provider = self._vision_provider_for(event)
                 if provider is not None:
