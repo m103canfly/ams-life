@@ -15,6 +15,18 @@ from asyncio import CancelledError, TimeoutError as AsyncTimeoutError, shield, w
 from datetime import datetime, timedelta
 from pathlib import Path
 
+
+def _image_key(plugin, api):
+    """The photo key: the 4a store's vision key in the new program ("" when unreadable), else api_config's."""
+    store = getattr(plugin, "_key_store", None)
+    if store is not None:
+        try:
+            return str(store.get("vision") or "")
+        except Exception:
+            return ""
+    return api.get("api_key")
+
+
 try:
     from .common import *  # noqa: F401,F403
     from . import tts, browse, daily, discretion, events, mixin_ports
@@ -391,10 +403,10 @@ class SelfieMixin(PortsMixin):
                 for attempt in range(PHOTO_RETRIES):
                     try:
                         if kind == "selfie":
-                            raw = await self._post_selfie(base + "/images/edits", prompt, api.get("api_key"), "1080x1440", ref)
+                            raw = await self._post_selfie(base + "/images/edits", prompt, _image_key(self, api), "1080x1440", ref)
                         else:
                             raw, _ = await self._post_json(base + "/images/generations", {"model": "codex-image", "prompt": prompt,
-                                "size": "1080x1440", "n": 1}, api.get("api_key"), timeout=300)
+                                "size": "1080x1440", "n": 1}, _image_key(self, api), timeout=300)
                         self._phone_account(kind, self._phone_price("photo"))
                         value = json.loads(raw.decode("utf-8"))
                         blob = base64.b64decode(value["data"][0]["b64_json"], validate=True)
