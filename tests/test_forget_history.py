@@ -90,6 +90,18 @@ class ForgetHistory(unittest.TestCase):
         self.assertEqual(result['history'], 0)
         self.assertEqual(len(store.recent('group:900001')), 1)
 
+        # A nonmatching entry ID can hide an incorrect history deletion call.
+        class RecordingStore:
+            def __init__(self): self.calls = []
+            def forget_person(self, person): self.calls.append(('person', person)); return 0
+            def forget_messages(self, ids): self.calls.append(('messages', ids)); return 0
+
+        recording = RecordingStore()
+        self.plugin._history = recording
+        result = self.plugin._forget(entry_ids=['entry-1'])
+        self.assertEqual(result['history'], 0)
+        self.assertEqual(recording.calls, [])
+
     def test_gate_checks_people_sources_and_message_id(self):
         store = self.history()
         reg = self.plugin._forget_reg
