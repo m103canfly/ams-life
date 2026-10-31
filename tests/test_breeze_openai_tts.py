@@ -190,3 +190,82 @@ class BridgeTests(unittest.TestCase):
                 with self.assertRaises(self.b.HTTPException) as cm:
                     asyncio.run(self.b.speech(Request()))
                 self.assertEqual((cm.exception.status_code, cm.exception.detail), (status, detail))
+
+    def tone_entry(self, name, text):
+        path = Path(self.tmp.name) / name
+        path.write_bytes(name.encode())
+        return {'ref_audio': str(path), 'ref_text': text}
+
+    def speak_with_config(self, config, voice):
+        class Request:
+            async def json(self): return {'input': 'hello', 'voice': voice}
+        with patch.object(self.b, 'conf', return_value=config), \
+                patch.object(self.b, 'call_breeze', return_value=(b'12', 24000)) as call:
+            asyncio.run(self.b.speech(Request()))
+        return call.call_args.args[1]
+
+    def test_tones_choose_first_for_each_voice(self):
+        tones = {name: [self.tone_entry(str(i), 'first ' + str(i)),
+                        self.tone_entry('backup' + str(i), 'second ' + str(i))]
+                 for i, name in enumerate(('开心', '平静', '温柔', '认真', '难过'))}
+        for name, entries in tones.items():
+            with self.subTest(name=name):
+                selected = self.speak_with_config(dict(self.c, tones=tones), name)
+                self.assertEqual((selected['ref_audio'], selected['ref_text']),
+                                 (entries[0]['ref_audio'], entries[0]['ref_text']))
+
+    def test_tone_uses_second_when_first_missing(self):
+        missing = {'ref_audio': str(Path(self.tmp.name) / 'missing'), 'ref_text': 'missing'}
+        backup = self.tone_entry('backup', 'backup words')
+        selected = self.speak_with_config(dict(self.c, tones={'开心': [missing, backup]}), '开心')
+        self.assertEqual((selected['ref_audio'], selected['ref_text']),
+                         (backup['ref_audio'], backup['ref_text']))
+
+    def test_unknown_voice_uses_calm(self):
+        calm = self.tone_entry('calm', 'calm words')
+        other = self.tone_entry('other', 'other words')
+        config = dict(self.c, tones={'平静': [calm], '': [other], 'alloy': [other], 'v4': [other]})
+        for voice in ('', 'alloy', 'v4', 'unknown', None, [], {}):
+            with self.subTest(voice=voice):
+                self.assertEqual(self.speak_with_config(config, voice)['ref_text'], 'calm words')
+
+    def test_tone_fallback_chain_and_unavailable(self):
+        bad = {'ref_audio': str(Path(self.tmp.name) / 'missing'), 'ref_text': 'missing'}
+        calm = self.tone_entry('calm', 'calm words')
+        config = dict(self.c, tones={'开心': [bad], '平静': [calm]})
+        self.assertEqual(self.speak_with_config(config, '开心')['ref_text'], 'calm words')
+        config['tones']['平静'] = [bad]
+        self.assertEqual(self.speak_with_config(config, '开心')['ref_text'], 'sample reference')
+        config['ref_audio'] = bad['ref_audio']
+        class Request:
+            async def json(self): return {'input': 'hello', 'voice': '开心'}
+        with patch.object(self.b, 'conf', return_value=config), \
+                patch.object(self.b, 'call_breeze') as call:
+            with self.assertRaises(self.b.HTTPException) as cm:
+                asyncio.run(self.b.speech(Request()))
+            self.assertEqual(cm.exception.status_code, 503)
+            call.assert_not_called()
+
+    def test_old_config_uses_top_level_reference(self):
+        selected = self.speak_with_config(self.c, '开心')
+        self.assertEqual((selected['ref_audio'], selected['ref_text']),
+                         (self.c['ref_audio'], self.c['ref_text']))
+
+    def test_selected_reference_reaches_breeze(self):
+        entry = self.tone_entry('selected', 'selected reference words')
+        config = dict(self.c, tones={'温柔': [entry]})
+        class Request:
+            async def json(self): return {'input': 'hello', 'voice': '温柔'}
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value, response.headers = b'12', {}
+        def opener(req, timeout):
+            parsed = parts(req.data, req.get_header('Content-type'))
+            self.assertEqual(parsed['ref_text'].get_content(), entry['ref_text'])
+            self.assertEqual(parsed['ref_audio'].get_filename(), 'reference.wav')
+            self.assertEqual(parsed['ref_audio'].get_payload(decode=True), b'selected')
+            return response
+        original = self.b.call_breeze
+        with patch.object(self.b, 'conf', return_value=config), \
+                patch.object(self.b, 'call_breeze', side_effect=lambda text, c: original(text, c, opener=opener)):
+            asyncio.run(self.b.speech(Request()))
