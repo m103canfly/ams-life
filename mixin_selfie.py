@@ -17,7 +17,7 @@ from pathlib import Path
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse, daily, discretion, events
+    from . import tts, browse, daily, discretion, events, mixin_ports
     from .mixin_ports import PortsMixin
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -26,6 +26,7 @@ except ImportError:
     import daily
     import discretion
     import events
+    import mixin_ports
     from mixin_ports import PortsMixin
 
 SELFIE_DIR = DATA_DIR / "selfie"
@@ -111,8 +112,8 @@ async def _browser_screenshot(plugin, event, url):
     provider = plugin._vision_provider_for(event, source="screenshot")
     if provider is None:
         return None
-    response = await provider.text_chat(prompt=interpretation.image_caption_prompt(), image_urls=[str(path)])
-    description = interpretation.parse_image_caption(str(getattr(response, "completion_text", "") or ""))
+    reply = await mixin_ports.model_for(provider).chat(prompt=interpretation.image_caption_prompt(), images=[str(path)])
+    description = interpretation.parse_image_caption(reply.text)
     return (path, description) if description else None
 
 

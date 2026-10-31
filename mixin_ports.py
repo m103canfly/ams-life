@@ -10,6 +10,11 @@ except ImportError:
     import discretion
 
 
+def model_for(provider):
+    """A model client over this provider."""
+    return adapter_astrbot_model.AstrBotModel(provider)
+
+
 class PortsMixin:
     """Where the plugin gets its ports: today over AstrBot, later over our own layers."""
 
@@ -37,7 +42,7 @@ class PortsMixin:
 
     def _model(self, provider):
         """A model client over this provider."""
-        return adapter_astrbot_model.AstrBotModel(provider)
+        return model_for(provider)
 
     def _incoming(self, event):
         """The incoming message represented by this event."""
