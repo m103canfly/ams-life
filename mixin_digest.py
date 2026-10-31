@@ -103,7 +103,7 @@ class DigestMixin:
         written = 0
         for item in items:
             people, ids = digest.sources(item, codes, shown, day_all)
-            record = self._digest_event(place, win.get("umo") or place, item, codes, day_all, people, ids,
+            record = self._digest_event(place, place, item, codes, day_all, people, ids,
                                         private, now)
             if not self._new_item_kept(record):
                 continue   # someone or something the registry rules out: not kept, nor merged in

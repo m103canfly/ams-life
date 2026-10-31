@@ -451,7 +451,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004390.0
      },
      "review_count": 0,
@@ -511,7 +511,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004390.0
      },
      "review_count": 0,
@@ -576,7 +576,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004510.0
      },
      "review_count": 0,
@@ -636,7 +636,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004510.0
      },
      "review_count": 0,
@@ -701,7 +701,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271330.0
      },
      "review_count": 0,
@@ -761,7 +761,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271330.0
      },
      "review_count": 0,
@@ -826,7 +826,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271350.0
      },
      "review_count": 0,
@@ -882,7 +882,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271350.0
      },
      "review_count": 0,
@@ -950,7 +950,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000000.0
      },
      "recall_count": 1,
@@ -1015,7 +1015,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000000.0
      },
      "review_count": 0,
@@ -1080,7 +1080,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000090.0
      },
      "review_count": 0,
@@ -1144,7 +1144,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000090.0
      },
      "recall_count": 1,
@@ -1217,7 +1217,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011740.0
      },
      "recall_count": 1,
@@ -1283,7 +1283,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011740.0
      },
      "review_count": 0,
@@ -1348,7 +1348,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011770.0
      },
      "review_count": 0,
@@ -1408,7 +1408,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011770.0
      },
      "review_count": 0,
@@ -1474,7 +1474,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793098170.0
      },
      "review_count": 0,
@@ -1534,7 +1534,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793098170.0
      },
      "review_count": 0,
@@ -1599,7 +1599,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271800.0
      },
      "review_count": 0,
@@ -1672,7 +1672,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271800.0
      },
      "recall_count": 2,
@@ -1742,7 +1742,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271820.0
      },
      "review_count": 0,
@@ -1802,7 +1802,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271820.0
      },
      "review_count": 0,
@@ -1880,7 +1880,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271840.0
      },
      "recall_count": 1,
@@ -1945,7 +1945,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271840.0
      },
      "review_count": 0,
@@ -2013,7 +2013,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271870.0
      },
      "recall_count": 1,
@@ -2077,7 +2077,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271870.0
      },
      "review_count": 0,
@@ -2142,7 +2142,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793272490.0
      },
      "review_count": 0,
@@ -2198,7 +2198,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793272490.0
      },
      "review_count": 0,
@@ -2263,7 +2263,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000690.0
      },
      "review_count": 0,
@@ -2323,7 +2323,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000690.0
      },
      "review_count": 0,
@@ -2391,7 +2391,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000730.0
      },
      "recall_count": 1,
@@ -2456,7 +2456,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000730.0
      },
      "review_count": 0,
@@ -2521,7 +2521,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000790.0
      },
      "review_count": 0,
@@ -2582,7 +2582,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000790.0
      },
      "review_count": 0,
@@ -2651,7 +2651,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098470.0
      },
      "recall_count": 2,
@@ -2716,7 +2716,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098470.0
      },
      "review_count": 0,
@@ -2781,7 +2781,7 @@
       ],
       "sender_id": "10005",
       "sender_name": "路人",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098530.0
      },
      "review_count": 0,
@@ -2841,7 +2841,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098530.0
      },
      "review_count": 0,
@@ -2906,7 +2906,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271380.0
      },
      "review_count": 0,
@@ -2966,7 +2966,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271380.0
      },
      "review_count": 0,
@@ -3034,7 +3034,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271400.0
      },
      "recall_count": 1,
@@ -3099,7 +3099,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271400.0
      },
      "review_count": 0,
@@ -3164,7 +3164,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793272890.0
      },
      "review_count": 0,
@@ -3224,7 +3224,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793272890.0
      },
      "review_count": 0,
@@ -3292,7 +3292,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793272920.0
      },
      "recall_count": 1,
@@ -3365,7 +3365,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793276520.0
      },
      "review_count": 0,
@@ -3421,7 +3421,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793276520.0
      },
      "review_count": 0,
@@ -8332,7 +8332,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004390.0
        },
        "role": "user",
@@ -8367,7 +8367,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004390.0
        },
        "role": "assistant",
@@ -8407,7 +8407,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004510.0
        },
        "role": "user",
@@ -8442,7 +8442,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004510.0
        },
        "role": "assistant",
@@ -8482,7 +8482,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271330.0
        },
        "role": "user",
@@ -8517,7 +8517,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271330.0
        },
        "role": "assistant",
@@ -8557,7 +8557,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271350.0
        },
        "role": "user",
@@ -8592,7 +8592,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271350.0
        },
        "role": "assistant",
@@ -8632,7 +8632,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000000.0
        },
        "role": "user",
@@ -8667,7 +8667,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000000.0
        },
        "role": "assistant",
@@ -8707,7 +8707,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000090.0
        },
        "role": "user",
@@ -8742,7 +8742,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000090.0
        },
        "role": "assistant",
@@ -8782,7 +8782,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011740.0
        },
        "role": "user",
@@ -8817,7 +8817,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011740.0
        },
        "role": "assistant",
@@ -8857,7 +8857,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011770.0
        },
        "role": "user",
@@ -8892,7 +8892,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011770.0
        },
        "role": "assistant",
@@ -8932,7 +8932,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793098170.0
        },
        "role": "user",
@@ -8967,7 +8967,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793098170.0
        },
        "role": "assistant",
@@ -9007,7 +9007,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271800.0
        },
        "role": "user",
@@ -9042,7 +9042,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271800.0
        },
        "role": "assistant",
@@ -9082,7 +9082,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271820.0
        },
        "role": "user",
@@ -9117,7 +9117,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271820.0
        },
        "role": "assistant",
@@ -9157,7 +9157,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271840.0
        },
        "role": "user",
@@ -9192,7 +9192,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271840.0
        },
        "role": "assistant",
@@ -9232,7 +9232,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        },
        "role": "user",
@@ -9267,7 +9267,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        },
        "role": "assistant",
@@ -9307,7 +9307,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793272490.0
        },
        "role": "user",
@@ -9342,7 +9342,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793272490.0
        },
        "role": "assistant",
@@ -9382,7 +9382,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000690.0
        },
        "role": "user",
@@ -9417,7 +9417,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000690.0
        },
        "role": "assistant",
@@ -9457,7 +9457,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000730.0
        },
        "role": "user",
@@ -9492,7 +9492,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000730.0
        },
        "role": "assistant",
@@ -9532,7 +9532,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000790.0
        },
        "role": "user",
@@ -9567,7 +9567,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000790.0
        },
        "role": "assistant",
@@ -9607,7 +9607,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098470.0
        },
        "role": "user",
@@ -9642,7 +9642,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098470.0
        },
        "role": "assistant",
@@ -9682,7 +9682,7 @@
         ],
         "sender_id": "10005",
         "sender_name": "路人",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098530.0
        },
        "role": "user",
@@ -9717,7 +9717,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098530.0
        },
        "role": "assistant",
@@ -9757,7 +9757,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271380.0
        },
        "role": "user",
@@ -9792,7 +9792,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271380.0
        },
        "role": "assistant",
@@ -9832,7 +9832,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271400.0
        },
        "role": "user",
@@ -9867,7 +9867,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271400.0
        },
        "role": "assistant",
@@ -9907,7 +9907,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        },
        "role": "user",
@@ -9942,7 +9942,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        },
        "role": "assistant",
@@ -9982,7 +9982,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272920.0
        },
        "role": "user",
@@ -10022,7 +10022,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793276520.0
        },
        "role": "user",
@@ -10057,7 +10057,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793276520.0
        },
        "role": "assistant",
