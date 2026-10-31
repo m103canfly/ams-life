@@ -146,7 +146,7 @@ class AutonomyMixin(PortsMixin):
                 core, self._relationship_of(user_data), now=current)
             if not text:
                 return False
-            here = discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
+            here = self._here(event)
             await self._messenger(event, as_event=True).send(here, (events.Segment("text", {"text": text}),))
             day = time.strftime("%Y-%m-%d", time.localtime(current))
             sent_count = int(state.get("sent_count", 0) or 0)

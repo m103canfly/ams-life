@@ -37,6 +37,9 @@ class PortsMixin:
 
     def _messenger(self, event=None, *, as_event=False):
         """A messenger for this event and the plugin's context."""
+        neutral = getattr(self, "_neutral_messenger", None)
+        if neutral is not None:   # the new program's OneBot messenger (5e-5): it sends by place
+            return neutral
         send = getattr(event, "send", None)
         kwargs = {}
         if as_event and callable(send):
