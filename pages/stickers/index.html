@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- ams-life (AGPL-3.0); see NOTICE.md. "她的表情包": the owner sees her stickers, deletes one, adds some.
-     Her pictures come from the plugin through AstrBot's page bridge (read with the owner's login); none is in
-     this repository. Opened without AstrBot, it shows made-up drawings so that the page can be looked at.
+     Her pictures come from the plugin through AstrBot's page bridge (read with the owner's login), or through
+     ams-bridge.js on our own panel server; none is in this repository. Opened without either, it shows made-up
+     drawings so that the page can be looked at.
      pages/dashboard/stickers/ is this folder copied, byte for byte, so that the panel can open it inside its own
      frame ("她的表情包" in the panel's side list); there it offers the way back. -->
 <html lang="zh-CN">
@@ -67,6 +68,7 @@
     </div>
   </div>
 </dialog>
+<script src="./ams-bridge.js"></script>
 <script src="./stickers.js?v=20261030-2"></script>
 </body>
 </html>

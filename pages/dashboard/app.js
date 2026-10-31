@@ -329,7 +329,7 @@
     try{
       let _embedded = false;
       try { _embedded = !!(window.parent && window.parent !== window); } catch (e) { _embedded = false; }
-      if(bridge && !_embedded){
+      if(bridge && !_embedded && !bridge.standalone){   // standalone: our own server's bridge (ams-bridge.js), opened by itself
         throw new Error("direct-open");
       }
       if(bridge){
@@ -983,33 +983,9 @@
       list.addEventListener("click",onMemAction);
       list.dataset.bound="1";
     }
-    if(tomb&&!tomb.dataset.bound){
-      tomb.addEventListener("click",onTombAction);
-      tomb.dataset.bound="1";
-    }
+    // ams-life step 1-3 took page/memory/restore away: the tombstone rows have no button, so no click handler
   }
 
-  async function onTombAction(e){
-    const target=e.target||{};
-    const btn=target.closest?target.closest("[data-mem-restore]"):null;
-    if(!btn) return;
-    const session=String(btn.dataset.session||"");
-    const id=String(btn.dataset.id||"");
-    if(!session||!id) return;
-    if(!bridge){ window.alert("未连接 AstrBot 页面桥，无法恢复"); return; }
-    btn.disabled=true; btn.textContent="恢复中…";
-    try{
-      const path="page/memory/restore/"+encodeURIComponent(session)+"/"+encodeURIComponent(id);
-      const raw=await bridge.apiPost(path,{});
-      const payload=raw&&raw.data?raw.data:raw;
-      if(!payload||payload.status==="error"||payload.status==="fail") throw new Error((payload&&payload.message)||"恢复失败");
-      btn.textContent="已恢复";
-      setTimeout(()=>{ try{ load(); }catch(err){} },500);
-    }catch(err){
-      btn.disabled=false; btn.textContent="恢复";
-      window.alert("恢复失败："+String(err&&err.message||err));
-    }
-  }
   function onMemAction(e){
     const target=e.target||{};
     const btn=target.closest?target.closest("[data-mem-op]"):null;
@@ -1042,14 +1018,16 @@
       const el=card?card.querySelector(".mem-op-state"):null;
       if(el) el.textContent=t;
     };
+    // only deleting is left (step 1-3 took the rollback route away); the list draws no other button
+    if(op!=="delete"){ setState("已经没有这个功能"); return; }
     if(!bridge){ setState("未连接 AstrBot 页面桥，无法操作"); return; }
-    setState(op==="delete"?"正在删除…":"正在回滚…");
+    setState("正在删除…");
     try{
-      const path="page/memory/"+op+"/"+encodeURIComponent(session)+"/"+encodeURIComponent(id);
+      const path="page/memory/delete/"+encodeURIComponent(session)+"/"+encodeURIComponent(id);
       const raw=await bridge.apiPost(path,{});
       const payload=raw&&raw.data?raw.data:raw;
       if(!payload||payload.status==="error"||payload.status==="fail") throw new Error((payload&&payload.message)||"操作失败");
-      setState(op==="delete"?forgetSummary(payload.data&&payload.data.counts):"已回滚到上一版本");
+      setState(forgetSummary(payload.data&&payload.data.counts));
       setTimeout(()=>{ try{ load(); }catch(err){} },900);
     }catch(err){
       setState("失败："+String(err&&err.message||err));

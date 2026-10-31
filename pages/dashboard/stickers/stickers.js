@@ -1,6 +1,6 @@
 /* ams-life (AGPL-3.0); see NOTICE.md. "她的表情包" (index.html): her stickers through AstrBot's page bridge --
    page/stickers (one page of them), page/stickers/image (one picture), page/stickers/delete, page/stickers/add.
-   No picture is in this page or this repository; opened without AstrBot it shows made-up drawings.
+   No picture is in this page or this repository; opened without AstrBot or our own panel server (ams-bridge.js) it shows made-up drawings.
    pages/dashboard/stickers/ is this folder copied: the panel opens it inside its own frame, because AstrBot lets a
    plugin page neither change the address of the window nor open another page of the plugin. */
 (function () {
