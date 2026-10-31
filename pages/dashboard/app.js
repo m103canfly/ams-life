@@ -1986,6 +1986,25 @@
   });
 
   let apiInit = false;
+  // On our own panel server (ams-bridge.js, `standalone`) the keys are filled in 钥匙 (keys.js),
+  // so the five API Key boxes are hidden and never read: every api_key sent from here is "",
+  // which the back end takes as "keep what is saved". Inside AstrBot the boxes stay as they were.
+  function apiOnOwnServer() {
+    try { const b = window.AstrBotPluginPage; return !!(b && b.standalone); } catch (e) { return false; }
+  }
+  function setupApiOwnServer() {
+    if (!apiOnOwnServer()) return;
+    document.querySelectorAll("#settingsApi .api-key-field").forEach(field => {
+      field.hidden = true;
+      const input = field.querySelector("input");
+      if (input) { input.value = ""; input.disabled = true; }
+    });
+    const line = $("apiKeysElsewhere"), unused = $("llmUnusedNote"), llm = $("llmBlock"), go = $("apiGoKeysBtn");
+    if (line) line.hidden = false;
+    if (unused) unused.hidden = false;
+    if (llm) llm.classList.add("api-unused");
+    if (go) go.addEventListener("click", () => { const tab = $("settingsKeysTab"); if (tab) tab.click(); });
+  }
   function setOptions(sel, models, current) {
     if (!sel) return;
     const list = Array.from(new Set((models || []).filter(Boolean)));
@@ -2010,7 +2029,7 @@
       note.textContent = "已检测到 AstrBot " + kind + " provider。默认直接使用它；选择自定义 API 再填下面字段。";
     } else {
       state.textContent = "未检测到 AstrBot provider";
-      note.textContent = "没有检测到 AstrBot " + kind + " provider。填写 API Base / API Key / 模型。";
+      note.textContent = "没有检测到 AstrBot " + kind + " provider。填写 API Base / " + (apiOnOwnServer() ? "" : "API Key / ") + "模型。";
     }
     if (source === "astrbot") {
       base.readOnly = true; key.readOnly = true;
@@ -2072,7 +2091,7 @@
     try {
       const raw = await Promise.race([
         bridge.apiPost("page/models", {
-          kind, source: src.value, base_url: base.value, api_key: key.value
+          kind, source: src.value, base_url: base.value, api_key: apiOnOwnServer() ? "" : key.value
         }),
         new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("25 秒没有回应（页面桥没转发，或后端卡住）")), 25000); })
       ]);
@@ -2092,13 +2111,13 @@
     const state = $("apiSaveState"), topState = $("apiSaveStateTop");
     const setState = (t) => { if (state) state.textContent = t; if (topState) topState.textContent = t; };
     if (!bridge) { setState("未连接 AstrBot 页面桥，保存失败"); return; }
-    const body = {};
+    const body = {}, ownServer = apiOnOwnServer();
     for (const [kind, prefix] of [["llm", "llm"], ["embedding", "embed"], ["rerank", "rerank"], ["tts", "tts"], ["image", "image"]]) {
       body[kind] = {
         source: $(prefix + "Source").value,
         base_url: $(prefix + "Base").value.trim(),
         model: $(prefix + "Model").value.trim(),
-        api_key: $(prefix + "Key").value.trim(),
+        api_key: ownServer ? "" : $(prefix + "Key").value.trim(),
         enabled: !!($(prefix + "Enabled") ? $(prefix + "Enabled").checked : true)
       };
       if (prefix === "tts") {
@@ -2137,6 +2156,7 @@
     if (btn) btn.addEventListener("click", () => loadModels(prefix === "embed" ? "embedding" : prefix, prefix));
   });
   document.querySelectorAll(".js-save-api").forEach(btn => btn.addEventListener("click", saveApiConfig));
+  setupApiOwnServer();
   async function loadAstrBotDefaults() {
     const top = $("apiSaveStateTop");
     if (!bridge) { if (top) top.textContent = "未连接 AstrBot 页面桥"; return; }

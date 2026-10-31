@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="light dark" /><title>小爱的内心世界</title>
-<link rel="stylesheet" href="./styles.css?v=20261031-1" />
+<link rel="stylesheet" href="./styles.css?v=20261031-2" />
 <link rel="stylesheet" href="./look.css?v=20261029-1" />
 </head>
 <body>
@@ -466,6 +466,8 @@
       </div>
       <div class="section-title" data-settings-title="settingsApi"><div><div class="eyebrow">API ACCESS</div><h2>API 接入 · 覆盖项</h2></div><span class="hint">ASTRBOT 优先</span></div>
       <div class="panel settings settings-panel api-panel active" id="settingsApi">
+      <!-- On our own panel server the keys are filled in 钥匙 (keys.js); app.js shows this line and hides the API Key boxes -->
+      <div class="notice api-keys-elsewhere" id="apiKeysElsewhere" hidden>新程序里，聊天模型和看图的 Key 在“钥匙”里填；这里只管地址和模型。<button type="button" class="btn mini" id="apiGoKeysBtn">去钥匙</button></div>
       <div class="notice">行为参数（注入意图 / 记忆 / 知识库 / 语音 / 图片 / 衰减常数）统一在 AstrBot 插件管理 → ams-life 配置里设置；这里只保留 ams-life 自己的 API 覆盖、记忆压缩、可视化和备份，避免两处重复。</div>
         <div class="api-savebar">
           <div><b>API 接入</b><span id="apiSaveStateTop">默认读取 AstrBot，确认后保存</span></div>
@@ -476,12 +478,13 @@
           </div>
         </div>
         <div id="apiBody">
-        <div class="api-block">
+        <div class="api-block" id="llmBlock">
           <div class="api-head"><b>LLM / 对话</b><span id="llmSourceState">检测中</span></div>
+          <p class="api-note api-unused-note" id="llmUnusedNote" hidden>新程序的聊天模型用“钥匙”里的聊天模型，这一块不用。</p>
           <div class="api-grid">
             <label><span>来源</span><select id="llmSource"><option value="astrbot">跟随 AstrBot</option><option value="custom">自定义 API</option></select></label>
             <label><span>API Base</span><input id="llmBase" placeholder="https://api.example.com/v1" autocomplete="off"></label>
-            <label><span>API Key</span><input id="llmKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
+            <label class="api-key-field"><span>API Key</span><input id="llmKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
             <label><span>模型</span><div class="api-model-row"><select id="llmModel"></select><button type="button" class="btn mini" id="llmModelsBtn">获取模型</button></div></label>
           </div>
           <p class="api-note" id="llmNote">LLM 默认使用 AstrBot 当前平台模型；没有时再填自定义 API。</p>
@@ -491,7 +494,7 @@
           <div class="api-grid">
             <label><span>来源</span><select id="embedSource"><option value="astrbot">跟随 AstrBot</option><option value="custom">自定义 API</option></select></label>
             <label><span>API Base</span><input id="embedBase" placeholder="https://api.example.com/v1" autocomplete="off"></label>
-            <label><span>API Key</span><input id="embedKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
+            <label class="api-key-field"><span>API Key</span><input id="embedKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
             <label><span>模型</span><div class="api-model-row"><select id="embedModel"></select><button type="button" class="btn mini" id="embedModelsBtn">获取模型</button></div></label>
           </div>
           <p class="api-note" id="embedNote">未检测到 AstrBot embedding provider 时，请填写自定义 API。</p>
@@ -501,7 +504,7 @@
           <div class="api-grid">
             <label><span>来源</span><select id="rerankSource"><option value="astrbot">跟随 AstrBot</option><option value="custom">自定义 API</option></select></label>
             <label><span>API Base</span><input id="rerankBase" placeholder="https://api.example.com/v1" autocomplete="off"></label>
-            <label><span>API Key</span><input id="rerankKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
+            <label class="api-key-field"><span>API Key</span><input id="rerankKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
             <label><span>模型</span><div class="api-model-row"><select id="rerankModel"></select><button type="button" class="btn mini" id="rerankModelsBtn">获取模型</button></div></label>
           </div>
           <p class="api-note" id="rerankNote">未检测到 AstrBot rerank provider 时，请填写自定义 API。</p>
@@ -511,7 +514,7 @@
           <div class="api-grid">
             <label><span>来源</span><select id="ttsSource"><option value="astrbot">跟随 AstrBot</option><option value="custom">自定义 API</option></select></label>
             <label><span>API Base</span><input id="ttsBase" placeholder="https://api.example.com/v1" autocomplete="off"></label>
-            <label><span>API Key</span><input id="ttsKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
+            <label class="api-key-field"><span>API Key</span><input id="ttsKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
             <label><span>模型</span><div class="api-model-row"><select id="ttsModel"></select><button type="button" class="btn mini" id="ttsModelsBtn">获取模型</button></div></label>
             <label><span>音色 / Voice</span><input id="ttsVoice" placeholder="alloy / 自定义音色" autocomplete="off"></label>
             <label><span>格式</span><select id="ttsFormat"><option value="mp3">mp3</option><option value="wav">wav</option><option value="opus">opus</option></select></label>
@@ -523,7 +526,7 @@
           <div class="api-grid">
             <label><span>来源</span><select id="imageSource"><option value="astrbot">跟随 AstrBot</option><option value="custom">自定义 API</option></select></label>
             <label><span>API Base</span><input id="imageBase" placeholder="https://api.example.com/v1" autocomplete="off"></label>
-            <label><span>API Key</span><input id="imageKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
+            <label class="api-key-field"><span>API Key</span><input id="imageKey" type="password" placeholder="留空 = 保持已保存" autocomplete="new-password"></label>
             <label><span>模型</span><div class="api-model-row"><select id="imageModel"></select><button type="button" class="btn mini" id="imageModelsBtn">获取模型</button></div></label>
             <label><span>尺寸 / Size</span><input id="imageSize" placeholder="1024x1024" autocomplete="off"></label>
           </div>
@@ -628,5 +631,5 @@
   </main>
 </div>
 <script src="./ams-bridge.js"></script><script src="./feedback.js"></script><script src="./look.js?v=20261029-1"></script><script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script><script src="./keys.js"></script><script src="./repo_link.js"></script>
-<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261031-3"></script><script src="./orb.js?v=20261027-0215"></script>
+<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261031-4"></script><script src="./orb.js?v=20261027-0215"></script>
 </body></html>
