@@ -417,7 +417,7 @@ class AttentionMixin:
         for index, part in enumerate(parts, 1):
             await asyncio.sleep(attention.typing_seconds(part))
             try:
-                await self._messenger(event).send(discretion.place_of(umo), messenger.text_segments(part))
+                await self._messenger(event).send(discretion.place_of(umo) or self._here(event), messenger.text_segments(part))
                 self._note_sent(event, 1)
             except Exception as exc:
                 logger.warning("[ams-life] the next message was not sent: %s", type(exc).__name__)

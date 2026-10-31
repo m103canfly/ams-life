@@ -390,8 +390,10 @@ class PhoneMixin(PortsMixin):
             line["reply_to"] = quoted
         win["recent"].append(line)
         # AstrBot's own id of this chat, for deleting what AstrBot keeps when the owner
-        # deletes someone (see _forget_in_astrbot)
-        win["umo"] = str(getattr(event, "unified_msg_origin", "") or "")
+        # deletes someone (see _forget_in_astrbot); a message without one leaves it as it was
+        _umo = str(getattr(event, "unified_msg_origin", "") or "")
+        if _umo:
+            win["umo"] = _umo
         self._write_window(here, win)
         if getattr(self, "_heard_ts", None) is not None:  # not yet read: the first read finds it
             self._heard_ts.append(line["ts"])

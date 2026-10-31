@@ -467,7 +467,7 @@ class SelfieMixin(PortsMixin):
             return False
 
     async def _media_after_reply(self, event, queue):
-        here = discretion.place_of(getattr(event, "unified_msg_origin", "") or "")
+        here = adapter_astrbot_turn.incoming_of(event).place
         rest = getattr(event, "_ams_rest_task", None)
         if rest is not None:
             try:
