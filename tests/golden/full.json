@@ -134,13 +134,13 @@
      "senders": [
       "10001"
      ],
-     "session": "default:FriendMessage:10001",
+     "session": "private:10001",
      "sources": [],
      "ts": 1793272490.0
     },
     "recall_count": 0,
     "reflection": "要好好记住",
-    "session": "default:FriendMessage:10001",
+    "session": "private:10001",
     "small_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！",
     "source_check": {
      "coverage": 1.0,
@@ -155,7 +155,7 @@
        ],
        "sender_id": "10001",
        "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793272490.0
       }
      ],
@@ -269,7 +269,7 @@
       "10001",
       "self"
      ],
-     "session": "default:FriendMessage:10001",
+     "session": "private:10001",
      "sources": [
       {
        "message_refs": [
@@ -277,14 +277,14 @@
        ],
        "sender_id": "10001",
        "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       },
       {
        "message_refs": [],
        "sender_id": "self",
        "sender_name": "她",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       }
      ],
@@ -293,10 +293,10 @@
     "ranking_mode": "deterministic_embedding",
     "recall_count": 0,
     "reflection": "",
-    "session": "default:FriendMessage:10001",
+    "session": "private:10001",
     "small_summary": "真的受够了！",
     "source_check": {
-     "coverage": 0.197,
+     "coverage": 0.2,
      "cross_ref": 2,
      "length_ratio": 0.007,
      "novelty": 0.0,
@@ -308,14 +308,14 @@
        ],
        "sender_id": "10001",
        "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       },
       {
        "message_refs": [],
        "sender_id": "self",
        "sender_name": "她",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       }
      ],
@@ -398,13 +398,13 @@
      "senders": [
       "10003"
      ],
-     "session": "default:GroupMessage:900001",
+     "session": "group:900001",
      "sources": [],
      "ts": 1793272890.0
     },
     "recall_count": 2,
     "reflection": "要好好记住",
-    "session": "default:GroupMessage:900001",
+    "session": "group:900001",
     "small_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下",
     "source_check": {
      "coverage": 1.0,
@@ -419,7 +419,7 @@
        ],
        "sender_id": "10003",
        "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
+       "session": "group:900001",
        "ts": 1793272890.0
       }
      ],
@@ -528,7 +528,7 @@
      "senders": [
       "10003"
      ],
-     "session": "default:GroupMessage:900001",
+     "session": "group:900001",
      "sources": [
       {
        "message_refs": [
@@ -536,7 +536,7 @@
        ],
        "sender_id": "10003",
        "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
+       "session": "group:900001",
        "ts": 1793272890.0
       }
      ],
@@ -545,10 +545,10 @@
     "ranking_mode": "deterministic_embedding",
     "recall_count": 2,
     "reflection": "",
-    "session": "default:GroupMessage:900001",
+    "session": "group:900001",
     "small_summary": "小爱 我们约好下周一起打副本吧",
     "source_check": {
-     "coverage": 0.23,
+     "coverage": 0.237,
      "cross_ref": 1,
      "length_ratio": 0.01,
      "novelty": 0.0,
@@ -560,7 +560,7 @@
        ],
        "sender_id": "10003",
        "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
+       "session": "group:900001",
        "ts": 1793272890.0
       }
      ],
@@ -676,7 +676,7 @@
      "senders": [
       "10003"
      ],
-     "session": "default:GroupMessage:900001",
+     "session": "group:900001",
      "sources": [
       {
        "message_refs": [
@@ -684,7 +684,7 @@
        ],
        "sender_id": "10003",
        "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
+       "session": "group:900001",
        "ts": 1793272920.0
       }
      ],
@@ -693,10 +693,10 @@
     "ranking_mode": "deterministic_embedding",
     "recall_count": 0,
     "reflection": "",
-    "session": "default:GroupMessage:900001",
+    "session": "group:900001",
     "small_summary": "记得提醒我明天交报告",
     "source_check": {
-     "coverage": 0.172,
+     "coverage": 0.179,
      "cross_ref": 1,
      "length_ratio": 0.006,
      "novelty": 0.0,
@@ -708,7 +708,7 @@
        ],
        "sender_id": "10003",
        "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
+       "session": "group:900001",
        "ts": 1793272920.0
       }
      ],
@@ -731,7 +731,401 @@
     "ts": 1793276520.0
    }
   ],
-  "archives/sessions/default_FriendMessage_10001/events.jsonl": [
+  "archives/sessions/group_900001/events.jsonl": [
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.89,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.599
+    },
+    "attachments": [],
+    "big_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
+    "boundary_score": 0.0,
+    "confidence": 1.0,
+    "emotion": "anger",
+    "emotion_intensity": 0.3901,
+    "emotion_layers": [
+     {
+      "centrality": 0.8,
+      "confidence": 0.9,
+      "emotion": "anger",
+      "evidence": "小爱 我们约好下周一起打副本吧",
+      "intensity": 0.8
+     }
+    ],
+    "emotion_layers_source": "summary",
+    "emotion_nuance": [
+     "委屈"
+    ],
+    "emotion_secondary": "contempt",
+    "event": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
+    "event_key": "小爱我们约好下周一起打",
+    "id": "evt_1793272890_50148",
+    "importance": 0.5,
+    "last_recall": 1793272890.0,
+    "meaning_to_her": "她很在意这件事",
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10002",
+      "10003"
+     ],
+     "source_ids": [
+      "m太开心了！！",
+      "m啊啊啊啊 好",
+      "m小爱 我们约"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "parent_event_id": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 我们约"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "group:900001",
+     "sources": [],
+     "ts": 1793272890.0
+    },
+    "recall_count": 0,
+    "reflection": "要好好记住",
+    "session": "group:900001",
+    "small_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下",
+    "source_check": {
+     "coverage": 1.0,
+     "cross_ref": 1,
+     "length_ratio": 1.063,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "group:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 5,
+    "source_texts": [
+     "太开心了！！！我终于抽到了！！！",
+     "恭喜恭喜！我也好开心",
+     "啊啊啊啊 好激动 小爱快夸我",
+     "超厉害的！好高兴",
+     "小爱 我们约好下周一起打副本吧"
+    ],
+    "strength": 0.5,
+    "summary_status": "llm",
+    "title": "小爱 我们约好下周一起打",
+    "ts": 1793272890.0
+   },
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.89,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.599
+    },
+    "attachments": [],
+    "big_summary": "小爱 我们约好下周一起打副本吧",
+    "central_details": "小爱 我们约好下周一起打副本吧",
+    "centrality": 0.0,
+    "confidence": 1.0,
+    "emotion": "anger",
+    "emotion_intensity": 0.3901,
+    "emotion_layers": [
+     {
+      "emotion": "anger",
+      "p": 0.7431
+     },
+     {
+      "emotion": "contempt",
+      "p": 0.2477
+     },
+     {
+      "emotion": "disgust",
+      "p": 0.0092
+     }
+    ],
+    "emotion_layers_source": "core",
+    "emotion_nuance": [],
+    "emotion_secondary": "contempt",
+    "event": "小爱 我们约好下周一起打副本吧",
+    "event_embedding": [
+     0.27735,
+     0.0,
+     0.0,
+     0.27735,
+     0.27735,
+     -0.27735,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.27735,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.27735,
+     0.0,
+     0.0,
+     0.27735,
+     -0.27735,
+     -0.27735,
+     0.0,
+     -0.5547,
+     0.0
+    ],
+    "event_key": "小爱我们约好下周一起打副本吧",
+    "id": "evt_1793272890_91556",
+    "importance": 0.562,
+    "last_recall": 1793272890.0,
+    "meaning_to_her": "",
+    "milestone": {},
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10003"
+     ],
+     "source_ids": [
+      "m小爱 我们约"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "peripheral_details": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 我们约"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "group:900001",
+     "sources": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "group:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "ts": 1793272890.0
+    },
+    "ranking_mode": "deterministic_embedding",
+    "recall_count": 0,
+    "reflection": "",
+    "session": "group:900001",
+    "small_summary": "小爱 我们约好下周一起打副本吧",
+    "source_check": {
+     "coverage": 0.237,
+     "cross_ref": 1,
+     "length_ratio": 0.01,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m小爱 我们约"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "group:900001",
+       "ts": 1793272890.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 1,
+    "source_texts": [
+     "小爱 我们约好下周一起打副本吧"
+    ],
+    "strength": 0.562,
+    "summary_status": "fallback",
+    "time_span": {
+     "end_ts": 1793272890.0,
+     "span_seconds": 0.0,
+     "start_ts": 1793272890.0
+    },
+    "title": "小爱 我们约好下周一起打副本吧",
+    "ts": 1793272890.0
+   },
+   {
+    "appraisal": {
+     "agency": 0.5,
+     "coping": 0.5,
+     "expectedness": 1.0,
+     "goal_relevance": 0.53,
+     "norm_compatibility": 0.62,
+     "novelty": 0.0,
+     "urgency": 0.406
+    },
+    "attachments": [],
+    "big_summary": "记得提醒我明天交报告",
+    "central_details": "记得提醒我明天交报告",
+    "centrality": 0.0,
+    "confidence": 1.0,
+    "emotion": "neutral",
+    "emotion_intensity": 0.2551,
+    "emotion_layers": [
+     {
+      "emotion": "confusion",
+      "p": 0.4446
+     },
+     {
+      "emotion": "disappointment",
+      "p": 0.2734
+     },
+     {
+      "emotion": "guilt",
+      "p": 0.2722
+     },
+     {
+      "emotion": "neutral",
+      "p": 0.0099
+     }
+    ],
+    "emotion_layers_source": "core",
+    "emotion_nuance": [],
+    "emotion_secondary": "confusion",
+    "event": "记得提醒我明天交报告",
+    "event_embedding": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     -0.28868,
+     -0.57735,
+     0.0,
+     0.0,
+     -0.28868,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.28868,
+     0.57735,
+     0.0,
+     0.28868,
+     0.0
+    ],
+    "event_key": "记得提醒我明天交报告",
+    "id": "evt_1793276520_99936",
+    "importance": 0.564,
+    "last_recall": 1793276520.0,
+    "meaning_to_her": "",
+    "milestone": {},
+    "modalities": [],
+    "origin": {
+     "people": [
+      "10003"
+     ],
+     "source_ids": [
+      "m记得提醒我明",
+      "m小爱 报告我"
+     ],
+     "visibility": "public",
+     "where": "group:900001"
+    },
+    "peripheral_details": "",
+    "provenance": {
+     "message_refs": [
+      "m小爱 报告我",
+      "m记得提醒我明"
+     ],
+     "sender_id": "10003",
+     "sender_name": "阿星",
+     "senders": [
+      "10003"
+     ],
+     "session": "group:900001",
+     "sources": [
+      {
+       "message_refs": [
+        "m记得提醒我明"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "group:900001",
+       "ts": 1793272920.0
+      }
+     ],
+     "ts": 1793276520.0
+    },
+    "ranking_mode": "deterministic_embedding",
+    "recall_count": 0,
+    "reflection": "",
+    "session": "group:900001",
+    "small_summary": "记得提醒我明天交报告",
+    "source_check": {
+     "coverage": 0.179,
+     "cross_ref": 1,
+     "length_ratio": 0.006,
+     "novelty": 0.0,
+     "overlap": 1.0,
+     "source_items": [
+      {
+       "message_refs": [
+        "m记得提醒我明"
+       ],
+       "sender_id": "10003",
+       "sender_name": "阿星",
+       "session": "group:900001",
+       "ts": 1793272920.0
+      }
+     ],
+     "speaker_ok": true,
+     "status": "ok",
+     "time_ok": true
+    },
+    "source_count": 1,
+    "source_texts": [
+     "记得提醒我明天交报告"
+    ],
+    "strength": 0.564,
+    "summary_status": "fallback",
+    "time_span": {
+     "end_ts": 1793272920.0,
+     "span_seconds": 0.0,
+     "start_ts": 1793272920.0
+    },
+    "title": "记得提醒我明天交报告",
+    "ts": 1793276520.0
+   }
+  ],
+  "archives/sessions/private_10001/events.jsonl": [
    {
     "appraisal": {
      "agency": 0.5,
@@ -792,13 +1186,13 @@
      "senders": [
       "10001"
      ],
-     "session": "default:FriendMessage:10001",
+     "session": "private:10001",
      "sources": [],
      "ts": 1793272490.0
     },
     "recall_count": 0,
     "reflection": "要好好记住",
-    "session": "default:FriendMessage:10001",
+    "session": "private:10001",
     "small_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！",
     "source_check": {
      "coverage": 1.0,
@@ -813,7 +1207,7 @@
        ],
        "sender_id": "10001",
        "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793272490.0
       }
      ],
@@ -927,7 +1321,7 @@
       "10001",
       "self"
      ],
-     "session": "default:FriendMessage:10001",
+     "session": "private:10001",
      "sources": [
       {
        "message_refs": [
@@ -935,14 +1329,14 @@
        ],
        "sender_id": "10001",
        "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       },
       {
        "message_refs": [],
        "sender_id": "self",
        "sender_name": "她",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       }
      ],
@@ -951,10 +1345,10 @@
     "ranking_mode": "deterministic_embedding",
     "recall_count": 0,
     "reflection": "",
-    "session": "default:FriendMessage:10001",
+    "session": "private:10001",
     "small_summary": "真的受够了！",
     "source_check": {
-     "coverage": 0.197,
+     "coverage": 0.2,
      "cross_ref": 2,
      "length_ratio": 0.007,
      "novelty": 0.0,
@@ -966,14 +1360,14 @@
        ],
        "sender_id": "10001",
        "sender_name": "芒果",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       },
       {
        "message_refs": [],
        "sender_id": "self",
        "sender_name": "她",
-       "session": "default:FriendMessage:10001",
+       "session": "private:10001",
        "ts": 1793271870.0
       }
      ],
@@ -995,400 +1389,6 @@
     },
     "title": "真的受够了",
     "ts": 1793272490.0
-   }
-  ],
-  "archives/sessions/default_GroupMessage_900001/events.jsonl": [
-   {
-    "appraisal": {
-     "agency": 0.5,
-     "coping": 0.5,
-     "expectedness": 1.0,
-     "goal_relevance": 0.89,
-     "norm_compatibility": 0.62,
-     "novelty": 0.0,
-     "urgency": 0.599
-    },
-    "attachments": [],
-    "big_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
-    "boundary_score": 0.0,
-    "confidence": 1.0,
-    "emotion": "anger",
-    "emotion_intensity": 0.3901,
-    "emotion_layers": [
-     {
-      "centrality": 0.8,
-      "confidence": 0.9,
-      "emotion": "anger",
-      "evidence": "小爱 我们约好下周一起打副本吧",
-      "intensity": 0.8
-     }
-    ],
-    "emotion_layers_source": "summary",
-    "emotion_nuance": [
-     "委屈"
-    ],
-    "emotion_secondary": "contempt",
-    "event": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下周一起打副本吧",
-    "event_key": "小爱我们约好下周一起打",
-    "id": "evt_1793272890_50148",
-    "importance": 0.5,
-    "last_recall": 1793272890.0,
-    "meaning_to_her": "她很在意这件事",
-    "modalities": [],
-    "origin": {
-     "people": [
-      "10002",
-      "10003"
-     ],
-     "source_ids": [
-      "m太开心了！！",
-      "m啊啊啊啊 好",
-      "m小爱 我们约"
-     ],
-     "visibility": "public",
-     "where": "group:900001"
-    },
-    "parent_event_id": "",
-    "provenance": {
-     "message_refs": [
-      "m小爱 我们约"
-     ],
-     "sender_id": "10003",
-     "sender_name": "阿星",
-     "senders": [
-      "10003"
-     ],
-     "session": "default:GroupMessage:900001",
-     "sources": [],
-     "ts": 1793272890.0
-    },
-    "recall_count": 0,
-    "reflection": "要好好记住",
-    "session": "default:GroupMessage:900001",
-    "small_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下",
-    "source_check": {
-     "coverage": 1.0,
-     "cross_ref": 1,
-     "length_ratio": 1.063,
-     "novelty": 0.0,
-     "overlap": 1.0,
-     "source_items": [
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      }
-     ],
-     "speaker_ok": true,
-     "status": "ok",
-     "time_ok": true
-    },
-    "source_count": 5,
-    "source_texts": [
-     "太开心了！！！我终于抽到了！！！",
-     "恭喜恭喜！我也好开心",
-     "啊啊啊啊 好激动 小爱快夸我",
-     "超厉害的！好高兴",
-     "小爱 我们约好下周一起打副本吧"
-    ],
-    "strength": 0.5,
-    "summary_status": "llm",
-    "title": "小爱 我们约好下周一起打",
-    "ts": 1793272890.0
-   },
-   {
-    "appraisal": {
-     "agency": 0.5,
-     "coping": 0.5,
-     "expectedness": 1.0,
-     "goal_relevance": 0.89,
-     "norm_compatibility": 0.62,
-     "novelty": 0.0,
-     "urgency": 0.599
-    },
-    "attachments": [],
-    "big_summary": "小爱 我们约好下周一起打副本吧",
-    "central_details": "小爱 我们约好下周一起打副本吧",
-    "centrality": 0.0,
-    "confidence": 1.0,
-    "emotion": "anger",
-    "emotion_intensity": 0.3901,
-    "emotion_layers": [
-     {
-      "emotion": "anger",
-      "p": 0.7431
-     },
-     {
-      "emotion": "contempt",
-      "p": 0.2477
-     },
-     {
-      "emotion": "disgust",
-      "p": 0.0092
-     }
-    ],
-    "emotion_layers_source": "core",
-    "emotion_nuance": [],
-    "emotion_secondary": "contempt",
-    "event": "小爱 我们约好下周一起打副本吧",
-    "event_embedding": [
-     0.27735,
-     0.0,
-     0.0,
-     0.27735,
-     0.27735,
-     -0.27735,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     -0.27735,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     -0.27735,
-     0.0,
-     0.0,
-     0.27735,
-     -0.27735,
-     -0.27735,
-     0.0,
-     -0.5547,
-     0.0
-    ],
-    "event_key": "小爱我们约好下周一起打副本吧",
-    "id": "evt_1793272890_91556",
-    "importance": 0.562,
-    "last_recall": 1793272890.0,
-    "meaning_to_her": "",
-    "milestone": {},
-    "modalities": [],
-    "origin": {
-     "people": [
-      "10003"
-     ],
-     "source_ids": [
-      "m小爱 我们约"
-     ],
-     "visibility": "public",
-     "where": "group:900001"
-    },
-    "peripheral_details": "",
-    "provenance": {
-     "message_refs": [
-      "m小爱 我们约"
-     ],
-     "sender_id": "10003",
-     "sender_name": "阿星",
-     "senders": [
-      "10003"
-     ],
-     "session": "default:GroupMessage:900001",
-     "sources": [
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      }
-     ],
-     "ts": 1793272890.0
-    },
-    "ranking_mode": "deterministic_embedding",
-    "recall_count": 0,
-    "reflection": "",
-    "session": "default:GroupMessage:900001",
-    "small_summary": "小爱 我们约好下周一起打副本吧",
-    "source_check": {
-     "coverage": 0.23,
-     "cross_ref": 1,
-     "length_ratio": 0.01,
-     "novelty": 0.0,
-     "overlap": 1.0,
-     "source_items": [
-      {
-       "message_refs": [
-        "m小爱 我们约"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272890.0
-      }
-     ],
-     "speaker_ok": true,
-     "status": "ok",
-     "time_ok": true
-    },
-    "source_count": 1,
-    "source_texts": [
-     "小爱 我们约好下周一起打副本吧"
-    ],
-    "strength": 0.562,
-    "summary_status": "fallback",
-    "time_span": {
-     "end_ts": 1793272890.0,
-     "span_seconds": 0.0,
-     "start_ts": 1793272890.0
-    },
-    "title": "小爱 我们约好下周一起打副本吧",
-    "ts": 1793272890.0
-   },
-   {
-    "appraisal": {
-     "agency": 0.5,
-     "coping": 0.5,
-     "expectedness": 1.0,
-     "goal_relevance": 0.53,
-     "norm_compatibility": 0.62,
-     "novelty": 0.0,
-     "urgency": 0.406
-    },
-    "attachments": [],
-    "big_summary": "记得提醒我明天交报告",
-    "central_details": "记得提醒我明天交报告",
-    "centrality": 0.0,
-    "confidence": 1.0,
-    "emotion": "neutral",
-    "emotion_intensity": 0.2551,
-    "emotion_layers": [
-     {
-      "emotion": "confusion",
-      "p": 0.4446
-     },
-     {
-      "emotion": "disappointment",
-      "p": 0.2734
-     },
-     {
-      "emotion": "guilt",
-      "p": 0.2722
-     },
-     {
-      "emotion": "neutral",
-      "p": 0.0099
-     }
-    ],
-    "emotion_layers_source": "core",
-    "emotion_nuance": [],
-    "emotion_secondary": "confusion",
-    "event": "记得提醒我明天交报告",
-    "event_embedding": [
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     -0.28868,
-     -0.57735,
-     0.0,
-     0.0,
-     -0.28868,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.0,
-     0.28868,
-     0.57735,
-     0.0,
-     0.28868,
-     0.0
-    ],
-    "event_key": "记得提醒我明天交报告",
-    "id": "evt_1793276520_99936",
-    "importance": 0.564,
-    "last_recall": 1793276520.0,
-    "meaning_to_her": "",
-    "milestone": {},
-    "modalities": [],
-    "origin": {
-     "people": [
-      "10003"
-     ],
-     "source_ids": [
-      "m记得提醒我明",
-      "m小爱 报告我"
-     ],
-     "visibility": "public",
-     "where": "group:900001"
-    },
-    "peripheral_details": "",
-    "provenance": {
-     "message_refs": [
-      "m小爱 报告我",
-      "m记得提醒我明"
-     ],
-     "sender_id": "10003",
-     "sender_name": "阿星",
-     "senders": [
-      "10003"
-     ],
-     "session": "default:GroupMessage:900001",
-     "sources": [
-      {
-       "message_refs": [
-        "m记得提醒我明"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272920.0
-      }
-     ],
-     "ts": 1793276520.0
-    },
-    "ranking_mode": "deterministic_embedding",
-    "recall_count": 0,
-    "reflection": "",
-    "session": "default:GroupMessage:900001",
-    "small_summary": "记得提醒我明天交报告",
-    "source_check": {
-     "coverage": 0.172,
-     "cross_ref": 1,
-     "length_ratio": 0.006,
-     "novelty": 0.0,
-     "overlap": 1.0,
-     "source_items": [
-      {
-       "message_refs": [
-        "m记得提醒我明"
-       ],
-       "sender_id": "10003",
-       "sender_name": "阿星",
-       "session": "default:GroupMessage:900001",
-       "ts": 1793272920.0
-      }
-     ],
-     "speaker_ok": true,
-     "status": "ok",
-     "time_ok": true
-    },
-    "source_count": 1,
-    "source_texts": [
-     "记得提醒我明天交报告"
-    ],
-    "strength": 0.564,
-    "summary_status": "fallback",
-    "time_span": {
-     "end_ts": 1793272920.0,
-     "span_seconds": 0.0,
-     "start_ts": 1793272920.0
-    },
-    "title": "记得提醒我明天交报告",
-    "ts": 1793276520.0
    }
   ],
   "brain_turns.json": {
@@ -1780,7 +1780,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004390.0
      },
      "review_count": 0,
@@ -1840,7 +1840,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004390.0
      },
      "review_count": 0,
@@ -1905,7 +1905,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004510.0
      },
      "review_count": 0,
@@ -1965,7 +1965,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793004510.0
      },
      "review_count": 0,
@@ -2030,7 +2030,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271330.0
      },
      "review_count": 0,
@@ -2090,7 +2090,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271330.0
      },
      "review_count": 0,
@@ -2155,7 +2155,7 @@
       ],
       "sender_id": "10004",
       "sender_name": "桃子",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271350.0
      },
      "review_count": 0,
@@ -2211,7 +2211,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900002",
+      "session": "group:900002",
       "ts": 1793271350.0
      },
      "review_count": 0,
@@ -2279,7 +2279,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000000.0
      },
      "recall_count": 1,
@@ -2344,7 +2344,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000000.0
      },
      "review_count": 0,
@@ -2409,7 +2409,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000090.0
      },
      "review_count": 0,
@@ -2473,7 +2473,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793000090.0
      },
      "recall_count": 1,
@@ -2546,7 +2546,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011740.0
      },
      "recall_count": 1,
@@ -2612,7 +2612,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011740.0
      },
      "review_count": 0,
@@ -2677,7 +2677,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011770.0
      },
      "review_count": 0,
@@ -2737,7 +2737,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793011770.0
      },
      "review_count": 0,
@@ -2803,7 +2803,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793098170.0
      },
      "review_count": 0,
@@ -2863,7 +2863,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793098170.0
      },
      "review_count": 0,
@@ -2928,7 +2928,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271800.0
      },
      "review_count": 0,
@@ -3001,7 +3001,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271800.0
      },
      "recall_count": 2,
@@ -3071,7 +3071,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271820.0
      },
      "review_count": 0,
@@ -3131,7 +3131,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271820.0
      },
      "review_count": 0,
@@ -3209,7 +3209,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271840.0
      },
      "recall_count": 1,
@@ -3274,7 +3274,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271840.0
      },
      "review_count": 0,
@@ -3342,7 +3342,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271870.0
      },
      "recall_count": 1,
@@ -3406,7 +3406,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793271870.0
      },
      "review_count": 0,
@@ -3471,7 +3471,7 @@
       ],
       "sender_id": "10001",
       "sender_name": "芒果",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793272490.0
      },
      "review_count": 0,
@@ -3527,7 +3527,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "ts": 1793272490.0
      },
      "review_count": 0,
@@ -3592,7 +3592,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000690.0
      },
      "review_count": 0,
@@ -3652,7 +3652,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000690.0
      },
      "review_count": 0,
@@ -3720,7 +3720,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000730.0
      },
      "recall_count": 1,
@@ -3785,7 +3785,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000730.0
      },
      "review_count": 0,
@@ -3850,7 +3850,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000790.0
      },
      "review_count": 0,
@@ -3911,7 +3911,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793000790.0
      },
      "review_count": 0,
@@ -3979,7 +3979,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098470.0
      },
      "recall_count": 2,
@@ -4044,7 +4044,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098470.0
      },
      "review_count": 0,
@@ -4109,7 +4109,7 @@
       ],
       "sender_id": "10005",
       "sender_name": "路人",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098530.0
      },
      "review_count": 0,
@@ -4169,7 +4169,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793098530.0
      },
      "review_count": 0,
@@ -4234,7 +4234,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271380.0
      },
      "review_count": 0,
@@ -4294,7 +4294,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271380.0
      },
      "review_count": 0,
@@ -4362,7 +4362,7 @@
       ],
       "sender_id": "10002",
       "sender_name": "柠檬",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271400.0
      },
      "recall_count": 1,
@@ -4427,7 +4427,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793271400.0
      },
      "review_count": 0,
@@ -4492,7 +4492,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793272890.0
      },
      "review_count": 0,
@@ -4552,7 +4552,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793272890.0
      },
      "review_count": 0,
@@ -4620,7 +4620,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793272920.0
      },
      "recall_count": 1,
@@ -4693,7 +4693,7 @@
       ],
       "sender_id": "10003",
       "sender_name": "阿星",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793276520.0
      },
      "review_count": 0,
@@ -4749,7 +4749,7 @@
       "message_refs": [],
       "sender_id": "self",
       "sender_name": "她",
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "ts": 1793276520.0
      },
      "review_count": 0,
@@ -9608,7 +9608,7 @@
       "senders": [
        "10003"
       ],
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "sources": [
        {
         "message_refs": [
@@ -9616,7 +9616,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272920.0
        }
       ],
@@ -9625,10 +9625,10 @@
      "ranking_mode": "deterministic_embedding",
      "recall_count": 0,
      "reflection": "",
-     "session": "default:GroupMessage:900001",
+     "session": "group:900001",
      "small_summary": "记得提醒我明天交报告",
      "source_check": {
-      "coverage": 0.172,
+      "coverage": 0.179,
       "cross_ref": 1,
       "length_ratio": 0.006,
       "novelty": 0.0,
@@ -9640,7 +9640,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272920.0
        }
       ],
@@ -9751,7 +9751,7 @@
       "senders": [
        "10003"
       ],
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "sources": [
        {
         "message_refs": [
@@ -9759,7 +9759,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        }
       ],
@@ -9768,10 +9768,10 @@
      "ranking_mode": "deterministic_embedding",
      "recall_count": 2,
      "reflection": "",
-     "session": "default:GroupMessage:900001",
+     "session": "group:900001",
      "small_summary": "小爱 我们约好下周一起打副本吧",
      "source_check": {
-      "coverage": 0.23,
+      "coverage": 0.237,
       "cross_ref": 1,
       "length_ratio": 0.01,
       "novelty": 0.0,
@@ -9783,7 +9783,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        }
       ],
@@ -9866,13 +9866,13 @@
       "senders": [
        "10003"
       ],
-      "session": "default:GroupMessage:900001",
+      "session": "group:900001",
       "sources": [],
       "ts": 1793272890.0
      },
      "recall_count": 2,
      "reflection": "要好好记住",
-     "session": "default:GroupMessage:900001",
+     "session": "group:900001",
      "small_summary": "太开心了！！！我终于抽到了！！！；恭喜恭喜！我也好开心；啊啊啊啊 好激动 小爱快夸我；超厉害的！好高兴；小爱 我们约好下",
      "source_check": {
       "coverage": 1.0,
@@ -9887,7 +9887,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        }
       ],
@@ -10000,7 +10000,7 @@
        "10001",
        "self"
       ],
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "sources": [
        {
         "message_refs": [
@@ -10008,14 +10008,14 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        },
        {
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        }
       ],
@@ -10024,10 +10024,10 @@
      "ranking_mode": "deterministic_embedding",
      "recall_count": 0,
      "reflection": "",
-     "session": "default:FriendMessage:10001",
+     "session": "private:10001",
      "small_summary": "真的受够了！",
      "source_check": {
-      "coverage": 0.197,
+      "coverage": 0.2,
       "cross_ref": 2,
       "length_ratio": 0.007,
       "novelty": 0.0,
@@ -10039,14 +10039,14 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        },
        {
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        }
       ],
@@ -10130,13 +10130,13 @@
       "senders": [
        "10001"
       ],
-      "session": "default:FriendMessage:10001",
+      "session": "private:10001",
       "sources": [],
       "ts": 1793272490.0
      },
      "recall_count": 0,
      "reflection": "要好好记住",
-     "session": "default:FriendMessage:10001",
+     "session": "private:10001",
      "small_summary": "今天被骂了 真的很委屈；抱抱你，好委屈啊；气死我了！！！他凭什么这样说我；太过分了，我也生气；真的受够了！！！气死了！！",
      "source_check": {
       "coverage": 1.0,
@@ -10151,7 +10151,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793272490.0
        }
       ],
@@ -10386,7 +10386,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004390.0
        },
        "role": "user",
@@ -10421,7 +10421,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004390.0
        },
        "role": "assistant",
@@ -10461,7 +10461,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004510.0
        },
        "role": "user",
@@ -10496,7 +10496,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793004510.0
        },
        "role": "assistant",
@@ -10536,7 +10536,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271330.0
        },
        "role": "user",
@@ -10571,7 +10571,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271330.0
        },
        "role": "assistant",
@@ -10611,7 +10611,7 @@
         ],
         "sender_id": "10004",
         "sender_name": "桃子",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271350.0
        },
        "role": "user",
@@ -10646,7 +10646,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900002",
+        "session": "group:900002",
         "ts": 1793271350.0
        },
        "role": "assistant",
@@ -10686,7 +10686,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000000.0
        },
        "role": "user",
@@ -10721,7 +10721,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000000.0
        },
        "role": "assistant",
@@ -10761,7 +10761,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000090.0
        },
        "role": "user",
@@ -10796,7 +10796,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793000090.0
        },
        "role": "assistant",
@@ -10836,7 +10836,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011740.0
        },
        "role": "user",
@@ -10871,7 +10871,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011740.0
        },
        "role": "assistant",
@@ -10911,7 +10911,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011770.0
        },
        "role": "user",
@@ -10946,7 +10946,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793011770.0
        },
        "role": "assistant",
@@ -10986,7 +10986,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793098170.0
        },
        "role": "user",
@@ -11021,7 +11021,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793098170.0
        },
        "role": "assistant",
@@ -11061,7 +11061,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271800.0
        },
        "role": "user",
@@ -11096,7 +11096,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271800.0
        },
        "role": "assistant",
@@ -11136,7 +11136,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271820.0
        },
        "role": "user",
@@ -11171,7 +11171,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271820.0
        },
        "role": "assistant",
@@ -11211,7 +11211,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271840.0
        },
        "role": "user",
@@ -11246,7 +11246,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271840.0
        },
        "role": "assistant",
@@ -11286,7 +11286,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        },
        "role": "user",
@@ -11321,7 +11321,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793271870.0
        },
        "role": "assistant",
@@ -11361,7 +11361,7 @@
         ],
         "sender_id": "10001",
         "sender_name": "芒果",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793272490.0
        },
        "role": "user",
@@ -11396,7 +11396,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:FriendMessage:10001",
+        "session": "private:10001",
         "ts": 1793272490.0
        },
        "role": "assistant",
@@ -11436,7 +11436,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000690.0
        },
        "role": "user",
@@ -11471,7 +11471,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000690.0
        },
        "role": "assistant",
@@ -11511,7 +11511,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000730.0
        },
        "role": "user",
@@ -11546,7 +11546,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000730.0
        },
        "role": "assistant",
@@ -11586,7 +11586,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000790.0
        },
        "role": "user",
@@ -11621,7 +11621,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793000790.0
        },
        "role": "assistant",
@@ -11661,7 +11661,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098470.0
        },
        "role": "user",
@@ -11696,7 +11696,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098470.0
        },
        "role": "assistant",
@@ -11736,7 +11736,7 @@
         ],
         "sender_id": "10005",
         "sender_name": "路人",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098530.0
        },
        "role": "user",
@@ -11771,7 +11771,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793098530.0
        },
        "role": "assistant",
@@ -11811,7 +11811,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271380.0
        },
        "role": "user",
@@ -11846,7 +11846,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271380.0
        },
        "role": "assistant",
@@ -11886,7 +11886,7 @@
         ],
         "sender_id": "10002",
         "sender_name": "柠檬",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271400.0
        },
        "role": "user",
@@ -11921,7 +11921,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793271400.0
        },
        "role": "assistant",
@@ -11961,7 +11961,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        },
        "role": "user",
@@ -11996,7 +11996,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272890.0
        },
        "role": "assistant",
@@ -12036,7 +12036,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793272920.0
        },
        "role": "user",
@@ -12076,7 +12076,7 @@
         ],
         "sender_id": "10003",
         "sender_name": "阿星",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793276520.0
        },
        "role": "user",
@@ -12111,7 +12111,7 @@
         "message_refs": [],
         "sender_id": "self",
         "sender_name": "她",
-        "session": "default:GroupMessage:900001",
+        "session": "group:900001",
         "ts": 1793276520.0
        },
        "role": "assistant",

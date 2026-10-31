@@ -1087,7 +1087,7 @@ class EventsMixin(PortsMixin):
                 continue
             # Requirement: group events (the test group and other
             # group chats) are out of scope for this private-session migration.
-            if ":GroupMessage:" in session or ":GuildMessage:" in session:
+            if canonical_session_key(session).startswith("group:"):
                 kept.append(row)
                 continue
             current = None
@@ -1663,8 +1663,8 @@ class EventsMixin(PortsMixin):
             return []
         try:
             events = [e for e in self._event_archive(100) if isinstance(e, dict)]
-            sess = str(session or "")
-            same = [e for e in events if str(e.get("session") or "default") == sess]
+            sess = canonical_session_key(session)
+            same = [e for e in events if canonical_session_key(e.get("session") or "default") == sess]
             if not same:
                 return []
             q = set(str(query or ""))
@@ -1717,7 +1717,7 @@ class EventsMixin(PortsMixin):
         # ams-life: message_refs is this message's own id (what forgetting by message
         # looks for); the id of a message it quotes goes in reply_to, never in the refs.
         prov = {"sender_id": _sid, "sender_name": _sname,
-                "session": str(getattr(event, "unified_msg_origin", "") or ""),
+                "session": self._here(event),
                 "ts": float(ts if ts is not None else time.time()),
                 "message_refs": self._source_ids(event)}
         quoted = self._reply_to(event)
@@ -2180,7 +2180,7 @@ class EventsMixin(PortsMixin):
                 except Exception:
                     _real_ts = now
                 dup = self._find_any_duplicate_event(
-                    str(getattr(event, "unified_msg_origin", "") or ""), _ekey, body, _real_ts)
+                    self._here(event), _ekey, body, _real_ts)
                 if dup is not None:
                     continue
                 _imp = round(max(0.55, min(1.0, imp * 0.7 + score * 0.3)), 3)
@@ -2190,7 +2190,7 @@ class EventsMixin(PortsMixin):
                 record = {
                     "id": "evt_" + str(int(now)) + "_" + str(abs(hash(title + body)) % 100000),
                     "ts": now,
-                    "session": str(getattr(event, "unified_msg_origin", "") or ""),
+                    "session": self._here(event),
                     "title": _safe_title,
                     "event": _safe_body[:600],
                     "big_summary": _safe_big,
@@ -2330,7 +2330,7 @@ class EventsMixin(PortsMixin):
             record = {
                 "id": "evt_" + str(int(time.time())) + "_" + str(abs(hash(summary)) % 100000),
                 "ts": time.time(),
-                "session": str(getattr(event, "unified_msg_origin", "") or ""),
+                "session": self._here(event),
                 "title": title,
                 "event": ev,
                 "big_summary": big_summary,

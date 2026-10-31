@@ -903,7 +903,7 @@ class MemoryMixin(PortsMixin):
                         _src_prov.append(_p)
                 _summary_prov = {
                     "sender_id": "summary", "sender_name": "她",
-                    "session": str(getattr(event, "unified_msg_origin", "") or ""),
+                    "session": self._here(event),
                     "ts": now, "message_refs": [],
                     "sources": [{
                         "sender_id": str(_p.get("sender_id") or ""),
@@ -1204,7 +1204,7 @@ class MemoryMixin(PortsMixin):
                                              entry_id=str(summary.get("id") or ""),
                                              reason="summary_derived", ts=now)
             # 2) event archive + insights.
-            session = str(getattr(event, "unified_msg_origin", "") or "")
+            session = self._here(event)
             changed = self._redact_archive_text(needle, session)
             if changed:
                 memory_meta.append_write_log(
@@ -1636,8 +1636,7 @@ class MemoryMixin(PortsMixin):
                     _link_lines.append("- 关联记忆：%s" % _nb_text[:200])
                     _link_pairs.append((str(e.get("id") or ""), str(_lid)))
             try:
-                _umo = str(getattr(event, "unified_msg_origin", "") or "")
-                _chain_lines = self._chain_event_lines(_umo, text, limit=2)
+                _chain_lines = self._chain_event_lines(self._here(event), text, limit=2)
                 if _chain_lines:
                     _link_lines.extend(_chain_lines)
             except Exception:
@@ -1957,7 +1956,7 @@ class MemoryMixin(PortsMixin):
         _sid, _sname = self._speaker(event)
         if role == "assistant":
             _prov = {"sender_id": "self", "sender_name": "她",
-                     "session": str(getattr(event, "unified_msg_origin", "") or ""),
+                     "session": self._here(event),
                      "ts": now, "message_refs": []}
         else:
             _prov = self._memory_provenance(event, now)
@@ -2036,8 +2035,7 @@ class MemoryMixin(PortsMixin):
         except Exception:
             pass
         try:
-            last = self._last_session_event(
-                str(getattr(event, "unified_msg_origin", "") or ""))
+            last = self._last_session_event(self._here(event))
             if isinstance(last, dict):
                 title = str(last.get("title") or "").strip()
                 detail = str(last.get("meaning_to_her")

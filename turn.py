@@ -10,10 +10,9 @@ class TurnEvent:
     whether handling it stopped. The plugin may keep its own notes for this turn on it, as
     attributes, as it does on AstrBot's event.
 
-    AstrBot's session string for this chat, as AstrBot gives it
-    ("<platform id>:GroupMessage:<group>" / "<platform id>:FriendMessage:<qq>"). Her stored data
-    is keyed by it (memory sessions, window umo, file names), so whoever builds a TurnEvent must
-    give the very string AstrBot gave for the same chat."""
+    AstrBot's session string for this chat, when the event came from AstrBot (else "").
+    Only AstrBot's own APIs use it (sending, its conversation and history managers); her
+    stored data is keyed by the neutral place (discretion.place_of), never by this string."""
     incoming: object
     stopped: bool = False
     unified_msg_origin: str = ""

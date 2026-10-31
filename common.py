@@ -125,25 +125,8 @@ EVENT_ARCHIVE_DIR = DATA_DIR / "archives"
 EVENT_SESSION_DIR = EVENT_ARCHIVE_DIR / "sessions"
 EVENT_ARCHIVE_PATH = EVENT_ARCHIVE_DIR / "events.jsonl"
 def canonical_session_key(raw) -> str:
-    """Canonical session identity: platform:Type:id (colon form).
-
-    Event archive keys use colons ("default:FriendMessage:123"), memory file
-    stems use underscores ("default_FriendMessage_123"); both must compare
-    equal for dedupe/dropdown unions (task-55/task-56). Mixed separators
-    ("default:GroupMessage_664") and platform prefixes with underscores are
-    accepted; ids are kept verbatim.
-    """
-    text = str(raw or "").strip()
-    if not text:
-        return ""
-    match = re.search(
-        r"(FriendMessage|GroupMessage|GuildMessage|TempMessage|OtherMessage)",
-        text)
-    if match:
-        platform = text[:match.start()].strip(":_") or "default"
-        ident = text[match.end():].strip(":_")
-        return platform + ":" + match.group(1) + ":" + ident
-    return text.replace("_", ":")
+    """Canonical chat identity: the neutral place (discretion.place_of)."""
+    return discretion.place_of(raw)
 
 
 def event_effective_time(record) -> float:
