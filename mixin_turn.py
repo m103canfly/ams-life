@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
-"""Prepare one platform-neutral turn."""
+"""One platform-neutral turn: getting it ready, and her reply after the model."""
 try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
     from .mixin_phone import _expand_forward, _phone_line, _history_original
-    from . import attention
+    from . import attention, stickers
 except ImportError:
     from common import *  # noqa: F401,F403
     from body import *  # noqa: F401,F403
     from mixin_phone import _expand_forward, _phone_line, _history_original
     import attention
+    import stickers
 
 
 class TurnMixin:
     """Getting one turn ready: what she knows, feels and recalls, put into the request.
-    Works on turn.TurnRequest only; AstrBot's hook converts to it and back (main.py)."""
+    Works on turn.TurnRequest only; AstrBot's hook converts to it and back (main.py).
+    The reply works through a reply handle only."""
 
     async def _prepare_turn(self, event, turn_request) -> None:
         _forward = await _expand_forward(self, event)
@@ -219,3 +221,151 @@ class TurnMixin:
             if _offer:   # offered sticker labels are not words said here
                 _note = self._check_note(event)
                 _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
+
+    async def _after_reply(self, event, reply):
+        """Her reply after the model: kept, checked, shaped and sent. Works through a reply handle only (adapter_astrbot_turn.reply_handle)."""
+        if self._ignored_sender(event):   # nothing of an answer to him is kept
+            self._phone_queue(event).clear()
+            event.stop_event()
+            return
+        if not self.enabled:
+            self._phone_queue(event).clear()
+            return
+        if getattr(self, "self_decide", False):
+            self._note_spend("reply", reply)   # step 2: the money of the day
+        if self._browse_on():
+            try:   # step 2 (丁): the rounds her tools took, into the browser's own money
+                self._browse_after_reply(event, reply)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
+            try:   # and the pages she read, as web memories (who asked kept apart)
+                await self._browse_keep_reply(event)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
+        self._continue_job(self._here(event))
+        self._check_registry(event)  # her reply to someone she may not keep is not kept either
+        core = self._core(event)
+        # ams-life: no state tag is asked for any more. If the model writes one anyway
+        # it is cut out (whether it parses or not) and what it says is not used.
+        _reply = reply.map_words(interpretation.strip_state_tags)
+        # step 2 (丙): the sticker she named ([表情包:n], only an offered one), sent after her words. Marks
+        # are taken out with stickers off too: her history may hold [表情包：标签] from before
+        _sticker_source = _reply
+        _reply, _sticker = self._sticker_named(event, reply, _reply)
+        _before_check = _reply
+        if not self._stickers_on():
+            _sticker = ""
+        if getattr(self, "self_decide", False) and attention.silent(_reply) \
+                and not (_sticker and attention.SILENT not in _reply):   # a sticker alone is not silence
+            # step 2 (甲): she chose to say nothing (【不说】): nothing is sent, nothing kept
+            logger.info("[ams-life] attention: she said nothing")
+            self._check_note(event).update(sent="", outcome="silent")
+            self._phone_queue(event).clear()
+            self._stop(event)
+            return
+        if getattr(self, "global_memory", False) and _reply.strip():
+            # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
+            # If the look itself fails, the reply is held back as if it leaked.
+            try:
+                _reply = await self._look_at_reply(event, reply, _reply)
+            except Exception as exc:
+                _reply = self._check_failed(event, exc, reply)
+            if not _reply:
+                self._phone_queue(event).clear()
+                return
+            # said once more: a mark in the new words is taken out too
+            if _reply != _before_check:
+                _sticker_source = _reply
+                _sticker = ""
+            _reply, _again = self._sticker_named(event, reply, _reply)
+            _sticker = _sticker or (_again if self._stickers_on() else "")
+            self._check_note(event)["sent"] = _reply
+        if getattr(self, "self_decide", False):
+            if attention.silent(_reply) and not (_sticker and attention.SILENT not in _reply):
+                self._check_note(event).update(sent="", outcome="silent")
+                self._phone_queue(event).clear()
+                self._stop(event)
+                return
+            _reply = _reply.replace(attention.SILENT, "")
+            if not getattr(self, "reply_in_pieces", True):
+                reply.set_text(_reply)
+        if _sticker and not await self._sticker_cleared(event, _sticker):
+            _sticker = ""
+        _then = self._sticker_after(event, _sticker) if _sticker else None
+        if _then is not None and not _reply.strip():
+            # a sticker and no words: AstrBot sends nothing, the plugin sends the sticker
+            self._stop(event)
+            asyncio.create_task(self._after_words(_then))
+        elif _then is not None and not getattr(self, "reply_in_pieces", True):
+            asyncio.create_task(self._after_words(_then))
+        if getattr(self, "reply_in_pieces", True) and _reply.strip():
+            # Her messages as she wrote them, with the sticker after its piece.
+            _sticker_part = None
+            if _then is not None:
+                _offered = getattr(event, "_ams_stickers_offered", None) or []
+                for _mark in stickers._MARK.finditer(_sticker_source):
+                    if stickers.pick_from_reply(_mark.group(), _offered)[1] == _sticker:
+                        _marked = stickers.pick_from_reply(
+                            _sticker_source[:_mark.start()] + "\ue000" + _sticker_source[_mark.end():],
+                            _offered)[0]
+                        _marked_parts = attention.split(_marked)
+                        _index = next((i for i, p in enumerate(_marked_parts) if "\ue000" in p), 0)
+                        _sticker_part = min(sum(bool(p.replace("\ue000", "").strip())
+                                                for p in _marked_parts[:_index + 1]) - 1,
+                                            len(attention.split(_reply)) - 1)
+                        _sticker_part = max(0, _sticker_part)
+                        break
+            _reply = self._shape_reply(event, reply, _reply, then=_then, sticker_part=_sticker_part)
+            self._check_note(event)["sent"] = _reply
+        if _sticker:
+            # kept in her phone and AstrBot's history as what was sent
+            _reply = (_reply + "\n" + stickers.phone_line(self._sticker_lib().rows.get(_sticker))).strip()
+            self._check_note(event)["sent"] = _reply
+            try:
+                setattr(event, "_ams_sticker_sent", True)
+            except Exception:
+                pass
+        try:
+            core.observe_own(_reply)
+            core.record_reply(_reply)
+        except Exception:
+            pass
+        try:
+            self._window_add_reply(event, _reply)
+        except Exception as exc:
+            logger.warning("[ams-life] window write failed: %s", exc)
+        try:
+            self._slang_note_reply(event, _reply)
+        except Exception:
+            logger.warning("[ams-life] slang status update failed")
+        try:
+            core.record_talk(_reply)
+        except Exception:
+            pass
+        try:
+            if _reply:
+                asyncio.create_task(self._remember(event, _reply, "assistant", core))
+        except Exception:
+            pass
+        try:
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
+            HER_STATE_PATH.write_text(
+                json.dumps(core.snapshot(), ensure_ascii=False, indent=1), encoding="utf-8")
+        except Exception:
+            pass
+        # L-T01/L-T08/L-T12: background proposal-only tasks. They self-check
+        # the per-function switch + cooldown, so default OFF means zero calls.
+        try:
+            asyncio.create_task(self._maybe_relationship_impression(event, core))
+            asyncio.create_task(self._maybe_relationship_narrative(event, core))
+        except Exception:
+            pass
+        # Her queued media follows a cleared reply.
+        try:
+            _queue = self._phone_queue(event)
+            _stopped = bool(event.is_stopped()) if hasattr(event, "is_stopped") else False
+            if _queue and _reply.strip() and not attention.silent(_reply) and not _stopped:
+                asyncio.create_task(self._media_after_reply(event, dict(_queue)))
+            _queue.clear()
+        except Exception:
+            pass

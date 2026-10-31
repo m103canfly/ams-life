@@ -149,7 +149,7 @@ class AstrBotReply:
 
 def reply_handle(obj):
     """A reply handle as it is; anything else is AstrBot's LLMResponse, wrapped."""
-    if hasattr(obj, 'set_text') and hasattr(obj, 'shape_first'):
+    if isinstance(obj, (turn.TurnReply, AstrBotReply)):
         return obj
     return AstrBotReply(obj)
 

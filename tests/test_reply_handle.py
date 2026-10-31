@@ -14,6 +14,7 @@ import test_basics  # noqa: E402,F401
 
 import adapter_astrbot_turn as adapter  # noqa: E402
 import browse  # noqa: E402
+import attention  # noqa: E402
 import events  # noqa: E402
 import interpretation  # noqa: E402
 import main  # noqa: E402
@@ -49,6 +50,41 @@ def old_map_words(response):
     return _reply
 
 
+def old_set_reply(response, text):
+    # mixin_send_check.py 199-212 at 92febba.
+    response.completion_text = text
+    chain = getattr(response, "result_chain", None)
+    if chain is not None and getattr(chain, "chain", None):
+        first = True
+        kept = []
+        for comp in chain.chain:
+            if hasattr(comp, "text"):
+                if first:
+                    comp.text = text
+                    kept.append(comp)
+                    first = False
+                continue   # the other text parts were the old words
+            kept.append(comp)
+        chain.chain = kept
+
+
+def old_chain_of(text):
+    # mixin_attention.py 379-385 at 92febba.
+    chain = []
+    for kind, value in attention.pieces(text):
+        chain.append(Face(id=value) if kind == "face" else Plain(value))
+    return MessageChain(chain)
+
+
+def old_shape_first(response, first):
+    # mixin_attention.py 429-434 at 92febba.
+    previous = getattr(getattr(response, "result_chain", None), "chain", None) or []
+    prefix = [component for component in previous if isinstance(component, (Reply, At))]
+    shaped = old_chain_of(first)
+    shaped.chain = prefix + shaped.chain
+    response.result_chain = shaped
+
+
 class ReplyHandleTests(unittest.TestCase):
     def assert_response_equal(self, old, new):
         self.assertEqual(old.completion_text, new.completion_text)
@@ -62,10 +98,12 @@ class ReplyHandleTests(unittest.TestCase):
         for chain, text in cases:
             with self.subTest(chain=chain, text=text):
                 response = LLMResponse('old', MessageChain(chain) if chain is not None else None)
-                old, new = copy.deepcopy(response), copy.deepcopy(response)
-                SendCheckMixin._set_reply(old, text)
+                old, new, plugin = (copy.deepcopy(response) for _ in range(3))
+                old_set_reply(old, text)
                 adapter.AstrBotReply(new).set_text(text)
+                SendCheckMixin._set_reply(plugin, text)
                 self.assert_response_equal(old, new)
+                self.assert_response_equal(old, plugin)
 
     def test_map_words_matches_main(self):
         tagged = 'hello<bc>{}</bc>'
@@ -103,14 +141,18 @@ class ReplyHandleTests(unittest.TestCase):
         for chain, text in [([Reply(id='900001'), Plain('old'), At(id='10001')], 'hello'),
                             ([Plain('old'), Reply(id='900001'), At(id='10001')], 'hello[表情:微笑]')]:
             response = LLMResponse('', MessageChain(chain))
-            old, new = copy.deepcopy(response), copy.deepcopy(response)
-            plugin._shape_reply(types.SimpleNamespace(), old, text, then=None)
-            adapter.AstrBotReply(new).shape_first(text)
+            old, new, shaped = (copy.deepcopy(response) for _ in range(3))
+            first = attention.split(text)[0]
+            old_shape_first(old, first)
+            plugin._shape_reply(types.SimpleNamespace(), shaped, text, then=None)
+            adapter.AstrBotReply(new).shape_first(first)
             self.assert_response_equal(old, new)
+            self.assert_response_equal(old, shaped)
 
     def test_chain_of_matches_attention(self):
         for text in ('hello', 'hello[表情:微笑]', '[表情:不存在]'):
-            self.assertEqual(components(AttentionMixin._chain_of(text)), components(adapter.chain_of(text)))
+            self.assertEqual(components(old_chain_of(text)), components(AttentionMixin._chain_of(text)))
+            self.assertEqual(components(old_chain_of(text)), components(adapter.chain_of(text)))
 
     def test_neutral_reply(self):
         prefix = [events.Segment('reply', {'id': '900001'})]
