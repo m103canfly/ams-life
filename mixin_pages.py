@@ -935,6 +935,10 @@ class PagesMixin:
                 source = "custom"
             old = self.api_config.get(kind) if isinstance(self.api_config.get(kind), dict) else {}
             key = str(incoming.get("api_key") or "").strip()
+            if getattr(self, "_key_store", None) is not None:
+                if key:
+                    logger.info("[biocore] ignored api key for %s", kind)
+                key = ""
             if not key:
                 key = str(old.get("api_key") or "")
             entry = {
