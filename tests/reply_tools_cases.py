@@ -71,10 +71,17 @@ def ask(tools, text='小爱 你好'):
 
 
 class Broken(ToolSet):
-    """A tool set that fails while tools are taken out of it."""
+    """A tool set that fails while its tools are written back."""
 
-    def remove_tool(self, name):
-        raise RuntimeError('made-up failure')
+    @property
+    def tools(self):
+        return self._tools
+
+    @tools.setter
+    def tools(self, value):
+        if hasattr(self, '_tools'):
+            raise RuntimeError('made-up failure')
+        self._tools = value
 
 
 if CASE == 'broken':

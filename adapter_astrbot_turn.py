@@ -2,10 +2,11 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Convert one turn to and from AstrBot's request and response."""
 try:
-    from . import adapter_astrbot, adapter_astrbot_model, attention, browse, turn
+    from . import adapter_astrbot, adapter_astrbot_model, adapter_astrbot_tools, attention, browse, turn
 except ImportError:
     import adapter_astrbot
     import adapter_astrbot_model
+    import adapter_astrbot_tools
     import attention
     import browse
     import turn
@@ -35,7 +36,7 @@ def request_from_astrbot(req) -> turn.TurnRequest:
         tools=tools)
 
 
-def request_into_astrbot(turn_request, req) -> None:
+def request_into_astrbot(turn_request, req, *, tools=True) -> None:
     """Write changed fields back, preserving unchanged objects and missing fields."""
     for name in ('prompt', 'system_prompt'):
         value = getattr(turn_request, name)
@@ -51,6 +52,12 @@ def request_into_astrbot(turn_request, req) -> None:
                 original[:] = value
         elif value:
             setattr(req, name, value)
+    if tools:
+        tools_into_astrbot(turn_request, req)
+
+
+def tools_into_astrbot(turn_request, req) -> None:
+    """Write changed tools back, preserving the existing tool set where possible."""
     original_tools = getattr(getattr(req, 'func_tool', None), 'tools', None) or []
     if (len(turn_request.tools) == len(original_tools) and
             all(tool.native is not None and tool.native is native
@@ -59,11 +66,14 @@ def request_into_astrbot(turn_request, req) -> None:
     if not turn_request.tools:
         req.func_tool = None
         return
-    from astrbot.core.agent.tool import FunctionTool, ToolSet
-    req.func_tool = ToolSet([tool.native if tool.native is not None else
-                             FunctionTool(name=tool.name, description=tool.description,
-                                          parameters=tool.parameters, handler=tool.handler)
-                             for tool in turn_request.tools])
+    tools = [tool.native if tool.native is not None else adapter_astrbot_tools.function_tool(tool)
+             for tool in turn_request.tools]
+    toolset = getattr(req, 'func_tool', None)
+    if toolset is None:
+        from astrbot.core.agent.tool import ToolSet
+        req.func_tool = ToolSet(tools)
+    else:
+        toolset.tools = tools
 
 
 def reply_from_astrbot(resp) -> turn.TurnReply:

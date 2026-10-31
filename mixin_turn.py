@@ -20,6 +20,36 @@ class TurnMixin:
     Works on turn.TurnRequest only; AstrBot's hook converts to it and back (main.py).
     The reply works through a reply handle only."""
 
+    async def _prepare_tools(self, event, turn_request, build=True) -> None:
+        """Her reply's tools, on a turn.TurnRequest: none of the platform's but those allowed,
+        then her phone's tools and her browser's. build=False: the platform cannot make tools
+        now (AstrBot's tool classes cannot be imported), so hers are not made."""
+        try:   # no tools in her reply, whatever else is on (the owner, 10-29)
+            self._turn_tools_off(turn_request)
+        except Exception as exc:   # failing, she gets none rather than all of them
+            turn_request.tools[:] = []
+            logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
+        else:
+            try:
+                for name in ("take_photo", "share_screenshot", "say_aloud", "set_now"):
+                    turn_request.remove_tool(name)
+                if self.enabled:
+                    await self._ensure_profile(event)
+                    if not build:
+                        logger.warning("[ams-life] phone tools unavailable")
+                    else:
+                        for tool in self._phone_tools(event):
+                            turn_request.add_tool(tool)
+            except Exception as exc:
+                turn_request.tools[:] = []
+                logger.warning("[ams-life] phone tools unavailable: %s", type(exc).__name__)
+            try:   # step 2 (丁): then her browser's two tools, only those (browse_enabled)
+                if self._browse_on() and self._browse_ledger().money_left() and build:
+                    for tool in self._browse_tools(event):
+                        turn_request.add_tool(tool)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: tools not given (%s)", type(exc).__name__)
+
     async def _on_message(self, event):
         """ams-life: her phone. Every message that reaches the plugin goes into its own
         chat window, whether it wakes her or not. Ignored senders and unapproved private

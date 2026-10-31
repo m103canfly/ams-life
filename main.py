@@ -111,9 +111,10 @@ except ImportError:
     from mixin_ports import PortsMixin
 try:
     from .mixin_turn import TurnMixin
-    from . import adapter_astrbot_turn
+    from . import adapter_astrbot_tools, adapter_astrbot_turn
 except ImportError:
     from mixin_turn import TurnMixin
+    import adapter_astrbot_tools
     import adapter_astrbot_turn
 
 
@@ -626,37 +627,27 @@ class BioCorePlugin(LLMMixin, AutonomyMixin, SettingsMixin, MediaMixin, PeopleMi
             return
         if self.enabled:
             self._group_reply_open(event)
-        try:   # no tools in her reply, whatever else is on (the owner, 10-29)
-            self._reply_tools_off(req)
-        except Exception as exc:   # failing, she gets none rather than all of them
+        try:
+            turn_request = adapter_astrbot_turn.request_from_astrbot(req)
+        except Exception as exc:   # failing, she gets none rather than all of them (PR #27)
             req.func_tool = None
             logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
+            turn_request = adapter_astrbot_turn.request_from_astrbot(req)
+            prepare_tools = False
         else:
-            try:
-                _tools = getattr(req, "func_tool", None)
-                if _tools:
-                    for _name in ("take_photo", "share_screenshot", "say_aloud", "set_now"):
-                        if _name in _tools.names():
-                            _tools.remove_tool(_name)
-                    if not _tools:
-                        req.func_tool = None
-                if self.enabled:
-                    await self._ensure_profile(event)
-                self._give_phone_tools(req, event)
-            except Exception as exc:
-                req.func_tool = None
-                logger.warning("[ams-life] phone tools unavailable: %s", type(exc).__name__)
-            try:   # step 2 (丁): then her browser's two tools, only those (browse_enabled)
-                self._give_browse_tools(req, event)
-            except Exception as exc:
-                logger.warning("[ams-life] browse: tools not given (%s)", type(exc).__name__)
-        if not self.enabled:
-            return
-        turn_request = adapter_astrbot_turn.request_from_astrbot(req)
+            prepare_tools = True
         try:
-            await self._prepare_turn(event, turn_request)
+            if prepare_tools:
+                await self._prepare_tools(event, turn_request, build=adapter_astrbot_tools.available())
+            if self.enabled:
+                await self._prepare_turn(event, turn_request)
         finally:
-            adapter_astrbot_turn.request_into_astrbot(turn_request, req)
+            adapter_astrbot_turn.request_into_astrbot(turn_request, req, tools=False)
+            try:
+                adapter_astrbot_turn.tools_into_astrbot(turn_request, req)
+            except Exception as exc:   # failing, she gets none rather than all of them (PR #27)
+                req.func_tool = None
+                logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
             # Asking once more uses AstrBot's request, after it prepares the images.
             note = getattr(event, "_ams_check", None)
             if isinstance(note, dict) and note.get("req") is turn_request:
