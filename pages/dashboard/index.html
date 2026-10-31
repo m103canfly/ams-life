@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="light dark" /><title>小爱的内心世界</title>
-<link rel="stylesheet" href="./styles.css?v=20261030-1" />
+<link rel="stylesheet" href="./styles.css?v=20261031-1" />
 <link rel="stylesheet" href="./look.css?v=20261029-1" />
 </head>
 <body>
@@ -447,6 +447,10 @@
         <button type="button" class="settings-tab fold-panel folded active" data-settings-target="settingsApi">
           <span class="fold-face"><span class="fold-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><small>API</small></span>
         </button>
+        <!-- 钥匙: only on our own panel server (keys.js shows it); inside AstrBot the keys stay in AstrBot's back end -->
+        <button type="button" class="settings-tab fold-panel folded" id="settingsKeysTab" data-settings-target="settingsKeys" hidden>
+          <span class="fold-face"><span class="fold-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg></span><small>钥匙</small></span>
+        </button>
         <button type="button" class="settings-tab fold-panel folded" data-settings-target="settingsMemory">
           <span class="fold-face"><span class="fold-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M2 3h20v4H2z"/><path d="M9 12h6"/></svg></span><small>记忆</small></span>
         </button>
@@ -526,6 +530,13 @@
           <p class="api-note" id="imageNote">通用 OpenAI 兼容 /images/generations；没有 AstrBot 图片 provider 时使用自定义 API。</p>
         </div>
         </div>
+      </div>
+      <div class="section-title mt" id="settingsKeysTitle" data-settings-title="settingsKeys" hidden><div><div class="eyebrow">KEYS</div><h2>钥匙</h2></div><span class="hint">只存在这台电脑上</span></div>
+      <div class="panel settings settings-panel keys-panel" id="settingsKeys" hidden>
+        <p class="keys-damaged" id="keysDamaged" role="alert" hidden></p>
+        <div class="notice">她用的三个 Key 在这里填。Key 加密存在这台电脑上，换电脑、换账户都解不开。这里只看得到填没填，看不到 Key 本身；填好点“保存”，框会马上清空。</div>
+        <div id="keysRows"></div>
+        <p class="api-note" id="keysState"></p>
       </div>
       <div class="section-title mt" data-settings-title="settingsMemory"><div><div class="eyebrow">MEMORY</div><h2>记忆设置</h2></div><span class="hint">默认私人模式 · 安全限制可开关</span></div>
       <div class="panel settings settings-panel" id="settingsMemory">
@@ -616,6 +627,6 @@
     <footer class="statusbar"><span>她的心情是一种倾向，不是剧本。</span><span id="footTime"></span></footer>
   </main>
 </div>
-<script src="./ams-bridge.js"></script><script src="./feedback.js"></script><script src="./look.js?v=20261029-1"></script><script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script><script src="./repo_link.js"></script>
-<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261031-2"></script><script src="./orb.js?v=20261027-0215"></script>
+<script src="./ams-bridge.js"></script><script src="./feedback.js"></script><script src="./look.js?v=20261029-1"></script><script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script><script src="./keys.js"></script><script src="./repo_link.js"></script>
+<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261031-3"></script><script src="./orb.js?v=20261027-0215"></script>
 </body></html>

@@ -1864,6 +1864,8 @@
   const brainFrame=window.BioBrainFrame?window.BioBrainFrame.attach({bridge:()=>bridge,dark:()=>document.documentElement.dataset.theme==="dark"}):null;
   // ams-life: "她记住了什么" (memories.js): read only, but for a confirmed delete of one memory
   const memoryList=window.BioMemoryList?window.BioMemoryList.attach({bridge:()=>bridge}):null;
+  // ams-life move 5e-6: "钥匙" in 设置 (keys.js): only on our own panel server, where the owner fills her keys
+  if(window.BioKeys) window.BioKeys.attach();
   document.querySelectorAll(".nav-item[data-view]").forEach(a=>a.addEventListener("click",()=>switchView(a.dataset.view)));
   // ams-life: "她的表情包" is a page of its own (pages/stickers/). AstrBot lets a plugin page neither change the
   // window's address nor open another page of the plugin, so a copy of it in ./stickers/ opens in this frame,
