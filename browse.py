@@ -226,6 +226,8 @@ def usage_of(usage) -> dict:
     (input_other, input_cached, output) or an OpenAI-style dict."""
     if usage is None:
         return {"input_miss": 0, "input_hit": 0, "output": 0}
+    if isinstance(usage, dict) and set(usage) == {"input_miss", "input_hit", "output"}:
+        return {key: max(0, int(value or 0)) for key, value in usage.items()}
     get = (lambda k: usage.get(k)) if isinstance(usage, dict) else (lambda k: getattr(usage, k, None))
     if get("input_other") is not None or get("input_cached") is not None:
         miss, hit = int(get("input_other") or 0), int(get("input_cached") or 0)
