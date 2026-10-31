@@ -248,12 +248,22 @@ class SameAsThePlugin(unittest.TestCase):
             except Exception:
                 return False
 
+        # mixin_phone.py 277-284 at 82b5412.
+        def old_reply_to(event):
+            try:
+                for comp in event.get_messages() or []:
+                    if type(comp).__name__ == "Reply":
+                        return str(getattr(comp, "id", "") or "")[:80]
+            except Exception:
+                pass
+            return ""
+
         for ev in self.cases:
             one = from_astrbot(ev)
             self.assertEqual(one.place, old_here(ev))
             self.assertEqual(one.at_me, old_addresses_her(ev))
             self.assertEqual((one.sender_id, one.sender_name), old_speaker(ev))
-            self.assertEqual(one.reply_to, self.phone._reply_to(ev))
+            self.assertEqual(one.reply_to, old_reply_to(ev))
             self.assertEqual(one.message_id, self.phone._message_id(ev))
             self.assertEqual(one.image_refs,
                              tuple(self.media._image_ref(comp) for comp in ev.get_messages()
