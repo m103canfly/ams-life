@@ -212,12 +212,11 @@ input[type=range]{width:180px;accent-color:var(--accent)}
 .repo-addr .api-note{flex-basis:100%;margin:0}
 #apiSaveState{font-size:var(--fs-note);color:var(--faint)}
 @media(max-width:900px){.api-grid{grid-template-columns:1fr}}
-/* Our own panel server: the API Key boxes are hidden (keys go in 钥匙), and the LLM block is not used */
+/* Our own panel server: the API Key boxes are hidden (keys go in 钥匙); the LLM block says where its key is */
 .api-grid label[hidden]{display:none}
 .api-keys-elsewhere{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:0 0 4px}
 .api-keys-elsewhere[hidden]{display:none}
-.api-unused-note{margin:0 0 10px}
-.api-block.api-unused .api-grid,.api-block.api-unused #llmNote{opacity:.5}
+.api-own-note{margin:0 0 10px}
 
 /* API savebar */
 .api-savebar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
