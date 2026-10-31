@@ -64,6 +64,9 @@ class LLMMixin(PortsMixin):
             logger.warning("[biocore] profile load failed: %s", exc)
 
     async def _persona_text(self, event) -> str:
+        persona = getattr(self, "_neutral_persona", None)
+        if persona is not None:   # the new program: her own persona.md (5h), no AstrBot to ask
+            return str(persona)
         try:
             pm = self.context.persona_manager
             _pid = str(getattr(self, "persona_id", "") or self.config.get("persona_id") or "").strip()

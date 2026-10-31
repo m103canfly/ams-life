@@ -8,6 +8,10 @@ try:
 except ImportError:
     import adapter_astrbot_turn
 try:
+    from . import app_config
+except ImportError:
+    import app_config
+try:
     from .common import *  # noqa: F401,F403
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -84,6 +88,10 @@ class SettingsMixin:
                     saver2 = getattr(self.config, "save_config", None)
                     if saver2:
                         saver2(updates)
+                    else:
+                        path = getattr(self, "_config_path", None)   # the new program's config.json (5g)
+                        if path:
+                            app_config.save(path, self.config, getattr(self, "_config_schema", None) or app_config.load_schema())
         except Exception as exc:
             logger.warning("[biocore] plugin config sync failed: %s", exc)
 
