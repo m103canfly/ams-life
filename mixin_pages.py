@@ -426,6 +426,8 @@ class PagesMixin:
         return {"sessions": sessions, "entries": entries}
 
     async def _kb_available(self):
+        if getattr(self, "_neutral_model", None) is not None:
+            return []
         try:
             kbs = await self.context.kb_manager.list_kbs()
             return [{"kb_id": str(getattr(k, "kb_id", "")), "kb_name": str(getattr(k, "kb_name", "")),

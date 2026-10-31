@@ -237,7 +237,8 @@ class TurnMixin:
         except Exception as exc:
             logger.warning("[biocore] tom probe call failed: %s", exc)
         _kb = ""
-        if getattr(self, "kb_enabled", False) and getattr(self, "kb_names", None) and self._usable_memory_text(text):
+        if (getattr(self, "_neutral_model", None) is None and getattr(self, "kb_enabled", False)
+                and getattr(self, "kb_names", None) and self._usable_memory_text(text)):
             try:
                 _r = await asyncio.wait_for(
                     self.context.kb_manager.retrieve(query=text, kb_names=self.kb_names, top_m_final=3),

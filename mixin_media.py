@@ -266,13 +266,16 @@ class MediaMixin(PortsMixin):
     async def _voice_context(self, event) -> str:
         if not getattr(self, "voice_transcription_enabled", True):
             return ""
-        try:
-            provider = await self.context.get_using_stt_provider_async(
-                getattr(event, "unified_msg_origin", "") or "")
-        except Exception as exc:
-            # No such method without AstrBot (or asking failed): QQ's own words below.
-            logger.warning("[biocore] voice context failed: %s", exc)
+        if getattr(self, "_neutral_model", None) is not None:
             provider = None
+        else:
+            try:
+                provider = await self.context.get_using_stt_provider_async(
+                    getattr(event, "unified_msg_origin", "") or "")
+            except Exception as exc:
+                # No such method without AstrBot (or asking failed): QQ's own words below.
+                logger.warning("[biocore] voice context failed: %s", exc)
+                provider = None
         if provider is not None:
             try:
                 texts = []
