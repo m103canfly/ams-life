@@ -49,10 +49,12 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import atomic_file, browse
+    from . import adapter_astrbot_tools, atomic_file, browse, turn
 except ImportError:
+    import adapter_astrbot_tools
     import atomic_file
     import browse
+    import turn
 
 BROWSE_DIR = DATA_DIR / "browse"
 QUOTA_ATTR = "_ams_browse_quota"
@@ -284,26 +286,26 @@ class BrowseMixin:
     # ------------------------------------------------------------------
     # the two tools in a reply
     # ------------------------------------------------------------------
-    def _give_browse_tools(self, req, event) -> bool:
-        """Put the two tools into this reply's request (browse on, today's money left)."""
+    def _browse_tools(self, event) -> list:
+        """The two tools, as turn.TurnTool, with this message's quota and addresses kept."""
         if not self._browse_on() or not self._browse_ledger().money_left():
-            return False
-        try:
-            from astrbot.core.agent.tool import FunctionTool, ToolSet
-        except Exception:
-            return False
-        search = FunctionTool(name=browse.SEARCH_TOOL, description=SEARCH_DESCRIPTION, parameters=SEARCH_PARAMS,
-                              handler=self._tool_search)
-        read = FunctionTool(name=browse.READ_TOOL, description=READ_DESCRIPTION, parameters=READ_PARAMS,
-                            handler=self._tool_read)
-        tools = getattr(req, "func_tool", None)
-        if tools is None:
-            req.func_tool = ToolSet([search, read])
-        else:
-            tools.add_tool(search)
-            tools.add_tool(read)
+            return []
+        tools = [turn.TurnTool(name=browse.SEARCH_TOOL, description=SEARCH_DESCRIPTION, parameters=SEARCH_PARAMS,
+                               handler=self._tool_search),
+                 turn.TurnTool(name=browse.READ_TOOL, description=READ_DESCRIPTION, parameters=READ_PARAMS,
+                               handler=self._tool_read)]
         self._browse_quota(event)
         self._browse_urls(event).update(browse.urls_in(self._message_words(event)))
+        return tools
+
+    def _give_browse_tools(self, req, event) -> bool:
+        """The plugin's way: the two tools into this reply's request (browse on, today's money left)."""
+        if not self._browse_on() or not self._browse_ledger().money_left():
+            return False
+        if not adapter_astrbot_tools.available():
+            return False
+        tools = self._browse_tools(event)
+        adapter_astrbot_tools.add_to_request(req, tools)
         return True
 
     @staticmethod

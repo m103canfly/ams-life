@@ -18,6 +18,7 @@ from pathlib import Path
 try:
     from .common import *  # noqa: F401,F403
     from . import tts, browse, daily, discretion, events, mixin_ports
+    from . import adapter_astrbot_tools, turn
     from .mixin_ports import PortsMixin
 except ImportError:
     from common import *  # noqa: F401,F403
@@ -27,6 +28,8 @@ except ImportError:
     import discretion
     import events
     import mixin_ports
+    import adapter_astrbot_tools
+    import turn
     from mixin_ports import PortsMixin
 
 SELFIE_DIR = DATA_DIR / "selfie"
@@ -192,17 +195,13 @@ class SelfieMixin(PortsMixin):
                 counts.get("screenshot", 0), counts.get("voice", 0), elapsed,
                 "发了" if voice else "没发", "发了" if photo else "没发"))
 
-    def _give_phone_tools(self, req, event):
-        cfg = self.config or {}
+    def _phone_tools(self, event) -> list:
+        """Her phone tools for this turn, as turn.TurnTool, in their order."""
         if not self.enabled:
-            return
-        try:
-            from astrbot.core.agent.tool import FunctionTool, ToolSet
-        except ImportError:
-            logger.warning("[ams-life] phone tools unavailable")
-            return
+            return []
+        cfg = self.config or {}
         context = self._phone_context(event) + COMMON_GUIDE
-        tools = [FunctionTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
+        tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 20},
             "doing": {"type": "string", "maxLength": 20}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
@@ -212,7 +211,7 @@ class SelfieMixin(PortsMixin):
                 recent = []
             photo_context = "\n最近说的：" + " / ".join(recent) + "\n" + self._now_line(event)
             photo_context += "\n只拍你此刻真在做的、跟你这轮说的对得上的；对不上就别拍。"
-            tools.append(FunctionTool(name="take_photo", description=PHOTO_GUIDE + context + photo_context,
+            tools.append(turn.TurnTool(name="take_photo", description=PHOTO_GUIDE + context + photo_context,
                 parameters={"type": "object", "properties": {"kind": {"type": "string", "enum": ["selfie", "snap"]},
                 "what": {"type": "string", "description": "拍什么、在哪、光线，60字以内"},
                 "where": {"type": "string", "maxLength": 20, "description": "与此刻相符的地点"},
@@ -220,22 +219,27 @@ class SelfieMixin(PortsMixin):
                 "caption": {"type": "string", "maxLength": 20, "description": "发照片时配的那一句"}},
                 "required": ["kind", "what", "where", "doing", "caption"]}, handler=self._tool_take_photo))
         if cfg.get("screenshot_enabled", False) and self._browse_on():
-            tools.append(FunctionTool(name="share_screenshot", description=SCREEN_GUIDE + context,
+            tools.append(turn.TurnTool(name="share_screenshot", description=SCREEN_GUIDE + context,
                 parameters={"type": "object", "properties": {"url": {"type": "string"}, "caption": {"type": "string"}},
                 "required": ["url", "caption"]}, handler=self._tool_share_screenshot))
         if cfg.get("say_aloud_enabled", False):
-            tools.append(FunctionTool(name="say_aloud", description=VOICE_GUIDE + context,
+            tools.append(turn.TurnTool(name="say_aloud", description=VOICE_GUIDE + context,
                 parameters={"type": "object", "properties": {"text": {"type": "string", "description": "要说的一句话，100字以内"},
                 "tone": {"type": "string", "enum": list(tts.TONES), "description": "语气，可以不填：不填就按你现在的心情"}},
                 "required": ["text"]}, handler=self._tool_say_aloud))
+        return tools
+
+    def _give_phone_tools(self, req, event):
+        """The plugin's way: her phone tools into the request's tool set."""
+        if not self.enabled:
+            return
+        if not adapter_astrbot_tools.available():
+            logger.warning("[ams-life] phone tools unavailable")
+            return
+        tools = self._phone_tools(event)
         if not tools:
             return
-        existing = getattr(req, "func_tool", None)
-        if existing is None:
-            req.func_tool = ToolSet(tools)
-        else:
-            for tool in tools:
-                existing.add_tool(tool)
+        adapter_astrbot_tools.add_to_request(req, tools)
 
     @staticmethod
     def _phone_queue(event):

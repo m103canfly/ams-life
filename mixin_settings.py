@@ -172,6 +172,22 @@ class SettingsMixin:
             pass
         return []
 
+    def _tools_not_allowed(self, names) -> list:
+        """The names not on the setting allowed_tools (one a line, or a list), in their order."""
+        raw = (getattr(self, "config", None) or {}).get("allowed_tools") or []
+        allowed = {str(x).strip() for x in (raw if isinstance(raw, (list, tuple)) else str(raw).splitlines())}
+        return [n for n in names if n not in allowed]
+
+    def _turn_tools_off(self, turn_request) -> list:
+        """The same, on a turn.TurnRequest (5i-2): take the names out; one log line names them."""
+        gone = self._tools_not_allowed(turn_request.tool_names())
+        if not gone:
+            return []
+        for name in gone:
+            turn_request.remove_tool(name)
+        logger.info("[ams-life] tools taken out of the reply: %s", ", ".join(gone))
+        return gone
+
     def _reply_tools_off(self, req) -> list:
         """No tools in her reply (the owner, 10-29): AstrBot puts tools of its own into every
         reply's request (future_task, send_message_to_user: core/astr_main_agent.py, added after
@@ -186,9 +202,7 @@ class SettingsMixin:
             names = [str(n) for n in tools.names()]
         except Exception:
             names = [str(getattr(t, "name", "")) for t in getattr(tools, "tools", None) or []]
-        raw = (getattr(self, "config", None) or {}).get("allowed_tools") or []
-        allowed = {str(x).strip() for x in (raw if isinstance(raw, (list, tuple)) else str(raw).splitlines())}
-        gone = [n for n in names if n not in allowed]
+        gone = self._tools_not_allowed(names)
         if not gone:
             return []
         if len(gone) == len(names):
