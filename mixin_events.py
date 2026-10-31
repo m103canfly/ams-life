@@ -2433,7 +2433,7 @@ class EventsMixin(PortsMixin):
         """Request-path hook: wire the single-event summary path (BUG-01)."""
         if not self._llm_allowed("event_summary"):
             return
-        key = str(getattr(event, "unified_msg_origin", "") or "")
+        key = self._here(event)
         now = time.time()
         try:
             last_map = getattr(self, "_last_strong_event_summary", None)
