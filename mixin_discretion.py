@@ -177,6 +177,21 @@ class DiscretionMixin:
         except Exception as exc:
             raise forget_registry.Unreadable(str(exc)) from exc
 
+    def _history_store(self):
+        """Her own conversation history, when the program has one."""
+        return getattr(self, "_history", None)
+
+    def _history_gate(self, row) -> bool:
+        """Ask the forget registry before writing a history row."""
+        ids = list(row["sources"])
+        if row["message_id"]:
+            ids.append(row["message_id"])
+        try:
+            return self._may_keep(row["about"], row["place"], row["ts"], ids)
+        except forget_registry.Unreadable as exc:
+            logger.warning("[ams-life] forget registry unreadable, not written: %s", exc)
+            return False
+
     @staticmethod
     def _registry_keeps(reg, people=(), place="", at=None, source_ids=()) -> bool:
         """The registry's own answer (reg: hers, or a copy of it made in another thread)."""
@@ -836,6 +851,15 @@ class DiscretionMixin:
             self._name_index.pop(person, None)
         self._forget_log.append((person, list(ids)))
         counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0, "insights": 0}
+        store = self._history_store()
+        if store is not None:
+            counts["history"] = 0
+            for method, value in (("forget_person", person), ("forget_messages", ids)):
+                if value:
+                    try:
+                        counts["history"] += getattr(store, method)(value)
+                    except Exception as exc:
+                        logger.warning("[ams-life] history delete failed: %s", exc)
         places, involved, pictures, gone_events = set(), set(), set(), set()
 
         def about(item):
