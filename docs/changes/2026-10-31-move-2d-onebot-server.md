@@ -18,6 +18,6 @@ The connection-replacement test bounds each wait so a missing close fails instea
 
 Full suite: 1231 tests OK outside the sandbox with `venv-ams-life` (aiohttp 3.14.5; main aee4e7a had 1220;
 +11 in `tests/test_onebot_server.py`); with the owner's Python (no aiohttp) also 1231 OK, the server tests
-skipped. To be rerun after main is merged in. Golden traces unchanged.
+skipped. After merging main 32662f1 (1240 tests): 1251 tests OK with venv-ams-life. Golden traces unchanged.
 The connection-replacement test waits with asyncio.wait_for (5 s): without it, a server that kept the old
 link open made the test wait forever instead of failing.
