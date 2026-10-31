@@ -148,7 +148,8 @@ class Split(unittest.TestCase):
         # Message admission and group speaking policy: three helpers.
         # move 1e: +4 (mixin_ports: _umo_of, _messenger, _model, _incoming)
         # move 5f: +2 (mixin_discretion: _history_store, _history_gate)
-        self.assertEqual(len(methods), 494)
+        # move 5b: +1 (_prepare_turn)
+        self.assertEqual(len(methods), 495)
 
     def test_backup_lists_every_module(self):
         import mixin_pages

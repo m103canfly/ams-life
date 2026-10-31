@@ -19,7 +19,7 @@ class TurnRequest:
     system_prompt: str = ''
     contexts: list = field(default_factory=list)
     image_urls: list = field(default_factory=list)
-    extra_user_content_parts: list = field(default_factory=list)
+    extra_user_content_parts: list = field(default_factory=list)  # None: platform puts the turn block in system prompt
     tools: list = field(default_factory=list)
     extras: dict = field(default_factory=dict)
 
