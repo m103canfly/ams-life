@@ -1989,6 +1989,8 @@
   // On our own panel server (ams-bridge.js, `standalone`) the keys are filled in 钥匙 (keys.js),
   // so the five API Key boxes are hidden and never read: every api_key sent from here is "",
   // which the back end takes as "keep what is saved". Inside AstrBot the boxes stay as they were.
+  // The new program reads its chat model's address and model name from the LLM block (5e-13), with
+  // the key from 钥匙 (deepseek); there is no AstrBot to follow, so the block is always 自定义 API.
   function apiOnOwnServer() {
     try { const b = window.AstrBotPluginPage; return !!(b && b.standalone); } catch (e) { return false; }
   }
@@ -1999,10 +2001,14 @@
       const input = field.querySelector("input");
       if (input) { input.value = ""; input.disabled = true; }
     });
-    const line = $("apiKeysElsewhere"), unused = $("llmUnusedNote"), llm = $("llmBlock"), go = $("apiGoKeysBtn");
+    const line = $("apiKeysElsewhere"), llmKeys = $("llmKeysNote"), llmSrc = $("llmSource"), go = $("apiGoKeysBtn");
     if (line) line.hidden = false;
-    if (unused) unused.hidden = false;
-    if (llm) llm.classList.add("api-unused");
+    if (llmKeys) llmKeys.hidden = false;
+    if (llmSrc) {
+      const follow = llmSrc.querySelector('option[value="astrbot"]');
+      if (follow) follow.remove();
+      llmSrc.value = "custom";
+    }
     if (go) go.addEventListener("click", () => { const tab = $("settingsKeysTab"); if (tab) tab.click(); });
   }
   function setOptions(sel, models, current) {
@@ -2016,7 +2022,8 @@
     const src = $(prefix + "Source"), base = $(prefix + "Base"), key = $(prefix + "Key"),
           model = $(prefix + "Model"), state = $(prefix + "SourceState"), note = $(prefix + "Note");
     if (!src) return;
-    const source = cfg.source || (def && def.provider_id ? "astrbot" : "custom");
+    const ownLlm = prefix === "llm" && apiOnOwnServer();
+    const source = ownLlm ? "custom" : (cfg.source || (def && def.provider_id ? "astrbot" : "custom"));
     src.value = source;
     base.value = cfg.base_url || (def && def.base_url) || "";
     setOptions(model, cfg.model ? [cfg.model] : [], cfg.model || (def && def.model) || "");
@@ -2024,7 +2031,10 @@
     key.placeholder = cfg.key_saved ? "已保存，留空保持不变" : "输入 API Key";
     const en = $(prefix + "Enabled");
     if (en) en.checked = cfg.enabled !== false;
-    if (def && def.provider_id) {
+    if (ownLlm) {
+      state.textContent = "新程序 · 自定义 API";
+      note.textContent = "填 API Base，点“获取模型”选模型。";
+    } else if (def && def.provider_id) {
       state.textContent = "ASTRBOT · " + def.provider_id;
       note.textContent = "已检测到 AstrBot " + kind + " provider。默认直接使用它；选择自定义 API 再填下面字段。";
     } else {
