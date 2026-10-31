@@ -463,3 +463,28 @@ class TurnMixin:
             _queue.clear()
         except Exception:
             pass
+
+    def _keep_turn(self, event, turn_request, reply) -> None:
+        """The new program's history (AstrBot keeps its own): this turn's line from the person and
+        what she sent, as AstrBot keeps it after _settle_history. Nothing when the turn was
+        stopped (she said nothing, or the look before sending held it back)."""
+        store = self._history_store()
+        if store is None:
+            return
+        try:
+            if event.is_stopped():
+                return
+            sent = self._check_note(event).get("sent")
+            text = sent if sent is not None else reply.text
+            if not str(text or "").strip():
+                return
+            place = self._here(event)
+            inc = adapter_astrbot_turn.incoming_of(event)
+            store.append(place, "user", turn_request.prompt, sender_id=inc.sender_id,
+                         sender_name=inc.sender_name, message_id=inc.message_id,
+                         sources=self._source_ids(event))
+            store.append(place, "assistant", text,
+                         about=(inc.sender_id,) if inc.sender_id else (),
+                         sources=self._source_ids(event))
+        except Exception as exc:   # a broken file, a full disk: the reply is already sent
+            logger.warning("[ams-life] history not kept (%s)", type(exc).__name__)
