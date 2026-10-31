@@ -12,7 +12,7 @@ The fake reply model drains background tasks before answering, matching the time
 
 ## Allowed differences
 
-The table below groups repeated list positions; the test lists the individual paths from report7.
+The table below groups repeated list positions; the test lists the individual paths from the three-step report. Spend paths match the date format used at runtime.
 
 - Golden to A, `asked_uncalled`: A records uncalled model requests.
 - Golden to A, `sent`: the golden trace has no send record.
@@ -36,11 +36,11 @@ The table below groups repeated list positions; the test lists the individual pa
 
 ## Test results
 
-- `tests.test_golden`: `Ran 2 tests in 4.385s | OK`.
-- The revised AstrBot route now imports aiohttp before the harness too, so none of the three routes can run in this sandbox without that dependency.
+- Outside the sandbox, before the date-matching test was added: `tests.test_golden` 2 OK (unchanged), `tests.test_golden_standalone` 4 OK, `tests.test_turn_runner` 9 OK, `tests.test_app` 11 OK, and `tests.test_basics` 11 OK (505 methods).
+- In the sandbox after the change: `tests.test_golden` 2 OK and `PathMatching.test_spend_date_placeholder` 1 OK.
 
 The full suite and the card's spot checks run once blocks 5 and 6 are written (the owner's rule, 10-31).
 
 ## Appendix: difference report
 
-Report7 records 85, 139 and 480 differing paths in basic, and 132, 139 and 480 in full. The allowed table now follows those paths; the three-route test still needs to run in an environment containing `aiohttp`.
+The three-step report records 85, 139 and 480 differing paths in basic, and 132, 139 and 480 in full. The allowed table follows those paths.

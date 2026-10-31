@@ -30,7 +30,7 @@ for field in ('hard', 'left', 'level', 'soft', 'spent', 'state'):
     GOLDEN_A.append((f'$["page_status"]["data"]["spend"]["{field}"]', 'self-decision',
                      'A exposes the self-decision spending state.'))
 for field in ('calls', 'event_summary', 'reply'):
-    GOLDEN_A.append((f'$["files"]["states/spend.json"]["2026-10-31"]["{field}"]', 'self-decision',
+    GOLDEN_A.append((f'$["files"]["states/spend.json"]["<day>"]["{field}"]', 'self-decision',
                      'A counts model calls when self-decision is enabled.'))
 for person, days in (('10001', ('20752', '20753', '20755')), ('10002', ('20752', '20753', '20755')),
                      ('10003', ('20752', '20755')), ('10004', ('20752', '20755')),
@@ -55,7 +55,7 @@ for name, indexes in zip(PHONE_FILES, ((0, 2, 4, 6, 8), (0, 2), (0, 2, 4, 6, 8))
 
 FULL_ONLY = []
 for field in ('persona_compile', 'tom_probe'):
-    FULL_ONLY.append((f'$["files"]["states/spend.json"]["2026-10-31"]["{field}"]', 'self-decision',
+    FULL_ONLY.append((f'$["files"]["states/spend.json"]["<day>"]["{field}"]', 'self-decision',
                       'A counts this enabled model function.'))
 
 def add_event_differences(root, index, *, appraisal=False, summary=False, sources=()):
@@ -152,7 +152,15 @@ def compare(mode):
 
 
 def matches(pattern, path):
-    return re.fullmatch(re.escape(pattern).replace(r'\*', r'\d+'), path) is not None
+    expression = re.escape(pattern).replace(r'\*', r'\d+').replace(re.escape('<day>'), r'\d{4}-\d{2}-\d{2}')
+    return re.fullmatch(expression, path) is not None
+
+
+class PathMatching(unittest.TestCase):
+    def test_spend_date_placeholder(self):
+        pattern = '$["files"]["states/spend.json"]["<day>"]["calls"]'
+        self.assertTrue(matches(pattern, '$["files"]["states/spend.json"]["2027-01-02"]["calls"]'))
+        self.assertFalse(matches(pattern, '$["files"]["states/spend.json"]["notaday"]["calls"]'))
 
 
 class GoldenStandalone(unittest.TestCase):
