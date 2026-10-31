@@ -57,19 +57,24 @@ class KeyStore:
     def __init__(self, path):
         self.path = Path(path)
 
-    def _read(self):
+    def _read_checked(self):
         try:
             with self.path.open(encoding='utf-8') as file:
                 data = json.load(file)
             if not isinstance(data, dict) or type(data.get('version')) is not int or data['version'] != 1:
-                return {}
+                return {}, False
             keys = data.get('keys')
             if not isinstance(keys, dict) or any(not isinstance(k, str) or not NAME_CHARS.fullmatch(k)
                                                  or not isinstance(v, str) for k, v in keys.items()):
-                return {}
-            return keys
+                return {}, False
+            return keys, True
+        except FileNotFoundError:
+            return {}, True
         except (OSError, ValueError, UnicodeError):
-            return {}
+            return {}, False
+
+    def _read(self):
+        return self._read_checked()[0]
 
     def _write(self, keys):
         tmp = None
@@ -125,6 +130,9 @@ class KeyStore:
 
     def status(self):
         return {name: True for name in self._read()}
+
+    def damaged(self):
+        return not self._read_checked()[1]
 
     def __repr__(self):
         return f'KeyStore(path={str(self.path)!r}, names={len(self._read())})'
