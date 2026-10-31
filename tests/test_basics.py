@@ -147,7 +147,8 @@ class Split(unittest.TestCase):
         # Shared daily state: _set_now, _now_line, _tool_set_now.
         # Message admission and group speaking policy: three helpers.
         # move 1e: +4 (mixin_ports: _umo_of, _messenger, _model, _incoming)
-        self.assertEqual(len(methods), 492)
+        # move 5f: +2 (mixin_discretion: _history_store, _history_gate)
+        self.assertEqual(len(methods), 494)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
