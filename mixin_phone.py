@@ -250,7 +250,7 @@ class PhoneMixin(PortsMixin):
             sid = ""
         here, ids = self._here(event), self._source_ids(event)
         private = here.startswith("group:") and discretion.keep_in_group(
-            str(getattr(event, "message_str", "") or "") or self._message_text(event))
+            adapter_astrbot_turn.incoming_of(event).text or self._message_text(event))
         if here.startswith("group:") and not private:
             private = any(discretion.is_about(discretion.origin_of(x), source_ids=ids)
                           and discretion.origin_of(x)["visibility"] == discretion.PRIVATE
@@ -270,7 +270,7 @@ class PhoneMixin(PortsMixin):
         own = self._message_id(event)
         if own:
             return [own[:80]]
-        text = str(getattr(event, "message_str", "") or "").strip() or self._message_text(event)
+        text = adapter_astrbot_turn.incoming_of(event).text.strip() or self._message_text(event)
         return [_sha256(text)[:16]] if text else []
 
     @staticmethod
@@ -314,7 +314,7 @@ class PhoneMixin(PortsMixin):
             parts = []
         text = "".join(parts).strip()
         if not text:
-            text = str(getattr(event, "message_str", "") or "").strip()
+            text = adapter_astrbot_turn.incoming_of(event).text.strip()
         return self._without_gone(text, event)
 
     # ------------------------------------------------------------------

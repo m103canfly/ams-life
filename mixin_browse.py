@@ -331,7 +331,7 @@ class BrowseMixin:
     @staticmethod
     def _message_words(event) -> str:
         """The words of this message and of the one it quotes."""
-        parts = [str(getattr(event, "message_str", "") or "")]
+        parts = [adapter_astrbot_turn.incoming_of(event).text]
         try:
             for comp in event.get_messages() or []:
                 for x in [comp] + list(getattr(comp, "chain", None) or []):

@@ -6,9 +6,10 @@ import time
 
 try:
     from .common import DATA_DIR
-    from . import attention, discretion, impressions, mixin_attention, redline, slang, vision
+    from . import adapter_astrbot_turn, attention, discretion, impressions, mixin_attention, redline, slang, vision
 except ImportError:
     from common import DATA_DIR
+    import adapter_astrbot_turn
     import attention
     import discretion
     import impressions
@@ -166,7 +167,7 @@ class SlangMixin:
             return ''
         store = self._slang_store()
         data = store.load(place)
-        text = str(getattr(event, 'message_str', '') or '') + ' ' + ' '.join(
+        text = adapter_astrbot_turn.incoming_of(event).text + ' ' + ' '.join(
             str(x.get('text') or '') for x in self._window_lines(event, 6))
         reg = self._registry()
         gone = reg.people()

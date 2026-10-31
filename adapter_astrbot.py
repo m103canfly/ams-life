@@ -184,4 +184,5 @@ def from_astrbot(event) -> events.Incoming:
         is_private=place.startswith("private:"),
         is_self=bool(sender_id) and sender_id == self_id,
         ts=time.time(),
+        text=_attr(event, "message_str"),
     )

@@ -5,11 +5,12 @@ try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
     from .mixin_phone import _expand_forward, _phone_line, _history_original
-    from . import attention, stickers
+    from . import adapter_astrbot_turn, attention, stickers
 except ImportError:
     from common import *  # noqa: F401,F403
     from body import *  # noqa: F401,F403
     from mixin_phone import _expand_forward, _phone_line, _history_original
+    import adapter_astrbot_turn
     import attention
     import stickers
 
@@ -65,7 +66,7 @@ class TurnMixin:
         # A4: capture open loops from *before* this turn so the continuity
         # opener cannot echo a loop created by the current message.
         _prior_open_loops = [dict(x) for x in self._window_loops(event)]
-        text = str(getattr(event, "message_str", "") or "").strip()
+        text = adapter_astrbot_turn.incoming_of(event).text.strip()
         if not text:
             text = _plain_prompt
         if not text:

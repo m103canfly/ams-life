@@ -4,9 +4,9 @@
 
 A message is a place, who sent it, her own account id, the message id, the parts in
 order (segments), whether it addresses her, the id it quotes, the images it carries,
-and whether it is in a private chat or is her own. The future QQ layer will build the
-same shape from NapCat's raw message; ``adapter_astrbot`` builds it from an AstrBot
-event today. Pure data only: no I/O, no AstrBot.
+whether it is in a private chat or is her own, and the words the platform gives. The
+future QQ layer will build the same shape from NapCat's raw message; ``adapter_astrbot``
+builds it from an AstrBot event today. Pure data only: no I/O, no AstrBot.
 
 What ``Segment.data`` holds, by type:
 
@@ -48,6 +48,7 @@ class Incoming:
     is_private: bool      # place starts with "private:"
     is_self: bool         # sender_id == self_id and both are not ""
     ts: float             # time.time() when built
+    text: str = ""        # the words as the platform gives them to the plugin; AstrBot: event.message_str when read
 
 
 def plain_text(incoming) -> str:
