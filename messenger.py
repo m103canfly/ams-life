@@ -23,7 +23,8 @@ except ImportError:
     import events
 
 # The platform actions she may ask for, and nothing else.
-ALLOWED_ACTIONS = frozenset(("get_msg", "get_forward_msg", "send_group_msg", "send_private_msg"))
+# fetch_ptt_text reads only: QQ's own speech-to-text for one voice.
+ALLOWED_ACTIONS = frozenset(("get_msg", "get_forward_msg", "send_group_msg", "send_private_msg", "fetch_ptt_text"))
 # What a message she sends may be made of.
 SEND_TYPES = ("text", "face", "image", "record")
 _IMAGE_KEYS = ("path", "base64", "url")   # an image takes exactly one of these
