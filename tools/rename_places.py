@@ -23,7 +23,7 @@ Not changed: phone/ windows (their umo is AstrBot's wiring, not a key), the old 
 insights, and people/ (the names and aliases she keeps of people).
 
 Everything is read and worked out before anything is written: a file that cannot be read, two
-platform prefixes, or two events with one id and different content stops the run with exit 2,
+unapproved platform prefixes, or two events with one id and different content stops the run with exit 2,
 and no file is written. Events of one place are deduplicated by id (an identical record is
 kept once) and sorted by ts before they are written, then the folders merged into it are
 removed. Printed: counts, folder names and relative paths only, never a record's words.
@@ -130,13 +130,13 @@ def memory_holders(entry) -> list:
     return holders
 
 
-def _rename_field(holder, changed) -> bool:
+def _rename_field(holder, changed, place=discretion.place_of) -> bool:
     """Set holder["session"] to discretion.place_of; True when it changed. A value that is not
     a string is left alone (an empty one stays empty)."""
     value = holder.get("session")
     if not isinstance(value, str):
         return False
-    new = discretion.place_of(value)
+    new = place(value)
     if new == value:
         return False
     holder["session"] = new
@@ -255,7 +255,7 @@ def _write(path, text) -> None:
 # ---------------------------------------------------------------------------
 # Renaming one store, in memory.
 # ---------------------------------------------------------------------------
-def renamed_events(rows):
+def renamed_events(rows, place=discretion.place_of):
     """(rows, changed) with the session fields of one events.jsonl renamed."""
     out, changed = [], []
     for line, obj in rows:
@@ -264,24 +264,24 @@ def renamed_events(rows):
             continue
         mine = []
         for holder in event_holders(obj):
-            _rename_field(holder, mine)
+            _rename_field(holder, mine, place)
         changed.extend(mine)
         out.append((line if not mine else None, obj))
     return out, changed
 
 
-def renamed_memory(doc) -> list:
+def renamed_memory(doc, place=discretion.place_of) -> list:
     """The session fields of the library's entries renamed in place; returns the changes."""
     changed = []
     if isinstance(doc, dict):
         for entry in doc.get("entries") or []:
             if isinstance(entry, dict):
                 for holder in memory_holders(entry):
-                    _rename_field(holder, changed)
+                    _rename_field(holder, changed, place)
     return changed
 
 
-def renamed_sessions(doc):
+def renamed_sessions(doc, place=discretion.place_of):
     """A users/*.json file's sessions renamed in place, the last place kept, at most 20.
     Returns (changes, whether the list changed at all): a place kept once is one change, a
     repeat dropped or a list cut to 20 is no rename, but the file is still written."""
@@ -292,7 +292,7 @@ def renamed_sessions(doc):
     new = []
     for value in old:
         if isinstance(value, str):
-            placed = discretion.place_of(value)
+            placed = place(value)
             if placed != value:
                 changed.append((value, placed))
             new.append(placed)
@@ -304,7 +304,7 @@ def renamed_sessions(doc):
     return changed, new != old
 
 
-def renamed_dedupe(rows):
+def renamed_dedupe(rows, place=discretion.place_of):
     """(rows, changed) with the session fields of one dedupe_log.jsonl renamed."""
     out, changed = [], []
     for line, obj in rows:
@@ -312,10 +312,10 @@ def renamed_dedupe(rows):
             out.append((line, obj))
             continue
         mine = []
-        _rename_field(obj, mine)
+        _rename_field(obj, mine, place)
         values = obj.get("dropped_sessions")
         if isinstance(values, list):
-            new = [discretion.place_of(x) if isinstance(x, str) else x for x in values]
+            new = [place(x) if isinstance(x, str) else x for x in values]
             for before, after in zip(values, new):
                 if before != after:
                     mine.append((before, after))
@@ -398,8 +398,8 @@ class Copy:
             yield _rel(self.data, self.data.joinpath(*DEDUPE)), dedupe_values(self.dedupe[1])
 
     # -- the checks done before anything is written ----------------------
-    def scan(self) -> None:
-        """Collect every session string first: one platform prefix only, and (for --check)
+    def scan(self, same_account=None) -> None:
+        """Collect every session string first: check platform prefixes, and (for --check)
         what is still a session and each folder's own events."""
         like = set()
         for label, values in self._every_value():
@@ -414,10 +414,12 @@ class Copy:
                 self.private += 1
             elif kind == "GuildMessage":
                 self.as_group += 1
-        if len(self.prefixes) > 1:
-            raise Problem("平台前缀不止一种：%s" % "、".join(
+        if (same_account is None and len(self.prefixes) > 1 or
+                same_account is not None and set(self.prefixes) - same_account):
+            reason = "平台前缀不止一种" if same_account is None else "平台前缀不在同账号名单中"
+            raise Problem("%s：%s" % (reason, "、".join(
                 "%s（%d 个）" % (prefix or "（没有前缀）", count)
-                for prefix, count in sorted(self.prefixes.items())))
+                for prefix, count in sorted(self.prefixes.items()))))
         root = self.data.joinpath(*SESSIONS)
         for name, (_text, rows) in sorted(self.folders.items()):
             wrong = 0
@@ -428,23 +430,30 @@ class Copy:
             self.mismatched.append((_rel(self.data, root / name), wrong))
 
     # -- renaming, in memory --------------------------------------------
-    def rename(self) -> None:
+    def rename(self, same_account=None) -> None:
         """Rename every session field of everything read. Nothing is written here."""
+        def place(value):
+            match = KIND.search(value)
+            if (same_account is not None and match and prefix_of(value) in same_account
+                    and value[:match.start()] == prefix_of(value) + ":"):
+                return discretion.place_of(value[match.start():])
+            return discretion.place_of(value)
+
         if self.events is not None:
-            rows, changed = renamed_events(self.events[1])
+            rows, changed = renamed_events(self.events[1], place)
             self.events = (self.events[0], rows)
             self.changed["events"] = changed
         for name, (text, rows) in list(self.folders.items()):
-            rows, changed = renamed_events(rows)
+            rows, changed = renamed_events(rows, place)
             self.folders[name] = (text, rows)
             self.changed["sessions"].extend(changed)
         if self.library is not None:
-            self.changed["library"] = renamed_memory(self.library[1])
+            self.changed["library"] = renamed_memory(self.library[1], place)
         for path, (text, doc) in list(self.users.items()):
-            changed, self.user_modified[path] = renamed_sessions(doc)
+            changed, self.user_modified[path] = renamed_sessions(doc, place)
             self.changed["users"].extend(changed)
         if self.dedupe is not None:
-            rows, changed = renamed_dedupe(self.dedupe[1])
+            rows, changed = renamed_dedupe(self.dedupe[1], place)
             self.dedupe = (self.dedupe[0], rows)
             self.changed["dedupe"] = changed
 
@@ -629,13 +638,15 @@ def main(argv=None) -> int:
                         help="a copy of her data folder (tools/migrate_data.py made it)")
     parser.add_argument("--check", action="store_true",
                         help="only look: no session string left, and every event in its folder")
+    parser.add_argument("--same-account", help="comma-separated prefixes of the same account")
     args = parser.parse_args(argv)
     try:
         data = checked_path(args.data)
         copy = Copy(data)
         copy.read()
-        copy.scan()
-        copy.rename()
+        same_account = set(args.same_account.split(",")) if args.same_account is not None else None
+        copy.scan(same_account)
+        copy.rename(same_account)
         copy.merge()
         if args.check:
             return OK if copy.check() else LEFT
