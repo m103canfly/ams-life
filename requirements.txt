@@ -1,1 +1,2 @@
-# BioCore uses AstrBot-provided dependencies only; no third-party packages required.
+# Optional: Pillow prepares images for vision requests.
+pillow

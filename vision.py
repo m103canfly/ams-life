@@ -2,7 +2,9 @@
 import asyncio
 import base64
 import hashlib
+import io
 import json
+import threading
 import time
 import types
 import urllib.error
@@ -16,6 +18,11 @@ except ImportError:
     from common import DATA_DIR, logger
     import stickers
     import mixin_attention
+
+VISION_MAX_SIDE = 1280
+VISION_MAX_BYTES = 1024 * 1024
+_pillow_warning_lock = threading.Lock()
+_pillow_warned = False
 
 
 def _legacy_counts(day):
@@ -76,6 +83,48 @@ def _data_url(data):
     return 'data:image/' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
 
 
+def _prepared(data):
+    """Adapted from AstrBot 4.29.3, astrbot/core/utils/media_utils.py, _compress_image_sync.
+
+    Unlike AstrBot, animated images use their first frame.
+    """
+    global _pillow_warned
+    try:
+        from PIL import Image
+    except ImportError:
+        with _pillow_warning_lock:
+            if not _pillow_warned:
+                logger.warning('[ams-life] Pillow unavailable; sending original image')
+                _pillow_warned = True
+        return data
+
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            opened.seek(0)
+            alpha = opened.mode in {'RGBA', 'LA'} or (opened.mode == 'P' and 'transparency' in opened.info)
+            image = opened.convert('RGBA' if alpha else 'RGB')
+    except (OSError, ValueError, EOFError) as exc:
+        logger.warning('[ams-life] image preparation failed: %s', type(exc).__name__)
+        return data
+
+    with image:
+        image.thumbnail((VISION_MAX_SIDE, VISION_MAX_SIDE), Image.Resampling.LANCZOS)
+        while True:
+            for quality in ((95,) if alpha else (95, 85, 75, 65, 55, 45, 35, 25)):
+                output = io.BytesIO()
+                options = {'optimize': True}
+                if not alpha:
+                    options['quality'] = quality
+                image.save(output, 'PNG' if alpha else 'JPEG', **options)
+                result = output.getvalue()
+                if len(result) <= VISION_MAX_BYTES:
+                    return result
+            if max(image.size) <= 1:
+                raise ValueError('image cannot be compressed')
+            image.thumbnail((max(1, image.width * 3 // 4), max(1, image.height * 3 // 4)),
+                            Image.Resampling.LANCZOS)
+
+
 class ImageAPI:
     provider_config = {'id': 'image_api', 'modalities': ['text', 'image']}
 
@@ -104,7 +153,7 @@ class ImageAPI:
                     data = _bytes(str(ref))
                     if not data:
                         raise ValueError('image unavailable')
-                    content.append({'type': 'image_url', 'image_url': {'url': _data_url(data)}})
+                    content.append({'type': 'image_url', 'image_url': {'url': _data_url(_prepared(data))}})
                 payload = json.dumps({'model': model, 'messages': [{'role': 'user', 'content': content}]}).encode('utf-8')
                 req = urllib.request.Request(base + '/chat/completions', data=payload, method='POST',
                                              headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
