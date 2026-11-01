@@ -17,6 +17,20 @@ except ImportError:
     import mixin_selfie
 
 
+def _one_line_history(contexts):
+    """Join assistant history while preserving code and list blocks."""
+    for message in contexts or []:
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            message["content"] = " ".join(attention.split(content, most=10**6))
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    part["text"] = " ".join(attention.split(part["text"], most=10**6))
+
+
 def _has_non_sticker_image(event):
     """Whether this message or its quote contains an image other than a QQ sticker."""
     segments = adapter_astrbot_turn.incoming_of(event).segments
@@ -161,6 +175,8 @@ class TurnMixin:
                 for _part in _content:
                     if isinstance(_part, dict) and isinstance(_part.get("text"), str):
                         _part["text"] = _history_original(_part["text"])
+        if bool(self.config.get("history_one_line", True)):
+            _one_line_history(getattr(turn_request, "contexts", None))
         self._numbers_out_of_request(turn_request, event)
         if not self.inject_intent:
             _now = self._now_line(event)
