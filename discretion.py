@@ -94,8 +94,11 @@ def origin_of(item, fallback_where="") -> dict:
         return make_origin("")
     stored = item.get("origin")
     if isinstance(stored, dict) and "where" in stored:
-        return make_origin(stored.get("where"), stored.get("people"), stored.get("source_ids"),
-                           stored.get("visibility"))
+        result = make_origin(stored.get("where"), stored.get("people"), stored.get("source_ids"),
+                             stored.get("visibility"))
+        if isinstance(stored.get("recall_sources"), list):
+            result["recall_sources"] = stored["recall_sources"]
+        return result
     prov = item.get("provenance") if isinstance(item.get("provenance"), dict) else {}
     where = place_of(prov.get("session") or item.get("session") or fallback_where)
     people, refs = [], []
@@ -120,14 +123,59 @@ def merge(origins) -> dict:
         refs.extend(o.get("source_ids") or [])
     places = {str(o.get("where") or "") for o in origins}
     vis = {str(o.get("visibility") or PRIVATE) for o in origins}
-    where = places.pop() if len(places) == 1 else ""
+    where = next(iter(places)) if len(places) == 1 else ""
+    private_places = {str(o.get("where") or "") for o in origins
+                      if str(o.get("where") or "").startswith("private:")}
+    if len(private_places) == 1 and all(o.get("visibility") != PRIVATE or
+                                        o.get("where") in private_places for o in origins):
+        where = next(iter(private_places))
     if PRIVATE in vis:
         visibility = PRIVATE
     elif PUBLIC in vis:
         visibility = PUBLIC
     else:
         visibility = SELF
-    return make_origin(where, people, refs, visibility)
+    result = make_origin(where, people, refs, visibility)
+    if not where and len(origins) > 1:
+        result["recall_sources"] = origins
+    return result
+
+
+def may_recall(origin, here, speaker="", member_of=None, shared=()) -> str:
+    """Decide what may enter a reply prompt from this origin."""
+    o = origin if isinstance(origin, dict) else {}
+    sources = o.get("recall_sources")
+    if isinstance(sources, list) and sources:
+        return SAY if all(may_recall(x, here, speaker, member_of, shared) == SAY for x in sources) else DROP
+    where = str(o.get("where") or "")
+    here = place_of(here)
+    vis = str(o.get("visibility") or PRIVATE)
+    if vis == SELF or where == SELF or where.startswith("web:"):
+        return SAY
+    if not where or not where.startswith(("group:", "private:")):
+        return DROP
+    if where == here:
+        return SAY
+    if where.startswith("private:") or vis != PUBLIC:
+        return DROP
+    group = where.split(":", 1)[1]
+    if here.startswith("group:"):
+        other = here.split(":", 1)[1]
+        for row in shared if isinstance(shared, (list, tuple)) else ():
+            if isinstance(row, (list, tuple)):
+                ids = {x for x in row if isinstance(x, str) and x.isascii() and x.isdigit()}
+                if group in ids and other in ids:
+                    return SAY
+        return ANON
+    if here.startswith("private:"):
+        person = here.split(":", 1)[1]
+        try:
+            if member_of and member_of(person, group):
+                return SAY
+        except Exception:
+            pass
+        return ANON
+    return DROP
 
 
 def verdict(origin, here) -> str:
@@ -247,6 +295,7 @@ def tag(lab, kind="memory", role="user", who="", partner="") -> str:
             return "（对方也有份的事，可以跟对方提%s）" % tail
         return "（对方自己%s说过，可以跟对方提%s）" % (where, tail)
     if may == ANON:
+        who = SOMEONE
         if kind == "event":
             t = "别的群里的事，可以提，不点名、不说是哪个群"
             if lab.get("quiet"):

@@ -13,10 +13,12 @@ except ImportError:
     from body import *  # noqa: F401,F403
 try:
     from . import adapter_astrbot_turn, digest, events
+    from .mixin_discretion import recall_permission, recall_anonymize
 except ImportError:
     import adapter_astrbot_turn
     import digest
     import events
+    from mixin_discretion import recall_permission, recall_anonymize
 
 
 def _source_text(item):
@@ -28,8 +30,7 @@ def _merged_origin(item, other) -> dict:
     every source id of both, the stricter visibility; it stays where `item` was."""
     mine = discretion.origin_of(item)
     both = discretion.merge([mine, other])
-    return discretion.make_origin(mine["where"] or both["where"], both["people"],
-                                  both["source_ids"], both["visibility"])
+    return both
 
 
 try:
@@ -1266,7 +1267,7 @@ class EventsMixin(PortsMixin):
         archive = self._event_archive(60)
         if getattr(self, "global_memory", False):
             return self._labeled_event_context(event, archive)
-        events = self._visible_events(event, [e for e in archive if not digest.is_digest(e)][:9])
+        events = self._visible_events(event, [e for e in archive if not digest.is_digest(e)])[:9]
         events = sorted(events, key=lambda e: float(e.get("importance", 0.0) or 0.0) *
                         (0.5 + 0.5 * float(e.get("centrality", 0.5) or 0.5)), reverse=True)[:3]
         events += self._visible_events(event, digest.for_reply(
@@ -1296,11 +1297,19 @@ class EventsMixin(PortsMixin):
         (their people), not by who said what."""
         present = self._present_people(event)
         labeled = []
-        for ev in [e for e in archive if not digest.is_digest(e)][:9]:
+        for ev in [e for e in archive if not digest.is_digest(e)]:
             if isinstance(ev, dict):
+                permission = recall_permission(self, ev, event)
+                if permission == discretion.DROP:
+                    continue
                 lab = self._label_for(ev, event, present=present)
-                if lab["may"] != discretion.HIDE:
-                    labeled.append((ev, lab))
+                if permission == discretion.ANON:
+                    lab.update(may=discretion.ANON, where_ok=False, yours=False)
+                elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                    lab.update(may=discretion.SAY, where_ok=True)
+                labeled.append((ev, lab))
+                if len(labeled) >= 9:
+                    break
         labeled.sort(key=lambda x: float(x[0].get("importance", 0.0) or 0.0) *
                      (0.5 + 0.5 * float(x[0].get("centrality", 0.5) or 0.5)), reverse=True)
         picked, n_no = [], 0
@@ -1314,14 +1323,24 @@ class EventsMixin(PortsMixin):
             picked.append((ev, lab))
         for ev in digest.for_reply(adapter_astrbot_turn.incoming_of(event).text, archive, self._here(event)):
             if isinstance(ev, dict):
+                permission = recall_permission(self, ev, event)
+                if permission == discretion.DROP:
+                    continue
                 lab = self._label_for(ev, event, present=present)
-                if lab["may"] != discretion.HIDE:
-                    picked.append((ev, lab))
+                if permission == discretion.ANON:
+                    lab.update(may=discretion.ANON, where_ok=False, yours=False)
+                elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                    lab.update(may=discretion.SAY, where_ok=True)
+                picked.append((ev, lab))
         lines = []
         for ev, lab in picked:
             title = str(ev.get("title") or "").strip()
             body = str(ev.get("central_details") or ev.get("event") or "").strip()
             meaning = str(ev.get("meaning_to_her") or "").strip()
+            if lab["may"] == discretion.ANON:
+                title = recall_anonymize(self, title, ev)
+                body = recall_anonymize(self, body, ev)
+                meaning = recall_anonymize(self, meaning, ev)
             origin = discretion.origin_of(ev)
             people = origin["people"]
             if lab["may"] == discretion.NO:   # the last look before sending (send_check)
@@ -1684,6 +1703,8 @@ class EventsMixin(PortsMixin):
                 lid = str(link.get("id") or "")
                 target = next((e for e in same if str(e.get("id") or "") == lid), None)
                 if not target:
+                    continue
+                if discretion.may_recall(discretion.origin_of(target), session) != discretion.SAY:
                     continue
                 w = memory_meta.decayed_chain_weight(link.get("weight", 1.0), link.get("ts", 0))
                 if w < 0.1:
@@ -2229,8 +2250,7 @@ class EventsMixin(PortsMixin):
                 }
                 _o = discretion.merge([discretion.origin_of(e) for e in seg_entries]
                                       + [discretion.origin_of({"provenance": prov})])
-                record["origin"] = discretion.make_origin(self._here(event), _o["people"],
-                                                          _o["source_ids"], _o["visibility"])
+                record["origin"] = _o
                 if vec:
                     record["event_embedding"] = [round(float(x), 5) for x in vec]
                 try:
@@ -2457,8 +2477,6 @@ class EventsMixin(PortsMixin):
                 return
             last_map[key] = now
             origin = discretion.merge(origins)
-            origin = discretion.make_origin(self._here(event), origin["people"], origin["source_ids"],
-                                            origin["visibility"])
             await self._archive_strong_event(event, core, texts, str(text or texts[-1])[:160], origin=origin)
         except Exception as exc:
             logger.warning("[biocore] request-path strong event failed: %s", exc)

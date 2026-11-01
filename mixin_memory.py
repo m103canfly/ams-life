@@ -19,8 +19,10 @@ except ImportError:
 
 try:
     from .mixin_ports import PortsMixin
+    from .mixin_discretion import recall_permission, recall_anonymize
 except ImportError:
     from mixin_ports import PortsMixin
+    from mixin_discretion import recall_permission, recall_anonymize
 
 
 class MemoryMixin(PortsMixin):
@@ -1442,11 +1444,11 @@ class MemoryMixin(PortsMixin):
             duplicate["write_ops"] = _ops
             duplicate["provenance"] = self._memory_provenance(event, now)
             _old_origin = discretion.origin_of(duplicate, _here)
-            duplicate["origin"] = discretion.make_origin(
-                _old_origin["where"] or _here, list(_old_origin["people"]) + [_sid],
-                list(_old_origin["source_ids"]) + list(duplicate["provenance"].get("message_refs") or []),
-                discretion.PRIVATE if self._event_origin(event)["visibility"] == discretion.PRIVATE
-                else _old_origin["visibility"])
+            duplicate["origin"] = discretion.merge([
+                _old_origin,
+                discretion.make_origin(_here, [_sid], duplicate["provenance"].get("message_refs") or [],
+                                       self._event_origin(event)["visibility"]),
+            ])
             duplicate["last_write_ts"] = now
             self._apply_memory_encoding(duplicate, core, now, text)
             if _write_op != "NOOP":
@@ -1504,6 +1506,8 @@ class MemoryMixin(PortsMixin):
         except Exception:
             pass
         self._schedule_consolidation(event, core)
+        scored = [(score, entry) for score, entry in scored
+                  if recall_permission(self, entry, event) != discretion.DROP]
         scored.sort(key=lambda x: x[0], reverse=True)
         top = memory_meta.select_top(
             scored, self._memory_top_k(core, _partner_trust),
@@ -1626,9 +1630,14 @@ class MemoryMixin(PortsMixin):
                         continue
                     if _nb.get("deleted") or _nb.get("summarized"):
                         continue
+                    _permission = recall_permission(self, _nb, event)
+                    if _permission == discretion.DROP:
+                        continue
                     if getattr(self, "safety_enabled", False) and _nb.get("poison_risk"):
                         continue
                     _nb_text = str(_nb.get("text") or "").strip().replace("\n", " ")
+                    if _permission == discretion.ANON:
+                        _nb_text = recall_anonymize(self, _nb_text, _nb)
                     if not _nb_text:
                         continue
                     if getattr(self, "safety_enabled", False) and _nb.get("sensitive"):
@@ -1679,7 +1688,7 @@ class MemoryMixin(PortsMixin):
                 if getattr(self, "safety_enabled", False) and (
                         _entry.get("sensitive") or _entry.get("poison_risk")):
                     continue
-                _verdict = discretion.verdict(discretion.origin_of(_entry), _here)
+                _verdict = recall_permission(self, _entry, event)
                 _evec = _entry.get("vector") or []
                 _ecos = self._cosine(vec, _evec) if _evec else 0.0
                 if _ecos < PARTIAL_MATCH_THRESHOLD:
@@ -1701,7 +1710,7 @@ class MemoryMixin(PortsMixin):
                 _line = "%s：%s" % (_who, str(_entry.get("text") or "").strip().replace("\n", " ")[:200])
                 if _verdict == discretion.ANON:
                     _numbers = self._known_numbers() if _numbers is None else _numbers
-                    _line = self._anonymized(_line, discretion.names_in(_entry), _numbers)
+                    _line = recall_anonymize(self, _line, _entry)
                 _foreign_lines.append("- （别处）" + _line)
                 _known_texts.add(str(_entry.get("text") or "").strip())
                 _foreign_ids.append(str(_entry.get("id") or ""))
@@ -1766,8 +1775,11 @@ class MemoryMixin(PortsMixin):
         lines = []
         _speaker_id = str(self._speaker(event)[0] or "")
         for score, e in top:
-            role = self._recall_who(e, _speaker_id)
+            _permission = recall_permission(self, e, event)
+            role = self._recall_who(e, _speaker_id, anon=_permission == discretion.ANON)
             snippet = str(e.get("text", "")).strip().replace("\n", " ")
+            if _permission == discretion.ANON:
+                snippet = recall_anonymize(self, snippet, e)
             if getattr(self, "sentence_dedup_enabled", False):
                 snippet = self._dedupe_sentences(snippet)
             if getattr(self, "safety_enabled", False) and snippet and e.get("sensitive"):
@@ -1776,6 +1788,10 @@ class MemoryMixin(PortsMixin):
                 # step 2: said here, labelled like everything else (who by number, not name)
                 lab = discretion.label(discretion.origin_of(e), _here, _speaker_id,
                                        said_by=self._said_by(e))
+                if _permission == discretion.ANON:
+                    lab.update(may=discretion.ANON, where_ok=False, yours=False)
+                elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                    lab.update(may=discretion.SAY, where_ok=True)
                 lines.append("- %s%s" % (discretion.tag(lab, "memory", self._recall_role(e),
                                                         self._sayer_name(e)), snippet[:240]))
             elif snippet:
@@ -1836,12 +1852,20 @@ class MemoryMixin(PortsMixin):
                     continue
                 if getattr(self, "safety_enabled", False) and (entry.get("sensitive") or entry.get("poison_risk")):
                     continue
+                permission = recall_permission(self, entry, event)
+                if permission == discretion.DROP:
+                    origin = discretion.origin_of(entry)
+                    if origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE:
+                        self._forbid(event, "memory:" + str(entry.get("id") or ""), text, [], entry.get("vector"))
+                    continue
                 lab = discretion.label(discretion.origin_of(entry), here, speaker, present,
                                        said_by=self._said_by(entry),
                                        asked_in=entry.get("asked_in") if isinstance(entry.get("asked_in"), dict)
                                        else None)
-                if lab["may"] == discretion.HIDE:
-                    continue
+                if permission == discretion.ANON:
+                    lab.update(may=discretion.ANON, where_ok=False, yours=False)
+                elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                    lab.update(may=discretion.SAY, where_ok=True)
                 evec = entry.get("vector") or []
                 cos = self._cosine(vec, evec) if evec else 0.0
                 if cos < PARTIAL_MATCH_THRESHOLD:
@@ -1859,6 +1883,8 @@ class MemoryMixin(PortsMixin):
             if len(lines) >= ELSEWHERE_MAX:
                 break
             text = str(entry.get("text") or "").strip()
+            if lab["may"] == discretion.ANON:
+                text = recall_anonymize(self, text, entry)
             if text in known:
                 continue
             origin = discretion.origin_of(entry)

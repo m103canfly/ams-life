@@ -705,6 +705,13 @@
     "type": "string",
     "default": "08:25"
   },
+  "shared_groups": {
+    "description": "Groups in the same list share recall as one place.",
+    "hint": "Use lists of group number strings; memories can be recalled between groups in each list.",
+    "type": "list",
+    "items": {"type": "list", "items": {"type": "string"}},
+    "default": []
+  },
   "global_memory": {
     "description": "记忆全局共享（第 2 步，默认关）",
     "hint": "打开后，她在哪都能想起所有的事，每条写清能不能在这里说：别处私下说的标“这里不能讲”，别的群公开说的标“不点名”，正在跟她说话的人自己在别处说过的标“可以跟对方提”。别处私下的事也会进提示、发给聊天模型（带标签）。给模型看的话里不带 QQ 号、群号。关着时跟原来一样：别处私下的不给她看，别处公开的去名字。主人看过第三趟回放的结果再打开。【开之前】要先做安全咨询 R1：别处不能讲的私聊、事件、本子，正文不能进别的地方的提示（现在只标“这里不能讲”，模型还是看得见）；发前检查不能只在这个开关开着时才跑。见设计“开关之前必做”。",
