@@ -47,6 +47,28 @@ class BodyNeedsTests(unittest.TestCase):
         self.assertAlmostEqual(core.sleepiness, 0.4)
         self.assertEqual(core.last_sleep_end, (start + timedelta(hours=2)).timestamp())
 
+    def test_midnight_preparing_sleep_is_asleep_but_evening_is_awake(self):
+        day = next(datetime(2026, 11, 1) + timedelta(days=i) for i in range(30)
+                   if daily.schedule(datetime(2026, 11, 1) + timedelta(days=i), 0.5, 0, 0.1)[1] == '准备睡觉')
+        with patch('time.time', return_value=day.timestamp()):
+            core = body.BioCore()
+        core.sleepiness, core.physical_fatigue = 0.9, 0.8
+        wake = day + timedelta(hours=7)
+        with patch('time.time', return_value=wake.timestamp()):
+            core._decay_to_now()
+        self.assertEqual(core.sleepiness, 0)
+        self.assertAlmostEqual(core.physical_fatigue, 0.1)
+        self.assertEqual(core.last_sleep_end, wake.timestamp())
+
+        evening = day.replace(hour=20)
+        with patch('time.time', return_value=evening.timestamp()):
+            core = body.BioCore()
+        with patch.object(daily, 'schedule', return_value=('家', '准备睡觉', evening)):
+            with patch('time.time', return_value=(evening + timedelta(hours=1)).timestamp()):
+                core._decay_to_now()
+        self.assertAlmostEqual(core.sleepiness, 0.26)
+        self.assertEqual(core.last_sleep_end, evening.timestamp())
+
     def test_meal_midpoint_and_later_hunger(self):
         start = datetime(2026, 10, 30, 12)
         with patch('time.time', return_value=start.timestamp()):

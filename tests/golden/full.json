@@ -7541,7 +7541,7 @@
    },
    "last_meal": 1793271600.0,
    "last_rest": 1793000000.0,
-   "last_sleep_end": 1793142000.0,
+   "last_sleep_end": 1793228400.0,
    "learning": {
     "evidence": {
      "regulation_q": {
@@ -7599,7 +7599,7 @@
     "social": 0.02153118861399197,
     "v": 0.07623915706880988
    },
-   "physical_fatigue": 0.7473,
+   "physical_fatigue": 0.2673,
    "plutchik": {
     "anger": [
      "anger",
@@ -7730,7 +7730,7 @@
     "past": [],
     "present": ""
    },
-   "sleepiness": 1,
+   "sleepiness": 0.802,
    "social": 0.5393,
    "spectrum": [
     {
@@ -9274,7 +9274,7 @@
       },
       "last_meal": 1793271600.0,
       "last_rest": 1793000000.0,
-      "last_sleep_end": 1793142000.0,
+      "last_sleep_end": 1793228400.0,
       "learning": {
        "evidence": {
         "regulation_q": {
@@ -9332,7 +9332,7 @@
        "social": 0.02153118861399197,
        "v": 0.07623915706880988
       },
-      "physical_fatigue": 0.7723,
+      "physical_fatigue": 0.2923,
       "plutchik": {
        "anger": [
         "anger",
@@ -9463,7 +9463,7 @@
        "past": [],
        "present": ""
       },
-      "sleepiness": 1,
+      "sleepiness": 0.877,
       "social": 0.5422,
       "spectrum": [
        {

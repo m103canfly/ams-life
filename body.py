@@ -54,7 +54,7 @@ def _advance_needs(core, start, end):
             boundary = midpoint
         stop = min(boundary, finish)
         hours = (stop - cursor).total_seconds() / 3600.0
-        sleeping = doing == '睡觉'
+        sleeping = daily.period_start(cursor).hour == 0 or doing == '睡觉'
         if sleeping:
             core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
             core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
