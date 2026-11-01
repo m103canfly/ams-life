@@ -6,10 +6,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import math
 import re
 import time
+import unicodedata
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import uuid
 from asyncio import CancelledError, TimeoutError as AsyncTimeoutError, shield, wait_for
 from datetime import datetime, timedelta
@@ -54,6 +57,7 @@ LOOK_PATH = STATE_DIR / "look.json"
 PHOTO_QUEUED = "照片和你配的那句会一起发出去，排在你的话后面；正文里别再提照片。"
 LINK_QUEUED = "链接和你配的那句会在你的话后面一起发出去，正文里别再提。"
 SEND_DELAY = 1.5
+VOICE_QUEUED = "这句会用语音发出去。正文别再写同样的意思：要么不打字，要么只补一句别的。"
 # Allow a slow image service to finish, but do not hold queued media indefinitely.
 PHOTO_WAIT_SECONDS = 150
 # If earlier text is stuck, later media would arrive without its context.
@@ -136,18 +140,67 @@ async def _browser_screenshot(plugin, event, url):
     return (path, description) if description else None
 
 
+def _photo_release(plugin, queue):
+    reservation = queue.get("photo_reservation")
+    if reservation:
+        place, started = reservation
+        pending = getattr(plugin, "_photo_pending", {})
+        if pending.get(place) == started:
+            pending.pop(place, None)
+
+
+def _photo_text(text):
+    return "".join(c for c in str(text or "") if not c.isspace() and not unicodedata.category(c).startswith("P"))
+
+
+def _local_embedding(plugin):
+    try:
+        config = plugin._embedding_runtime_config() or {}
+        url = urlsplit(config.get("base_url") or "")
+        return url.scheme.lower() in ("http", "https") and url.hostname in ("127.0.0.1", "localhost", "::1")
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+async def _same_as_voice(plugin, text, voice):
+    left, right = _photo_text(text), _photo_text(voice)
+    if not left or not right:
+        return False
+    if left in right or right in left:
+        return True
+    if _local_embedding(plugin):
+        try:
+            a, b = await plugin._embed_text(text), await plugin._embed_text(voice)
+            if a and b and len(a) == len(b):
+                norm = math.sqrt(sum(x * x for x in a) * sum(x * x for x in b))
+                if norm and math.isfinite(norm):
+                    similarity = sum(x * y for x, y in zip(a, b)) / norm
+                    if math.isfinite(similarity):
+                        return similarity >= 0.80
+        except Exception:
+            pass
+    a = {left[i:i + 2] for i in range(len(left) - 1)}
+    b = {right[i:i + 2] for i in range(len(right) - 1)}
+    return bool(a and b) and len(a & b) / len(a | b) >= 0.35
+
+
 async def _prepare_photo(plugin, event, queue):
     kind, what = queue["photo"][:2]
     caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
     queue["photo_path"] = None
-    if not await plugin._phone_clear(event, what) or (caption and not await plugin._phone_clear(event, caption)):
-        return
     try:
+        if not await plugin._phone_clear(event, what) or (caption and not await plugin._phone_clear(event, caption)):
+            queue["photo_failure"] = "held"
+            return
         queue["photo_path"] = await wait_for(plugin._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
+        if not queue["photo_path"]:
+            queue["photo_failure"] = "failed"
+    except AsyncTimeoutError:
+        queue["photo_failure"] = "timeout"
     except Exception:
-        pass
-    if not queue["photo_path"]:
-        logger.info("[ams-life] photo not ready; reply sent alone")
+        queue["photo_failure"] = "failed"
+    finally:
+        _photo_release(plugin, queue)
 
 
 def _her_now_valid(state, now):
@@ -271,12 +324,9 @@ class SelfieMixin(PortsMixin):
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
             "doing": {"type": "string", "maxLength": 12}, "minutes": {"type": "integer", "description": "大概做多久（分钟，5–240）"}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
-            async def set_look(event, today="", change=""):
-                return await look.set_look(self, event, LOOK_PATH, today, change)
-
             tools.append(turn.TurnTool(name="set_look", description="定今天的打扮，也可以记下样子的变化。" + context,
                 parameters={"type": "object", "properties": {"today": {"type": "string", "maxLength": 30},
-                "change": {"type": "string", "maxLength": 30}}, "required": ["today"]}, handler=set_look))
+                "change": {"type": "string", "maxLength": 30}}, "required": ["today"]}, handler=self._tool_set_look))
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
             except Exception:
@@ -320,6 +370,9 @@ class SelfieMixin(PortsMixin):
             queue = event._ams_phone_queue = {}
         return queue
 
+    async def _tool_set_look(self, event, today="", change=""):
+        return await look.set_look(self, event, LOOK_PATH, today, change)
+
     async def _tool_take_photo(self, event, kind="", what="", where="", doing="", caption=""):
         queue = self._phone_queue(event)
         if "photo" in queue:
@@ -332,12 +385,21 @@ class SelfieMixin(PortsMixin):
                 or not what or len(what) > 60 or any(not x or len(x) > 20 for x in (where, doing))
                 or len(caption) > 20):
             return "不能拍这张"
+        place = adapter_astrbot_turn.incoming_of(event).place
+        pending = getattr(self, "_photo_pending", None)
+        if pending is None:
+            pending = self._photo_pending = {}
+        started = time.monotonic()
+        if place in pending and started - pending[place] <= PHOTO_WAIT_SECONDS + 30:
+            return "刚才那张还在拍，拍好了会一起发；这次别再拍。"
         try:
             self._set_now(where, doing, event=event)
         except Exception as exc:
             logger.debug("[ams-life] now update failed: %s", type(exc).__name__)
             return "不能拍这张"
         queue["photo"] = (kind, what, caption)
+        pending[place] = started
+        queue["photo_reservation"] = (place, started)
         logger.info("[ams-life] phone photo queued")
         return PHOTO_QUEUED
 
@@ -371,7 +433,7 @@ class SelfieMixin(PortsMixin):
         if tone in tts.TONES:
             queue["voice_tone"] = tone
         logger.info("[ams-life] phone voice queued")
-        return "排上了"
+        return VOICE_QUEUED
 
     def _phone_counts(self):
         data = _read_json(SPEND_PATH, {})
@@ -558,48 +620,79 @@ class SelfieMixin(PortsMixin):
             try:
                 result = await wait_for(shield(rest), timeout=REST_WAIT_SECONDS)
                 if result is False:
+                    if "photo" in queue:
+                        logger.info("[ams-life] phone photo not sent (%s)", "failed")
+                        _photo_release(self, queue)
                     logger.info("[ams-life] phone: earlier reply was not sent")
                     return
             except AsyncTimeoutError:
+                if "photo" in queue:
+                    logger.info("[ams-life] phone photo not sent (%s)", "timeout")
+                    _photo_release(self, queue)
                 logger.info("[ams-life] phone: reply wait timed out")
                 return
             except CancelledError:
+                _photo_release(self, queue)
                 raise
             except Exception as exc:
+                if "photo" in queue:
+                    logger.info("[ams-life] phone photo not sent (%s)", "failed")
+                    _photo_release(self, queue)
                 logger.warning("[ams-life] phone: reply wait failed (%s)", type(exc).__name__)
                 return
         await asyncio.sleep(SEND_DELAY)
+        photo_done = False
         try:
             if hasattr(event, "is_stopped") and event.is_stopped():
+                if "photo" in queue:
+                    logger.info("[ams-life] phone photo not sent (%s)", "stopped")
                 return
             if "photo" in queue:
                 kind, what = queue["photo"][:2]
                 caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
                 if "photo_path" in queue:
                     path = queue["photo_path"]
+                    failure = queue.get("photo_failure", "failed")
                 elif await self._phone_clear(event, what) and (not caption or await self._phone_clear(event, caption)):
+                    failure = "failed"
                     try:
                         path = await wait_for(self._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
                     except AsyncTimeoutError:
-                        logger.info("[ams-life] phone: photo timed out")
+                        failure = "timeout"
+                        path = None
+                    except Exception:
                         path = None
                 else:
                     path = None
+                    failure = "held"
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
+                    normalized = _photo_text(caption)
+                    if normalized and normalized in _photo_text(self._check_note(event).get("sent")):
+                        caption = ""
                     segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
                     segments.append(events.Segment("image", {"path": str(path)}))
                     await self._messenger(event, as_event=True).send(here, tuple(segments))
+                    logger.info("[ams-life] phone photo sent")
+                    photo_done = True
                     self._phone_account(kind, sent=True)
                     self._note_she_sent(event, kind)
                     self._phone_prune("photo")
+                else:
+                    if path:
+                        failure = "stopped"
+                    logger.info("[ams-life] phone photo not sent (%s)", failure)
+                    photo_done = True
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
                 if queue.get("voice_tone"):
                     path = await self._make_voice(queue["voice"], tone=queue["voice_tone"])
                 else:
                     path = await self._make_voice(queue["voice"])
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                    await self._messenger(event, as_event=True).send(
+                    result = await self._messenger(event, as_event=True).send(
                         here, (events.Segment("record", {"path": str(path)}),))
+                    history = getattr(event, "_ams_voice_history", None)
+                    if history and getattr(result, "ok", False) and "request" in history:
+                        self._keep_turn(event, history["request"], history["reply"])
                     self._phone_account("voice", sent=True)
                     self._note_she_sent(event, "voice")
                     self._phone_prune("voice")
@@ -626,4 +719,8 @@ class SelfieMixin(PortsMixin):
                     self._phone_account("screenshot", sent=True)
                     self._note_she_sent(event, "screenshot")
         except Exception as exc:
+            if "photo" in queue and not photo_done:
+                logger.info("[ams-life] phone photo not sent (%s)", "failed")
             logger.warning("[ams-life] phone send failed: %s", type(exc).__name__)
+        finally:
+            _photo_release(self, queue)

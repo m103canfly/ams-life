@@ -459,6 +459,25 @@ class TurnMixin:
         if _sticker and not await self._sticker_cleared(event, _sticker):
             _sticker = ""
         _queue = self._phone_queue(event)
+        _voice_only_event = None
+        if (isinstance(event, adapter_astrbot_turn.turn.TurnEvent) and _queue.get("voice")
+                and _reply.strip()):
+            _parts = attention.split(_reply)
+            _kept = []
+            for _part in _parts:
+                if await mixin_selfie._same_as_voice(self, _part, _queue["voice"]):
+                    logger.info("[ams-life] reply text dropped: same as voice")
+                else:
+                    _kept.append(_part)
+            if len(_kept) != len(_parts):
+                _reply = "\n".join(_kept)
+                reply.set_text(_reply)
+                self._check_note(event)["sent"] = _reply
+                if not _reply.strip():
+                    from copy import copy
+                    event._ams_voice_history = {"text": _queue["voice"]}
+                    _voice_only_event = copy(event)
+                    self._stop(event)
         if _reply.strip() and "photo" in _queue:
             await mixin_selfie._prepare_photo(self, event, _queue)
         _then = self._sticker_after(event, _sticker) if _sticker else None
@@ -534,7 +553,9 @@ class TurnMixin:
         try:
             _queue = self._phone_queue(event)
             _stopped = bool(event.is_stopped()) if hasattr(event, "is_stopped") else False
-            if _queue and _reply.strip() and not attention.silent(_reply) and not _stopped:
+            if _queue and _voice_only_event is not None:
+                asyncio.create_task(self._media_after_reply(_voice_only_event, dict(_queue)))
+            elif _queue and _reply.strip() and not attention.silent(_reply) and not _stopped:
                 asyncio.create_task(self._media_after_reply(event, dict(_queue)))
             _queue.clear()
         except Exception:
@@ -587,8 +608,13 @@ class TurnMixin:
             return
         try:
             if event.is_stopped():
+                pending = getattr(event, "_ams_voice_history", None)
+                if pending is not None:
+                    pending["request"] = turn_request
+                    pending["reply"] = reply
                 return
-            sent = self._check_note(event).get("sent")
+            pending = getattr(event, "_ams_voice_history", None)
+            sent = "[语音] " + pending["text"] if pending is not None else self._check_note(event).get("sent")
             text = sent if sent is not None else reply.text
             if not str(text or "").strip():
                 return
