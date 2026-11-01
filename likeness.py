@@ -9,6 +9,12 @@ import re
 import time
 from pathlib import Path
 
+try:
+    from . import discretion, her_days
+except ImportError:
+    import discretion
+    import her_days
+
 
 def week_of(timestamp):
     date = datetime.datetime.fromtimestamp(timestamp).date().isocalendar()
@@ -34,6 +40,30 @@ def _write(path, text):
     tmp = path.with_suffix(path.suffix + '.tmp')
     tmp.write_text(text, encoding='utf-8')
     tmp.replace(path)
+
+
+def _days(root, week, selected):
+    start = datetime.date.fromisocalendar(int(week[:4]), int(week[6:]), 1)
+    store = her_days.Store(root)
+    candidates = []
+    for offset in range(7):
+        date = (start + datetime.timedelta(days=offset)).isoformat()
+        if 'day-' + date in selected:
+            continue
+        rows = store.day(date)
+        if rows:
+            candidates.append((date, rows))
+    rng = random.Random('likeness-days-' + week)
+    rng.shuffle(candidates)
+    result = []
+    for date, rows in candidates[:max(0, 2 - len(selected))]:
+        entries = [{'time': datetime.datetime.fromtimestamp(row['ts']).strftime('%H:%M'),
+                    'do': row.get('do', ''), 'detail': row.get('detail', ''),
+                    'minutes': row.get('minutes'), 'feel': row.get('feel', ''),
+                    'related_users': row.get('related_users', [])}
+                   for row in sorted(rows, key=lambda row: row['ts'])]
+        result.append({'id': 'day-' + date, 'kind': 'day', 'date': date, 'rows': entries})
+    return result
 
 
 class Store:
@@ -74,21 +104,26 @@ class Store:
         _write(self._samples(week), ''.join(json.dumps(x, ensure_ascii=False) + '\n' for x in rows))
 
     def select(self, week, *, now=None):
+        week = _week(week)
         path = self._selection(week)
         if path.exists():
             chosen = _read(path, [])
             now = time.time() if now is None else now
-            if week != week_of(now) or len(chosen) >= 20:
+            if week != week_of(now):
                 return chosen
             selected_ids = {row['id'] for row in chosen}
             candidates = [row for row in self.samples(week) if row['id'] not in selected_ids]
-            added = self.rng.sample(candidates, min(20 - len(chosen), len(candidates)))
+            replies = sum(row.get('kind') != 'day' for row in chosen)
+            added = self.rng.sample(candidates, min(max(0, 20 - replies), len(candidates)))
+            days = {row['id'] for row in chosen if row.get('kind') == 'day'}
+            added.extend(_days(self.root.parent, week, days))
             if added:
                 chosen.extend(added)
                 _write(path, json.dumps(chosen, ensure_ascii=False) + '\n')
             return chosen
         rows = self.samples(week)
         chosen = self.rng.sample(rows, min(20, len(rows)))
+        chosen.extend(_days(self.root.parent, week, set()))
         _write(path, json.dumps(chosen, ensure_ascii=False) + '\n')
         return chosen
 
@@ -116,18 +151,40 @@ class Store:
             kept = [row for row in rows if not any(str(line.get('sender_id') or '') == person
                                                     for line in row.get('context', []))]
             removed += len(rows) - len(kept)
-            if len(kept) != len(rows):
+            changed = len(kept) != len(rows)
+            for row in kept:
+                if row.get('kind') == 'day':
+                    entries = row['rows']
+                    row['rows'] = [entry for entry in entries
+                                   if str(person) not in {str(x) for x in entry.get('related_users', [])}]
+                    removed += len(entries) - len(row['rows'])
+                    changed |= len(entries) != len(row['rows'])
+            if changed:
                 text = (''.join(json.dumps(x, ensure_ascii=False) + '\n' for x in kept) if is_samples
                         else json.dumps(kept, ensure_ascii=False) + '\n')
                 _write(path, text)
         return removed
 
 
-def public(rows):
+def public(rows, names=None):
     def hide_numbers(text):
         return re.sub(r'\d{5,}', '[number]', str(text))
 
-    return [{'id': row['id'], 'ts': row['ts'], 'place': row['place'].split(':', 1)[0],
+    result = []
+    for row in rows:
+        if row.get('kind') == 'day':
+            entries = []
+            for entry in row['rows']:
+                known = names(entry.get('related_users', [])) if names else []
+                entries.append({key: (hide_numbers(discretion.anonymize(entry.get(key, ''), known))
+                                      if key in ('detail', 'feel') else
+                                      hide_numbers(entry.get(key, '')) if key == 'do' else entry.get(key))
+                                for key in ('time', 'do', 'detail', 'minutes', 'feel')})
+            result.append({'id': row['id'], 'kind': 'day', 'date': row['date'], 'rows': entries,
+                           'rating': row.get('rating'), 'reason': hide_numbers(row.get('reason', ''))})
+            continue
+        result.append({'id': row['id'], 'ts': row['ts'], 'place': row['place'].split(':', 1)[0],
              'reply': hide_numbers(row['reply']),
              'context': [{'name': hide_numbers(x['name']), 'text': hide_numbers(x['text'])} for x in row['context']],
-             'rating': row.get('rating'), 'reason': row.get('reason', '')} for row in rows]
+             'rating': row.get('rating'), 'reason': row.get('reason', '')})
+    return result

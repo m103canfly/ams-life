@@ -471,7 +471,11 @@ class PagesMixin:
         try:
             from quart import request
             week = request.args.get('week') or likeness.week_of(time.time())
-            return {'status': 'ok', 'data': likeness.public(likeness.Store(DATA_DIR).select(week))}
+            rows = likeness.Store(DATA_DIR).select(week)
+            replies = [row for row in rows if row.get('kind') != 'day']
+            days = [row for row in rows if row.get('kind') == 'day']
+            return {'status': 'ok', 'data': likeness.public(replies),
+                    'days': likeness.public(days, self._known_names)}
         except (TypeError, ValueError):
             return {'status': 'error', 'message': 'invalid week', 'data': {}}
         except Exception as exc:
