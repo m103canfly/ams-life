@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
 """One platform-neutral turn: getting it ready, and her reply after the model."""
+import unicodedata
+
 try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
@@ -15,6 +17,22 @@ except ImportError:
     import stickers
     import likeness
     import mixin_selfie
+
+
+def _copies_owner_rule(reply, rules):
+    """Find twelve consecutive characters after removing whitespace and punctuation."""
+    def clean(text):
+        return "".join(c for c in str(text or "")
+                       if not c.isspace() and not unicodedata.category(c).startswith("P"))
+
+    if not rules:
+        return False
+    words = clean(reply)
+    for rule in rules:
+        text = clean(rule)
+        if any(text[i:i + 12] in words for i in range(len(text) - 11)):
+            return True
+    return False
 
 
 def _one_line_history(contexts):
@@ -426,6 +444,12 @@ class TurnMixin:
             _reply = _reply.replace(attention.SILENT, "")
             if not getattr(self, "reply_in_pieces", True):
                 reply.set_text(_reply)
+        if _copies_owner_rule(_reply, self._owner_rules()):
+            logger.info("[ams-life] reply held: owner rule copied")
+            self._check_note(event).update(sent="", outcome="rule_copy")
+            self._phone_queue(event).clear()
+            self._stop(event)
+            return
         if _sticker and not await self._sticker_cleared(event, _sticker):
             _sticker = ""
         _queue = self._phone_queue(event)
