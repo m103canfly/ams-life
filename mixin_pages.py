@@ -314,7 +314,13 @@ class PagesMixin:
                 headers["Authorization"] = "Bearer " + api_key
             req = urllib.request.Request(url, headers=headers)
             _proxies = _system_proxies_for(url)
-            _opener = urllib.request.build_opener(urllib.request.ProxyHandler(_proxies))
+            handlers = [urllib.request.ProxyHandler(_proxies)]
+            if kind == "llm" and getattr(self, "_key_store", None) is not None:
+                class NoRedirect(urllib.request.HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, headers, newurl):
+                        return None
+                handlers.append(NoRedirect())
+            _opener = urllib.request.build_opener(*handlers)
             with _opener.open(req, timeout=20) as resp:
                 return json.loads(resp.read().decode("utf-8", "replace"))
         try:
@@ -997,6 +1003,23 @@ class PagesMixin:
         body = await request.get_json(silent=True) or {}
         kind = str(body.get("kind") or "embedding").strip()
         source = str(body.get("source") or "custom").strip()
-        return await self._fetch_models(kind, source,
-                                        str(body.get("base_url") or ""),
-                                        str(body.get("api_key") or ""))
+        base_url = str(body.get("base_url") or "")
+        api_key = str(body.get("api_key") or "")
+        keys = getattr(self, "_key_store", None)
+        if keys is not None and kind == "llm":
+            try:
+                from .deepseek_client import deepseek_url_ok
+                from .key_store import KeyStoreError
+            except ImportError:
+                from deepseek_client import deepseek_url_ok
+                from key_store import KeyStoreError
+            if not deepseek_url_ok(base_url):
+                return {"status": "error", "message": "只认 DeepSeek 的地址（https://api.deepseek.com）"}
+            api_key = ""
+            try:
+                if keys.has("deepseek"):
+                    api_key = keys.get("deepseek")
+            except KeyStoreError:
+                pass
+            source = "custom"
+        return await self._fetch_models(kind, source, base_url, api_key)

@@ -46,6 +46,21 @@ def prepare_data(path):
     return path
 
 
+def panel_llm_config(api_config):
+    """Return the complete, safe panel LLM settings, if selected."""
+    from deepseek_client import deepseek_url_ok
+    llm = api_config.get('llm') if isinstance(api_config, dict) else None
+    if not isinstance(llm, dict) or llm.get('source') != 'custom':
+        return None
+    base_url, model = llm.get('base_url'), llm.get('model')
+    if not base_url or not model:
+        return None
+    if not deepseek_url_ok(base_url):
+        logger.warning('[ams-life] panel LLM address is not DeepSeek; using --model')
+        return None
+    return base_url, model
+
+
 class App:
     """Her, her history, the OneBot server and the panel, started and stopped together."""
 
@@ -118,7 +133,16 @@ class App:
                 self.her._neutral_model = self.model
             elif deepseek:
                 from deepseek_client import DeepSeekModel
-                self.her._neutral_model = DeepSeekModel(api_key=deepseek, model=self.args.model)
+                panel_llm = panel_llm_config(self.her.api_config)
+                if panel_llm:
+                    try:
+                        self.her._neutral_model = DeepSeekModel(api_key=deepseek, model=panel_llm[1],
+                                                               base_url=panel_llm[0])
+                    except ValueError:
+                        panel_llm = None
+                if not panel_llm:
+                    self.her._neutral_model = DeepSeekModel(api_key=deepseek, model=self.args.model)
+                logger.info('[ams-life] chat model: %s', panel_llm[1] if panel_llm else self.args.model)
             self.her._key_store = keys
             self.her._history = self.history
             self.history.gate = self.her._history_gate

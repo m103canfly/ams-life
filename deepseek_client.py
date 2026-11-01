@@ -15,18 +15,21 @@ TIMEOUT_SECONDS = 60
 MAX_RETRIES = 1
 
 
+def deepseek_url_ok(base_url):
+    try:
+        url = urlsplit(base_url)
+        return (url.scheme == 'https' and url.netloc == 'api.deepseek.com'
+                and not url.query and not url.fragment)
+    except (ValueError, TypeError):
+        return False
+
+
 class DeepSeekModel(model_client.ModelClient):
     def __init__(self, *, api_key, model, client=None, base_url=BASE_URL,
                  timeout=TIMEOUT_SECONDS, max_retries=MAX_RETRIES):
         if not api_key:
             raise ValueError('no key')
-        try:
-            url = urlsplit(base_url)
-            valid = (url.scheme == 'https' and url.netloc == 'api.deepseek.com'
-                     and not url.query and not url.fragment)
-        except (ValueError, TypeError):
-            valid = False
-        if not valid:
+        if not deepseek_url_ok(base_url):
             raise ValueError('invalid DeepSeek base URL')
         self.model = model
         self.base_url = base_url
