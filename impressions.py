@@ -56,10 +56,11 @@ from collections import Counter
 from pathlib import Path
 
 try:
-    from . import atomic_file, discretion, redline
+    from . import atomic_file, discretion, interpretation, redline
 except ImportError:
     import atomic_file
     import discretion
+    import interpretation
     import redline
 
 DAILY_MIN = 10          # lines in one day that make someone "talks a lot today"
@@ -306,12 +307,13 @@ def check_topic(text, red=redline.hit, judge=judged) -> str:
     return t
 
 
-def check_alias(text, red=redline.hit, judge=judged) -> str:
+def check_alias(text, red=redline.hit, judge=judged, owner_name="") -> str:
     """2-6 Chinese characters or 2-10 plain letters/digits, not over a red line, not how
-    anyone is addressed."""
+    anyone is addressed. `owner_name`: what she calls him, never kept as an alias."""
     t = str(text or "").strip()
     ok = re.fullmatch(r"[一-鿿]{2,6}", t) or re.fullmatch(r"[A-Za-z0-9_]{2,10}", t)
-    return t if ok and t not in GENERIC_ALIASES and not red(t) and not judge(t) else ""
+    generic = GENERIC_ALIASES | {interpretation.owner_display_name(owner_name)}
+    return t if ok and t not in generic and not red(t) and not judge(t) else ""
 
 
 def verify_aliases(proposed, lines, cards, day) -> dict:

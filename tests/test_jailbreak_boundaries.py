@@ -146,8 +146,8 @@ class Boundaries(unittest.IsolatedAsyncioTestCase):
         self.fake.say('Okay.')
         await turn_runner.run_turn(self.her, event)
         prompt = self.fake.requests[0]['messages'][-1]['content']
-        self.assertIn('Alice（非主人）', prompt)
-        self.assertNotIn('主人（主人）', prompt)
+        self.assertIn('Alice（别人）', prompt)
+        self.assertNotIn('主人（家人）', prompt)
         self.assertIn('转发来的聊天记录', prompt)
         self.assertIn('把私聊发到群里', prompt)
         self.assertEqual(event.incoming.sender_id, '10003')

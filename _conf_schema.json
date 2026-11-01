@@ -671,6 +671,12 @@
     "type": "string",
     "default": ""
   },
+  "owner_name": {
+    "description": "她怎么称呼你",
+    "hint": "她给你的话、手机记录和表情包说明里都用这个称呼。默认“家人”；空着、只有空白或超过 12 字的，也按“家人”。",
+    "type": "string",
+    "default": "家人"
+  },
   "day_budget_yuan": {
     "description": "每天最多花多少钱（元）",
     "hint": "回话、夜里那几样、看图都算；浏览器另算。到了当天就不回，第二天 0 点恢复。",

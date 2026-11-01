@@ -391,7 +391,7 @@ class LoginTest(unittest.IsolatedAsyncioTestCase):
             plugin._spent_today = lambda: 8
             self.assertFalse(await life_loop.browse_heybox(plugin, 1700000001))
         self.assertEqual(len(prompts), 2)
-        self.assertIn('主人还没回的有 3 条', prompts[1])
+        self.assertIn('家人还没回的有 3 条', prompts[1])
         self.assertNotIn('虚构作者', str(prompts) + str(entries))
         self.assertNotIn('虚构评论人', str(prompts) + str(entries))
         self.assertEqual(entries[0]['origin']['where'], 'self')

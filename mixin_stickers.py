@@ -19,8 +19,9 @@ Off unless stickers_enabled (and looking at pictures, image_caption, is on).
   (page/stickers/image), delete one (page/stickers/delete, the owner's own gifts too; nothing goes
   into the forget registry; its fingerprint is remembered and it is never kept again unless the owner
   adds it himself), add some (page/stickers/add: pictures only, by their first bytes, each
-  under a new name; marked "主人给的": never swept, not counted in the 300; labelled by the owner's line,
-  else by one look when looking at pictures is on, else "主人给的").
+  under a new name; marked "<name>给的" from the owner_name setting: never swept, not counted
+  in the 300; labelled by the owner's line, else by one look when looking at pictures is on,
+  else that name).
 """
 from __future__ import annotations
 
@@ -37,11 +38,12 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_turn, attention, events, stickers
+    from . import adapter_astrbot_turn, attention, events, interpretation, stickers
 except ImportError:
     import adapter_astrbot_turn
     import attention
     import events
+    import interpretation
     import stickers
 
 STICKERS_DIR = DATA_DIR / "stickers"
@@ -467,9 +469,10 @@ class StickersMixin(PortsMixin):
         note = " ".join(str(b.get("note") or "").split())[:60]
         look = None
         lib = self._sticker_lib()
+        called = interpretation.owner_name(self.config)
         async with self._sticker_lock():
             sid, why = lib.add(data, time.time(), source="owner", from_qq=self._attention_cfg().get("owner", ""),
-                               from_where="owner", note=note or stickers.OWNER_LABEL)
+                               from_where="owner", note=note or (called + "给的"), owner_name=called)
         if not sid:
             return {"status": "error", "message": "收不了这张（%s）" % why, "data": {}}
         if not note and self._llm_allowed("image_caption"):

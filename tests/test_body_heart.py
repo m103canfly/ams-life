@@ -285,7 +285,7 @@ class Heart(unittest.TestCase):
         self.assertEqual(len(rules), 10)
         self.assertEqual(len(rules[1]), 100)
         for prompt in (r['group'], r['private']):
-            self.assertIn('[主人定的规矩] 别在群里提我的工作', prompt)
+            self.assertIn('[家人定的规矩] 别在群里提我的工作', prompt)
 
     def test_a_strong_event_no_longer_writes_her_narrative(self):
         r = run_case('strong_no_narrative')

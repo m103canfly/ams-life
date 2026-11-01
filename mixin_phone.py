@@ -20,9 +20,10 @@ forgetting finds them the same way.
 from __future__ import annotations
 import hashlib
 try:
-    from . import adapter_astrbot_turn
+    from . import adapter_astrbot_turn, interpretation
 except ImportError:
     import adapter_astrbot_turn
+    import interpretation
 try:
     from .common import *  # noqa: F401,F403
 except ImportError:
@@ -62,7 +63,7 @@ def _history_original(text):
     label = "（历史消息，发言人和时间未核实）"
     if text.startswith(label):
         return label + _original(text[len(label):])
-    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:主人|非主人)）：(?=（原文）)", text)
+    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:主人|非主人|别人|[^\r\n：（），。]{1,16})）：(?=（原文）)", text)
     if framed:
         return text[:framed.end()] + _original(text[framed.end():])
     return label + _original(text)
@@ -74,9 +75,9 @@ def _phone_line(plugin, event, line):
     name = HER_NAME if line.get("role") == "assistant" else str(line.get("sender_name") or "某人")
     name = re.sub(r"[\r\n：:]", " ", name).strip()[:40] or "某人"
     if line.get("role") != "assistant" and sid and sid == owner:
-        name += "（主人）"
+        name += "（%s）" % interpretation.owner_name(plugin.config)
     elif line.get("role") != "assistant":
-        name += "（非主人）"
+        name += "（别人）"
     try:
         stamp = time.strftime("%m-%d %H:%M", time.localtime(float(line.get("ts") or time.time())))
     except (ValueError, TypeError, OverflowError, OSError):

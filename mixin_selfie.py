@@ -32,7 +32,7 @@ def _image_key(plugin, api):
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse, daily, discretion, events, mixin_ports, look, our_days
+    from . import tts, browse, daily, discretion, events, interpretation, mixin_ports, look, our_days
     from . import adapter_astrbot_tools, adapter_astrbot_turn, turn
     from .mixin_ports import PortsMixin
 except ImportError:
@@ -42,6 +42,7 @@ except ImportError:
     import daily
     import discretion
     import events
+    import interpretation
     import mixin_ports
     import look
     import our_days
@@ -96,7 +97,7 @@ def _our_days_line(plugin, event, today):
 async def _remember_day(plugin, event, date='', what=''):
     owner = _day_owner(plugin, event)
     if not owner:
-        return '这里只能在和主人的私聊里记。'
+        return '这里只能在和%s的私聊里记。' % interpretation.owner_name(plugin.config)
     try:
         our_days.remember(DATA_DIR, owner, date, what)
     except ValueError:
@@ -379,7 +380,8 @@ class SelfieMixin(PortsMixin):
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
             "doing": {"type": "string", "maxLength": 12}, "minutes": {"type": "integer", "description": "大概做多久（分钟，5–240）"}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if _day_owner(self, event):
-            tools.append(turn.TurnTool(name='remember_day', description='记下你和主人之间重要的日子。',
+            tools.append(turn.TurnTool(name='remember_day', description='记下你和%s之间重要的日子。'
+                % interpretation.owner_name(self.config),
                 parameters={'type': 'object', 'properties': {'date': {'type': 'string', 'description': 'MM-DD 或 YYYY-MM-DD'},
                 'what': {'type': 'string', 'maxLength': 20}}, 'required': ['date', 'what']},
                 handler=self._tool_remember_day))
