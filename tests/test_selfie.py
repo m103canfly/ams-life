@@ -217,11 +217,11 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         clock = harness.Clock(datetime(2026, 10, 30, 11, 59).timestamp())
         with patch.object(phone.time, 'time', clock):
             before = self.p._now_line(self.event)
-            self.assertIn('从09:00开始', before)
+            self.assertIn('从 09:00 开始，已经', before)
             clock.advance(120)
             after = self.p._now_line(self.event)
             self.assertIn('吃午饭', after)
-            self.assertIn('从12:00开始', after)
+            self.assertIn('从 12:00 开始，已经', after)
             self.assertNotEqual(before, after)
 
     async def test_her_now_lasts_minimum_hour_until_next_boundary(self):
@@ -230,16 +230,16 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.p._tool_set_now(self.event, '外面', '逛街'), '记下了')
             for hour, minute in ((12, 30), (13, 30)):
                 clock.now = datetime(2026, 10, 30, hour, minute).timestamp()
-                self.assertIn('此刻：在外面，正在逛街（从11:50开始）', self.p._now_line(self.event))
+                self.assertIn('此刻：在外面，正在逛街（从 11:50 开始，已经', self.p._now_line(self.event))
             clock.now = datetime(2026, 10, 30, 14).timestamp()
-            self.assertNotIn('从11:50开始', self.p._now_line(self.event))
+            self.assertNotIn('从 11:50 开始', self.p._now_line(self.event))
             self.assertEqual(json.loads(phone.NOW_PATH.read_text(encoding='utf-8'))['source'], 'schedule')
             clock.now = datetime(2026, 10, 30, 14, 10).timestamp()
             await self.p._tool_take_photo(self.event, 'snap', '天空', '外面', '散步', '')
             clock.now = datetime(2026, 10, 30, 17, 9).timestamp()
             self.assertIn('正在散步', self.p._now_line(self.event))
             clock.advance(60)
-            self.assertNotIn('正在散步（从14:10', self.p._now_line(self.event))
+            self.assertNotIn('正在散步（从 14:10', self.p._now_line(self.event))
             clock.now = datetime(2026, 10, 31, 7).timestamp()
             await self.p._tool_set_now(self.event, '外面', '散步')
             clock.now = datetime(2026, 10, 31, 7, 59).timestamp()

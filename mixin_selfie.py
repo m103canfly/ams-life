@@ -148,8 +148,18 @@ async def _prepare_photo(plugin, event, queue):
         logger.info("[ams-life] photo not ready; reply sent alone")
 
 
+def _her_now_valid(state, now):
+    try:
+        start = datetime.fromisoformat(state["start"])
+        earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
+        boundary = daily.next_period(earliest - timedelta(microseconds=1))
+        return start <= now < min(boundary, start + timedelta(hours=daily.HER_MAX_HOURS))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
+
 class SelfieMixin(PortsMixin):
-    def _set_now(self, where, doing, now=None, event=None):
+    def _set_now(self, where, doing, now=None, event=None, minutes=None):
         values = [str(value or "").strip() for value in (where, doing)]
         if any(re.search(r"http|www\.|://|@|\d{5,}", value, re.IGNORECASE) for value in values):
             raise ValueError("invalid now text")
@@ -160,8 +170,15 @@ class SelfieMixin(PortsMixin):
         now = now or datetime.fromtimestamp(time.time())
         here = getattr(self, "_here", None)
         place = here(event) if here else adapter_astrbot_turn.incoming_of(event).place
-        _write_json(NOW_PATH, {"where": where, "doing": doing,
-                               "start": now.isoformat(), "source": "her", "place": place})
+        previous = _read_json(NOW_PATH, {})
+        same = (isinstance(previous, dict) and previous.get("source") == "her"
+                and previous.get("where") == where and previous.get("doing") == doing
+                and _her_now_valid(previous, now))
+        state = dict(previous) if same else {"where": where, "doing": doing,
+                                              "start": now.isoformat(), "source": "her", "place": place}
+        if isinstance(minutes, int) and not isinstance(minutes, bool):
+            state["minutes"] = max(5, min(240, minutes))
+        _write_json(NOW_PATH, state)
 
     def _now_line(self, event):
         try:
@@ -176,9 +193,7 @@ class SelfieMixin(PortsMixin):
             valid = (start is not None and start <= now and state.get("source") in ("her", "schedule")
                      and all(isinstance(state.get(k), str) and 0 < len(state[k]) <= 20 for k in ("where", "doing")))
             if valid and state["source"] == "her":
-                earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
-                boundary = daily.next_period(earliest - timedelta(microseconds=1))
-                valid = now < min(boundary, start + timedelta(hours=daily.HER_MAX_HOURS))
+                valid = _her_now_valid(state, now)
             elif valid:
                 valid = start == daily.period_start(now)
             if not valid:
@@ -186,12 +201,18 @@ class SelfieMixin(PortsMixin):
                 where, doing, start = daily.schedule(now, float(body["energy"]), float(body["v"]), float(body["stress"]))
                 state = {"where": where, "doing": doing, "start": start.isoformat(), "source": "schedule"}
                 _write_json(NOW_PATH, state)
-            return "此刻：在%s，正在%s（从%s开始）。" % (state["where"], state["doing"], start.strftime("%H:%M"))
+            elapsed = int((now - start).total_seconds() // 60)
+            duration = "%d 小时 %d 分钟" % divmod(elapsed, 60) if elapsed >= 60 else "%d 分钟" % elapsed
+            line = "此刻：在%s，正在%s（从 %s 开始，已经 %s）。" % (state["where"], state["doing"], start.strftime("%H:%M"), duration)
+            minutes = state.get("minutes")
+            if state["source"] == "her" and isinstance(minutes, int) and not isinstance(minutes, bool) and elapsed > minutes:
+                line += "这件事按说已经做完了，现在干什么由你定。"
+            return line
         except Exception as exc:
             logger.debug("[ams-life] now unavailable: %s", type(exc).__name__)
             return ""
 
-    async def _tool_set_now(self, event, where="", doing=""):
+    async def _tool_set_now(self, event, where="", doing="", minutes=None):
         where, doing = str(where or "").strip(), str(doing or "").strip()
         if not self.enabled:
             return "不能更新此刻"
@@ -200,7 +221,7 @@ class SelfieMixin(PortsMixin):
         if len(where) > 20 or len(doing) > 20:
             return "不能更新此刻"
         try:
-            self._set_now(where, doing, event=event)
+            self._set_now(where, doing, event=event, minutes=minutes)
             return "记下了"
         except ValueError:
             return "不能这样写"
@@ -244,9 +265,9 @@ class SelfieMixin(PortsMixin):
             return []
         cfg = self.config or {}
         context = self._phone_context(event) + COMMON_GUIDE
-        tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
+        tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。同一件事接着做不用再记；做完了、换了事再记。",
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
-            "doing": {"type": "string", "maxLength": 12}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
+            "doing": {"type": "string", "maxLength": 12}, "minutes": {"type": "integer", "description": "大概做多久（分钟，5–240）"}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
