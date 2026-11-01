@@ -11,3 +11,5 @@ Existing tests were updated for the intentional behavior: `test_sticker_look_v2.
 Both golden JSON files were intentionally regenerated. Each differs from its previous version only by the `/astrbot_plugin_ams_life/page/sticker_scope` route. The first golden run failed on that route; regeneration skipped both cases as expected, and the next run passed.
 
 Validation: sticker scope 5 passed; sticker look 5 passed; neutral send 6 passed; sticker wire 29 passed; panel API 3 passed and 17 skipped (aiohttp unavailable); golden 2 passed; basics 11 passed. The standalone golden test is reserved for the owner outside the sandbox. The full suite was not run as instructed. The skipped panel tests include the live write-authentication checks.
+
+The `InAReply` test fixture now marks its four rows as old stickers, so they remain eligible under the sharing-scope check; its assertions and production behavior are unchanged. Validation: sticker tests 22 passed; sticker scope 5 passed; golden 2 passed; basics 11 passed. The standalone golden test remains reserved for the owner outside the sandbox; the full suite was not run.
