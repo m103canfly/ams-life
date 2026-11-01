@@ -1,6 +1,6 @@
 # Outbound checks and web memory (card 1h)
 
-Fifth repair of PR #180, based on merged head `7dd533e` and main `8e90f89`.
+Sixth repair of PR #180, based on head `e04dd47` and main `8e90f89`.
 
 ## Behavior
 
@@ -32,12 +32,40 @@ to room documents, where trimming, summarization and whole-room replacement
 could affect them. The changed list order was a symptom of this mistake.
 
 The fifth repair restores `web:<url>` and the original ordered wire assertion.
-`mixin_memory.py` and its room replacement algorithm are unchanged. Pages never
+The room replacement algorithm is unchanged. Pages never
 enter a room document. `origin_of` preserves `shared_in`; label, verdict and
 recall permission enforce it. Merge retains the source boundaries. The actual
 recall test covers both global-memory settings, private recall with the web
 tag, denial elsewhere, requester-name protection and room save isolation.
 Group pages again survive forgetting the requester with an `asked_in` marker.
+
+## Sixth repair: K1 and follow-ups
+
+The panel's forced consolidation enumerated `_library_places`, which included
+web origins from entries and room metadata. It could treat two reads of one
+URL as a room, then produce a summary or candidate fact without `shared_in`.
+The only production-code change in this repair excludes `web:` places in that
+enumerator. Ordinary places keep their existing order and consolidation path.
+No summary, candidate, label or recall algorithm was changed.
+
+`WebOrigin.test_panel_consolidation_leaves_private_web_pages_uncompressed`
+stores two different private page texts at the same URL using `_remember_web`,
+then calls the real `page_consolidate`. It includes an old web room key and
+an ordinary group as a control. Only the group is visited with force enabled.
+The web entries stay unchanged, no summary is created and group recall cannot
+retrieve either private text.
+
+`FetchLimits.test_fifth_simultaneous_fetch_is_rejected_by_real_admission_limit`
+holds four fake fetches concurrently and keeps the production semaphore. The
+fifth must abort before any of the first four finishes. The test does not
+replace admission with a one-slot semaphore; changing the real limit to an
+unlimited one would queue the fifth request and fail this test.
+
+Tests now use `new_event_loop` with explicit task, async-generator and executor
+cleanup instead of the Python-3.11-only runner. Polling still avoids a real
+Windows loopback wake-up socket. Fake transports and real DNS/socket guards
+remain. The TLS description below is corrected: the handshake is bounded by
+the remaining socket timeout, not interrupted by the Timer.
 
 ## Browser requests and proxies
 
@@ -63,8 +91,12 @@ the shared default executor or waits in an unbounded queue. Slots stay occupied
 until the worker actually exits, including after coroutine cancellation.
 
 Each redirect hop has a monotonic total deadline. Its watchdog shuts down and
-closes the active socket, including during connect, proxy CONNECT, TLS/header
-and chunked body reads. Cancellation closes the same socket. Responses and
+closes the watched socket during connect, proxy CONNECT, HTTP headers and
+chunked body reads. TLS wrapping detaches the raw socket during the handshake,
+so the Timer does not interrupt that handshake. The remaining time is set as
+the socket timeout before wrapping; that timeout bounds the TLS handshake.
+The wrapped socket is watched after the handshake. Cancellation closes the
+currently watched socket. Responses and
 connections close on completion or failure. Address retries share that hop's
 deadline and try only the original checked batch. Proxy connections also use
 watched sockets. OS DNS work remains confined to the bounded browser executor.
@@ -100,7 +132,7 @@ The merged main already expects 511 methods; `test_basics` is unchanged.
 
 ## Offline test changes
 
-`test_go_out_checks` has eighteen tests for the off-switch send check, blocked
+`test_go_out_checks` has nineteen tests for the off-switch send check, blocked
 searches, trip names and exemptions, memory origins, blocked-reply save order,
 private now rendering, actual recall, room isolation, DNS pinning, Host/SNI,
 embedded addresses, methods, redirects, request count and proxy tunneling.
@@ -118,6 +150,7 @@ PinnedBrowser.test_sixty_first_subrequest_aborts
 WebOrigin.test_private_group_and_self_recall
 WebOrigin.test_real_recall_keeps_private_pages_outside_rooms
 WebOrigin.test_shared_origin_survives_origin_copy_and_merge
+WebOrigin.test_panel_consolidation_leaves_private_web_pages_uncompressed
 Outbound.test_forbidden_words_checked_when_global_memory_off
 Outbound.test_search_does_not_send_forbidden_words
 Outbound.test_blocked_reply_keeps_pages_after_check
@@ -137,7 +170,7 @@ Most browser tests run the fake bridge inline. The executor regression test
 uses real dedicated/default worker threads with in-process fake sockets and a
 timer pulse instead of a Windows loopback wake-up pipe. It proves that slow
 bytes expire, the socket closes, the default executor works, excess work aborts
-and the browser worker slot is released. All 66 tests pass with the real network
+and the browser worker slot is released. All 67 tests pass with the real network
 guards untouched.
 Both test executors have one worker, so using the default executor for the slow
 fetch would prevent its other job from completing. The second request must be
@@ -184,9 +217,10 @@ Browser.test_response_encoding_is_removed_before_fulfill
 Transport.test_other_checked_addresses_are_tried_without_resolving_again
 Transport.test_deadline_closes_socket_during_slow_headers
 FetchLimits.test_slow_body_expires_without_using_default_pool_or_queuing
+FetchLimits.test_fifth_simultaneous_fetch_is_rejected_by_real_admission_limit
 ```
 
-## Validation (2026-11-01)
+## Fifth-repair validation (2026-11-01)
 
 The designated sandbox runner ran one file at a time. Final summaries:
 
@@ -211,7 +245,9 @@ basic/full scenarios in both runners failed at `panel_api` import because the
 designated Python lacks `aiohttp`. All four failures have the same missing
 dependency; they did not reach golden comparison. Two other tests passed.
 No dependency was installed, no fixture was changed and no retry was made.
-The owner must run that file in the environment with the dependency available.
+The reviewer subsequently reported all six standalone golden tests passing
+and a full run of 1923 tests passing on `e04dd47`. Those are reviewer results
+for the fifth repair, not a full-suite run of the sixth repair here.
 The other twelve files passed. The golden fixtures are unchanged and
 `test_golden` passed. The full suite remains assigned to the reviewer.
 No pages, live data, dependencies or service settings were changed. No network
@@ -219,3 +255,25 @@ requests, commits, permission changes or elevated commands were used.
 Added-line scans check fictional identities, username paths and token/private-key
 literal patterns. No real credentials or identifiers are used in the fixtures.
 `git diff --check` passed. The test and change-note files end in one newline.
+
+## Sixth-repair validation
+
+Each requested file ran separately through the designated sandbox runner.
+`test_discretion` is the existing consolidation/forgetting regression file.
+
+```text
+tests.test_go_out_checks: Ran 19 tests in 0.096s | OK
+tests.test_real_browser: Ran 67 tests in 1.648s | OK
+tests.test_browse_wire: Ran 20 tests in 2.583s | OK
+tests.test_browse: Ran 20 tests in 0.017s | OK
+tests.test_send_walls: Ran 10 tests in 0.085s | OK
+tests.test_recall_walls: Ran 10 tests in 0.063s | OK
+tests.test_discretion: Ran 84 tests in 33.959s | OK
+tests.test_golden: Ran 2 tests in 3.914s | OK
+tests.test_basics: Ran 11 tests in 0.041s | OK
+```
+
+All nine files passed (243 tests). No full suite or mutations were run here.
+The golden fixtures and plugin method count are unchanged. The repair touches
+only `_library_places`, the two test files and this note. No network, real
+local port, dependency installation, permission change or commit was used.

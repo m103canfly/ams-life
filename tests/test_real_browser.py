@@ -943,6 +943,29 @@ class Transport(Offline):
         conn.close.assert_called_once()
 
 
+def run_offline_loop(coro, default_executor=None):
+    """Poll worker completions without a Windows loopback wake-up socket."""
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        if default_executor is not None:
+            loop.set_default_executor(default_executor)
+        def pulse():
+            loop.call_later(0.005, pulse)
+        pulse()
+        return loop.run_until_complete(coro)
+    finally:
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.run_until_complete(loop.shutdown_default_executor())
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
 class FetchLimits(Offline):
     def test_slow_body_expires_without_using_default_pool_or_queuing(self):
         entered, closed = threading.Event(), threading.Event()
@@ -1002,14 +1025,51 @@ class FetchLimits(Offline):
              mock.patch.object(real_browser.socket, 'socket', return_value=sock), \
              mock.patch.object(real_browser.ssl, 'create_default_context') as tls:
             tls.return_value.wrap_socket.return_value = sock
-            with asyncio.Runner() as runner:
-                loop = runner.get_loop()
-                loop.set_default_executor(default_pool)
-                # Poll completions without an actual Windows loopback wake-up pipe.
-                def pulse():
-                    loop.call_later(0.005, pulse)
-                pulse()
-                runner.run(exercise())
+            run_offline_loop(exercise(), default_pool)
+
+    def test_fifth_simultaneous_fetch_is_rejected_by_real_admission_limit(self):
+        release = threading.Event()
+        entered = []
+        lock = threading.Lock()
+        def fetch(url, headers, check, job):
+            with lock:
+                entered.append(url)
+            if not release.wait(5):
+                raise AssertionError('fake fetch was not released')
+            return 200, {}, b'fictional page', url
+
+        async def exercise():
+            routes = [Route(URL + '?request=' + str(index)) for index in range(5)]
+            tasks = [asyncio.create_task(real_browser._pinned_route(route, lambda reason: None, [0]))
+                     for route in routes[:4]]
+            try:
+                for _ in range(200):
+                    with lock:
+                        ready = len(entered) == 4
+                    if ready:
+                        break
+                    await asyncio.sleep(0.005)
+                self.assertTrue(ready)
+                fifth = asyncio.create_task(real_browser._pinned_route(routes[4], lambda reason: None, [0]))
+                tasks.append(fifth)
+                await asyncio.wait_for(asyncio.shield(fifth), 0.2)
+                self.assertEqual(routes[4].result, 'abort')
+                self.assertTrue(all(not task.done() for task in tasks[:4]))
+                with lock:
+                    self.assertEqual(len(entered), 4)
+            finally:
+                release.set()
+                if len(tasks) == 5 and not tasks[-1].done():
+                    tasks[-1].cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+            self.assertEqual([route.result for route in routes[:4]], ['fulfill'] * 4)
+
+        # Keep the real admission semaphore: replacing it with an unlimited one
+        # must make the fifth request queue here and fail the assertion above.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool, \
+             mock.patch.object(real_browser, '_fetch_pool', pool), \
+             mock.patch.object(real_browser, '_fetch_checked', side_effect=fetch):
+            run_offline_loop(exercise())
 
 
 class Wiring(Offline):

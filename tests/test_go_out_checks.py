@@ -2,6 +2,7 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Offline checks for outbound browsing and pinned browser requests."""
 import asyncio
+import copy
 import socket
 import sys
 import tempfile
@@ -223,6 +224,51 @@ class WebOrigin(unittest.TestCase):
         origin = discretion.origin_of(memory)
         self.assertEqual(origin["shared_in"], "private:10001")
         self.assertEqual(discretion.may_recall(discretion.merge([origin, origin]), "group:900001"), discretion.DROP)
+
+    def test_panel_consolidation_leaves_private_web_pages_uncompressed(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={})
+        test_basics.PLUGINS.append(plugin)
+        url = "https://example.com/private-document"
+        web_place = "web:" + url
+        library = {"entries": [{"id": "room", "role": "user", "text": "ordinary room memory",
+                                 "origin": discretion.make_origin("group:900001", ["10003"])}],
+                   "rooms": {"group:900001": {}, web_place: {}}}
+        plugin._read_library = lambda **kwargs: library
+        plugin._write_library = lambda lib: True
+        plugin._job_stale = lambda: False
+        plugin._begin_job = lambda *args: None
+        plugin._core = lambda event: None
+        plugin._llm_allowed = lambda kind: False
+        plugin._cosine = lambda *args: 1.0
+        plugin._memory_score = lambda *args, **kwargs: 1.0
+        plugin._present_people = lambda event: []
+        plugin._known_names = lambda people: ["阿星"]
+        plugin._embed_text = mock.AsyncMock(return_value=[1.0])
+        plugin._embed_text_guarded = mock.AsyncMock(return_value=[1.0])
+        plugin._archive_ranked_events = mock.AsyncMock()
+        plugin._maybe_archive_insight = mock.AsyncMock()
+        asked = discretion.make_origin("private:10001", ["10001"])
+        words = ("虚构的考试安排还在讨论", "虚构的远足路线尚未确定")
+
+        async def exercise():
+            for index, said in enumerate(words):
+                self.assertTrue(await plugin._remember_web({"url": url, "said": said}, "read:" + str(index), asked))
+            before = copy.deepcopy([entry for entry in library["entries"] if entry.get("role") == "web"])
+            consolidate = mock.AsyncMock(wraps=plugin._consolidate_memory)
+            plugin._consolidate_memory = consolidate
+            result = await plugin.page_consolidate()
+            self.assertEqual(result["data"], {"files": 1, "sessions": 1})
+            self.assertEqual([plugin._here(call.args[0]) for call in consolidate.await_args_list], ["group:900001"])
+            self.assertTrue(consolidate.await_args.kwargs["force"])
+            self.assertEqual([entry for entry in library["entries"] if entry.get("role") == "web"], before)
+            self.assertFalse(any(entry.get("role") == "summary" or entry.get("summarized")
+                                 for entry in library["entries"]))
+            group = harness.FakeEvent("hello", sender="10003", group="900001")
+            lines, ids, _ = plugin._labeled_elsewhere(group, [1.0], None, [])
+            for said in words:
+                self.assertNotIn(said, "\n".join(lines))
+            self.assertEqual(ids, [])
+        asyncio.run(exercise())
 
 
 class Outbound(unittest.IsolatedAsyncioTestCase):

@@ -384,7 +384,7 @@ class MemoryMixin(PortsMixin):
     def _library_places(self) -> list:
         lib = self._read_library()
         places = set(lib["rooms"]) | {discretion.origin_of(e)["where"] for e in lib["entries"]}
-        return sorted(p for p in places if p)
+        return sorted(p for p in places if p and not p.startswith("web:"))
 
     def _migrate_memory_library(self) -> None:
         """Fold BioCore's memory/<session>.json files into the library (once).
