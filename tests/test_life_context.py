@@ -23,6 +23,7 @@ import heybox  # noqa: E402
 import history_store  # noqa: E402
 import life_loop as life  # noqa: E402
 import messenger  # noqa: E402
+import mixin_phone  # noqa: E402
 import mixin_selfie as phone  # noqa: E402
 import turn  # noqa: E402
 import turn_runner  # noqa: E402
@@ -36,6 +37,10 @@ NOW_WORDS = '在虚构此刻暗号里坐着'
 
 class Person(phone.SelfieMixin):
     """The few things life_loop and turn_runner want from the plugin; nothing on disk."""
+
+    # A reply reads through the real phone mixin; this Person only fakes the ports below.
+    _reply_context = mixin_phone.PhoneMixin._reply_context
+    _message_id = staticmethod(mixin_phone.PhoneMixin._message_id)
 
     def __init__(self):
         self.enabled = True
@@ -307,7 +312,9 @@ class LifeContextTests(unittest.IsolatedAsyncioTestCase):
         self.p._keep_likeness = Mock()
         event = turn.TurnEvent(events.Incoming('private:' + OWNER, OWNER, '', '', '', (), False,
                                                '', (), True, False, self.clock(), '在干嘛'))
-        await turn_runner.run_turn(self.p, event, history_limit=20)
+        # The reply reads the last 24 hours by time.time(); here the fake clock is now too.
+        with patch.object(mixin_phone.time, 'time', self.clock):
+            await turn_runner.run_turn(self.p, event, history_limit=20)
         messages = model.requests[0]['messages']
         self.assertEqual([row['content'] for row in messages],
                          ['你今天在做什么呀', '在干嘛'])
