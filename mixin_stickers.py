@@ -168,8 +168,12 @@ class StickersMixin(PortsMixin):
         lines = []
         for n, sid in enumerate(offered, 1):
             r = lib.rows[sid]
-            tags = "，".join(x for x in (r.get("emotion"), r.get("scene")) if x)
-            lines.append("%d. %s%s" % (n, r.get("caption") or "表情", "（%s）" % tags if tags else ""))
+            meaning = r.get("meaning")
+            details = [r.get("emotion")]
+            details += (r.get("tags") or [])[:2] if meaning else [r.get("scene")]
+            tags = "，".join(x for x in details if x)
+            line = "%d. %s%s" % (n, meaning or r.get("caption") or "表情", "（%s）" % tags if tags else "")
+            lines.append(line[:60])
         return "[她的表情包] " + OFFER_NOTE + "\n" + "\n".join(lines)
 
     # ------------------------------------------------------------------
