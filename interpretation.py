@@ -1285,8 +1285,10 @@ def notebook_prompt(entries, materials, private_sitting=False, max_entries=20, m
             '{"changes":[{"op":"add","text":"……","private":false,"uses":["m2"]},'
             '{"op":"edit","no":1,"text":"……","private":true,"uses":["m1","m3"]},{"op":"delete","no":2}]}\n'
             "private 写你觉得这一条是不是私事；uses 写这一条用到了哪些材料的编号。"
-            "名字照材料里那样，用「」框着。"
-            % (where, book, mats, max_edits, max_chars, max_entries))
+            "%s"
+            % (where, book, mats, max_edits, max_chars, max_entries,
+               "这一次的材料来自私聊。只写你自己学到的、感受到的（比如“跟熟的人聊天会放松”），不写人名、群名，也不写私事的细节。"
+               if private_sitting else "名字照材料里那样，用「」框着。"))
 
 
 def parse_notebook_changes(raw, n_entries=0, material_ids=(), max_chars=40, max_edits=3) -> list:
