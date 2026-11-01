@@ -21,7 +21,7 @@
  *   Software.
  */
 /*
- * ams-life: copied unchanged from https://github.com/nayuki/QR-Code-generator, v1.8.0
+ * ams-life: from https://github.com/nayuki/QR-Code-generator, v1.8.0
  * (commit 720f62bddb7226106071d4728c292cb1df519ceb), typescript-javascript/qrcodegen.ts
  * (sha256 c4749095a91bf9696e3a303998b9905e467094f53041e64393e65e6d887737fd), turned into
  * plain JavaScript by Node.js's own module.stripTypeScriptTypes(source, { mode: "transform" }),
