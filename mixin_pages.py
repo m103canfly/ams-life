@@ -12,9 +12,10 @@ try:
 except ImportError:
     from body import *  # noqa: F401,F403
 try:
-    from . import ui_look
+    from . import ui_look, likeness
 except ImportError:
     import ui_look
+    import likeness
 try:
     from .vision import vision_for_panel
     from . import mixin_attention
@@ -345,6 +346,8 @@ class PagesMixin:
         try:
             register = getattr(self.context, "register_web_api", None)
             if register:
+                register("/astrbot_plugin_ams_life/page/likeness", self.page_likeness, ["GET"], "weekly reply samples")
+                register("/astrbot_plugin_ams_life/page/likeness/rate", self.page_likeness_rate, ["POST"], "rate a reply sample")
                 register("/astrbot_plugin_ams_life/page/status", self.page_status, ["GET"],
                          "BioCore dashboard status")
                 register("/astrbot_plugin_ams_life/page/self_model", self.page_self_model,
@@ -412,6 +415,29 @@ class PagesMixin:
                          "her pictures for the panel, when the owner put them in (read-only)")
         except Exception as exc:
             logger.warning("[biocore] page api register failed: %s", exc)
+
+    async def page_likeness(self):
+        try:
+            from quart import request
+            week = request.args.get('week') or likeness.week_of(time.time())
+            return {'status': 'ok', 'data': likeness.public(likeness.Store(DATA_DIR).select(week))}
+        except (TypeError, ValueError):
+            return {'status': 'error', 'message': 'invalid week', 'data': {}}
+        except Exception as exc:
+            logger.warning('[ams-life] likeness read failed (%s)', type(exc).__name__)
+            return {'status': 'error', 'message': 'likeness unavailable', 'data': {}}
+
+    async def page_likeness_rate(self):
+        try:
+            from quart import request
+            body = await request.get_json(silent=True) or {}
+            saved = likeness.Store(DATA_DIR).rate(body.get('week'), body.get('id'), body.get('rating'), body.get('reason', ''))
+            return {'status': 'ok' if saved else 'error', 'data': {}}
+        except (TypeError, ValueError):
+            return {'status': 'error', 'message': 'invalid rating', 'data': {}}
+        except Exception as exc:
+            logger.warning('[ams-life] likeness rate failed (%s)', type(exc).__name__)
+            return {'status': 'error', 'message': 'likeness unavailable', 'data': {}}
 
     async def page_look(self, args=None):
         return {"status": "ok", "data": await asyncio.to_thread(ui_look.read_ui_images, DATA_DIR)}

@@ -154,7 +154,8 @@ class Split(unittest.TestCase):
         # move 5i-2: +1 (_prepare_tools)
         # move 5e-1: +1 (_core_init)
         # move 5e-4b: +1 (_keep_turn)
-        self.assertEqual(len(methods), 505)
+        # L1: +3 (_keep_likeness, page_likeness, page_likeness_rate).
+        self.assertEqual(len(methods), 508)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
