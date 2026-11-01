@@ -8,7 +8,7 @@ try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
     from .mixin_phone import _expand_forward, _phone_line, _history_original
-    from . import adapter_astrbot_turn, attention, stickers, likeness, mixin_selfie, weather
+    from . import adapter_astrbot_turn, attention, stickers, likeness, mixin_selfie, weather, calendar_cn
 except ImportError:
     from common import *  # noqa: F401,F403
     from body import *  # noqa: F401,F403
@@ -19,6 +19,7 @@ except ImportError:
     import likeness
     import mixin_selfie
     import weather
+    import calendar_cn
 
 
 def _copies_owner_rule(reply, rules):
@@ -190,6 +191,9 @@ class TurnMixin:
         self._numbers_out_of_request(turn_request, event)
         if not self.inject_intent:
             _now = self._now_line(event)
+            _day = calendar_cn.today_line(datetime.now().date())
+            if _day:
+                _now = (_now + "\n[日子] " + _day).strip()
             if _now:
                 # The system prompt is not stored in AstrBot's conversation history.
                 turn_request.system_prompt = (str(getattr(turn_request, "system_prompt", "") or "") + "\n\n" + _now).strip()
@@ -255,7 +259,9 @@ class TurnMixin:
             logger.warning("[biocore] continuity context failed: %s", exc)
             _continuity = {}
         try:
-            self._record_continuity_feedback(event, _continuity)
+            _feedback = {key: _continuity.get(key) for key in ("summary", "loops", "relationship")}
+            if any(_feedback.values()):
+                self._record_continuity_feedback(event, _feedback)
         except Exception:
             pass
         _img = await self._image_context(event)
@@ -327,6 +333,9 @@ class TurnMixin:
         _now = self._now_line(event)
         if _now:
             _compact = (_compact + "\n" + _now).strip()
+        _day = calendar_cn.today_line(datetime.now().date())
+        if _day:
+            _compact = (_compact + "\n[日子] " + _day).strip()
         _slang = self._slang_prompt(event)
         if _slang:
             _compact = (_compact + "\n" + _slang).strip()
