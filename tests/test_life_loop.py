@@ -410,6 +410,8 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('kind', life.current())
 
     async def test_detail_forty_characters_cleaning_and_now_line(self):
+        # Dazing writes no detail any more (card 1c-6a), so a kept detail is chosen here.
+        self.p.answer['do'] = '休息'
         self.p.answer['detail'] = '看' * 45
         await self.tick()
         self.assertEqual(life.current()['doing'], '看' * 40)
