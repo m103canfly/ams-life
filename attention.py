@@ -15,7 +15,7 @@ no I/O, no model, no AstrBot. The plugin keeps the state (mixin_attention.py).
 - Two safety nets, no fixed limits otherwise: about 30 messages an hour in one group; money a
   day (10 yuan; near it only the owner's private chat; over it nothing).
 - What she sends is hers to pick (the owner, 10-29: 6): 【不说】 (nothing), a QQ face, a short line,
-  or a real answer; several messages split by 【下一条】 (at most MAX_MESSAGES, the owner's 27).
+  or a real answer; several messages split by 【下一条】 (at most MAX_MESSAGES, the owner's 27; 10 since 11-01).
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ NIGHT_WAKE_CALLS = 3
 NIGHT_WAKE_MINUTES = 10
 NIGHT_SLEEP_AGAIN_MINUTES = 20
 GROUP_HOUR_MAX = 30
-MAX_MESSAGES = 5
+MAX_MESSAGES = 10
 SILENT = "【不说】"
 NEXT = "【下一条】"
 
@@ -211,7 +211,7 @@ def silent(text) -> bool:
     return not t or t.replace(SILENT, "").strip() == "" and SILENT in t
 
 
-PIECES_NOTE = "像真人发消息：想分几条就分几段写，每段一条，最多 5 条；一条里别换行。"
+PIECES_NOTE = "绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
 
 
 def split(text, most=MAX_MESSAGES) -> list:
