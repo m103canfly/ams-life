@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
-"""A quiet chat counts only after the other side has spoken in it."""
+"""A quiet chat counts only when someone called her or the other side spoke and she answered."""
 import json
 import sys
 import time
@@ -61,6 +61,36 @@ class QuietChatTests(unittest.TestCase):
         for here, exchange in due:
             state.setdefault('quiet_seen', {})[here] = exchange
         self.assertEqual(life.quiet_chats(plugin, state, start + 1200), [])
+
+    def test_unaddressed_group_chatter_is_not_quiet(self):
+        start = 4_000_000.0
+        plugin = Windows({'group:900001': [{'role': 'user', 'ts': start},
+                                           {'role': 'user', 'ts': start + 30},
+                                           {'role': 'user', 'ts': start + 90}]})
+        state = {}
+        self.assertEqual(life.quiet_chats(plugin, state, start + 690), [])
+        self.assertEqual(life.quiet_chats(plugin, state, start + 3660), [])
+
+    def test_her_own_line_after_a_seen_exchange_is_not_quiet(self):
+        start = 5_000_000.0
+        plugin = Windows({'private:10001': [{'role': 'user', 'ts': start},
+                                            {'role': 'assistant', 'ts': start + 60},
+                                            {'role': 'assistant', 'ts': start + 1200}]})
+        state = {'quiet_seen': {'private:10001': start + 60}}
+        self.assertEqual(life.quiet_chats(plugin, state, start + 1800), [])
+        self.assertEqual(life.quiet_chats(plugin, state, start + 4800), [])
+
+    def test_private_exchange_is_quiet_once(self):
+        start = 6_000_000.0
+        plugin = Windows({'private:10001': [{'role': 'user', 'ts': start},
+                                            {'role': 'assistant', 'ts': start + 60}]})
+        state = {}
+        self.assertEqual(life.quiet_chats(plugin, state, start + 60 + 599), [])
+        due = life.quiet_chats(plugin, state, start + 60 + 600)
+        self.assertEqual(due, [('private:10001', start + 60)])
+        for here, exchange in due:
+            state.setdefault('quiet_seen', {})[here] = exchange
+        self.assertEqual(life.quiet_chats(plugin, state, start + 60 + 1200), [])
 
 
 class Person:
