@@ -33,6 +33,7 @@ OTHER = '10003'         # someone else, made up
 PHOTO = b'made-up-picture-bytes'   # not a real picture
 VOICE = b'made-up-voice-bytes'     # not a real voice
 PREFIX = 'base64://'
+PNG_BASE64 = base64.b64encode(b'\x89PNG\r\n\x1a\n').decode('ascii')
 
 
 def ok(data=None, retcode=0):
@@ -127,16 +128,16 @@ class Segments(InFiles):
                          [{'type': 'image', 'data': {'file': base64_ref(PHOTO)}}])
 
     def test_a_picture_from_base64_gets_the_prefix_once(self):
-        for given, onebot in (('AAAA', PREFIX + 'AAAA'), (PREFIX + 'AAAA', PREFIX + 'AAAA')):
+        for given, onebot in ((PNG_BASE64, PREFIX + PNG_BASE64),
+                              (PREFIX + PNG_BASE64, PREFIX + PNG_BASE64)):
             with self.subTest(given=given):
                 self.assertEqual(to_onebot((Segment('image', {'base64': given}),), self.roots),
                                  [{'type': 'image', 'data': {'file': onebot}}])
 
-    def test_a_picture_from_a_url_keeps_the_url(self):
+    def test_a_picture_from_a_url_is_refused(self):
         for url in ('http://img.test/a.png', 'https://img.test/b.png'):
-            with self.subTest(url=url):
-                self.assertEqual(to_onebot((Segment('image', {'url': url}),), self.roots),
-                                 [{'type': 'image', 'data': {'file': url}}])
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                to_onebot((Segment('image', {'url': url}),), self.roots)
 
     def test_a_voice_from_a_file_is_read_as_base64(self):
         self.assertEqual(to_onebot((Segment('record', {'path': str(self.voice)}),), self.roots),
@@ -151,11 +152,11 @@ class Segments(InFiles):
     def test_the_bytes_read_back_are_the_file(self):
         parts = to_onebot((Segment('image', {'path': str(self.photo)}),
                            Segment('record', {'path': str(self.voice)}),
-                           Segment('image', {'base64': 'AAAA'})), self.roots)
+                           Segment('image', {'base64': PNG_BASE64})), self.roots)
         for part, payload in zip(parts, (PHOTO, VOICE)):
             self.assertTrue(part['data']['file'].startswith(PREFIX))
             self.assertEqual(base64.b64decode(part['data']['file'][len(PREFIX):]), payload)
-        self.assertEqual(parts[2]['data'], {'file': PREFIX + 'AAAA'})   # base64 is not decoded
+        self.assertEqual(parts[2]['data'], {'file': PREFIX + PNG_BASE64})
 
     def test_these_are_refused(self):
         for segment in (Segment('text', {'text': '   '}), Segment('face', {}),
@@ -321,9 +322,19 @@ class Actions(unittest.TestCase):
         for action in sorted(messenger.ALLOWED_ACTIONS):
             with self.subTest(action=action):
                 api = Api(answer=ok({'message_id': 'm-1'}))
-                self.assertEqual(call(api, action, message_id='m-1', group_id=GROUP),
+                params = {'message_id': 'm-1', 'group_id': GROUP}
+                if action in ('send_group_msg', 'send_private_msg'):
+                    params['message'] = [{'type': 'text', 'data': {'text': 'hello'}}]
+                self.assertEqual(call(api, action, **params),
                                  {'message_id': 'm-1'})
-                self.assertEqual(api.calls, [(action, {'message_id': 'm-1', 'group_id': GROUP})])
+                self.assertEqual(api.calls, [(action, params)])
+
+    def test_send_actions_without_message_are_refused(self):
+        for action in ('send_group_msg', 'send_private_msg'):
+            api = Api()
+            with self.subTest(action=action), self.assertRaises(messenger.ActionRefused):
+                call(api, action, group_id=GROUP)
+            self.assertEqual(api.calls, [])
 
     def test_data_that_is_not_a_dict_is_empty(self):
         for data in ('ok', None, [1], 0):
@@ -409,10 +420,13 @@ class SameAsAstrBot(InFiles):
         self.assertEqual(to_onebot(segments, self.roots)[0]['data']['file'], base64_ref(VOICE))
 
     def test_a_sticker_as_base64(self):
-        self.check((Segment('image', {'base64': 'AAAA'}),), 'a sticker')
+        self.check((Segment('image', {'base64': PNG_BASE64}),), 'a sticker')
 
     def test_a_picture_from_a_url(self):
-        self.check((Segment('image', {'url': 'http://img.test/a.png'}),), 'a url')
+        api = Api()
+        with self.assertRaises(ValueError):
+            send(api, 'group:' + GROUP, (Segment('image', {'url': 'http://img.test/a.png'}),), self.roots)
+        self.assertEqual(api.calls, [])
 
     def test_a_whole_message(self):
         self.check((Segment('text', {'text': '看'}), Segment('image', {'path': str(self.photo)}),

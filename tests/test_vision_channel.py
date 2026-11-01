@@ -23,6 +23,7 @@ def fake_bytes(ref):
 import mixin_attention
 import mixin_discretion
 import mixin_llm
+import mixin_selfie
 
 
 class Plugin(mixin_llm.LLMMixin, mixin_attention.AttentionMixin):
@@ -67,8 +68,11 @@ class VisionTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.data = Path(self.tmp.name)
+        self.shots = self.data / 'browser' / 'shots'
+        self.shots.mkdir(parents=True)
         self.patches = [patch.object(vision, 'DATA_DIR', self.data),
-                        patch.object(mixin_attention, 'SPEND_PATH', self.data / 'spend.json')]
+                        patch.object(mixin_attention, 'SPEND_PATH', self.data / 'spend.json'),
+                        patch.object(mixin_selfie, 'SHOT_DIR', self.shots)]
         for p in self.patches:
             p.start()
             self.addCleanup(p.stop)
@@ -98,7 +102,7 @@ class VisionTests(unittest.TestCase):
         self.assertNotIn('made-up-test-key', str(vision.logger.records))
 
     def test_local_text_file_is_not_read_past_header_or_sent(self):
-        path = self.data / 'not-image.txt'
+        path = self.shots / 'not-image.txt'
         path.write_text('not a picture and private text', encoding='utf-8')
         plugin = Plugin()
         provider = FakeProvider()
@@ -111,14 +115,14 @@ class VisionTests(unittest.TestCase):
         self.assertEqual(provider.calls, 0)
 
     def test_local_image_is_checked_by_header_not_extension(self):
-        path = self.data / 'picture.dat'
+        path = self.shots / 'picture.dat'
         path.write_bytes(PNG)
         self.assertEqual(vision._bytes(str(path)), PNG)
 
     def test_local_picture_headers_accept_the_four_supported_formats(self):
         headers = (b'\xff\xd8\xffrest', b'\x89PNG\r\n\x1a\nrest', b'GIF89arest', b'RIFF1234WEBPrest')
         for index, data in enumerate(headers):
-            path = self.data / ('picture-' + str(index))
+            path = self.shots / ('picture-' + str(index))
             path.write_bytes(data)
             self.assertEqual(vision._bytes(str(path)), data)
 

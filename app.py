@@ -103,6 +103,7 @@ class App:
         from history_store import HistoryStore
         from key_store import KeyStore, KeyStoreError
         from panel_server import PanelServer
+        from mixin_selfie import SELFIE_DIR, SHOT_DIR
 
         try:
             keys = KeyStore(root / 'keys.dat')
@@ -154,7 +155,7 @@ class App:
                 from onebot_server import OneBotServer
                 self.onebot = OneBotServer(token=napcat, on_event=self.on_event,
                                            host='127.0.0.1', port=self.args.onebot_port)
-                self.her._neutral_messenger = self.onebot.messenger(roots=[root])
+                self.her._neutral_messenger = self.onebot.messenger(roots=[SELFIE_DIR, SHOT_DIR])
                 onebot_port = await self.onebot.start()
             else:
                 print('Please fill in the keys in the panel.')
@@ -202,6 +203,20 @@ class App:
                 data = part['data']
                 if part.get('type') == 'reply':
                     quoted = await self._lookup('get_msg', {'message_id': data.get('id')})
+                    if isinstance(quoted, dict):
+                        kind = frame.get('message_type')
+                        field = 'group_id' if kind == 'group' else 'user_id'
+                        place = frame.get(field)
+                        other = quoted.get(field)
+                        self_id = frame.get('self_id')
+                        own_private = (kind == 'private' and self_id is not None and str(self_id)
+                                       and other is not None and str(other) == str(self_id))
+                        recipients_match = all(str(quoted[key]) == str(place)
+                                               for key in ('target_id', 'peer_id') if key in quoted)
+                        if (kind not in ('group', 'private') or quoted.get('message_type') != kind
+                                or place is None or other is None or not str(place)
+                                or (str(place) != str(other) and not (own_private and recipients_match))):
+                            quoted = None
                 elif part.get('type') == 'at' and frame.get('message_type') == 'group':
                     qq = str(data.get('qq') or '')
                     if qq and qq != 'all' and qq not in names:
