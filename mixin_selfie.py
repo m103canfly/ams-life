@@ -535,13 +535,21 @@ class SelfieMixin(PortsMixin):
                     if outfit:
                         prompt += "她今天穿：" + outfit + "\n"
                 prompt += what
+                try:
+                    from .vision import bridge_call, bridge_lock
+                except ImportError:
+                    from vision import bridge_call, bridge_lock
                 for attempt in range(PHOTO_RETRIES):
                     try:
+                        bridge = bridge_lock(self)
+                        await bridge.acquire()
                         if kind == "selfie":
-                            raw = await self._post_selfie(base + "/images/edits", prompt, _image_key(self, api), "1080x1440", ref)
+                            call = self._post_selfie(base + "/images/edits", prompt, _image_key(self, api), "1080x1440", ref)
+                            raw = await bridge_call(bridge, call)
                         else:
-                            raw, _ = await self._post_json(base + "/images/generations", {"model": "codex-image", "prompt": prompt,
+                            call = self._post_json(base + "/images/generations", {"model": "codex-image", "prompt": prompt,
                                 "size": "1080x1440", "n": 1}, _image_key(self, api), timeout=300)
+                            raw, _ = await bridge_call(bridge, call)
                         self._phone_account(kind, self._phone_price("photo"))
                         value = json.loads(raw.decode("utf-8"))
                         blob = base64.b64decode(value["data"][0]["b64_json"], validate=True)
