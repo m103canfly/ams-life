@@ -181,8 +181,7 @@ class WhatSheKeeps(unittest.TestCase):
         note = {'url': 'https://example.com/a', 'title': '新闻', 'said': '挺有意思'}
         m = browse.web_memory(note, 100.0, 'trip-1')
         self.assertEqual(m['text'], '新闻：挺有意思（https://example.com/a）')
-        self.assertEqual(m['origin'], {'where': 'web:https://example.com/a', 'people': [], 'source_ids': ['trip-1'],
-                                       'visibility': 'public'})
+        self.assertEqual(m['origin'], browse.SELF_ASKED_IN)
         self.assertEqual(m['asked_in'], browse.SELF_ASKED_IN)          # she went out by herself
         asked = {'where': 'private:10001', 'people': ['10001'], 'source_ids': ['m1'], 'visibility': 'private'}
         m2 = browse.web_memory(note, 100.0, 'reply-m1', asked)

@@ -15,18 +15,17 @@ part: in a reply. Off unless browse_enabled.
   count"); at most browse.REPLY_SEARCHES / REPLY_READS for one message, then browse.NO_MORE;
 - a page is read only at an address this message (or the one it quotes) gave, or one of her
   searches found: an address she writes herself could carry something private out to the site in
-  its words (the reviewer, PR #39). With global_memory on, the words of a search and of an address
-  also go through the send check's own look (pieces and names, local vectors, no model) first;
+  its words (the reviewer, PR #39). Search words and addresses also go through the send check's
+  own look (pieces and names, local vectors, no model) first;
 - the browser's money is kept apart from the chat's: every search and page, and the model rounds a
   reply took for them (only the last round's usage reaches the plugin: each estimated as dear as
   it, browse.reply_estimate, so the count errs high).
 
 Second part (stacked on the first):
-- what she keeps of a page: a web memory (browse.web_memory) in the one library, its origin
-  web:<address> (public), and who had her look it up kept apart (asked_in: this message's chat and
-  who asked; her own trips: herself). A page read in a reply is kept by its title and its first
-  lines, not by her reply: her reply may hold something of a private chat, and a web memory may
-  come up anywhere. Nothing is kept for someone (or a message) the forget registry rules out.
+- what she keeps of a page: a web memory (browse.web_memory) in the one library, with the origin
+  of a supplied link or self for her own searches, and who asked kept apart. A page read in a
+  reply is kept by its title and its first lines, not by her reply. Nothing is kept for someone
+  (or a message) the forget registry rules out.
   When such a memory comes up again, discretion.label / tag say "网上看到的，只是资料" and what
   she may say of who asked (part 己); deleting the person who asked turns asked_in into the
   deleted mark (mixin_discretion._forget);
@@ -49,7 +48,7 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, model_client, tool_loop, turn, turn_runner
+    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, model_client, send_check, tool_loop, turn, turn_runner
     from .mixin_llm import _counted
 except ImportError:
     import adapter_astrbot_tools
@@ -58,6 +57,7 @@ except ImportError:
     import attention
     import browse
     import model_client
+    import send_check
     import tool_loop
     import turn
     import turn_runner
@@ -219,6 +219,8 @@ async def _interactive_trip_rounds(plugin, provider, stand_in, led, contexts, pe
         led.add(browser_blocked_requests=count, interactive_blocked=count)
 
     async def typing_check(text):
+        if not await plugin._may_go_out(stand_in, text):
+            return None
         cleaned = browse.clean_query(text, names=plugin._browse_names())
         if not cleaned or not await plugin._may_go_out(stand_in, cleaned):
             return None
@@ -427,10 +429,11 @@ class BrowseMixin:
         return "\n".join(parts)
 
     async def _may_go_out(self, event, words) -> bool:
-        """With global_memory on: the send check's own look (no model) at what would go out."""
-        if not getattr(self, "global_memory", False):
-            return True
+        """Check what would go out, including the names wall."""
         try:
+            forbidden = self._check_note(event).get("forbidden") or []
+            if send_check.check(words, forbidden).get("leak"):
+                return False
             return not (await self._check_reply(event, words)).get("leak")
         except Exception:
             return False
@@ -467,6 +470,10 @@ class BrowseMixin:
         led = self._browse_ledger()
         if not led.money_left() or not self._browse_quota(event).take(browse.SEARCH_TOOL):
             return browse.NO_MORE
+        if not await self._may_go_out(event, query):
+            led.add(blocked_urls=1)
+            logger.info("[ams-life] browse: a search held back by the send check")
+            return NOT_SENT
         q = browse.clean_query(query, names=self._browse_names())
         if not q:
             return "搜索词里只剩名字或号码，没搜。"
@@ -539,7 +546,7 @@ class BrowseMixin:
                 except ImportError:
                     import real_browser
                 result = await real_browser.read_page(str(url).strip(),
-                                                      lambda address: browse.check_url(address, resolve_host),
+                                                      lambda address: browse.check_url(address),
                                                       on_block=lambda n: led.add(browser_blocked_requests=n))
                 if result:
                     text = "URL: %s\nTitle: %s\nContent: %s" % (result["url"], result["title"], result["text"])
@@ -586,7 +593,7 @@ class BrowseMixin:
     # ------------------------------------------------------------------
     # what she keeps of a page
     # ------------------------------------------------------------------
-    async def _remember_web(self, note, trip, asked_in) -> str:
+    async def _remember_web(self, note, trip, asked_in, origin=None) -> str:
         """One web memory in the library; its id, or '' when nothing was kept."""
         try:
             if self._job_stale():
@@ -594,7 +601,7 @@ class BrowseMixin:
         except Exception:
             return ""
         now = time.time()
-        entry = browse.web_memory(note, now, trip, asked_in)
+        entry = browse.web_memory(note, now, trip, asked_in, origin)
         if not str(entry.get("text") or "").strip():
             return ""
         try:
@@ -603,7 +610,8 @@ class BrowseMixin:
             vec = None
         lib = self._read_library()
         if any(isinstance(e, dict) and e.get("role") == "web" and (e.get("web") or {}).get("url") == note.get("url")
-               and e.get("text") == entry["text"] for e in lib["entries"]):
+               and e.get("text") == entry["text"] and e.get("origin") == entry["origin"]
+               for e in lib["entries"]):
             return ""   # the same page, the same words: once
         entry.update({"id": self._new_memory_id("web", note.get("url"), now, entry["text"]), "vector": vec or [],
                       "ts": now, "hits": 1, "importance": 0.4, "memory_source": "web", "memory_tier": "hot",
@@ -618,10 +626,12 @@ class BrowseMixin:
         if not pages:
             return 0
         asked_in = discretion.make_origin(self._here(event), [self._speaker(event)[0]], self._source_ids(event))
+        given = set(browse.urls_in(self._message_words(event)))
         trip = "reply:" + adapter_astrbot_turn.incoming_of(event).message_id
         kept = 0
         for page in pages[:browse.REPLY_READS]:
-            if await self._remember_web(page, trip, asked_in):
+            origin = asked_in if page.get("url") in given else browse.SELF_ASKED_IN
+            if await self._remember_web(page, trip, asked_in, origin):
                 kept += 1
         return kept
 

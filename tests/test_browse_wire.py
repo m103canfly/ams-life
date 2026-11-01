@@ -131,14 +131,18 @@ class Kept(unittest.TestCase):
             self.assertTrue(w['text'].startswith('一页：正文'))
             self.assertNotIn('找到啦', w['text'])                        # her reply is not in it
             self.assertNotIn('（资料完）', w['text'])
-            self.assertEqual(w['origin']['where'], 'web:' + w['url'])     # the page: public
-            self.assertEqual(w['origin']['people'], [])
+            if w['url'] == 'https://example.com/a':
+                self.assertEqual(w['origin']['where'], 'group:900001')
+                self.assertEqual(w['origin']['people'], ['10001'])
+            else:
+                self.assertEqual(w['origin']['where'], 'self')
+                self.assertEqual(w['origin']['people'], [])
             self.assertEqual((w['asked_in']['where'], w['asked_in']['people']), ('group:900001', ['10001']))
 
     def test_who_asked_deleted_the_page_stays_who_asked_is_the_mark(self):
         r = run_case('reply')
-        self.assertEqual(r['forget_counts']['asked_in'], 2)
-        self.assertEqual([w['url'] for w in r['web_after']], ['https://example.com/a', 'https://news.example.org/cat'])
+        self.assertEqual(r['forget_counts']['asked_in'], 1)
+        self.assertEqual([w['url'] for w in r['web_after']], ['https://news.example.org/cat'])
         for w in r['web_after']:
             self.assertEqual(w['asked_in'], {'where': 'gone', 'people': [], 'source_ids': [], 'visibility': 'private'})
 
@@ -174,7 +178,7 @@ class Trip(unittest.TestCase):
         r = run_case('trip')
         self.assertEqual(r['web'], [{'text': '猫咖开业：看着挺可爱的（https://news.example.org/cat）',
                                      'asked_in': {'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'},
-                                     'where': 'web:https://news.example.org/cat'}])   # a page she did not read: not kept
+                                     'where': 'self'}])   # a page she did not read: not kept
         self.assertEqual(r['wishes'], [{'url': 'https://news.example.org/cat', 'what': '新开了猫咖', 'group_hint': '群1'}])
         self.assertEqual(r['boredom_after'], 0.7)
 

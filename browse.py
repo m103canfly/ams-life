@@ -408,15 +408,14 @@ def parse_trip(raw, seen_urls=()) -> dict:
 # ----------------------------------------------------------------------
 # What she keeps of it
 # ----------------------------------------------------------------------
-def web_memory(note, now, trip, asked_in=None) -> dict:
-    """The part of a memory that comes from the web (the plugin adds id, vector...): the page
-    is public (origin web:<url>); who had her look it up (asked_in) is kept apart."""
+def web_memory(note, now, trip, asked_in=None, origin=None) -> dict:
+    """A page memory with the origin of the request kept alongside it."""
     url = str(note.get("url") or "")
     title = str(note.get("title") or "").strip()
     text = ("%s：%s（%s）" % (title, str(note.get("said") or "").strip(), url)) if title else \
         "%s（%s）" % (str(note.get("said") or "").strip(), url)
     return {"text": text[:MEMORY_CHARS], "role": "web",
-            "origin": {"where": "web:" + url, "people": [], "source_ids": [str(trip)], "visibility": "public"},
+            "origin": dict(origin or asked_in or SELF_ASKED_IN),
             "asked_in": dict(asked_in or SELF_ASKED_IN),
             "web": {"url": url, "title": title[:80], "seen_at": float(now), "trip": str(trip)}}
 
