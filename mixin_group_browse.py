@@ -186,7 +186,22 @@ class GroupBrowseMixin:
         return ('web', '') if quiet >= 60 else ('none', '')
 
     async def _group_browse_tick(self):
-        action, here = self._group_action()
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        if life_loop.enabled(self):
+            if not life_loop.consume(self, 'group_browse') or not self.browse_groups_enabled:
+                return
+            self._group_prune()
+            places = [here for here, group in self._group_state().items()
+                      if (group.get('unread') or group.get('queue')) and self._may_speak_in(here)]
+            if not places:
+                return
+            here = min(places, key=lambda p: (self._group_state()[p].get('opened', 0), p))
+            action = 'group'
+        else:
+            action, here = self._group_action()
         if action == 'web':
             return  # Connect PR #41 after its scheduler and entry point are verified.
         if action != 'group' or not self._may_speak_in(here):

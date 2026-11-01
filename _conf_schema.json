@@ -1,4 +1,9 @@
 {
+  "life_loop_enabled": {
+    "description": "她有事才想：自己挑这会儿干什么（吃饭、睡觉、看群、拍照……）；开着时看群、出门只在她挑了才去",
+    "type": "bool",
+    "default": false
+  },
   "weather_place": {
     "description": "写个城市名，只在提示里给她看；空着就只按季节",
     "type": "string",

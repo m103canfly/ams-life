@@ -422,6 +422,10 @@ class CoreMixin:
         logger.info("[ams-life] body: dropped the old physiology, global trust and insight tree")
 
     def _core(self, event=None) -> BioCore:
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
         # ams-life: one her. Every group and private chat shares this one body.
         key = "her"
         if key not in self.cores:
@@ -479,4 +483,10 @@ class CoreMixin:
                     pass
             self._refresh_loop_pressure(core)
             self.cores[key] = core
-        return self.cores[key]
+        core = self.cores[key]
+        if life_loop.enabled(self):
+            life_loop.bind_body(core)
+        else:
+            core.__dict__.pop('_life_now_path', None)
+            core.__dict__.pop('_life_state_path', None)
+        return core

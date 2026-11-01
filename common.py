@@ -314,6 +314,7 @@ LLM_FUNCTIONS = (
     "group_impressions",
     # ams-life: what happened today in each chat window, once a night per window
     "daily_digest",
+    "life",
 )
 LLM_FUNCTION_DEFAULTS = {
     "persona_compile": False,
@@ -332,6 +333,7 @@ LLM_FUNCTION_DEFAULTS = {
     "humor_hint": False,
     "group_impressions": False,
     "daily_digest": False,
+    "life": True,
 }
 INSIGHT_MIN_NEW_EVENTS = 3
 INSIGHT_COOLDOWN_SECONDS = 60 * 60

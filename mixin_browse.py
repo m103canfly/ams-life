@@ -679,6 +679,13 @@ class BrowseMixin:
 
     async def _maybe_go_browse(self) -> bool:
         """The 5-minute loop: one trip when browse.should_go says so."""
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        picked = life_loop.enabled(self)
+        if picked and not life_loop.consume(self, 'go_browse'):
+            return False
         if not self._browse_on() or not getattr(self, "browse_trips_enabled", False):
             return False
         if getattr(self, "_neutral_model", None) is not None and not _trip_budget_left(self):
@@ -692,8 +699,9 @@ class BrowseMixin:
         except Exception:
             night = browse.NIGHT
         state = self._browse_state()
-        go, why = browse.should_go(now, body, state.get("last_trip", 0), self._last_message_ts(),
-                                   self._browse_ledger().may_trip(now), night=night)
+        go, why = ((True, 'life') if picked else browse.should_go(
+            now, body, state.get("last_trip", 0), self._last_message_ts(),
+            self._browse_ledger().may_trip(now), night=night))
         if not go:
             return False
         state["last_trip"] = now
