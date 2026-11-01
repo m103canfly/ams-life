@@ -111,10 +111,12 @@ class ShownToHer(unittest.TestCase):
         for text in texts:
             self.assertNotIn('主人', text)
         self.assertIn('[%s定的规矩] ' % DEFAULT, rules)
-        self.assertIn('%s还没回的有 3 条' % DEFAULT, materials)
-        self.assertIn('想和%s说什么就在 tell 写一句' % DEFAULT, materials)
+        # The card replaces the unanswered count and the "write to tell" nudge with one
+        # neutral line; the chat itself is shown to her instead.
+        self.assertNotIn('还没回的有', materials)
+        self.assertIn('要是想跟%s说点什么就写在 tell，不写也行' % DEFAULT, materials)
         self.assertNotIn('tell_owner', materials)
-        self.assertIn('对%s说' % DEFAULT, heybox)
+        self.assertIn('要是想跟%s说点什么' % DEFAULT, heybox)
         self.assertIn('{"thought":"心得","tell":""}', heybox)
         self.assertIn('和%s的私聊' % DEFAULT, remember)
         self.assertIn('你和%s之间' % DEFAULT, tool)
@@ -127,9 +129,9 @@ class ShownToHer(unittest.TestCase):
         materials = materials_text(plugin)
         heybox = life_loop.heybox_ask_prompt(plugin, [READING])
         self.assertIn('[%s定的规矩] ' % NAMED, rules)
-        self.assertIn('%s还没回的有 3 条' % NAMED, materials)
-        self.assertIn('想和%s说什么' % NAMED, materials)
-        self.assertIn('对%s说' % NAMED, heybox)
+        self.assertNotIn('还没回的有', materials)
+        self.assertIn('要是想跟%s说点什么' % NAMED, materials)
+        self.assertIn('要是想跟%s说点什么' % NAMED, heybox)
         self.assertIn('你和%s之间' % NAMED, tool_description(plugin.config))
         owned = SimpleNamespace(config=plugin.config)
         self.assertIn('小雨（%s）：' % NAMED, phone_line(owned, OWNER_QQ))

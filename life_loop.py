@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta
 
 try:
-    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, turn, weather
+    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, send_check, turn, weather
     from .common import DATA_DIR, STATE_DIR
     from . import mixin_selfie as phone
 except ImportError:
@@ -28,6 +28,7 @@ except ImportError:
     import mixin_discretion
     import mixin_turn
     import redline
+    import send_check
     import turn
     import weather
     from common import DATA_DIR, STATE_DIR
@@ -37,6 +38,8 @@ logger = logging.getLogger('ams-life.life')
 NEEDS = ('sleepiness', 'hunger', 'physical_fatigue')
 BODY_FIELDS = (*NEEDS, 'last_sleep_end', 'last_meal', 'last_rest')
 BASE_MENU = ('吃饭', '睡觉', '休息', '什么都不干')
+CHAT_SECONDS = 24 * 3600    # his private window: the phone keeps only this
+CHAT_MAX = 200              # and she reads at most this many of its lines
 
 
 def enabled(plugin):
@@ -256,6 +259,110 @@ def owner_unanswered(plugin):
     return count
 
 
+def owner_place(plugin):
+    """His private window, or "" when no owner is set."""
+    owner = str((getattr(plugin, 'config', None) or {}).get('owner_qq') or '').strip()
+    return 'private:' + owner if owner else ''
+
+
+def owner_chat(plugin, now):
+    """His private window: the last 24 hours, at most 200 lines, oldest first."""
+    place = owner_place(plugin)
+    if not place:
+        return []
+    try:
+        rows = plugin._read_window(place).get('recent') or []
+    except Exception:
+        return []
+    out = []
+    for row in rows:
+        if not isinstance(row, dict) or not str(row.get('text') or '').strip():
+            continue
+        try:
+            stamp = float(row.get('ts', 0) or 0)
+        except (TypeError, ValueError):
+            stamp = 0.0
+        if stamp < now - CHAT_SECONDS:
+            continue
+        out.append(row)
+    return out[-CHAT_MAX:]
+
+
+def chat_view(plugin, rows):
+    """The chat as she reads it, and the same lines as what may not be said elsewhere."""
+    called = interpretation.owner_name(getattr(plugin, 'config', None))
+    lines, forbidden = [], []
+    for index, row in enumerate(rows or ()):
+        text = '；'.join(part.strip() for part in str(row.get('text') or '').splitlines() if part.strip())
+        if not text:
+            continue
+        try:
+            stamp = datetime.fromtimestamp(float(row.get('ts', 0) or 0)).strftime('%m-%d %H:%M')
+        except (TypeError, ValueError, OverflowError, OSError):
+            stamp = ''
+        who = '她' if row.get('role') == 'assistant' else called
+        lines.append((stamp + ' ' if stamp else '') + who + '：' + text)
+        forbidden.append({'id': 'chat:%d' % index, 'text': text, 'private': True,
+                          'names': [], 'vec': None})
+    return lines, forbidden
+
+
+def notebook_wishes(plugin, now):
+    """Her notebook's "想做的" lines that may be told in his private chat."""
+    place = owner_place(plugin)
+    if not place:
+        return []
+    owner = place.split(':', 1)[1]
+    event = turn.TurnEvent(events.Incoming(place, owner, '', '', '', (), False, '', (),
+                                           True, False, now, ''))
+    entries = [item for item in (getattr(plugin, 'self_model', None) or {}).get('notebook') or []
+               if isinstance(item, dict)]
+    out = []
+    for item in her_days.notebook_sections(entries)['想做的']:
+        text = str(item.get('text') or '').strip()
+        if not text:
+            continue
+        try:
+            may = mixin_discretion.recall_permission(plugin, item, event)
+            if may == discretion.DROP:
+                continue
+            if may == discretion.ANON:
+                text = mixin_discretion.recall_anonymize(plugin, text, item)
+        except Exception:
+            continue
+        out.append(text)
+    return out
+
+
+def says_private(text, forbidden):
+    """Does this line repeat words of the private chat she was just shown?
+
+    This is the send check on four characters in a row, the same list `tell_owner` builds.
+    Shorter repeats are common words and are left alone."""
+    text = str(text or '').strip()
+    if not text or not forbidden:
+        return False
+    try:
+        return bool(send_check.check(text, list(forbidden)).get('leak'))
+    except Exception:
+        return True
+
+
+def keep_sent(plugin, text, now, owner):
+    """Her own words, in the history a reply reads (as _keep_turn keeps one turn).
+
+    She wrote this herself, so there is no message it came from: no sources."""
+    store = getattr(plugin, '_history_store', None)
+    store = store() if callable(store) else None
+    text = str(text or '').strip()
+    if store is None or not text or not owner:
+        return
+    try:
+        store.append('private:' + owner, 'assistant', text, about=(owner,), ts=now)
+    except Exception as exc:
+        logger.warning('[ams-life] sent words not kept (%s)', type(exc).__name__)
+
+
 def owner_wishes(plugin, now):
     return [wish for wish in (getattr(plugin, 'self_model', None) or {}).get('share_wishes', [])
             if isinstance(wish, dict) and isinstance(wish.get('ts'), (int, float))
@@ -313,6 +420,7 @@ async def tell_owner(plugin, text, now, wishes):
         if not sent.ok:
             return False
         plugin._window_add_reply(event, text)
+        keep_sent(plugin, text, now, owner)
         if wishes:
             ids = {wish_ref(wish) for wish in wishes}
             plugin.self_model['share_wishes'] = [wish for wish in plugin.self_model.get('share_wishes', [])
@@ -324,8 +432,9 @@ async def tell_owner(plugin, text, now, wishes):
         return False
 
 
-def materials(plugin, state, item, core, reason, now, choices, outfit):
+def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None):
     local = datetime.fromtimestamp(now)
+    called = interpretation.owner_name(getattr(plugin, 'config', None))
     activity = {'在哪': item.get('where', ''), '在干什么': item.get('doing', ''),
                 '几点开始': clock_time(item.get('start')), '打算多久': item.get('minutes')}
     lines = ['现在：' + local.strftime('%Y-%m-%d %H:%M') + '，星期' + '一二三四五六日'[local.weekday()],
@@ -342,22 +451,69 @@ def materials(plugin, state, item, core, reason, now, choices, outfit):
                    '多久': row.get('minutes'), '感觉': row.get('feel', ''), '喜不喜欢': row.get('liked', '')}
                   for row in rows]
     lines.append('今天已经做过：' + json.dumps(activities, ensure_ascii=False))
+    shown, _forbidden = chat_view(plugin, owner_chat(plugin, now) if chat is None else chat)
+    lines.append('最近跟他聊的（近24小时，最多200条）：')
+    lines += shown or ['最近没聊']
+    wanted = notebook_wishes(plugin, now)
+    if wanted:
+        lines.append('我最近想做的：' + '；'.join(wanted))
     lines.append('菜单：' + '、'.join(choices))
-    lines.append('自己挑这会儿做什么，只回 JSON：{"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
-                 '"minutes":30,"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
-                 '"post":"公开短句，最多300字，不需要就空","look":""}。')
+    proactive = bool((plugin.config or {}).get('proactive_owner_enabled', False))
+    answer = ('"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
+              '"minutes":30,"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
+              '"look":""')
+    if proactive:
+        answer += ',"tell":""'
+    lines.append('自己挑这会儿做什么，只回 JSON：{' + answer + '}。')
     if outfit:
         lines.append('刚睡醒，今天还没定打扮，顺手在 look 里说今天穿什么（最多30字）。')
-    if (plugin.config or {}).get('proactive_owner_enabled', False):
+    if proactive:
+        lines.append('要是想跟%s说点什么就写在 tell，不写也行（最多80字）。' % called)
         wishes = owner_wishes(plugin, now)
         if wishes:
             lines.append('想分享的事：' + json.dumps([{'id': wish_ref(w), 'what': w['what']}
                                                 for w in wishes], ensure_ascii=False))
             lines.append('tell 用到想分享的事时，把用到的 id 写进 used_wishes 数组。')
-        called = interpretation.owner_name(plugin.config)
-        lines.append('%s还没回的有 %d 条。想和%s说什么就在 tell 写一句（最多80字），不想说就空。'
-                     % (called, owner_unanswered(plugin), called))
     return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
+
+
+def post_materials(plugin, core, now, reason):
+    """What she may write a public line from: her day, the weather, her body; not the chat."""
+    local = datetime.fromtimestamp(now)
+    lines = ['现在：' + local.strftime('%Y-%m-%d %H:%M') + '，星期' + '一二三四五六日'[local.weekday()],
+             '这会儿想：' + reason]
+    forecast = weather.weather_line(STATE_DIR / 'weather.json', plugin.config or {})
+    if forecast:
+        lines.append(forecast)
+    lines += bodily.feel_lines({key: getattr(core, key) for key in NEEDS})
+    rows = her_days.Store(DATA_DIR).day(local.date().isoformat())[-8:]
+    activities = [{'几点': clock_time(row.get('ts')), '做了什么': row.get('do', '') + '：' + row.get('detail', ''),
+                   '多久': row.get('minutes'), '感觉': row.get('feel', ''), '喜不喜欢': row.get('liked', '')}
+                  for row in rows]
+    lines.append('今天已经做过：' + json.dumps(activities, ensure_ascii=False))
+    lines.append('把这会儿想公开说的一句写出来，只回 JSON：{"post":"公开短句，最多300字"}。')
+    return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
+
+
+def parse_post(raw):
+    value = browse._json_object(raw)
+    if not isinstance(value, dict) or not isinstance(value.get('post'), str):
+        return None
+    text = value['post'].strip()[:300]
+    return {'post': text} if text else None
+
+
+async def write_post(plugin, core, now, reason):
+    """One separate call for the public line, with none of the private chat in it."""
+    if budget(plugin) != 'ok' or not plugin._llm_allowed('life'):
+        return ''
+    try:
+        value = await plugin._llm_v2_call('life', post_materials(plugin, core, now, reason),
+                                          parse_post, system_prompt=await plugin._persona_text(None))
+    except Exception as exc:
+        logger.warning('[ams-life] public line not written (%s)', type(exc).__name__)
+        return ''
+    return (value or {}).get('post', '')
 
 
 def anonymized(plugin, text):
@@ -418,13 +574,19 @@ async def photo(plugin, detail):
         logger.warning('[ams-life] life photo failed (%s)', type(exc).__name__)
 
 
-async def apply_choice(plugin, value, core, now, outfit):
+async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden=()):
     state = read_state()
     action = value['do']
     started = int(now) if action == '睡觉' else now
     detail, users = anonymized(plugin, value['detail'])
-    post, post_users = anonymized(plugin, value['post'])
+    if says_private(detail, forbidden):
+        detail = ''
     liked, _ = anonymized(plugin, value['liked_last'])
+    if says_private(liked, forbidden):
+        liked = ''
+    post, post_users = '', []
+    if action == '发说说':
+        post, post_users = anonymized(plugin, await write_post(plugin, core, now, reason))
     detail = browse.clean_query(detail)[:40]
     doing = detail or value['do']
     # Prefer an explicit place; otherwise keep her at home.
@@ -453,7 +615,7 @@ async def apply_choice(plugin, value, core, now, outfit):
         state.setdefault('pending', {})['group_browse' if action == '去测试群看看' else 'go_browse'] = True
     checkpoint(state, core, now)
     save_state(state)
-    if outfit and value['look']:
+    if outfit and value['look'] and not says_private(value['look'], forbidden):
         await look.set_look(plugin, None, phone.LOOK_PATH, today=value['look'])
     if action == '睡觉':
         await notebook(plugin, now)
@@ -529,13 +691,23 @@ def heybox_materials(readings):
     return '\n'.join(wrapped)
 
 
-def heybox_ask_prompt(plugin, readings):
+def heybox_ask_prompt(plugin, readings, now=None, chat=None):
     """What she is asked after reading: a thought of her own, and a word for him if she wants."""
-    called = interpretation.owner_name(plugin.config)
-    return ('下面是外部资料。写一句自己的心得；若想对%s说，另写一句，不想就空。'
-            '只返回 JSON：{"thought":"心得","tell":""}。\n'
-            '%s还没回的有 %d 条。\n' % (called, called, owner_unanswered(plugin))
-            + heybox_materials(readings))
+    called = interpretation.owner_name(getattr(plugin, 'config', None))
+    now = time.time() if now is None else now
+    shown, _forbidden = chat_view(plugin, owner_chat(plugin, now) if chat is None else chat)
+    proactive = bool((getattr(plugin, 'config', None) or {}).get('proactive_owner_enabled', False))
+    if proactive:
+        ask = ('下面是外部资料。写一句自己的心得；要是想跟%s说点什么就写在 tell，不写也行。'
+               '只返回 JSON：{"thought":"心得","tell":""}。' % called)
+    else:
+        ask = '下面是外部资料。写一句自己的心得。只返回 JSON：{"thought":"心得"}。'
+    head = [ask, '最近跟他聊的（近24小时，最多200条）：']
+    head += shown or ['最近没聊']
+    wanted = notebook_wishes(plugin, now)
+    if wanted:
+        head.append('我最近想做的：' + '；'.join(wanted))
+    return '\n'.join(head) + '\n' + heybox_materials(readings)
 
 
 async def browse_heybox(plugin, now):
@@ -585,13 +757,14 @@ async def browse_heybox(plugin, now):
         heybox.mark_seen([ident], now)
     if not readings or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
         return False
-    prompt = heybox_ask_prompt(plugin, readings)
+    chat = owner_chat(plugin, now)
+    prompt = heybox_ask_prompt(plugin, readings, now=now, chat=chat)
     value = await plugin._llm_v2_call('heybox', prompt, heybox_impression,
                                        system_prompt=await plugin._persona_text(None))
     if not value or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
         return False
     thought = value['thought']
-    if thought and not plugin._red_line(thought, 'heybox'):
+    if thought and not says_private(thought, chat_view(plugin, chat)[1]) and not plugin._red_line(thought, 'heybox'):
         await remember_heybox(plugin, thought, now)
     if value['tell_owner']:
         await tell_owner(plugin, value['tell_owner'], now, [])
@@ -682,7 +855,8 @@ async def tick(plugin, now=None):
     save_state(state)
     choices = menu(plugin)
     outfit = state.get('woke_date') == local.date().isoformat() and not look.read_look(phone.LOOK_PATH, local.date())
-    prompt = materials(plugin, state, item, core, reason, now, choices, outfit)
+    chat = owner_chat(plugin, now)
+    prompt = materials(plugin, state, item, core, reason, now, choices, outfit, chat=chat)
     value = await plugin._llm_v2_call('life', prompt, lambda raw: parse(raw, choices),
                                       system_prompt=await plugin._persona_text(None))
     if not value:
@@ -696,7 +870,8 @@ async def tick(plugin, now=None):
     action = value['do']
     if action == '睡觉':
         await automatic_heybox(plugin, now, 'sleep')
-    await apply_choice(plugin, value, core, now, outfit)
+    await apply_choice(plugin, value, core, now, outfit, reason=reason,
+                       forbidden=chat_view(plugin, chat)[1])
     wake = (state.get('woke_date') == local.date().isoformat()
             and state.get('heybox_occasions', {}).get('wake') != state.get('woke_date'))
     lunch = (action == '吃饭' and sum(row.get('do') == '吃饭' for row in
