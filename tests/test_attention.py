@@ -66,7 +66,7 @@ class HerName(unittest.TestCase):
         self.assertTrue(at.names_her('阿爱，在吗', ['阿爱']))
 
     def test_character_name_is_not_her_name(self):
-        for t in ('爱弥斯伤害好高', '我最喜欢爱弥斯'):
+        for t in ('爱弥斯伤害好高', '我最喜欢爱弥斯', '爱弥斯，好帅', '爱弥斯！', '爱弥斯？'):
             self.assertFalse(at.names_her(t), t)
         self.assertTrue(at.names_her('小爱 你喜欢爱弥斯吗'))
 
