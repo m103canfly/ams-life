@@ -136,7 +136,7 @@ def merge(origins) -> dict:
     else:
         visibility = SELF
     result = make_origin(where, people, refs, visibility)
-    if not where and len(origins) > 1:
+    if len(places) > 1 or any(o.get("recall_sources") for o in origins):
         result["recall_sources"] = origins
     return result
 
@@ -146,7 +146,10 @@ def may_recall(origin, here, speaker="", member_of=None, shared=()) -> str:
     o = origin if isinstance(origin, dict) else {}
     sources = o.get("recall_sources")
     if isinstance(sources, list) and sources:
-        return SAY if all(may_recall(x, here, speaker, member_of, shared) == SAY for x in sources) else DROP
+        decisions = [may_recall(x, here, speaker, member_of, shared) for x in sources]
+        if DROP in decisions:
+            return DROP
+        return ANON if ANON in decisions else SAY
     where = str(o.get("where") or "")
     here = place_of(here)
     vis = str(o.get("visibility") or PRIVATE)

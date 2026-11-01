@@ -685,8 +685,10 @@ def main(argv=None):
         async def text_chat(self, prompt="", system_prompt=None, **kwargs):
             stats["model_calls_fake"] += 1
             stats["model_calls_fake_" + (self.kind or "other")] += 1
-            if self.kind == "reply":   # step 2: a fake reply says back what it was shown of the canaries
+            if self.kind == "reply":   # probe a leak even when the secret was withheld
                 said = [v for v in CANARY_SECRETS.values() if v in "%s\n%s" % (system_prompt or "", prompt)]
+                if current.get("probe") == "game":
+                    said = [CANARY_SECRETS["private"]]
                 if current["place"] == "private:" + CANARY_PEOPLE["private"]:
                     # Answer the owner's question without repeating a forbidden group secret.
                     said = [v for v in said if v == CANARY_SECRETS["private"]]
@@ -878,7 +880,7 @@ def main(argv=None):
         if why:
             stats["skipped_" + why] += 1
             continue
-        current.update(place=row["place"], ts=row["ts"], who=row["user_id"])
+        current.update(place=row["place"], ts=row["ts"], who=row["user_id"], probe=row.get("probe", ""))
         event = ReplayEvent(row)
         q = by_id.get(row.get("quoted") or "")
         if q and reg.why_not(qq=q["user_id"], place=q["place"], at=q["ts"], source_id=q["message_id"]) and any(

@@ -210,7 +210,7 @@ class NumbersGoWithNames(unittest.TestCase):
             for gone in ('柠檬', '10002', '900001'):
                 self.assertNotIn(gone, ln)
             self.assertIn('[号码]', ln)
-            self.assertNotIn('900077', ln)
+            self.assertIn('900077', ln)
 
 
 class SomeoneOnlyAtted(unittest.TestCase):

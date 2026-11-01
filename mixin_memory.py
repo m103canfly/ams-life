@@ -1790,7 +1790,7 @@ class MemoryMixin(PortsMixin):
                                        said_by=self._said_by(e))
                 if _permission == discretion.ANON:
                     lab.update(may=discretion.ANON, where_ok=False, yours=False)
-                elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                elif _permission == discretion.SAY and lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
                     lab.update(may=discretion.SAY, where_ok=True)
                 lines.append("- %s%s" % (discretion.tag(lab, "memory", self._recall_role(e),
                                                         self._sayer_name(e)), snippet[:240]))
@@ -1853,18 +1853,16 @@ class MemoryMixin(PortsMixin):
                 if getattr(self, "safety_enabled", False) and (entry.get("sensitive") or entry.get("poison_risk")):
                     continue
                 permission = recall_permission(self, entry, event)
-                if permission == discretion.DROP:
-                    origin = discretion.origin_of(entry)
-                    if origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE:
-                        self._forbid(event, "memory:" + str(entry.get("id") or ""), text, [], entry.get("vector"))
-                    continue
                 lab = discretion.label(discretion.origin_of(entry), here, speaker, present,
                                        said_by=self._said_by(entry),
                                        asked_in=entry.get("asked_in") if isinstance(entry.get("asked_in"), dict)
                                        else None)
+                was_own = lab["may"] == discretion.OWN
+                if permission == discretion.DROP and lab["may"] != discretion.NO:
+                    continue
                 if permission == discretion.ANON:
                     lab.update(may=discretion.ANON, where_ok=False, yours=False)
-                elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                elif permission == discretion.SAY and lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
                     lab.update(may=discretion.SAY, where_ok=True)
                 evec = entry.get("vector") or []
                 cos = self._cosine(vec, evec) if evec else 0.0
@@ -1873,13 +1871,31 @@ class MemoryMixin(PortsMixin):
                 score = self._memory_score(core, entry, cos)
                 if score < RETRIEVAL_THRESHOLD:
                     continue
-                found.append((lab["may"] == discretion.OWN, score, lab, entry))
+                found.append((was_own, score, lab, entry, permission))
         except Exception as exc:
             logger.warning("[ams-life] recall from elsewhere failed: %s", exc)
             return [], [], []
         found.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        old_count, old_no = 0, 0
+        for _own, _score, lab, entry, permission in found:
+            if old_count >= ELSEWHERE_MAX:
+                break
+            if lab["may"] == discretion.NO:
+                if old_no >= ELSEWHERE_PRIVATE_MAX:
+                    continue
+                old_no += 1
+                if permission == discretion.DROP:
+                    origin = discretion.origin_of(entry)
+                    group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                    people = list(origin["people"]) + [str(entry.get("sender_id") or "")]
+                    self._forbid(event, "memory:" + str(entry.get("id") or ""),
+                                 str(entry.get("text") or "").strip(),
+                                 [] if group_private else people, entry.get("vector"))
+            old_count += 1
         lines, ids, held, n_no = [], [], [], 0
-        for _own, score, lab, entry in found:
+        for _own, score, lab, entry, permission in found:
+            if permission == discretion.DROP:
+                continue
             if len(lines) >= ELSEWHERE_MAX:
                 break
             text = str(entry.get("text") or "").strip()

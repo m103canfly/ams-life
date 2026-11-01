@@ -1296,6 +1296,32 @@ class EventsMixin(PortsMixin):
         EVENTS_PRIVATE_MAX she may not say here. Events are told apart by who was in them
         (their people), not by who said what."""
         present = self._present_people(event)
+        previous = []
+        for ev in [e for e in archive if not digest.is_digest(e)][:9]:
+            if isinstance(ev, dict):
+                lab = self._label_for(ev, event, present=present)
+                if lab["may"] != discretion.HIDE:
+                    previous.append((ev, lab))
+        previous.sort(key=lambda x: float(x[0].get("importance", 0.0) or 0.0) *
+                      (0.5 + 0.5 * float(x[0].get("centrality", 0.5) or 0.5)), reverse=True)
+        old_count, old_no = 0, 0
+        for ev, lab in previous:
+            if old_count >= 3:
+                break
+            if lab["may"] == discretion.NO:
+                if old_no >= EVENTS_PRIVATE_MAX:
+                    continue
+                old_no += 1
+                if recall_permission(self, ev, event) == discretion.DROP:
+                    origin = discretion.origin_of(ev)
+                    group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                    words = [str(ev.get(key) or "").strip() for key in ("title", "central_details", "meaning_to_her")]
+                    if not words[1]:
+                        words[1] = str(ev.get("event") or "").strip()
+                    self._forbid(event, "event:" + str(ev.get("id") or ""),
+                                 "\n".join(x for x in words if x),
+                                 [] if group_private else origin["people"])
+            old_count += 1
         labeled = []
         for ev in [e for e in archive if not digest.is_digest(e)]:
             if isinstance(ev, dict):
@@ -1325,6 +1351,16 @@ class EventsMixin(PortsMixin):
             if isinstance(ev, dict):
                 permission = recall_permission(self, ev, event)
                 if permission == discretion.DROP:
+                    lab = self._label_for(ev, event, present=present)
+                    if lab["may"] == discretion.NO:
+                        origin = discretion.origin_of(ev)
+                        group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                        words = [str(ev.get("title") or "").strip(),
+                                 str(ev.get("central_details") or ev.get("event") or "").strip(),
+                                 str(ev.get("meaning_to_her") or "").strip()]
+                        self._forbid(event, "event:" + str(ev.get("id") or ""),
+                                     "\n".join(x for x in words if x),
+                                     [] if group_private else origin["people"])
                     continue
                 lab = self._label_for(ev, event, present=present)
                 if permission == discretion.ANON:

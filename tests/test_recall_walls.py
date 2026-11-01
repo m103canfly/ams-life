@@ -88,9 +88,85 @@ class RecallWalls(unittest.TestCase):
         merged = discretion.merge([self.private, self.group])
         self.assertEqual(merged['where'], 'private:10001')
         self.assertEqual(discretion.may_recall(merged, 'group:900001'), discretion.DROP)
-        self.assertEqual(discretion.may_recall(merged, 'private:10001'), discretion.SAY)
+        self.assertEqual(discretion.may_recall(merged, 'private:10001'), discretion.ANON)
+        self.assertEqual(discretion.may_recall(merged, 'private:10001', member_of=lambda person, group: True),
+                         discretion.SAY)
         self.assertIn('蓝鲸三号', self.sections(merged, self.event(), True))
         self.assertNotIn('蓝鲸三号', self.sections(merged, self.event('900001'), True))
+
+    def test_merged_public_groups_use_strictest_permission(self):
+        other = discretion.make_origin('group:900002', ['10003'])
+        merged = discretion.merge([self.group, other])
+        for place in ('group:900001', 'group:900002', 'group:900003'):
+            self.assertEqual(discretion.may_recall(merged, place), discretion.ANON)
+            text = self.sections(merged, self.event(place.split(':')[1]), True)
+            self.assertIn('蓝鲸三号', text)
+            self.assertNotIn('Alice', text)
+        self.plugin.config['shared_groups'] = [['900001', '900002']]
+        for group in ('900001', '900002'):
+            self.assertEqual(discretion.may_recall(merged, 'group:' + group,
+                                                   shared=self.plugin.config['shared_groups']), discretion.SAY)
+            self.assertIn('Alice', self.sections(merged, self.event(group), True))
+
+    def test_merged_private_and_group_membership(self):
+        merged = discretion.merge([self.private, self.group])
+        output = self.sections(merged, self.event(), True)
+        self.assertIn('蓝鲸三号', output)
+        self.assertNotIn('Alice', output)
+        (self.users / '10001.json').write_text(json.dumps({'sessions': ['group:900001']}), encoding='utf-8')
+        self.assertIn('Alice', self.sections(merged, self.event(), True))
+        for group in ('900001', '900002'):
+            self.assertNotIn('蓝鲸三号', self.sections(merged, self.event(group), True))
+
+    def test_membership_file_is_read_once_per_turn(self):
+        (self.users / '10003.json').write_text(json.dumps({'sessions': ['group:900001']}), encoding='utf-8')
+        event = self.event(sender='10003')
+        original = Path.read_text
+        calls = []
+        def read(path, *args, **kwargs):
+            calls.append(path)
+            return original(path, *args, **kwargs)
+        with patch.object(Path, 'read_text', read):
+            for _ in range(4):
+                self.assertEqual(mixin_discretion.recall_permission(self.plugin, {'origin': self.group}, event),
+                                 discretion.SAY)
+        self.assertEqual(len(calls), 1)
+
+    def test_private_not_in_prompt_but_send_check_stops_leak(self):
+        p = self.plugin
+        p._forbid = type(p)._forbid.__get__(p)
+        p._cross_session_memory_entries = lambda event: [('private', {
+            'id': 'secret', 'origin': self.private, 'text': '我的暗号是蓝鲸三号',
+            'vector': [1.0], 'sender_id': '10001'})]
+        p._cosine = lambda *args: 1.0
+        p._memory_score = lambda *args, **kwargs: 1.0
+        event = self.event('900001', sender='10003')
+        lines, _, _ = p._labeled_elsewhere(event, [1.0], None, [])
+        self.assertNotIn('蓝鲸三号', '\n'.join(lines))
+        async def no_vector(*args):
+            return None
+        async def no_redo(*args):
+            return None
+        p._embed_text = no_vector
+        p._redo_reply = no_redo
+        p._common_pieces = lambda: set()
+        p._count_check = lambda *args: None
+        p._set_reply = lambda *args: None
+        sent = asyncio.run(p._look_at_reply(event, object(), '蓝鲸三号'))
+        self.assertEqual(sent, '')
+
+    def test_private_event_and_note_are_forbidden_without_being_shown(self):
+        p = self.plugin
+        p._forbid = type(p)._forbid.__get__(p)
+        event = self.event('900001', sender='10003')
+        p.self_model = {'notebook': [{'id': 'n', 'origin': self.private, 'text': '蓝鲸三号笔记'}]}
+        archive = [{'id': 'e', 'origin': self.private, 'title': '蓝鲸三号标题',
+                    'central_details': '蓝鲸三号正文', 'meaning_to_her': '蓝鲸三号意义'}]
+        self.assertEqual(p._labeled_notebook(event), [])
+        self.assertEqual(p._labeled_event_context(event, archive), '')
+        forbidden = p._check_note(event)['forbidden']
+        self.assertEqual({item['id'] for item in forbidden}, {'note:n', 'event:e'})
+        self.assertTrue(all(item['private'] for item in forbidden))
 
     def test_blocked_event_does_not_use_a_slot(self):
         p = self.plugin

@@ -40,13 +40,21 @@ def recall_permission(plugin, item, event):
     def member_of(person, group):
         if not (person.isascii() and person.isdigit()):
             return False
-        try:
-            data = json.loads((USER_DIR / (person + ".json")).read_text(encoding="utf-8"))
-            sessions = data.get("sessions")
-            return isinstance(sessions, list) and any(
-                discretion.place_of(s) == "group:" + group for s in sessions if isinstance(s, str))
-        except (OSError, ValueError, AttributeError):
-            return False
+        cache = getattr(event, "_ams_member_of", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            try:
+                event._ams_member_of = cache
+            except (AttributeError, TypeError):
+                pass
+        if person not in cache:
+            try:
+                data = json.loads((USER_DIR / (person + ".json")).read_text(encoding="utf-8"))
+                sessions = data.get("sessions")
+                cache[person] = {discretion.place_of(s) for s in sessions if isinstance(s, str)} if isinstance(sessions, list) else set()
+            except (OSError, ValueError, AttributeError):
+                cache[person] = set()
+        return "group:" + group in cache[person]
     config = getattr(plugin, "config", {})
     shared = config.get("shared_groups", []) if isinstance(config, dict) else []
     return discretion.may_recall(discretion.origin_of(item), plugin._here(event),
@@ -58,8 +66,7 @@ def recall_anonymize(plugin, text, item):
     names = discretion.names_in(item)
     if isinstance(item, dict) and isinstance(item.get("names"), list):
         names += item["names"]
-    text = plugin._anonymized(str(text or ""), names)
-    return re.sub(r"(?<!\d)\d{5,}(?!\d)", discretion.NUMBER, text)
+    return plugin._anonymized(str(text or ""), names)
 
 
 class DiscretionMixin:
@@ -792,6 +799,13 @@ class DiscretionMixin:
             lab = self._label_for(item, event, present=present)
             permission = recall_permission(self, item, event)
             if permission == discretion.DROP:
+                if lab["may"] == discretion.NO:
+                    text = str(item.get("text") or "")
+                    origin = discretion.origin_of(item)
+                    people = origin["people"]
+                    group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                    self._forbid(event, "note:" + str(item.get("id") or text[:12]), text,
+                                 [] if group_private else people)
                 continue
             if permission == discretion.ANON:
                 lab.update(may=discretion.ANON, where_ok=False, yours=False)
