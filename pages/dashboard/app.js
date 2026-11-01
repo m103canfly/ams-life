@@ -2190,13 +2190,17 @@
 
 
 
+  // 5e-28: the backup leaves the keys out. Inside AstrBot there is no 钥匙 tab: the keys go back in under API.
+  const backupKeysNote = $("backupKeysNote");
+  if (backupKeysNote && !apiOnOwnServer()) backupKeysNote.textContent = "备份里不含 API Key，恢复后要在“API”里重填。";
   const backupBtn = $("backupBtn");
   if (backupBtn) backupBtn.addEventListener("click", async () => {
     const st = $("backupState");
     if (!bridge) { if (st) st.textContent = "未连接 AstrBot 页面桥，无法下载"; return; }
     if (st) st.textContent = "正在打包备份…";
     try {
-      const raw = await bridge.apiGet("page/backup", {});
+      // 5e-28: a POST, so it goes through the panel's write token like the other writes
+      const raw = await bridge.apiPost("page/backup", {});
       const payload = raw && raw.data ? raw.data : raw;
       if (!payload || !payload.base64) throw new Error((payload && payload.message) || "empty backup");
       const bin = atob(payload.base64);
