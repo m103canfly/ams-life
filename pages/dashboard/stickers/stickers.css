@@ -74,6 +74,7 @@ a.btn{text-decoration:none}
 .tags{display:flex;gap:4px;flex-wrap:wrap}
 .tag{font-size:12px;color:var(--muted);background:var(--panel2);border-radius:var(--r-pill);padding:0 8px}
 .tag.owner{color:var(--accent-strong);background:rgba(var(--accent-rgb),.10)}
+.tag.scope.all{color:var(--ink);background:rgba(var(--accent2-rgb),.16)}
 .more{height:1px}
 .empty{color:var(--muted);text-align:center;padding:48px 0}
 .foot{margin-top:24px;color:var(--muted);font-size:12px}
