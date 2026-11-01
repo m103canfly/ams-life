@@ -236,7 +236,10 @@ class App:
                                 names[qq] = name
             incoming = from_onebot(frame, quoted=quoted, names=names)
             if incoming is not None and not incoming.is_self:
-                await turn_runner.run_turn(self.her, TurnEvent(incoming), history_limit=self.args.history)
+                from history_store import CONTEXT_SECONDS
+                hours = getattr(self.args, 'history_hours', CONTEXT_SECONDS // 3600)
+                await turn_runner.run_turn(self.her, TurnEvent(incoming),
+                                           history_limit=self.args.history, history_hours=hours)
         except Exception as error:
             logger.error('[ams-life] event error: %s', type(error).__name__)
 
@@ -293,12 +296,14 @@ async def run(args, model=None):
 
 def main(argv=None):
     """The command line: python app.py --data <folder> [options]."""
+    from history_store import CONTEXT_ROWS, CONTEXT_SECONDS
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', required=True)
     parser.add_argument('--onebot-port', type=int, default=6199)
     parser.add_argument('--panel-port', type=int, default=0)
     parser.add_argument('--model', default='deepseek-chat')
-    parser.add_argument('--history', type=int, default=20)
+    parser.add_argument('--history', type=int, default=CONTEXT_ROWS)
+    parser.add_argument('--history-hours', type=int, default=CONTEXT_SECONDS // 3600)
     parser.add_argument('--log')
     return asyncio.run(run(parser.parse_args(argv)))
 

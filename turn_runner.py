@@ -5,12 +5,14 @@ import logging
 
 try:
     from . import turn, messenger, model_client, tool_loop, adapter_astrbot_turn
+    from .history_store import CONTEXT_ROWS, CONTEXT_SECONDS
 except ImportError:
     import turn
     import messenger
     import model_client
     import tool_loop
     import adapter_astrbot_turn
+    from history_store import CONTEXT_ROWS, CONTEXT_SECONDS
 
 
 logger = logging.getLogger(__name__)
@@ -49,7 +51,8 @@ def reply_of(result):
     return turn.TurnReply(text=result.text, tool_calls=tuple(result.calls), usage=dict(result.usage))
 
 
-async def run_turn(her, event, *, history_limit=20, max_rounds=tool_loop.MAX_ROUNDS):
+async def run_turn(her, event, *, history_limit=CONTEXT_ROWS,
+                   history_hours=CONTEXT_SECONDS // 3600, max_rounds=tool_loop.MAX_ROUNDS):
     """One turn in the new program, in the order AstrBot's pipeline goes; None when she does not answer."""
     await her._on_message(event)
     if event.is_stopped():
@@ -61,8 +64,7 @@ async def run_turn(her, event, *, history_limit=20, max_rounds=tool_loop.MAX_ROU
         return None
     if her.enabled:
         her._group_reply_open(event)
-    history = getattr(her, '_history', None)
-    contexts = history.recent(her._here(event), history_limit) if history is not None else []
+    contexts = her._reply_context(event, limit=history_limit, hours=history_hours)
     request = turn.TurnRequest(prompt=adapter_astrbot_turn.incoming_of(event).text,
                                system_prompt=str(getattr(her, '_neutral_persona', '') or ''),
                                contexts=contexts,

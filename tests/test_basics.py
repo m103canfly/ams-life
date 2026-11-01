@@ -158,7 +158,8 @@ class Split(unittest.TestCase):
         # move 5e-27: +1 (page_sticker_scope).
         # Stable phone tool handler: +1 (_tool_set_look).
         # Private anniversary tool handler: +1 (_tool_remember_day).
-        self.assertEqual(len(methods), 511)
+        # What one reply sees (move C1): +1 (_reply_context).
+        self.assertEqual(len(methods), 512)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
