@@ -47,6 +47,11 @@ async def bridge_call(lock, awaitable):
     return await asyncio.shield(task)
 
 
+async def _rest(seconds):
+    """Rest between busy retries; the tests patch this to skip the wait."""
+    await asyncio.sleep(seconds)
+
+
 async def wait_when_busy(attempt, waited):
     """Rest after a 429 with the bridge lock released, so her other requests can go first.
 
@@ -59,7 +64,7 @@ async def wait_when_busy(attempt, waited):
         logger.warning('[ams-life] vision service busy (429), gave up after %ds', waited)
         return None
     logger.warning('[ams-life] vision service busy (429), retry in %ds', delay)
-    await asyncio.sleep(delay)
+    await _rest(delay)
     return waited + delay
 
 

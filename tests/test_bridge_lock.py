@@ -84,7 +84,7 @@ class BridgeLockTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(vision.bridge_lock(self.plugin).locked())
             with self.subTest(failures=failures), \
                     patch('urllib.request.urlopen', side_effect=[error] * failures + [Response()]) as request, \
-                    patch.object(vision.asyncio, 'sleep', new=AsyncMock(side_effect=sleep)):
+                    patch.object(vision, '_rest', new=AsyncMock(side_effect=sleep)):
                 if failures == 1:
                     self.assertEqual((await self.api.text_chat()).completion_text, 'seen')
                 else:

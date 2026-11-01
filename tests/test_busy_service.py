@@ -83,7 +83,7 @@ class BusyServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_vision_waits_5_then_10_seconds_and_sees_the_image(self):
         with patch('urllib.request.urlopen', side_effect=[busy(), busy(), an_answer()]) as request, \
-                patch.object(vision.asyncio, 'sleep', new=AsyncMock()) as sleep, \
+                patch.object(vision, '_rest', new=AsyncMock()) as sleep, \
                 patch.object(vision.logger, 'warning') as warning:
             reply = await self.api.text_chat(prompt='看图')
         self.assertEqual(reply.completion_text, 'seen')
@@ -95,7 +95,7 @@ class BusyServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_vision_gives_up_after_at_most_three_minutes(self):
         with patch('urllib.request.urlopen', side_effect=always_busy) as request, \
-                patch.object(vision.asyncio, 'sleep', new=AsyncMock()) as sleep, \
+                patch.object(vision, '_rest', new=AsyncMock()) as sleep, \
                 patch.object(vision.logger, 'warning') as warning:
             with self.assertRaises(RuntimeError):
                 await self.api.text_chat(prompt='看图')
@@ -106,7 +106,7 @@ class BusyServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_photo_waits_5_then_10_seconds_and_makes_the_photo(self):
         self.plugin._post_json = AsyncMock(side_effect=[busy(), busy(), (photo_json(), 'application/json')])
-        with patch.object(phone.asyncio, 'sleep', new=AsyncMock()) as sleep, \
+        with patch.object(vision, '_rest', new=AsyncMock()) as sleep, \
                 patch.object(vision.logger, 'warning') as warning:
             path = await self.plugin._make_photo('snap', '窗边的天空')
         self.assertIsNotNone(path)
@@ -151,7 +151,7 @@ class BusyServiceTests(unittest.IsolatedAsyncioTestCase):
         plugin.api_config = {'image': {'base_url': 'https://vision.invalid/v1'}}
         event = neutral([{'type': 'image', 'data': {'url': IMAGE_URL}}])
         with patch('urllib.request.urlopen', side_effect=always_busy) as request, \
-                patch.object(vision.asyncio, 'sleep', new=AsyncMock()) as sleep:
+                patch.object(vision, '_rest', new=AsyncMock()) as sleep:
             image_context = await plugin._image_context(event)
         self.assertEqual(image_context, '')
         self.assertEqual(request.call_count, 6)
