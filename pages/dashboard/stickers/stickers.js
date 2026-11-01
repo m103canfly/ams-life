@@ -1,5 +1,6 @@
 /* ams-life (AGPL-3.0); see NOTICE.md. "她的表情包" (index.html): her stickers through AstrBot's page bridge --
-   page/stickers (one page of them), page/stickers/image (one picture), page/stickers/delete, page/stickers/add.
+   page/stickers (one page of them), page/stickers/image (one picture), page/stickers/delete, page/stickers/add,
+   page/sticker_scope (the owner lets one she kept be sent everywhere, or takes it back to where she kept it).
    No picture is in this page or this repository; opened without AstrBot or our own panel server (ams-bridge.js) it shows made-up drawings.
    pages/dashboard/stickers/ is this folder copied: the panel opens it inside its own frame, because AstrBot lets a
    plugin page neither change the address of the window nor open another page of the plugin. */
@@ -44,6 +45,11 @@
     $("themeBtn").textContent = dark ? "浅色" : "深色";
   }
   function say(id, text) { $(id).textContent = text || ""; }
+  // 5e-27: where one may be sent. "all": everywhere; "here": only where she kept it (no group or number is shown).
+  // Old 小爱's and the owner's are everywhere anyway; only the ones she kept herself can be published or taken back.
+  const OLD_LABEL = "旧小爱";
+  const scopeWords = (item) => (item.scope === "all" ? "所有地方都能用" : "只在存下的地方用");
+  const hersAlone = (item) => !item.owner && item.from !== OLD_LABEL;
 
   // ---------------------------------------------------------------- the list
   function fillSelect(id, values, keep) {
@@ -74,7 +80,8 @@
     cap.textContent = item.caption || "（没有说明）";
     const tags = document.createElement("div");
     tags.className = "tags";
-    for (const [t, cls] of [[item.from, item.owner ? "tag owner" : "tag"], [item.emotion, "tag"], [item.scene, "tag"]]) {
+    for (const [t, cls] of [[item.from, item.owner ? "tag owner" : "tag"], [scopeWords(item), item.scope === "all" ? "tag scope all" : "tag scope"],
+                            [item.emotion, "tag"], [item.scene, "tag"]]) {
       if (!t) continue;
       const s = document.createElement("span");
       s.className = cls; s.textContent = t;
@@ -145,13 +152,41 @@
     say("detailUsed", item.uses ? ago(item.last_used) : "还没用过");
     say("detailUses", String(item.uses || 0));
     say("detailLeft", item.owner ? "你给的，不会自动删" : (item.days_left + " 天没用就删"));
+    showScope(item);
     say("detailState", "");
     $("detailImg").removeAttribute("src");
     $("detail").showModal();
     try { const url = await picture(id); if (url && st.shown === id) $("detailImg").src = url; } catch (e) { /* stays empty */ }
   }
 
+  function showScope(item) {
+    say("detailScope", scopeWords(item));
+    const btn = $("scopeBtn");
+    btn.hidden = !hersAlone(item);
+    btn.textContent = item.scope === "all" ? "收回" : "发到所有地方";
+  }
+
   $("closeBtn").addEventListener("click", () => $("detail").close());
+  $("scopeBtn").addEventListener("click", async () => {
+    const item = st.items.get(st.shown);
+    if (!item || !hersAlone(item)) return;
+    const scope = item.scope === "all" ? "here" : "all";
+    if (scope === "all" && !window.confirm("发到所有地方以后，她在别的群、别的私聊里也可能发这张。确定吗？")) return;
+    $("scopeBtn").disabled = true;
+    say("detailState", scope === "all" ? "正在发到所有地方……" : "正在收回……");
+    try {
+      await post("page/sticker_scope", { id: item.id, scope });
+      item.scope = scope;
+      showScope(item);
+      const old = $("grid").querySelector('.card[data-id="' + CSS.escape(item.id) + '"]');
+      if (old) old.replaceWith(card(item));
+      say("detailState", scope === "all" ? "好了：所有地方都能用。" : "收回了：只在存下的地方用。");
+    } catch (e) {
+      say("detailState", "没改成：" + e.message);
+    } finally {
+      $("scopeBtn").disabled = false;
+    }
+  });
   $("deleteBtn").addEventListener("click", async () => {
     const item = st.items.get(st.shown);
     if (!item) return;
@@ -220,8 +255,10 @@
       const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="18" fill="' +
         color + '"/><circle cx="60" cy="64" r="34" fill="#fff" opacity=".85"/><circle cx="48" cy="58" r="5" fill="#333"/>' +
         '<circle cx="72" cy="58" r="5" fill="#333"/><path d="M46 76 q14 12 28 0" stroke="#333" stroke-width="4" fill="none"/></svg>';
-      rows.push({ id: "s" + i, caption: cap, emotion: emo, scene: scene, why: "好玩", from: owner ? "主人给的" : from[i % 4],
-                  owner, saved_at: now - i * 86400 * 1.5, last_used: now - i * 86400, uses: (i * 7) % 5,
+      const where = owner ? "主人给的" : from[i % 4];
+      rows.push({ id: "s" + i, caption: cap, emotion: emo, scene: scene, why: "好玩", from: where,
+                  owner, scope: owner || where === "旧小爱" || i === 6 ? "all" : "here",
+                  saved_at: now - i * 86400 * 1.5, last_used: now - i * 86400, uses: (i * 7) % 5,
                   days_left: owner ? null : Math.max(0, 30 - i), url: "data:image/svg+xml;base64," + btoa(svg) });
     }
     return {
