@@ -202,9 +202,10 @@ class ImageAPI:
 
 
 class VisionGate:
-    def __init__(self, plugin, provider, event, source="reply"):
+    def __init__(self, plugin, provider, event, source="reply", fresh=False):
         self.plugin, self.provider, self.event = plugin, provider, event
         self.source = source if source in ("reply", "browse", "owner_add", "screenshot") else "reply"
+        self.fresh = fresh
 
     def __getattr__(self, name):
         return getattr(self.provider, name)
@@ -228,7 +229,7 @@ class VisionGate:
         if lock is None:
             lock = p._vision_lock = asyncio.Lock()
         async with lock:
-            cache = p._load_image_cache()
+            cache = {} if self.fresh else p._load_image_cache()
             now = time.time()
             item = cache.get(key) if digest else None
             if isinstance(item, dict) and 0 <= now - float(item.get('ts', 0)) < 86400 and item.get('caption'):
@@ -258,6 +259,8 @@ class VisionGate:
             raw = str(getattr(resp, 'completion_text', '') or '')
             caption = stickers.parse_look(raw).get('caption', '') if prompt == stickers.LOOK_PROMPT else raw.strip()[:1600]
             if digest and caption and not p._job_stale():
+                if self.fresh:
+                    cache = p._load_image_cache()
                 cache[key] = {'caption': caption, 'from_qq': sender, 'from_qqs': [sender] if sender else [],
                               'where': place, 'ts': now}
                 p._save_image_cache(cache)
