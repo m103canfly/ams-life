@@ -3,6 +3,7 @@
 # Copyright (C) 2026 Johnhmzm, AGPL-3.0. Modified by m103canfly since 2026-10-27; see NOTICE.md.
 """BioCorePlugin methods moved out of main.py unchanged: persona, model function switches, provider choice, proposal-only LLM hints, user records."""
 from __future__ import annotations
+import re
 try:
     from .common import *  # noqa: F401,F403
 except ImportError:
@@ -484,14 +485,19 @@ class LLMMixin(PortsMixin):
                     continue
             elif origin["where"] != sitting or origin["visibility"] != discretion.PRIVATE:
                 continue
+            elif str(e.get("summary_status") or "").lower() not in ("digest", "llm"):
+                continue
             mine.append(dict(e, origin=origin))
         for e in digest.pick_fairly(mine, 13 - len(mats)):
             origin = e["origin"]
             body = str(e.get("meaning_to_her") or e.get("reflection") or e.get("small_summary")
-                       or e.get("event") or "")
-            text = ("%s：%s" % (str(e.get("title") or "一件事"), body)).strip("：")
+                       or (e.get("event") if sitting == "group" else "") or "")
+            title = str(e.get("title") or "一件事") if sitting == "group" or e.get("summary_status") == "digest" else "一件事"
+            text = ("%s：%s" % (title, body)).strip("：")
             mats.append({"id": "m%d" % (len(mats) + 1), "text": "事件：" + text[:160],
-                         "origin": origin, "names": discretion.names_in(e), "ref": str(e.get("id") or "")})
+                         "origin": origin, "names": discretion.names_in(e) + (list(e.get("names") or [])
+                                                                                if sitting != "group" else []),
+                         "ref": str(e.get("id") or "")})
         return mats
 
     @staticmethod
@@ -577,6 +583,19 @@ class LLMMixin(PortsMixin):
                 continue
             origin = self._sitting_origin(sitting, materials)
             names = sorted({n for m in materials for n in (m.get("names") or [])})
+            if sitting != "group":
+                lines = self._read_window(sitting)["recent"]
+                people = {sitting.split(":", 1)[1]}
+                private_names = set(names)
+                for line in lines:
+                    if not isinstance(line, dict):
+                        continue
+                    people.update(str(line.get(k) or "") for k in ("sender_id",))
+                    private_names.add(str(line.get("sender_name") or ""))
+                    for name, person in discretion.at_names(line.get("text")):
+                        private_names.add(name)
+                        people.add(person)
+                private_names.update(self._known_names(people | set(origin.get("people") or [])))
             refs = {m["id"]: m["ref"] for m in materials}
             entries = [x for x in (self.self_model.get("notebook") or []) if isinstance(x, dict)]
             gone = set()
@@ -584,6 +603,9 @@ class LLMMixin(PortsMixin):
                 mark = {"private_mark": change.get("private")}
                 # what she writes is kept like the rest: someone deleted is 某人
                 text = self._without_gone(change.get("text")) if change["op"] != "delete" else ""
+                if sitting != "group" and text:
+                    text = discretion.anonymize(text, private_names)
+                    text = re.sub(r"(?<![0-9])[0-9]{5,}(?![0-9])", discretion.NUMBER, text)
                 uses = [refs[x] for x in (change.get("uses") or []) if x in refs]
                 if change["op"] in ("edit", "delete"):
                     i, may = shown[change["no"] - 1]
@@ -631,7 +653,7 @@ class LLMMixin(PortsMixin):
             return
         try:
             user_data = self._user_record(event)
-            rel = self._relationship_of(user_data)
+            rel = self._relationship_of(self._user_view(event, user_data))
             marks = [m for m in (rel.get("milestones") or []) if isinstance(m, dict)]
             allowed = [str(m.get("key") or m.get("type") or "") for m in marks
                        if str(m.get("key") or m.get("type") or "")]

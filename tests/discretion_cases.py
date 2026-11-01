@@ -647,7 +647,7 @@ def run():
                        else 'default:FriendMessage:' + place.split(':')[1])
             plugin._append_event_archive({
                 'id': eid, 'ts': clock.now, 'session': session, 'title': title, 'event': meaning,
-                'meaning_to_her': meaning, 'event_key': eid,
+                'meaning_to_her': meaning, 'event_key': eid, 'summary_status': 'digest',
                 'origin': main.discretion.make_origin(place, people, ['m_' + eid])})
             if n_lines:  # how busy the chat was today
                 plugin._write_window(place, {'recent': [{'ts': clock.now, 'role': 'user', 'text': '…'}] * n_lines,
@@ -764,6 +764,7 @@ def run():
         plugin._append_event_archive({
             'id': 'cake', 'ts': clock.now, 'session': 'default:FriendMessage:10001', 'title': '偷偷准备惊喜蛋糕',
             'event': '芒果在偷偷准备一个惊喜蛋糕', 'meaning_to_her': '芒果在偷偷准备一个惊喜蛋糕', 'event_key': 'cake',
+            'summary_status': 'digest',
             'origin': main.discretion.make_origin('private:10001', ['10001'], ['m_cake'])})
         prompts = {}
 
