@@ -76,11 +76,31 @@ _MATERIAL_END = "（资料完）"
 _LOCAL_SUFFIXES = (".localhost", ".local", ".lan", ".internal", ".home", ".arpa", ".corp", ".intranet")
 _LONG_NUMBER = re.compile(r"\d{5,}")
 _BLANK_LINES = re.compile(r"\n[ \t]*(\n[ \t]*)+")
+# IPv6 forms that carry an IPv4 address in their last 32 bits (RFC 4291, 6052, 2765).
+_IPV4_IN_IPV6 = tuple(ipaddress.ip_network(net) for net in
+                      ("::/96", "::ffff:0:0:0/96", "64:ff9b::/96", "64:ff9b:1::/48"))
 
 
 # ----------------------------------------------------------------------
 # Which pages she may read
 # ----------------------------------------------------------------------
+def _embedded_bad_ipv4(ip) -> bool:
+    """True when an IPv6 address carries an address that is not out on the internet: an IPv4
+    mapped, compatible or translated address, a 6to4 address, a Teredo address or a NAT64 one.
+    Some of these read as global in Python 3.10 (and a few in 3.12 too), so they are checked
+    here by what they embed."""
+    embedded = []
+    for found in (getattr(ip, "ipv4_mapped", None), getattr(ip, "sixtofour", None)):
+        if found is not None:
+            embedded.append(found)
+    teredo = getattr(ip, "teredo", None)
+    if teredo:
+        embedded.extend(teredo)
+    if any(ip in net for net in _IPV4_IN_IPV6):
+        embedded.append(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))
+    return any(not v4.is_global or v4.is_multicast for v4 in embedded)
+
+
 def _bad_address(text) -> bool:
     """True for an address that is not out on the internet (this computer, the home network,
     link-local, multicast, reserved, the cloud's metadata address...)."""
@@ -88,8 +108,8 @@ def _bad_address(text) -> bool:
         ip = ipaddress.ip_address(str(text).strip("[]").split("%", 1)[0])
     except ValueError:
         return False
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address) and _embedded_bad_ipv4(ip):
+        return True
     return not ip.is_global or ip.is_multicast
 
 
@@ -409,27 +429,37 @@ def parse_trip(raw, seen_urls=()) -> dict:
 # ----------------------------------------------------------------------
 # What she keeps of it
 # ----------------------------------------------------------------------
-def _origin_of_asked(asked_in) -> dict:
-    """Where a page she read belongs, by who had her look at it: herself (self: recalled
-    anywhere), a group (openly there), or a private chat (only there). Who asked stays in
-    asked_in: a page is never deleted with them, it becomes a page nobody may say who for."""
+def web_origin(url, shared_in=None) -> dict:
+    """Where one web page belongs: the page itself (web:<url>), as material she may recall
+    anywhere. `shared_in`: the private chat a link was given in; the page may be brought up
+    only there. It carries no people and no message ids: deleting someone never deletes a
+    page, only who asked (asked_in)."""
+    origin = {"where": "web:" + str(url or ""), "people": [], "source_ids": [],
+              "visibility": "public"}
+    shared = str(shared_in or "")
+    if shared.startswith("private:"):
+        origin["shared_in"] = shared
+    return origin
+
+
+def _origin_of_asked(url, asked_in) -> dict:
+    """Where a page she read belongs: the page (web:<url>), and, when a link was given in a
+    private chat, that chat (shared_in). Who asked stays in asked_in: a page is never
+    deleted with them, it becomes a page nobody may say who for."""
     asked = dict(asked_in or SELF_ASKED_IN)
-    where = str(asked.get("where") or "")
-    if where == SELF or not where:
-        return {"where": SELF, "people": [], "source_ids": [], "visibility": SELF}
-    return {"where": where, "people": [], "source_ids": [],
-            "visibility": "public" if where.startswith("group:") else "private"}
+    return web_origin(url, asked.get("where"))
 
 
 def web_memory(note, now, trip, asked_in=None, origin=None) -> dict:
-    """The part of a memory that comes from the web (the plugin adds id, vector...): whose the
-    page is comes from who had her look it up, unless `origin` says it (a link given in a chat);
-    asked_in (who had her look it up) is kept apart."""
+    """The part of a memory that comes from the web (the plugin adds id, vector...): the page
+    is a web page (web:<url>) whoever had her look it up; a link given in a private chat
+    keeps that chat in `shared_in` (only usable there). asked_in (who had her look it up)
+    is kept apart; `origin` overrides the page's own origin."""
     url = str(note.get("url") or "")
     title = str(note.get("title") or "").strip()
     text = ("%s：%s（%s）" % (title, str(note.get("said") or "").strip(), url)) if title else \
         "%s（%s）" % (str(note.get("said") or "").strip(), url)
-    found = dict(origin) if isinstance(origin, dict) else _origin_of_asked(asked_in)
+    found = dict(origin) if isinstance(origin, dict) else _origin_of_asked(url, asked_in)
     found["source_ids"] = list(dict.fromkeys(list(found.get("source_ids") or []) + [str(trip)]))
     return {"text": text[:MEMORY_CHARS], "role": "web",
             "origin": found,

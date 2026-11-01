@@ -1,13 +1,22 @@
 # -*- coding: utf-8 -*-
 """A temporary, read-only browser for pages that need scripts."""
 import asyncio
+import concurrent.futures
+import functools
 import ipaddress
 import logging
 import socket
 import ssl
+import threading
+import time
 from contextlib import asynccontextmanager
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import getproxies
+
+try:
+    from . import browse
+except ImportError:
+    import browse
 
 logger = logging.getLogger(__name__)
 OPEN_SECONDS = 20
@@ -40,26 +49,103 @@ MAX_SUBREQUESTS = 60
 MAX_RESPONSE_BYTES = HTML_MAX_BYTES
 REDIRECT_STATUS = (301, 302, 303, 307, 308)
 HOP_HEADERS = ("connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "trailer")
+# Fetching a page is done on our own small pool, never the default one: a slow page
+# (or a slow name) may not take the threads embeddings, pictures and voice use.
+FETCH_WORKERS = 4
+HOP_SECONDS = OPEN_SECONDS          # one hop's whole budget: name, connect, send, read
+READ_CHUNK = 65536
+PROXY_SCHEMES = ("http",)           # the only proxy kind we speak ourselves
 _lock = asyncio.Lock()
+_fetch_lock = threading.Lock()
+_fetch_pool = concurrent.futures.ThreadPoolExecutor(max_workers=FETCH_WORKERS,
+                                                    thread_name_prefix="ams-fetch")
+_active_fetches = 0
+
+
+class FetchBusy(RuntimeError):
+    """Every fetch thread is taken: the page is not fetched, and the request is aborted."""
+
+
+def _take_fetch_slot() -> bool:
+    global _active_fetches
+    with _fetch_lock:
+        if _active_fetches >= FETCH_WORKERS:
+            return False
+        _active_fetches += 1
+        return True
+
+
+def _release_fetch_slot() -> None:
+    global _active_fetches
+    with _fetch_lock:
+        _active_fetches = max(0, _active_fetches - 1)
+
+
+async def _pool_call(fn, *args, **kwargs):
+    """`fn` on the fetch pool, or FetchBusy when every thread is taken. The slot is held until
+    the thread really ends, even when the waiting coroutine is cancelled or times out."""
+    if not _take_fetch_slot():
+        raise FetchBusy("all fetch threads are busy")
+    try:
+        future = _fetch_pool.submit(functools.partial(fn, *args, **kwargs))
+    except BaseException:
+        _release_fetch_slot()
+        raise
+    future.add_done_callback(lambda _done: _release_fetch_slot())
+    return await asyncio.wrap_future(future)
+
+
+def _set_timeout(sock, seconds) -> None:
+    """The socket's next recv/send may wait at most `seconds` (fake sockets may not take it)."""
+    setter = getattr(sock, "settimeout", None)
+    if not callable(setter):
+        return
+    try:
+        setter(max(0.001, float(seconds)))
+    except Exception:
+        pass
+
+
+def _remaining(deadline) -> float:
+    return max(0.0, float(deadline) - time.monotonic())
+
+
+def _ipv4_first(addresses) -> list:
+    """The addresses once each, IPv4 before IPv6: a home without IPv6 must not lose a
+    dual-stack site to an address it cannot reach. The resolver's own order is kept inside
+    each family."""
+    seen, v4, v6 = set(), [], []
+    for address in addresses or ():
+        text = str(address or "")
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        try:
+            is_v6 = isinstance(ipaddress.ip_address(text.split("%", 1)[0]),
+                               ipaddress.IPv6Address)
+        except ValueError:
+            is_v6 = False
+        (v6 if is_v6 else v4).append(text)
+    return v4 + v6
 
 
 def _system_resolve(host) -> list:
     """The addresses this computer's resolver gives for a name ([] when it gives none)."""
     try:
-        return sorted({info[4][0] for info in socket.getaddrinfo(host, None)})
+        addresses = [info[4][0] for info in socket.getaddrinfo(host, None)]
     except Exception:
         return []
+    return _ipv4_first(addresses)
 
 
 def _public_address(text) -> bool:
-    """True for an address out on the internet (not this computer, the home network, ...)."""
+    """True for an address out on the internet (not this computer, the home network, an
+    address IPv6 carries inside, ...)."""
     try:
-        ip = ipaddress.ip_address(str(text).strip("[]").split("%", 1)[0])
+        ipaddress.ip_address(str(text).strip("[]").split("%", 1)[0])
     except ValueError:
         return False
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
-    return bool(ip.is_global and not ip.is_multicast)
+    return not browse._bad_address(text)
 
 
 def _ascii_host(host) -> str:
@@ -69,10 +155,11 @@ def _ascii_host(host) -> str:
         return str(host or "")
 
 
-def _pin_address(url, check, resolve) -> tuple:
-    """(address, reason): the one address to connect to for `url`, resolved here exactly once.
+def _pin_addresses(url, check, resolve) -> tuple:
+    """(addresses, reason): the addresses to try for `url`, resolved here exactly once.
     `check` is the caller's rule on the address (scheme, port, no user, no local name); every
-    address the name resolves to must be public, and the first one is the one we connect to."""
+    address the name resolves to must be public, and IPv4 comes first. None with a reason
+    when the page may not be read."""
     try:
         ok, reason = check(url)
     except Exception:
@@ -91,7 +178,7 @@ def _pin_address(url, check, resolve) -> tuple:
     except ValueError:
         literal = False
     if literal:
-        return (host, "") if _public_address(host) else (None, "local address")
+        return ([host], "") if _public_address(host) else (None, "local address")
     try:
         addresses = list(resolve(host) or [])
     except Exception:
@@ -101,7 +188,13 @@ def _pin_address(url, check, resolve) -> tuple:
     for address in addresses:
         if not _public_address(address):
             return None, "local address"
-    return str(addresses[0]), ""
+    return _ipv4_first(addresses), ""
+
+
+def _pin_address(url, check, resolve) -> tuple:
+    """(the first address to try, reason), as _pin_addresses but only the best one."""
+    addresses, reason = _pin_addresses(url, check, resolve)
+    return (str(addresses[0]) if addresses else None), reason
 
 
 def _connect(ip, port, hostname, tls, timeout):
@@ -120,18 +213,55 @@ def _connect(ip, port, hostname, tls, timeout):
         raise
 
 
-def _read_all(sock, limit) -> bytes:
+def _read_all(sock, limit, deadline=None) -> bytes:
+    """Everything up to `limit` bytes, a chunk at a time, until the hop's `deadline`; the socket
+    is left for the caller to close, so a slow server cannot keep it (or a thread) alive."""
     out, total = [], 0
     while total < limit:
+        left = _remaining(deadline) if deadline is not None else None
+        if left is not None:
+            if left <= 0:
+                break
+            _set_timeout(sock, left)
         try:
-            piece = sock.recv(min(65536, limit - total))
-        except socket.timeout:
+            piece = sock.recv(min(READ_CHUNK, limit - total))
+        except (socket.timeout, TimeoutError):
+            break
+        except OSError:
             break
         if not piece:
             break
         out.append(piece)
         total += len(piece)
     return b"".join(out)
+
+
+def _read_head(sock, deadline=None, limit=65536) -> bytes:
+    """One response's head (up to the empty line), within the hop's deadline."""
+    out = b""
+    while b"\r\n\r\n" not in out and len(out) < limit:
+        left = _remaining(deadline) if deadline is not None else None
+        if left is not None:
+            if left <= 0:
+                break
+            _set_timeout(sock, left)
+        try:
+            piece = sock.recv(min(4096, limit - len(out)))
+        except (socket.timeout, TimeoutError):
+            break
+        except OSError:
+            break
+        if not piece:
+            break
+        out += piece
+    return out
+
+
+def _status_of(raw) -> int:
+    try:
+        return int(bytes(raw).split(b"\r\n", 1)[0].split()[1])
+    except (IndexError, ValueError):
+        return 0
 
 
 def _dechunk(body) -> bytes:
@@ -179,30 +309,58 @@ def _parse_response(raw) -> tuple:
     body = body[:MAX_RESPONSE_BYTES]
     for key in HOP_HEADERS:
         headers.pop(key, None)
+    # we asked for identity: whatever the server still sent compressed is not for the browser
+    headers.pop("content-encoding", None)
     headers["content-length"] = str(len(body))
     return status, headers, body
 
 
-def _fetch_once(url, ip, timeout=OPEN_SECONDS, connect=None) -> tuple:
-    """One GET to the address checked: (status, headers, body). The hostname stays in Host and
-    in TLS; only `ip` is connected to. Redirects are not followed here."""
-    connect = connect or _connect
+def _host_header(host, port, scheme) -> str:
+    name = _ascii_host(host)
+    if int(port) != (443 if str(scheme).lower() == "https" else 80):
+        name += ":" + str(port)
+    return name
+
+
+def _request_target(parts) -> str:
+    target = quote(parts.path or "/", safe="/%:@!$&'()*+,;=-._~")
+    if parts.query:
+        target += "?" + quote(parts.query, safe="=&%:@!$'()*+,;/-._~")
+    return target
+
+
+def _get_request(url, via_proxy=False) -> bytes:
+    """The one GET we send: origin form straight to the page, absolute form to an HTTP proxy.
+    Identity: no compressed body to unpack without a limit."""
     parts = urlsplit(str(url))
     scheme = parts.scheme.lower()
     host = parts.hostname or ""
     port = parts.port or (443 if scheme == "https" else 80)
-    header_host = _ascii_host(host)
-    if parts.port and parts.port != (443 if scheme == "https" else 80):
-        header_host += ":" + str(parts.port)
-    target = quote(parts.path or "/", safe="/%:@!$&'()*+,;=-._~")
-    if parts.query:
-        target += "?" + quote(parts.query, safe="=&%:@!$'()*+,;/-._~")
-    request = ("GET %s HTTP/1.1\r\nHost: %s\r\nAccept: */*\r\nAccept-Encoding: identity\r\n"
-               "Connection: close\r\n\r\n" % (target, header_host)).encode("ascii", "replace")
-    sock = connect(ip, port, host, scheme == "https", timeout)
+    header_host = _host_header(host, port, scheme)
+    target = _request_target(parts)
+    if via_proxy and scheme != "https":
+        target = "%s://%s%s" % (scheme, header_host, target)
+    extra = "Proxy-Connection: close\r\n" if via_proxy else ""
+    return ("GET %s HTTP/1.1\r\nHost: %s\r\nAccept: */*\r\nAccept-Encoding: identity\r\n"
+            "%sConnection: close\r\n\r\n" % (target, header_host, extra)).encode("ascii", "replace")
+
+
+def _fetch_once(url, ip, timeout=OPEN_SECONDS, connect=None) -> tuple:
+    """One GET to the address checked: (status, headers, body). The hostname stays in Host and
+    in TLS; only `ip` is connected to. Redirects are not followed here. The whole hop (connect,
+    send, read) is bound by `timeout`; the socket is closed either way."""
+    connect = connect or _connect
+    deadline = time.monotonic() + max(0.001, float(timeout or OPEN_SECONDS))
+    parts = urlsplit(str(url))
+    scheme = parts.scheme.lower()
+    host = parts.hostname or ""
+    port = parts.port or (443 if scheme == "https" else 80)
+    request = _get_request(url)
+    sock = connect(ip, port, host, scheme == "https", max(0.001, _remaining(deadline)))
     try:
+        _set_timeout(sock, _remaining(deadline))
         sock.sendall(request)
-        raw = _read_all(sock, MAX_RESPONSE_BYTES + 65536)
+        raw = _read_all(sock, MAX_RESPONSE_BYTES + 65536, deadline)
     finally:
         try:
             sock.close()
@@ -221,7 +379,9 @@ async def _timed_lock():
 
 
 def _proxy_config() -> dict:
-    """The system proxy, as Playwright's context takes it ({} when there is none)."""
+    """The system proxy, as Playwright's context takes it ({} when there is none). No bypass
+    list: a host in NO_PROXY is fetched by us on the checked-address path, never resolved and
+    connected by the browser itself."""
     try:
         proxies = getproxies()
     except Exception:
@@ -229,11 +389,148 @@ def _proxy_config() -> dict:
     server = proxies.get("https") or proxies.get("http")
     if not server:
         return {}
-    proxy = {"server": server}
-    bypass = proxies.get("no", "")
-    if bypass:
-        proxy["bypass"] = ",".join(part.strip() for part in bypass.replace(";", ",").split(",") if part.strip())
-    return proxy
+    return {"server": server}
+
+
+def _no_proxy_host(host, listed) -> bool:
+    """Whether `host` is in the system's NO_PROXY list (a name or a domain, or *)."""
+    if isinstance(listed, str):
+        entries = [part.strip() for part in listed.replace(";", ",").split(",") if part.strip()]
+    elif isinstance(listed, (list, tuple)):
+        entries = [str(part).strip() for part in listed if str(part).strip()]
+    else:
+        entries = []
+    host = str(host or "").strip(".").lower()
+    for entry in entries:
+        entry = entry.split("://")[-1].split("/")[0].lstrip(".").lower()
+        if ":" in entry and not entry.startswith("["):
+            entry = entry.split(":", 1)[0]      # host:port
+        if not entry:
+            continue
+        if entry == "*" or host == entry or host.endswith("." + entry):
+            return True
+    return False
+
+
+def _parse_proxy(server) -> tuple:
+    """((host, port), reason) of an HTTP proxy; (None, reason) for anything else. Only an HTTP
+    proxy is spoken here: another kind is refused, never taken for no proxy and dialled."""
+    text = str(server or "").strip()
+    if not text:
+        return None, "no proxy"
+    if "://" not in text:
+        text = "http://" + text
+    try:
+        parts = urlsplit(text)
+        port = parts.port
+    except ValueError:
+        return None, "proxy"
+    if parts.scheme.lower() not in PROXY_SCHEMES:
+        return None, "proxy scheme"
+    if not parts.hostname:
+        return None, "proxy"
+    return (parts.hostname, int(port or 80)), ""
+
+
+def _proxy_for(url) -> tuple:
+    """(server, reason) for one address: (None, "") = straight to the checked address,
+    (server, "") = through that HTTP proxy, (None, reason) = refused, never a direct
+    connection. A SOCKS or ALL_PROXY setting is refused, not ignored."""
+    try:
+        proxies = getproxies() or {}
+    except Exception:
+        return None, ""
+    try:
+        parts = urlsplit(str(url))
+        scheme = parts.scheme.lower()
+        host = (parts.hostname or "").strip(".")
+    except ValueError:
+        return None, ""
+    if _no_proxy_host(host, proxies.get("no")):
+        # NO_PROXY: our own path, resolved and connected by the address checked
+        return None, ""
+    server = proxies.get(scheme) or proxies.get("http")
+    if not server:
+        if proxies.get("all") or proxies.get("socks") or proxies.get("socks5"):
+            return None, "proxy scheme"
+        return None, ""
+    _, reason = _parse_proxy(server)
+    if reason:
+        return None, reason
+    return str(server), ""
+
+
+def _pin_proxied(url, check, resolve) -> tuple:
+    """(addresses, reason) for a page a proxy fetches. The name itself is checked, and a name
+    that resolves here to this computer or the home network is refused; a name that does not
+    resolve here is left to the proxy (taken as the card's remaining risk: the proxy resolves
+    the name again)."""
+    try:
+        ok, reason = check(url)
+    except Exception:
+        return None, "unchecked"
+    if not ok:
+        return None, reason or "refused"
+    try:
+        host = urlsplit(str(url)).hostname or ""
+    except ValueError:
+        return None, "bad url"
+    if not host:
+        return None, "no host"
+    try:
+        ipaddress.ip_address(host.strip("[]").split("%", 1)[0])
+        literal = True
+    except ValueError:
+        literal = False
+    if literal:
+        return ([], "") if _public_address(host) else (None, "local address")
+    try:
+        addresses = list(resolve(host) or [])
+    except Exception:
+        addresses = []
+    for address in addresses:
+        if not _public_address(address):
+            return None, "local address"
+    return [], ""
+
+
+def _fetch_once_proxy(url, proxy, timeout=OPEN_SECONDS, connect=None) -> tuple:
+    """One GET through an HTTP proxy, sent by us: the same identity request, the same 2MB cut
+    and the same stripped headers as a direct GET. https goes by CONNECT, so the proxy never
+    sees the page's plain text. The whole hop is bound by `timeout` and the socket is closed."""
+    connect = connect or _connect
+    found, reason = _parse_proxy(proxy)
+    if found is None:
+        raise OSError(reason or "proxy")
+    proxy_host, proxy_port = found
+    deadline = time.monotonic() + max(0.001, float(timeout or OPEN_SECONDS))
+    parts = urlsplit(str(url))
+    scheme = parts.scheme.lower()
+    host = parts.hostname or ""
+    port = parts.port or (443 if scheme == "https" else 80)
+    authority = "%s:%d" % (_ascii_host(host), int(port))
+    sock = connect(proxy_host, proxy_port, "", False, max(0.001, _remaining(deadline)))
+    try:
+        if scheme == "https":
+            tunnel = ("CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Connection: close\r\n\r\n"
+                      % (authority, authority)).encode("ascii", "replace")
+            _set_timeout(sock, _remaining(deadline))
+            sock.sendall(tunnel)
+            status = _status_of(_read_head(sock, deadline))
+            if status != 200:
+                raise OSError("proxy refused")
+            context = ssl.create_default_context()
+            sock = context.wrap_socket(sock, server_hostname=_ascii_host(host))
+        request = _get_request(url, via_proxy=(scheme != "https"))
+        _set_timeout(sock, _remaining(deadline))
+        sock.sendall(request)
+        raw = _read_all(sock, MAX_RESPONSE_BYTES + 65536, deadline)
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+    return _parse_response(raw)
 
 
 async def _launch_browser(playwright, shot_path=None, pin_dns=False):
@@ -247,9 +544,12 @@ async def _launch_browser(playwright, shot_path=None, pin_dns=False):
     try:
         options = dict(accept_downloads=False, permissions=[], service_workers="block",
                        ignore_https_errors=False, bypass_csp=False)
-        proxy = _proxy_config()
-        if proxy:
-            options["proxy"] = proxy
+        if not pin_dns:
+            # the shared launch (the interactive browser) keeps the system proxy; the pinned
+            # browser (pin_dns) fetches every request itself, so Chromium gets no proxy at all
+            proxy = _proxy_config()
+            if proxy:
+                options["proxy"] = proxy
         if shot_path is not None:
             options["viewport"] = dict(SHOT_VIEWPORT)
         context = await browser.new_context(**options)
@@ -295,10 +595,7 @@ def _strict_url(url, check):
         if not addresses:
             return False, "unresolved"
         for address in addresses:
-            ip = ipaddress.ip_address(address.split("%", 1)[0])
-            if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-                ip = ip.ipv4_mapped
-            if not ip.is_global or ip.is_multicast:
+            if not _public_address(address):
                 return False, "local address"
         return True, ""
     except Exception:
@@ -408,8 +705,6 @@ class _RequestGate:
         self.blocked = 0
         self.document_url = ""
         self.main_frame = None
-        self.proxy = None
-        self.context = None
 
     def block(self, reason) -> None:
         self.blocked += 1
@@ -434,37 +729,37 @@ class _RequestGate:
         return self.main_frame is None or frame is self.main_frame
 
 
-async def _proxy_get(context, url):
-    """One request through the system proxy (the proxy resolves; this computer connects to it)."""
-    response = await context.request.get(url, max_redirects=0, timeout=OPEN_SECONDS * 1000)
-    try:
-        status = int(getattr(response, "status", 0) or 0)
-        headers = getattr(response, "headers", None)
-        if not isinstance(headers, dict):
-            try:
-                headers = dict(await response.all_headers())
-            except Exception:
-                headers = {}
-        headers = {str(k).lower(): str(v) for k, v in (headers or {}).items() if str(k)}
-        body = b""
-        read = getattr(response, "body", None)
-        if read is not None:
-            try:
-                body = bytes(await read() or b"")
-            except Exception:
-                body = b""
-        return status, headers, body
-    finally:
+async def _get_direct(url, addresses):
+    """One hop to the addresses checked, trying them in order (an IPv6 address a home cannot
+    reach does not lose the site). Every attempt is on the fetch pool, bounded."""
+    last = None
+    for address in list(addresses or ()):
         try:
-            await response.dispose()
-        except Exception:
-            pass
+            return await _pool_call(_fetch_once, url, address, HOP_SECONDS)
+        except FetchBusy:
+            raise
+        except Exception as exc:
+            last = exc
+    if last is not None:
+        raise last
+    raise OSError("no address")
 
 
-async def _get(route, gate, url, address):
-    if gate.proxy:
-        return await _proxy_get(gate.context, url)
-    return await asyncio.to_thread(_fetch_once, url, address, OPEN_SECONDS)
+async def _get_proxied(url, proxy):
+    """One hop through the HTTP proxy, by us: the same limits as a direct hop."""
+    return await _pool_call(_fetch_once_proxy, url, proxy, HOP_SECONDS)
+
+
+async def _checked(url, gate) -> tuple:
+    """(addresses, reason) for one address: through the proxy when the system sets one, else
+    the addresses checked here; (None, why) when the page may not be read or no thread is
+    free. FetchBusy is raised for the caller to abort with its own reason."""
+    proxy, why = _proxy_for(url)
+    if why:
+        return None, why
+    if proxy:
+        return await _pool_call(_pin_proxied, url, gate.check, gate.resolve)
+    return await _pool_call(_pin_addresses, url, gate.check, gate.resolve)
 
 
 async def _route_pinned(route, gate):
@@ -504,15 +799,31 @@ async def _route_pinned_active(route, gate, on_block):
         return
     hops = 0
     while True:
-        address, reason = await asyncio.to_thread(_pin_address, url, gate.check, gate.resolve)
-        if address is None:
+        proxy = _proxy_for(url)[0]
+        try:
+            addresses, reason = await _checked(url, gate)
+        except FetchBusy:
+            on_block("busy")
+            await route.abort()
+            return
+        except Exception:
+            addresses, reason = None, "unchecked"
+        if addresses is None:
             on_block(reason)
             await route.abort()
             return
-        status, headers, body = await _get(route, gate, url, address)
+        try:
+            if proxy:
+                status, headers, body = await _get_proxied(url, proxy)
+            else:
+                status, headers, body = await _get_direct(url, addresses)
+        except FetchBusy:
+            on_block("busy")
+            await route.abort()
+            return
         location = headers.get("location") if isinstance(headers, dict) else None
         if status in REDIRECT_STATUS and location:
-            # followed here, never by the browser: every hop resolved, checked, and connected again
+            # followed here, never by the browser: every hop resolved, checked and fetched again
             if hops >= MAX_HOPS:
                 on_block("redirect limit")
                 await route.abort()
@@ -562,8 +873,6 @@ async def _visit(url, check, shot_path, on_block, resolve=None):
                 logger.info("[ams-life] browser: blocked request (%s)", reason)
 
         gate = _RequestGate(check, resolve or _system_resolve, note_block)
-        proxy = _proxy_config().get("server")
-        gate.proxy = proxy
 
         def track(coro):
             task = asyncio.create_task(coro)
@@ -574,7 +883,6 @@ async def _visit(url, check, shot_path, on_block, resolve=None):
             await _route_pinned(route, gate)
 
         async def read(context):
-            gate.context = context
             await context.route("**/*", route_request)
             # Safety 3: close long-lived WebSockets before they can communicate.
             await context.route_web_socket("**/*", lambda ws: track(ws.close()))
@@ -610,8 +918,11 @@ async def _visit(url, check, shot_path, on_block, resolve=None):
                 return None
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
-            address, reason = await asyncio.to_thread(_pin_address, final_url, gate.check, gate.resolve)
-            if address is None:
+            try:
+                addresses, reason = await _checked(final_url, gate)
+            except Exception:
+                addresses, reason = None, "busy"
+            if addresses is None:
                 logger.info("[ams-life] browser: redirect refused (%s)", reason)
                 return None
             # Safety 9: short challenge pages are not read or photographed.
@@ -629,8 +940,11 @@ async def _visit(url, check, shot_path, on_block, resolve=None):
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
             for address_to_check in list(dict.fromkeys([final_url, end_url])):
-                address, reason = await asyncio.to_thread(_pin_address, address_to_check, gate.check, gate.resolve)
-                if address is None:
+                try:
+                    addresses, reason = await _checked(address_to_check, gate)
+                except Exception:
+                    addresses, reason = None, "busy"
+                if addresses is None:
                     logger.info("[ams-life] browser: redirect refused (%s)", reason)
                     return None
             return shot_path if shot_path is not None else {"url": final_url, "title": title, "text": body}

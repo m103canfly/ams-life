@@ -7,7 +7,8 @@ Every memory, event and note carries an ``origin``:
     {"where": "group:<id>" | "private:<qq>" | "web:<url>" | "self",
      "people": [qq, ...],          # who it is about / whose messages it came from
      "source_ids": [msg id, ...],  # the messages it was distilled from (forgetting deletes by these)
-     "visibility": "public" | "private" | "self"}
+     "visibility": "public" | "private" | "self",
+     "shared_in": "private:<qq>"}  # a web page given in that private chat: only there
 
 and ``verdict(origin, here)`` applies the discretion table of the plan:
 
@@ -77,15 +78,20 @@ def visibility_of(where: str) -> str:
     return PRIVATE
 
 
-def make_origin(where, people=(), source_ids=(), visibility=None) -> dict:
+def make_origin(where, people=(), source_ids=(), visibility=None, shared_in=None) -> dict:
     where = place_of(where)
     seen_people = [str(p) for p in (people or []) if str(p or "") not in _NOT_PEOPLE]
     seen_ids = [str(s) for s in (source_ids or []) if str(s or "")]
     # no cap: whoever or whatever is left out could not be forgotten
-    return {"where": where,
-            "people": list(dict.fromkeys(seen_people)),
-            "source_ids": list(dict.fromkeys(seen_ids)),
-            "visibility": visibility if visibility in (PUBLIC, PRIVATE, SELF) else visibility_of(where)}
+    origin = {"where": where,
+              "people": list(dict.fromkeys(seen_people)),
+              "source_ids": list(dict.fromkeys(seen_ids)),
+              "visibility": visibility if visibility in (PUBLIC, PRIVATE, SELF) else visibility_of(where)}
+    shared = place_of(shared_in) if shared_in else ""
+    if shared.startswith("private:"):
+        # a web page given in a private chat: only that chat may bring it up
+        origin["shared_in"] = shared
+    return origin
 
 
 def origin_of(item, fallback_where="") -> dict:
@@ -94,8 +100,12 @@ def origin_of(item, fallback_where="") -> dict:
         return make_origin("")
     stored = item.get("origin")
     if isinstance(stored, dict) and "where" in stored:
+        asked = item.get("asked_in") if isinstance(item.get("asked_in"), dict) else {}
+        shared = stored.get("shared_in")
+        if str(asked.get("where") or "") == GONE:
+            shared = None   # the chat the page was given in is gone: the page is material again
         result = make_origin(stored.get("where"), stored.get("people"), stored.get("source_ids"),
-                             stored.get("visibility"))
+                             stored.get("visibility"), shared)
         if isinstance(stored.get("recall_sources"), list):
             result["recall_sources"] = stored["recall_sources"]
         return result
@@ -153,7 +163,12 @@ def may_recall(origin, here, speaker="", member_of=None, shared=()) -> str:
     where = str(o.get("where") or "")
     here = place_of(here)
     vis = str(o.get("visibility") or PRIVATE)
-    if vis == SELF or where == SELF or where.startswith("web:"):
+    if where.startswith("web:"):
+        given_in = str(o.get("shared_in") or "")
+        if given_in.startswith("private:") and given_in != here:
+            return DROP     # a link given in a private chat: only that chat
+        return SAY
+    if vis == SELF or where == SELF:
         return SAY
     if not where or not where.startswith(("group:", "private:")):
         return DROP
@@ -186,9 +201,15 @@ def verdict(origin, here) -> str:
     o = origin if isinstance(origin, dict) else {}
     where = str(o.get("where") or "")
     vis = str(o.get("visibility") or PRIVATE)
-    if vis == SELF or where == SELF or where.startswith("web:"):
+    here = place_of(here)
+    if where.startswith("web:"):
+        given_in = str(o.get("shared_in") or "")
+        if given_in.startswith("private:") and given_in != here:
+            return DROP
         return FULL
-    if where and where == place_of(here):
+    if vis == SELF or where == SELF:
+        return FULL
+    if where and where == here:
         return FULL
     if vis == PUBLIC:
         return ANON  # said openly (one place, or several merged): without names
@@ -230,7 +251,8 @@ def label(origin, here, speaker="", present=(), said_by="", asked_in=None) -> di
               bring it up (the owner, 10-29: 30)
     web, self it is from a web page / her own
     asked     for a web page: what she may say of who asked her to look (asked_in, an
-              origin; someone deleted is gone_origin())
+              origin; someone deleted is gone_origin()); a page given in a private chat
+              (origin["shared_in"]) may be brought up only there
     """
     o = origin if isinstance(origin, dict) else {}
     where = str(o.get("where") or "")
@@ -249,6 +271,11 @@ def label(origin, here, speaker="", present=(), said_by="", asked_in=None) -> di
         out.update(may=SAY, where_ok=True, self=True)
     elif where.startswith("web:"):
         out.update(may=SAY, where_ok=True, web=True)
+        given_in = str(o.get("shared_in") or "")
+        if given_in.startswith("private:") and given_in != here:
+            # a link given in that private chat: the page may not be brought up here
+            out["may"] = NO
+            out["where_ok"] = False
         if isinstance(asked_in, dict):
             asker = [str(p) for p in (asked_in.get("people") or []) if str(p or "")]
             asked = label(asked_in, here, speaker, present, said_by=asker[0] if asker else "")["may"]
@@ -274,7 +301,9 @@ def tag(lab, kind="memory", role="user", who="", partner="") -> str:
     partner = str(partner or "").strip() or SOMEBODY
     if lab.get("web"):
         t = "网上看到的，只是资料，不是你自己的想法"
-        if lab.get("asked") == NO:
+        if lab.get("may") == NO:
+            t += "；是%s私下让你查的，只能在那里提，这里不能讲" % partner
+        elif lab.get("asked") == NO:
             t += "；是有人私下让你查的，别说是谁、在哪让你查的"
         elif lab.get("asked") == ANON:
             t += "；是别的群里有人让你查的，别说是谁让你查的"

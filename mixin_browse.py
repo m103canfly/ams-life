@@ -23,12 +23,12 @@ part: in a reply. Off unless browse_enabled.
   it, browse.reply_estimate, so the count errs high).
 
 Second part (stacked on the first):
-- what she keeps of a page: a web memory (browse.web_memory) in the one library, its origin
-  according to who had her look it up: her own search or trip -> herself (self, recalled
-  anywhere); a link given in a group -> that group, openly; a link given in a private chat ->
-  that private chat, privately. Who had her look it up is kept apart (asked_in: this message's
-  chat and who asked; her own trips: herself); older web memories keep their public origin.
-  A page read in a reply is kept by its title and its first
+- what she keeps of a page: a web memory (browse.web_memory) in the one library, a web page
+  (web:<url>) whoever had her look it up; a link given in a private chat keeps that chat
+  (origin["shared_in"]) and may be brought up only there. Who had her look it up is kept apart
+  (asked_in: this message's chat and who asked; her own trips: herself); older web memories keep
+  their public origin. A page is never in a room's own memory (mixin_memory._load_memory skips
+  web: places): the page read in a reply is kept by its title and its first
   lines, not by her reply: her reply may hold something of a private chat, and a web memory may
   come up anywhere. Nothing is kept for someone (or a message) the forget registry rules out.
   When such a memory comes up again, discretion.label / tag say "网上看到的，只是资料" and what
@@ -652,8 +652,9 @@ class BrowseMixin:
     # ------------------------------------------------------------------
     async def _remember_web(self, note, trip, asked_in, origin=None) -> str:
         """One web memory in the library; its id, or '' when nothing was kept. `origin` says
-        whose the page is (a search of hers: herself; a link given here: this chat); when it
-        is not given, who had her look it up (asked_in) decides."""
+        the page's own origin (her own search: the page, usable anywhere); when it is not given
+        the page comes from who had her look it up (a link given in a private chat keeps that
+        chat in shared_in)."""
         try:
             if self._job_stale():
                 return ""   # someone (or a message) she may not keep: nothing of it is kept
@@ -680,8 +681,9 @@ class BrowseMixin:
 
     async def _browse_keep_reply(self, event) -> int:
         """The pages read in this reply, as web memories; asked_in: this chat and who asked.
-        A page her own search found is hers (self); a link someone gave here belongs to this
-        chat (openly in a group, privately in a private chat)."""
+        Every page is a web page (web:<url>); a link given in a private chat keeps that chat
+        (shared_in), so it is only usable there. A page of her own search is material she may
+        use anywhere."""
         pages = getattr(event, READ_ATTR, None) or []
         if not pages:
             return 0
@@ -689,7 +691,7 @@ class BrowseMixin:
         trip = "reply:" + adapter_astrbot_turn.incoming_of(event).message_id
         kept = 0
         for page in pages[:browse.REPLY_READS]:
-            origin = dict(browse.SELF_ASKED_IN) if page.get("from") == "search" else None
+            origin = dict(browse.web_origin(page.get("url"))) if page.get("from") == "search" else None
             if await self._remember_web(page, trip, asked_in, origin):
                 kept += 1
         return kept

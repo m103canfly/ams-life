@@ -204,6 +204,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         clock = harness.Clock(datetime(2026, 10, 30, 9, 30).timestamp())
         group = Event()
         group._group = '900001'
+        group.unified_msg_origin = 'default:GroupMessage:900001'   # a group, not this private chat
         with patch.object(phone.time, 'time', clock):
             self.assertEqual(await self.p._tool_set_now(self.event, '学院', '上课'), '记下了')
             # set in this private chat, shown in a group: only the rough where/doing

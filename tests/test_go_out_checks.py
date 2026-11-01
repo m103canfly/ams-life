@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Offline checks for what may go out (1h): the send check on a search, an address or what she
-would type; a trip's names wall; where a web memory belongs; a page kept after her reply was
-held back; "此刻" in another chat; and the browser that resolves every name once and connects
-by the address it checked. No network, no model, no AstrBot, no files."""
+would type; a trip's names wall; where a web memory belongs and where it may not be brought up;
+a page kept after her reply was held back; "此刻" in another chat; and the browser that resolves
+every name once, connects by the address it checked, fetches on its own small pool and speaks
+only an HTTP proxy. No network, no model, no AstrBot, no files."""
 import asyncio
 import json
 import sys
+import threading
+import time
 import types
 import unittest
 from pathlib import Path
@@ -19,6 +22,7 @@ import browse  # noqa: E402
 import discretion  # noqa: E402
 import harness  # noqa: E402
 import mixin_browse  # noqa: E402
+import mixin_memory  # noqa: E402
 import mixin_selfie  # noqa: E402
 import mixin_send_check  # noqa: E402
 import mixin_turn  # noqa: E402
@@ -27,6 +31,30 @@ import send_check  # noqa: E402
 
 URL = 'https://example.com/page'
 PUBLIC = '93.184.216.34'
+PUBLIC_V6 = '2606:2800:220:1:248:1893:25c8:1946'
+
+
+class _RealNetwork(BaseException):
+    """Raised when a test would reach the real network. A BaseException so nothing that
+    swallows Exception (a resolver, a fetch) can hide it."""
+
+
+class Sealed(unittest.TestCase):
+    """Every browser test is offline: the real resolver and the real sockets are booby traps
+    (tests that mean to use one replace it with a fake of their own), and the system proxy is
+    empty unless the test sets it."""
+
+    def setUp(self):
+        super().setUp()
+        for target, name in ((real_browser.socket, 'getaddrinfo'),
+                             (real_browser.socket, 'create_connection'),
+                             (real_browser.ssl, 'create_default_context')):
+            patch = mock.patch.object(target, name, side_effect=_RealNetwork(name))
+            patch.start()
+            self.addCleanup(patch.stop)
+        proxy_patch = mock.patch.object(real_browser, 'getproxies', return_value={})
+        proxy_patch.start()
+        self.addCleanup(proxy_patch.stop)
 
 
 class FakeLedger:
@@ -145,7 +173,7 @@ def web_pages(pages):
     return made
 
 
-class OutboundChecks(unittest.TestCase):
+class OutboundChecks(Sealed):
     def test_forbidden_words_are_checked_with_global_memory_off(self):
         # The card's first check: with global_memory off, this turn's forbidden list still counts.
         plugin = TestPlugin()
@@ -174,41 +202,108 @@ class OutboundChecks(unittest.TestCase):
 
     def test_where_a_web_memory_belongs(self):
         plugin = TestPlugin()
-        # a link given in a private chat: that private chat, privately
+        # a link given in a private chat: the page itself, usable only in that chat
         private = harness.FakeEvent('看看', sender='10003', name='小甲')
         setattr(private, mixin_browse.READ_ATTR, web_pages([('https://example.com/private', '私下给的')]))
         for page in getattr(private, mixin_browse.READ_ATTR):
             page['from'] = 'given'
         self.assertEqual(asyncio.run(plugin._browse_keep_reply(private)), 1)
         entry = plugin.library['entries'][-1]
-        self.assertEqual(entry['origin']['where'], 'private:10003')
-        self.assertEqual(entry['origin']['visibility'], 'private')
+        self.assertEqual(entry['origin']['where'], 'web:https://example.com/private')
+        self.assertEqual(entry['origin']['visibility'], 'public')
+        self.assertEqual(entry['origin']['shared_in'], 'private:10003')
+        self.assertEqual(discretion.may_recall(entry['origin'], 'group:900001'), discretion.DROP)
+        self.assertEqual(discretion.may_recall(entry['origin'], 'private:10003'), discretion.SAY)
         self.assertEqual(discretion.verdict(entry['origin'], 'group:900001'), discretion.DROP)
         self.assertEqual(discretion.verdict(entry['origin'], 'private:10003'), discretion.FULL)
-        # a link given in a group: that group, openly
+        lab = discretion.label(entry['origin'], 'group:900001', '10001',
+                               asked_in=entry['asked_in'])
+        self.assertEqual((lab['may'], lab['web']), (discretion.NO, True))
+        self.assertIn('这里不能讲', discretion.tag(lab, partner='小甲'))
+        # a link given in a group: the page itself, not a room's memory, usable anywhere
         group = harness.FakeEvent('看看', sender='10001', name='柠檬', group='900001')
         setattr(group, mixin_browse.READ_ATTR, web_pages([('https://example.com/group', '群里给的')]))
         for page in getattr(group, mixin_browse.READ_ATTR):
             page['from'] = 'given'
         asyncio.run(plugin._browse_keep_reply(group))
         entry = plugin.library['entries'][-1]
-        self.assertEqual(entry['origin']['where'], 'group:900001')
-        self.assertEqual(entry['origin']['visibility'], 'public')
-        self.assertEqual(discretion.verdict(entry['origin'], 'group:900002'), discretion.ANON)
-        self.assertEqual(discretion.verdict(entry['origin'], 'group:900001'), discretion.FULL)
-        # a page her own search found: hers, anywhere
+        self.assertEqual(entry['origin']['where'], 'web:https://example.com/group')
+        self.assertNotIn('shared_in', entry['origin'])
+        self.assertEqual(discretion.may_recall(entry['origin'], 'group:900002'), discretion.SAY)
+        self.assertEqual(discretion.label(entry['origin'], 'group:900002')['web'], True)
+        # a page her own search found: the page itself, material anywhere, not her own memory
         searched = harness.FakeEvent('看看', sender='10001', name='柠檬', group='900001')
         setattr(searched, mixin_browse.READ_ATTR, web_pages([('https://example.com/search', '自己搜的')]))
         for page in getattr(searched, mixin_browse.READ_ATTR):
             page['from'] = 'search'
         asyncio.run(plugin._browse_keep_reply(searched))
         entry = plugin.library['entries'][-1]
-        self.assertEqual(entry['origin']['where'], 'self')
-        self.assertEqual(discretion.verdict(entry['origin'], 'group:900002'), discretion.FULL)
-        self.assertEqual(discretion.verdict(entry['origin'], 'private:10005'), discretion.FULL)
+        self.assertEqual(entry['origin']['where'], 'web:https://example.com/search')
+        self.assertNotIn('shared_in', entry['origin'])
+        lab = discretion.label(entry['origin'], 'private:10005')
+        self.assertEqual((lab['may'], lab['web'], lab['self']), (discretion.SAY, True, False))
+        self.assertIn('网上看到的，只是资料', discretion.tag(lab, partner='小甲'))
+        self.assertEqual(discretion.may_recall(entry['origin'], 'private:10005'), discretion.SAY)
+
+    def test_a_page_given_in_a_private_chat_is_only_that_chats(self):
+        origin = browse.web_origin('https://example.com/a', 'private:10003')
+        asked = discretion.make_origin('private:10003', ['10003'], ['m1'])
+        for here in ('group:900001', 'private:10005'):
+            lab = discretion.label(origin, here, '10001', asked_in=asked)
+            self.assertEqual((lab['may'], lab['web']), (discretion.NO, True), here)
+            self.assertIn('这里不能讲', discretion.tag(lab, partner='小甲'))
+            # the real recall wall drops it outside that chat too
+            self.assertEqual(discretion.may_recall(origin, here), discretion.DROP)
+            self.assertEqual(discretion.verdict(origin, here), discretion.DROP)
+        inside = discretion.label(origin, 'private:10003', '10003', asked_in=asked)
+        self.assertEqual((inside['may'], inside['web'], inside['self']), (discretion.SAY, True, False))
+        self.assertEqual(discretion.may_recall(origin, 'private:10003'), discretion.SAY)
+        # once the chat is gone (the one who gave it was forgotten), the page is material again
+        forgotten = dict({'origin': origin}, asked_in=discretion.gone_origin())
+        self.assertNotIn('shared_in', discretion.origin_of(forgotten))
+        self.assertEqual(discretion.may_recall(discretion.origin_of(forgotten), 'group:900001'),
+                         discretion.SAY)
+
+    def test_a_web_page_is_not_a_rooms_memory(self):
+        class FakeMemory(mixin_memory.MemoryMixin):
+            def __init__(self, lib):
+                self.lib = lib
+
+            def _here(self, event):
+                return 'group:900001'
+
+            def _job_stale(self):
+                return False
+
+            def _read_library(self, vectors=True):
+                return self.lib
+
+            def _write_library(self, lib):
+                self.lib = lib
+                return True
+
+        group_room = discretion.make_origin('group:900001', ['10001'], ['m1'])
+        lib = {'rooms': {}, 'entries': [
+            {'id': 'm1', 'text': '群里说过的话', 'origin': group_room},
+            {'id': 'w1', 'text': '私下给的网页', 'role': 'web',
+             'origin': browse.web_origin('https://example.com/a', 'private:10003')},
+            {'id': 'w2', 'text': '群里给的网页', 'role': 'web',
+             'origin': browse.web_origin('https://example.com/b')},
+            {'id': 'p1', 'text': '私聊说过的话', 'origin': discretion.make_origin('private:10003')},
+        ]}
+        plugin = FakeMemory(lib)
+        doc = plugin._load_memory(types.SimpleNamespace())
+        self.assertEqual([e['id'] for e in doc['entries']], ['m1'])
+        # tidying memories never takes a web page for a room
+        self.assertEqual(plugin._library_places(), ['group:900001', 'private:10003'])
+        doc['entries'].append({'id': 'm2', 'text': '又一句话', 'origin': group_room})
+        plugin._save_memory(types.SimpleNamespace(), doc)
+        ids = {e['id'] for e in plugin.lib['entries']}
+        self.assertTrue({'w1', 'w2'} <= ids)      # the pages are still there
+        self.assertIn('m2', ids)
 
 
-class HeldReply(unittest.TestCase):
+class HeldReply(Sealed):
     def test_pages_are_kept_after_the_send_check_even_when_nothing_is_sent(self):
         class Plugin(mixin_turn.TurnMixin, TestPlugin):
             pass
@@ -243,10 +338,10 @@ class HeldReply(unittest.TestCase):
         asyncio.run(plugin._after_reply(event, reply))
         self.assertEqual(order, ['check', 'keep', 'stop'])   # kept after the check, then not sent
         entry = plugin.library['entries'][-1]
-        self.assertEqual(entry['origin']['where'], 'group:900001')
+        self.assertEqual(entry['origin']['where'], 'web:https://example.com/held')
 
 
-class NowInAnotherChat(unittest.TestCase):
+class NowInAnotherChat(Sealed):
     class FakeNowPath:
         def __init__(self):
             self.text = None
@@ -272,6 +367,7 @@ class NowInAnotherChat(unittest.TestCase):
             return types.SimpleNamespace(snapshot=lambda: {'v': 0.3, 'energy': 0.2, 'stress': 0.2})
 
     def setUp(self):
+        super().setUp()
         self.path = self.FakeNowPath()
         self.patches = [mock.patch.object(mixin_selfie, 'NOW_PATH', self.path),
                         mock.patch.object(mixin_selfie, '_write_json',
@@ -285,6 +381,7 @@ class NowInAnotherChat(unittest.TestCase):
     def tearDown(self):
         for item in self.patches:
             item.stop()
+        super().tearDown()
 
     def test_private_place_is_only_rough_elsewhere(self):
         private = harness.FakeEvent('在呢', sender='10003', name='小甲')
@@ -329,6 +426,10 @@ class FakeRoute:
 class FakeSocket:
     def __init__(self, raw):
         self.raw, self.sent, self.closed = raw, b'', False
+        self.timeout = None
+
+    def settimeout(self, value):
+        self.timeout = value
 
     def sendall(self, data):
         self.sent += data
@@ -349,7 +450,7 @@ def http_response(status=200, headers=(), body=b'ok'):
     return head.encode() + body
 
 
-class PinnedBrowser(unittest.TestCase):
+class PinnedBrowser(Sealed):
     """R7 the way Playwright works: no name in the browser, every request fetched by us."""
 
     def test_launch_takes_the_host_resolver_rule(self):
@@ -401,6 +502,73 @@ class PinnedBrowser(unittest.TestCase):
         self.assertEqual(connects, [(PUBLIC, 443, 'example.com')])      # connected the first address
         self.assertEqual(connects[0][2], 'example.com')                 # TLS's SNI keeps the name
         self.assertIn(b'Host: example.com\r\n', sockets[0].sent)        # and so does the Host header
+
+    def test_connect_connects_the_checked_address_and_keeps_the_name_for_tls(self):
+        # C2: _connect itself, not a test's replacement of it. It resolves nothing, connects the
+        # address it was given, and gives TLS the page's name (SNI and the certificate check).
+        created, wrapped = [], {}
+
+        class FakeTLS:
+            def wrap_socket(self, sock, server_hostname=None):
+                wrapped['sock'], wrapped['name'] = sock, server_hostname
+                return sock
+
+        def create_connection(address, timeout=None):
+            created.append((address, timeout))
+            return FakeSocket(b'')
+
+        with mock.patch.object(real_browser.socket, 'create_connection', side_effect=create_connection), \
+             mock.patch.object(real_browser.ssl, 'create_default_context', return_value=FakeTLS()):
+            real_browser._connect(PUBLIC, 443, 'example.com', True, 5)
+        self.assertEqual(created, [((PUBLIC, 443), 5)])
+        self.assertEqual(wrapped['name'], 'example.com')
+        self.assertIsInstance(wrapped['sock'], FakeSocket)
+        # plain http: no TLS at all, the same checked address
+        created.clear()
+        with mock.patch.object(real_browser.socket, 'create_connection', side_effect=create_connection):
+            real_browser._connect(PUBLIC, 80, 'example.com', False, 5)
+        self.assertEqual(created, [((PUBLIC, 80), 5)])
+        # a TLS failure still closes the socket it opened
+        sock = FakeSocket(b'')
+        class BrokenTLS:
+            def wrap_socket(self, *args, **kwargs):
+                raise OSError('fictional tls failure')
+        with mock.patch.object(real_browser.socket, 'create_connection', return_value=sock), \
+             mock.patch.object(real_browser.ssl, 'create_default_context', return_value=BrokenTLS()):
+            with self.assertRaises(OSError):
+                real_browser._connect(PUBLIC, 443, 'example.com', True, 5)
+        self.assertTrue(sock.closed)
+
+    def test_an_address_that_does_not_answer_falls_through_to_the_next(self):
+        resolved, tried = [], []
+
+        def resolve(host):
+            resolved.append(host)
+            return [PUBLIC_V6, PUBLIC]      # the resolver gives IPv6 first here
+
+        def fetch(url, ip, timeout=real_browser.OPEN_SECONDS, connect=real_browser._connect):
+            tried.append(ip)
+            if ip == PUBLIC:        # this one does not answer; the next address must be tried
+                raise OSError('unreachable here')
+            return 200, {}, b'page'
+
+        gate = real_browser._RequestGate(browse.check_url, resolve, lambda reason: None)
+        route = FakeRoute(navigation=True)
+        with mock.patch.object(real_browser, '_fetch_once', new=fetch):
+            asyncio.run(real_browser._route_pinned(route, gate))
+        self.assertEqual(route.result, 'fulfill')
+        self.assertEqual(resolved, ['example.com'])       # resolved exactly once
+        self.assertEqual(tried, [PUBLIC, PUBLIC_V6])      # IPv4 first, then the next address
+
+    def test_an_address_embedding_this_computer_is_never_public(self):
+        for address in ('::127.0.0.1', '64:ff9b::7f00:1', '::ffff:0:7f00:1', '::ffff:127.0.0.1',
+                        '2002:7f00:1::', '2002:0a00:1::', 'fe80::1', 'fd00::1', '::1'):
+            self.assertFalse(real_browser._public_address(address), address)
+            self.assertTrue(browse._bad_address(address), address)
+        # an address that only carries a public IPv4 stays public
+        for address in (PUBLIC, PUBLIC_V6, '::ffff:93.184.216.34', '64:ff9b::5db8:d822'):
+            self.assertTrue(real_browser._public_address(address), address)
+            self.assertFalse(browse._bad_address(address), address)
 
     def test_subrequest_hosts_methods_and_schemes(self):
         def resolve(host):
@@ -475,6 +643,270 @@ class PinnedBrowser(unittest.TestCase):
         self.assertEqual(results[:real_browser.MAX_SUBREQUESTS], ['fulfill'] * real_browser.MAX_SUBREQUESTS)
         self.assertEqual(results[-1], 'abort')
         self.assertEqual(gate.requests, real_browser.MAX_SUBREQUESTS)
+
+
+class ResponseLimits(Sealed):
+    def test_a_response_is_cut_at_two_megabytes_and_loses_its_encoding(self):
+        raw = http_response(headers=[('Content-Encoding', 'gzip'), ('Content-Length', '1')],
+                            body=b'a' * (real_browser.MAX_RESPONSE_BYTES + 10))
+        status, headers, body = real_browser._parse_response(raw)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body), real_browser.MAX_RESPONSE_BYTES)
+        self.assertNotIn('content-encoding', headers)
+        self.assertEqual(headers['content-length'], str(real_browser.MAX_RESPONSE_BYTES))
+        self.assertFalse(any(key in headers for key in ('transfer-encoding', 'connection')))
+
+    def test_the_direct_request_asks_for_identity_and_strips_the_encoding(self):
+        sockets = []
+
+        def connect(ip, port, hostname, tls, timeout):
+            sock = FakeSocket(http_response(headers=[('Content-Encoding', 'gzip')], body=b'page'))
+            sockets.append((sock, (ip, port, hostname, tls, timeout)))
+            return sock
+
+        status, headers, body = real_browser._fetch_once(URL, PUBLIC, 5, connect)
+        self.assertEqual((status, body), (200, b'page'))
+        self.assertNotIn('content-encoding', headers)
+        self.assertIn(b'Accept-Encoding: identity\r\n', sockets[0][0].sent)
+        self.assertEqual(sockets[0][1][:3], (PUBLIC, 443, 'example.com'))
+        self.assertTrue(sockets[0][0].closed)
+
+
+class ProxyRule(Sealed):
+    def test_only_an_http_proxy_is_spoken(self):
+        self.assertEqual(real_browser._proxy_for(URL), (None, ''))
+        with mock.patch.object(real_browser, 'getproxies',
+                               return_value={'https': 'http://proxy.example.test:8080'}):
+            self.assertEqual(real_browser._proxy_for(URL), ('http://proxy.example.test:8080', ''))
+        for proxies in ({'all': 'socks5://127.0.0.1:1080'}, {'socks': 'socks5://127.0.0.1:1080'},
+                        {'https': 'socks5://127.0.0.1:1080'}):
+            with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+                self.assertEqual(real_browser._proxy_for(URL), (None, 'proxy scheme'), proxies)
+        # a refused proxy kind aborts the request; it never falls back to a direct connection
+        gate = real_browser._RequestGate(browse.check_url, lambda host: [PUBLIC], lambda reason: None)
+        route = FakeRoute(navigation=True)
+        with mock.patch.object(real_browser, 'getproxies',
+                               return_value={'all': 'socks5://127.0.0.1:1080'}), \
+             mock.patch.object(real_browser, '_fetch_once', side_effect=_RealNetwork('direct')):
+            asyncio.run(real_browser._route_pinned(route, gate))
+        self.assertEqual(route.result, 'abort')
+
+    def test_a_host_in_no_proxy_takes_the_checked_address_path(self):
+        proxies = {'https': 'http://proxy.example.test:8080', 'no': 'localhost; .example.com'}
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+            self.assertEqual(real_browser._proxy_for(URL), (None, ''))
+            self.assertEqual(real_browser._proxy_for('https://other.example.org/'),
+                             ('http://proxy.example.test:8080', ''))
+        gate = real_browser._RequestGate(browse.check_url, lambda host: [PUBLIC], lambda reason: None)
+        route = FakeRoute(navigation=True)
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies), \
+             mock.patch.object(real_browser, '_fetch_once', new=lambda url, ip,
+                               timeout=real_browser.OPEN_SECONDS,
+                               connect=real_browser._connect: (200, {}, b'page')), \
+             mock.patch.object(real_browser, '_fetch_once_proxy', side_effect=_RealNetwork('proxy')):
+            asyncio.run(real_browser._route_pinned(route, gate))
+        self.assertEqual(route.result, 'fulfill')        # our own checked-address path
+        self.assertEqual(route.fulfilled['body'], b'page')
+
+    def test_a_proxied_page_is_fetched_by_our_own_fetch(self):
+        seen = []
+
+        def proxied(url, proxy, timeout=real_browser.OPEN_SECONDS, connect=real_browser._connect):
+            seen.append((url, proxy, timeout))
+            return 200, {'content-type': 'text/html'}, b'page'
+
+        gate = real_browser._RequestGate(browse.check_url, lambda host: [PUBLIC], lambda reason: None)
+        route = FakeRoute(navigation=True)
+        proxies = {'https': 'http://proxy.example.test:8080'}
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies), \
+             mock.patch.object(real_browser, '_fetch_once_proxy', new=proxied), \
+             mock.patch.object(real_browser, '_fetch_once', side_effect=_RealNetwork('direct')):
+            asyncio.run(real_browser._route_pinned(route, gate))
+        self.assertEqual(route.result, 'fulfill')
+        self.assertEqual(seen, [(URL, 'http://proxy.example.test:8080', real_browser.HOP_SECONDS)])
+
+    def test_the_proxy_request_has_the_same_limits_as_a_direct_one(self):
+        sockets = []
+
+        def connect(ip, port, hostname, tls, timeout):
+            sock = FakeSocket(http_response(headers=[('Content-Encoding', 'gzip')], body=b'page'))
+            sockets.append((sock, (ip, port, hostname, tls)))
+            return sock
+
+        status, headers, body = real_browser._fetch_once_proxy(
+            'http://example.com/a', 'http://proxy.example.test:8080', 5, connect)
+        self.assertEqual((status, body), (200, b'page'))
+        self.assertNotIn('content-encoding', headers)
+        self.assertEqual(sockets[0][1], ('proxy.example.test', 8080, '', False))
+        sent = sockets[0][0].sent
+        self.assertIn(b'GET http://example.com/a HTTP/1.1\r\n', sent)     # absolute form to the proxy
+        self.assertIn(b'Accept-Encoding: identity\r\n', sent)
+        self.assertTrue(sockets[0][0].closed)
+
+    def test_an_https_page_goes_through_the_proxy_by_connect(self):
+        wrapped = {}
+
+        class FakeTLS:
+            def wrap_socket(self, sock, server_hostname=None):
+                tunneled = FakeSocket(http_response(body=b'page'))
+                wrapped['plain'], wrapped['sock'], wrapped['name'] = sock, tunneled, server_hostname
+                return tunneled
+
+        def connect(ip, port, hostname, tls, timeout):
+            return FakeSocket(b'HTTP/1.1 200 Connection established\r\n\r\n')
+
+        with mock.patch.object(real_browser.ssl, 'create_default_context', return_value=FakeTLS()):
+            status, headers, body = real_browser._fetch_once_proxy(
+                URL, 'http://proxy.example.test:8080', 5, connect)
+        self.assertEqual((status, body), (200, b'page'))
+        self.assertEqual(wrapped['name'], 'example.com')             # TLS to the page, not the proxy
+        self.assertIn(b'CONNECT example.com:443 HTTP/1.1\r\n', wrapped['plain'].sent)
+        self.assertIn(b'GET /page HTTP/1.1\r\n', wrapped['sock'].sent)   # origin form inside the tunnel
+
+    def test_the_shared_launch_keeps_the_proxy_without_a_bypass_list(self):
+        class FakePlaywright:
+            chromium = None
+
+            def __init__(self):
+                self.chromium = self
+                self.context_args = None
+
+            async def launch(self, **kwargs):
+                return self
+
+            async def new_context(self, **kwargs):
+                self.context_args = kwargs
+                return types.SimpleNamespace(add_init_script=self._init, close=self._close)
+
+            async def _init(self, *args):
+                pass
+
+            async def _close(self, *args):
+                pass
+
+            async def close(self):
+                pass
+
+        fake = FakePlaywright()
+        proxies = {'https': 'http://proxy.example.test', 'no': 'localhost; .example.test'}
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+            asyncio.run(real_browser._launch_browser(fake, None, False))
+        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+            asyncio.run(real_browser._launch_browser(fake, None, True))
+        self.assertNotIn('proxy', fake.context_args)   # the pinned browser gets no proxy at all
+
+
+class FetchPool(Sealed):
+    """Pages are fetched on our own small pool, each hop on a deadline, and a page that cannot
+    get a thread is refused instead of queued."""
+
+    class SlowSocket:
+        def __init__(self):
+            self.closed, self.sent, self.timeout = False, b'', None
+
+        def settimeout(self, value):
+            self.timeout = value
+
+        def sendall(self, data):
+            self.sent += data
+
+        def recv(self, size):
+            time.sleep(0.01)
+            return b'x'     # a server that dribbles one byte at a time
+
+        def close(self):
+            self.closed = True
+
+    class BlockingSocket:
+        def __init__(self, release):
+            self.release, self.closed, self.timeout = release, False, None
+
+        def settimeout(self, value):
+            self.timeout = value
+
+        def sendall(self, data):
+            pass
+
+        def recv(self, size):
+            self.release.wait(5)
+            return b''
+
+        def close(self):
+            self.closed = True
+
+    def test_a_slow_server_is_cut_at_the_hop_deadline_and_the_default_pool_lives(self):
+        sockets = []
+
+        def connect(ip, port, hostname, tls, timeout):
+            sock = self.SlowSocket()
+            sockets.append(sock)
+            return sock
+
+        async def exercise():
+            started = time.monotonic()
+            slow = asyncio.create_task(
+                real_browser._pool_call(real_browser._fetch_once, URL, PUBLIC, 0.3, connect))
+            # the default pool is untouched while a page dribbles
+            other = await asyncio.wait_for(asyncio.to_thread(lambda: 'done'), 2)
+            result = await slow
+            return other, result, time.monotonic() - started
+
+        other, result, elapsed = asyncio.run(exercise())
+        self.assertEqual(other, 'done')
+        self.assertLess(elapsed, 2)                     # the hop's deadline ended it
+        self.assertEqual(result, (0, {}, b''))          # nothing was read past the deadline
+        self.assertTrue(sockets[0].closed)              # and the socket was closed
+
+    def test_the_fifth_page_at_once_is_refused(self):
+        release = threading.Event()
+
+        def connect(ip, port, hostname, tls, timeout):
+            return self.BlockingSocket(release)
+
+        async def exercise():
+            tasks = [asyncio.create_task(
+                real_browser._pool_call(real_browser._fetch_once, URL, PUBLIC, 5, connect))
+                for _ in range(real_browser.FETCH_WORKERS)]
+            await asyncio.sleep(0.1)                    # let them take the threads
+            self.assertTrue(all(not task.done() for task in tasks))
+            with self.assertRaises(real_browser.FetchBusy):
+                await real_browser._pool_call(real_browser._fetch_once, URL, PUBLIC, 5, connect)
+            release.set()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        try:
+            asyncio.run(exercise())
+        finally:
+            release.set()
+
+    def test_a_subrequest_that_cannot_get_a_thread_is_aborted(self):
+        release = threading.Event()
+
+        def fetch(url, ip, timeout=real_browser.HOP_SECONDS, connect=real_browser._connect):
+            release.wait(5)
+            return 200, {}, b'ok'
+
+        gate = real_browser._RequestGate(browse.check_url, lambda host: [PUBLIC], lambda reason: None)
+        async def exercise():
+            first = [asyncio.create_task(real_browser._route_pinned(
+                FakeRoute('https://example.com/%d' % n, navigation=True), gate))
+                for n in range(real_browser.FETCH_WORKERS)]
+            await asyncio.sleep(0.1)
+            fifth = FakeRoute('https://example.com/fifth', navigation=True)
+            await real_browser._route_pinned(fifth, gate)
+            release.set()
+            await asyncio.gather(*first)
+            return fifth
+
+        try:
+            with mock.patch.object(real_browser, '_fetch_once', new=fetch):
+                fifth = asyncio.run(exercise())
+        finally:
+            release.set()
+        self.assertEqual(fifth.result, 'abort')
+        self.assertEqual(gate.blocked, 1)
 
 
 if __name__ == '__main__':

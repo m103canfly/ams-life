@@ -242,30 +242,44 @@ class Browser(unittest.TestCase):
             asyncio.run(real_browser._launch_browser(fake))
         self.assertTrue(fake.context.closed and fake.closed)
 
-    def test_context_uses_system_https_proxy_and_bypass(self):
+    def test_the_pinned_browser_gets_no_playwright_proxy(self):
         fake = FakePlaywright()
         proxies = {'https': 'http://proxy.example.test', 'http': 'http://other.example.test',
                    'no': 'localhost; .example.test'}
-        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies), \
+             mock.patch.object(real_browser, '_fetch_once_proxy',
+                               new=lambda url, proxy, timeout=real_browser.HOP_SECONDS,
+                               connect=real_browser._connect: (200, {}, b'<html>page</html>')):
             self.assertIsNotNone(self.run_browser(fake))
-        self.assertEqual(fake.context_args['proxy'], {'server': proxies['https'],
-                                                      'bypass': 'localhost,.example.test'})
-
-    def test_context_uses_http_proxy_or_omits_proxy(self):
-        fake = FakePlaywright()
-        with mock.patch.object(real_browser, 'getproxies', return_value={'http': 'http://proxy.example.test'}):
-            self.assertIsNotNone(self.run_browser(fake))
-        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
-        fake = FakePlaywright()
-        self.assertIsNotNone(self.run_browser(fake))
+        # every request is fetched by us; Chromium itself gets no proxy (and no bypass list)
         self.assertNotIn('proxy', fake.context_args)
 
-    def test_proxy_does_not_bypass_page_address_checks(self):
+    def test_the_shared_launch_keeps_the_proxy_without_a_bypass_list(self):
         fake = FakePlaywright()
-        fake.context.routes = [Route('https://private.example.com/')]
-        with mock.patch.object(real_browser, 'getproxies', return_value={'https': 'http://proxy.example.test'}):
-            self.assertIsNotNone(self.run_browser(fake))
-        self.assertEqual(fake.context.routes[0].result, 'abort')
+        proxies = {'https': 'http://proxy.example.test', 'no': 'localhost; .example.test'}
+        with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
+            asyncio.run(real_browser._launch_browser(fake, None, False))
+        # the interactive browser: the proxy, and no bypass list (NO_PROXY is handled by us)
+        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', return_value={'http': 'http://proxy.example.test'}):
+            asyncio.run(real_browser._launch_browser(fake, None, False))
+        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
+
+    def test_proxy_does_not_bypass_page_address_checks(self):
+        page = FakePlaywright()
+        page.context.routes = [Route('https://private.example.com/')]
+        proxied = []
+
+        def fake_proxy(url, proxy, timeout=real_browser.HOP_SECONDS, connect=real_browser._connect):
+            proxied.append(url)
+            return 200, {}, b'<html>page</html>'
+
+        with mock.patch.object(real_browser, 'getproxies', return_value={'https': 'http://proxy.example.test'}), \
+             mock.patch.object(real_browser, '_fetch_once_proxy', new=fake_proxy):
+            self.assertIsNotNone(self.run_browser(page))
+        self.assertEqual(page.context.routes[0].result, 'abort')
+        self.assertEqual(proxied, [URL])     # the private name was refused before any proxy fetch
 
     def test_proxy_lookup_failure_keeps_browser_available(self):
         fake = FakePlaywright()

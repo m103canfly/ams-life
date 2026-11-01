@@ -134,13 +134,15 @@ class Kept(unittest.TestCase):
             self.assertNotIn('（资料完）', w['text'])
             self.assertEqual((w['asked_in']['where'], w['asked_in']['people']), ('group:900001', ['10001']))
         by_url = {w['url']: w for w in r['web']}
-        # a link Mango gave in the group: the group's, openly (who asked is in asked_in)
-        self.assertEqual(by_url['https://example.com/a']['origin']['where'], 'group:900001')
+        # a page is a page, whoever gave it: a link Mango gave is not the group's own memory
+        self.assertEqual(by_url['https://example.com/a']['origin']['where'], 'web:https://example.com/a')
         self.assertEqual(by_url['https://example.com/a']['origin']['people'], [])
         self.assertEqual(by_url['https://example.com/a']['origin']['visibility'], 'public')
-        # a page her own search found: hers, anywhere
-        self.assertEqual(by_url['https://news.example.org/cat']['origin']['where'], 'self')
-        self.assertEqual(by_url['https://news.example.org/cat']['origin']['visibility'], 'self')
+        self.assertNotIn('shared_in', by_url['https://example.com/a']['origin'])   # given in a group
+        # a page her own search found: the page too, material anywhere
+        self.assertEqual(by_url['https://news.example.org/cat']['origin']['where'],
+                         'web:https://news.example.org/cat')
+        self.assertEqual(by_url['https://news.example.org/cat']['origin']['visibility'], 'public')
 
     def test_who_asked_deleted_the_page_stays_who_asked_is_the_mark(self):
         r = run_case('reply')
@@ -182,7 +184,7 @@ class Trip(unittest.TestCase):
         r = run_case('trip')
         self.assertEqual(r['web'], [{'text': '猫咖开业：看着挺可爱的（https://news.example.org/cat）',
                                      'asked_in': {'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'},
-                                     'where': 'self'}])   # her own trip: hers; a page she did not read: not kept
+                                     'where': 'web:https://news.example.org/cat'}])   # her own trip: the page; a page she did not read: not kept
         self.assertEqual(r['wishes'], [{'url': 'https://news.example.org/cat', 'what': '新开了猫咖', 'group_hint': '群1'}])
         self.assertEqual(r['boredom_after'], 0.7)
 

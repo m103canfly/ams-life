@@ -25,6 +25,16 @@ except ImportError:
     from mixin_discretion import recall_permission, recall_anonymize, forbid_dropped
 
 
+def _in_room(entry, here) -> bool:
+    """Whether a library entry belongs to this room's own memory. A web page never does: it is
+    web:<url> (a page someone gave in this chat keeps that chat in shared_in, not its place),
+    so tidying a room, saving it and the room's recall leave it alone."""
+    if not isinstance(entry, dict) or not here:
+        return False
+    where = str(discretion.origin_of(entry)["where"] or "")
+    return not where.startswith("web:") and where == here
+
+
 class MemoryMixin(PortsMixin):
     @staticmethod
     def _ipv4_json(url: str, headers: dict, payload: dict, timeout: float = 12.0) -> dict:
@@ -384,7 +394,8 @@ class MemoryMixin(PortsMixin):
     def _library_places(self) -> list:
         lib = self._read_library()
         places = set(lib["rooms"]) | {discretion.origin_of(e)["where"] for e in lib["entries"]}
-        return sorted(p for p in places if p)
+        # a web page is not a place: tidying memories never takes a page for a room
+        return sorted(p for p in places if p and not p.startswith("web:"))
 
     def _migrate_memory_library(self) -> None:
         """Fold BioCore's memory/<session>.json files into the library (once).
@@ -428,8 +439,7 @@ class MemoryMixin(PortsMixin):
             here = self._here(event)
             lib = self._read_library()
             d = dict(lib["rooms"].get(here) or {})
-            d["entries"] = [e for e in lib["entries"]
-                            if isinstance(e, dict) and discretion.origin_of(e)["where"] == here]
+            d["entries"] = [e for e in lib["entries"] if _in_room(e, here)]
             if isinstance(d, dict) and isinstance(d.get("entries"), list):
                 d["entries"] = [e for e in d["entries"]
                                 if isinstance(e, dict)
@@ -504,8 +514,7 @@ class MemoryMixin(PortsMixin):
                     o = discretion.origin_of(e, here)
                     e["origin"] = o if o["where"] else discretion.make_origin(here, o["people"], o["source_ids"])
             lib = self._read_library()
-            lib["entries"] = [e for e in lib["entries"]
-                              if not (isinstance(e, dict) and discretion.origin_of(e)["where"] == here)] + mine
+            lib["entries"] = [e for e in lib["entries"] if not _in_room(e, here)] + mine
             lib["rooms"][here] = {k: v for k, v in doc.items() if k not in ("entries", "schema_version")}
             self._write_library(lib)
         except Exception as exc:

@@ -181,19 +181,20 @@ class WhatSheKeeps(unittest.TestCase):
         note = {'url': 'https://example.com/a', 'title': '新闻', 'said': '挺有意思'}
         m = browse.web_memory(note, 100.0, 'trip-1')
         self.assertEqual(m['text'], '新闻：挺有意思（https://example.com/a）')
-        # a page of her own: hers, recalled anywhere (she went out by herself)
-        self.assertEqual(m['origin'], {'where': 'self', 'people': [], 'source_ids': ['trip-1'],
-                                       'visibility': 'self'})
+        # a page is a page, whoever had her look it up: never her own memory
+        self.assertEqual(m['origin'], {'where': 'web:https://example.com/a', 'people': [],
+                                       'source_ids': ['trip-1'], 'visibility': 'public'})
         self.assertEqual(m['asked_in'], browse.SELF_ASKED_IN)          # she went out by herself
         asked = {'where': 'private:10001', 'people': ['10001'], 'source_ids': ['m1'], 'visibility': 'private'}
         m2 = browse.web_memory(note, 100.0, 'reply-m1', asked)
         self.assertEqual(m2['asked_in'], asked)
-        # a link given in a private chat: only that private chat (who asked stays in asked_in)
-        self.assertEqual(m2['origin'], {'where': 'private:10001', 'people': [],
-                                        'source_ids': ['reply-m1'], 'visibility': 'private'})
+        # a link given in a private chat: the page, only usable in that chat (shared_in)
+        self.assertEqual(m2['origin'], {'where': 'web:https://example.com/a', 'people': [],
+                                        'source_ids': ['reply-m1'], 'visibility': 'public',
+                                        'shared_in': 'private:10001'})
         group = {'where': 'group:900001', 'people': ['10003'], 'source_ids': ['m9'], 'visibility': 'public'}
         m3 = browse.web_memory(note, 100.0, 'reply-m9', group)
-        self.assertEqual(m3['origin'], {'where': 'group:900001', 'people': [],
+        self.assertEqual(m3['origin'], {'where': 'web:https://example.com/a', 'people': [],
                                         'source_ids': ['reply-m9'], 'visibility': 'public'})
         self.assertEqual(m2['web'], {'url': 'https://example.com/a', 'title': '新闻', 'seen_at': 100.0,
                                      'trip': 'reply-m1'})

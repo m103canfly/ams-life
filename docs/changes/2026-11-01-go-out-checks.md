@@ -1,9 +1,10 @@
-# Outbound checks (card 1h)
+# Outbound checks (card 1h) — rework
 
 Files: `mixin_browse.py`, `browse.py`, `mixin_turn.py`, `mixin_selfie.py`,
-`real_browser.py`, the new `tests/test_go_out_checks.py`, and the old tests whose
-assertions this card changes (`test_browse`, `test_browse_wire`, `test_selfie`,
-`test_real_browser`). No plugin method was added (`test_basics` still counts 510).
+`real_browser.py`, `discretion.py`, `mixin_memory.py`, the new
+`tests/test_go_out_checks.py`, and the old tests whose assertions this card changes
+(`test_browse`, `test_browse_wire`, `test_selfie`, `test_real_browser`). No plugin method was
+added (`test_basics` still counts 510).
 
 Her going out is checked on what leaves her, not on what she may read.
 
@@ -22,27 +23,66 @@ of a search; everyone else's name is, when it is known from another place. The n
 wall is the one `mixin_send_check._name_walls` already keeps for replies, so no new
 plugin method is added.
 
-## Where a web memory belongs
+## A web memory is a page, not a room's memory (B1, B2)
 
-`browse.web_memory` now sets a page's origin by who had her look it up: her own
-search or her own trip -> `self` (recalled anywhere); a link given in a group -> that
-group, openly; a link given in a private chat -> that private chat, privately. The
-address in the origin is no longer used for new pages; older web memories are not
-migrated and keep their public origin. `asked_in` (this chat and who asked) is kept
-exactly as before, and `_remember_web` takes the origin as an optional argument.
+`browse.web_memory` keeps `where` as `web:<url>` for every page, whoever had her look it up
+(her own trip, her own search, a link given anywhere). A page is never her own memory
+(`self` is not used for a page), so `discretion.label`/`tag` always say `网上看到的，只是资料`.
 
-A page's origin carries no people and no message ids: someone deleted does not take
-the page with them. `_browse_keep_reply` marks each page with where it came from
-(`from: given | search`), which `_tool_read` records.
+A link given in a private chat is recorded apart: `origin["shared_in"] = "private:<qq>"`.
+`discretion.label`'s web branch then gives `may=NO` outside that chat, and the rest of the
+wall follows: `may_recall` and `verdict` drop the page outside it too (so it is not put in a
+prompt there), and `discretion.tag` says it may only be brought up there. `make_origin` and
+`origin_of` carry `shared_in`; when the one who gave the page is forgotten (`asked_in` is the
+`gone` mark) the page becomes material again (the chat is gone, so the page is public).
 
-## Reply pages are kept after the last look
+`mixin_memory._load_memory` and `_save_memory` take a room's entries with `_in_room`: an entry
+whose `where` starts with `web:` is never one of them. So a page given in a group or a private
+chat is not trimmed with that room's window, not squashed into a room summary (which loses its
+address) and not overwritten by a concurrent save. `_library_places` (the place list
+`page_consolidate` walks) skips `web:` places: tidying memories does not take a page for a room.
 
-`mixin_turn._after_reply` now calls `_browse_keep_reply` after the send check instead
-of before it, and still calls it when the check held the reply back. The pages she
-read are her own reading, not the words of the reply, so they are kept either way;
-nothing was sent. Because a group's web memory now belongs to that group's window,
-the library order can differ from before (an assertion in `test_browse_wire` now
-compares the set of kept pages).
+Older web memories (made before this card) are not migrated: they keep `web:<url>` or the old
+`self`, and are no longer counted as a room's either.
+
+## Fetching a page on its own small pool (B3)
+
+`real_browser` fetches pages on its own `ThreadPoolExecutor` of `FETCH_WORKERS` (4) threads,
+never the default one that embeddings, pictures and voice use. Name resolution and the fetch
+itself both go through it (`_pool_call`). Each hop has one total deadline (`HOP_SECONDS`, 20s)
+covering name, connect, request and read: `_read_all`/`_read_head` set the socket's timeout to
+what is left and read in chunks, so a server that dribbles bytes is cut at the deadline, and the
+socket is closed on the way out. A slot is held until its thread really ends, even when the
+waiting coroutine times out. When no slot is free the request is aborted (`FetchBusy`, the block
+reason `busy`) instead of queued behind a slow page.
+
+## An HTTP proxy, by us (B4)
+
+Only an HTTP proxy is spoken. `_proxy_for` reads the system proxy per address: a host in
+`NO_PROXY` takes our own path (resolved and connected by the checked address); a proxy URL whose
+scheme is not `http` (a SOCKS or `ALL_PROXY` setting) is refused and the request is aborted --
+never taken for no proxy and dialled.
+
+`_fetch_once_proxy` connects to the proxy itself and sends the request (absolute form for
+`http`, `CONNECT` then TLS with the page's name for `https`), so the page has the same limits as
+a direct fetch: `Accept-Encoding: identity`, `MAX_RESPONSE_BYTES` (2MB) cut, hop headers and
+`Content-Encoding` removed before it is handed to the browser. Playwright's own
+`context.request.get` is no longer used for a page. The pinned browser is launched with no
+Playwright proxy at all (every request is fetched by us); the shared launch (the interactive
+browser) still gets the system proxy but without a Playwright bypass list, so `NO_PROXY` is ours
+to handle.
+
+## Addresses (minor items)
+
+`browse._bad_address` and `real_browser._public_address` now also refuse an IPv6 address that
+carries an IPv4 address that is not public: IPv4-mapped, IPv4-compatible (`::127.0.0.1`),
+IPv4-translated (`::ffff:0:7f00:1`), NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 and Teredo
+(these read as global in 3.12, and some in 3.10). `_strict_url` uses the same rule.
+
+Names are resolved once and their addresses tried IPv4 first (a home without IPv6 must not lose
+a dual-stack site), and a hop whose address does not answer falls through to the next checked
+address instead of failing (`_get_direct`). `_parse_response` drops `Content-Encoding` on every
+path, proxy or not.
 
 ## "此刻" set in a private chat
 
@@ -62,36 +102,49 @@ every address is checked as public (the same rules as `browse.check_url`), and t
 connection is made to the checked address with the original hostname in the `Host`
 header and in TLS's SNI and certificate check. Redirects are followed by us, not by
 the browser (at most five), and each hop is resolved, checked and connected again.
-A page may make at most 60 subrequests; more are aborted. The system-proxy path is
-unchanged: the proxy resolves and the browser's request goes through it. The
-interactive browser is not touched by this card (it still uses the old route fetch),
-and neither is DeepSeek's own fetch (the page is read on DeepSeek's side, not on this
-computer).
+A page may make at most 60 subrequests; more are aborted. The interactive browser is
+not touched by this card (it still uses the old route fetch), and neither is DeepSeek's
+own fetch (the page is read on DeepSeek's side, not on this computer).
 
 ## Tests
 
-New file `tests/test_go_out_checks.py` (offline, no files): forbidden words with
-`global_memory` off; a trip's names wall; web-memory origins and recall permission;
-pages kept after a held reply (with order check/keep/stop); "此刻" blurring; the launch
-rule; one resolution and connecting the checked address (Host/SNI by name); blocked
-subrequest hosts, `POST` and `ws://`; redirects followed per hop and stopped at the
-sixth; the 61st subrequest aborted. 11 tests, all pass.
+New file `tests/test_go_out_checks.py` (offline, no files, and sealed: the real resolver, the
+real sockets and the real TLS context are booby traps, and the system proxy is empty unless a
+test sets it). 27 tests: forbidden words with `global_memory` off; a trip's names wall; web
+memory origins (`web:<url>`, `shared_in`), label/tag and the real recall wall for a page given
+in a private chat, a group and her own search; `_load_memory`/`_save_memory` never count a page
+as a room's memory and `_library_places` skips `web:`; pages kept after a held reply (with
+order check/keep/stop); "此刻" blurring; the launch rule; `_connect` itself connecting the
+checked address with the name only for TLS (C2), and closing on a TLS failure; one resolution,
+next address after a failed one, IPv4 first; embedded-IPv4 addresses blocked; blocked
+subrequest hosts, `POST` and `ws://`; redirects followed per hop and stopped at the sixth; the
+61st subrequest aborted; the 2MB cut and `Content-Encoding` removal; HTTP-only proxies (SOCKS
+and `ALL_PROXY` refused, never direct); a `NO_PROXY` host on our checked-address path; a proxied
+page fetched by us with `identity` (absolute form and `CONNECT`); the pinned browser getting no
+Playwright proxy and the shared launch keeping the proxy without a bypass; a slow server cut at
+the hop deadline while the default pool keeps working; the fifth page at once refused; a route
+with no free thread aborted.
 
-Old tests were updated only where the card changes their behaviour:
-`test_browse` (a new web memory is `self` for a trip, a group for a group, a private
-chat for a private chat), `test_browse_wire` (origins; kept pages compared as a set),
-`test_selfie` (one now-line assertion: set in a private chat, shown in a group), and
-`test_real_browser` (the request fixtures now go through our own fetch: launch args,
-GET-only, redirects followed and counted, the redirect/permission checks).
+Old tests were updated only where the card changes their behaviour: `test_browse` (a page is
+`web:<url>`, `shared_in` for a private chat), `test_browse_wire` (origins; the trip page is
+`web:<url>`), `test_selfie` (the "group" event of the now test really is a group: its
+`unified_msg_origin` is a group's, so the test checks the private-to-group blurring it means to),
+and `test_real_browser` (the pinned browser gets no Playwright proxy; the shared launch keeps
+the proxy without a bypass list; a proxied private name is refused before any proxy fetch).
 
-Results inside this sandbox (no network, no playwright, temp dirs partly read-only):
-`test_go_out_checks` 11/11 passed; `test_browse` had only the two `PermissionError`
-teardown errors of its temporary directories; `test_real_browser` had no assertion
-failures, only the `PermissionError` cases that write a screenshot or a temp directory;
-`test_interactive_browser` 39 passed and 21 `PermissionError`s writing its ledger/temp
-files. `test_browse_wire`, `test_browse_standalone`, `test_send_walls`,
-`test_recall_walls`, `test_selfie`, `test_golden`, `test_golden_standalone` and
-`test_basics` could not run here (temp subdirectories are not writable in the
-sandbox); the `browse_cases.py` reply/leak/trip/trip_switch scripts were run directly
-with a data folder inside the worktree and their results match the updated
-expectations. The full suite was not run; the dispatcher runs it outside.
+Results inside this sandbox (Python 3.12, no network, temp dirs not writable):
+`test_go_out_checks` 27/27 passed. `test_turn_tools` 10/10 passed. `test_basics` 11 tests: no
+failures, the method count is still 510; 2 `PermissionError`s writing its temporary data folder.
+`test_real_browser` 56 tests: no failures, 15 `PermissionError` cases that write a screenshot or
+a ledger. `test_interactive_browser` 60 tests: no failures, 21 `PermissionError` cases (its
+ledger and temporary files). `test_browse` 20 tests: 2 `PermissionError` teardown errors of its
+temporary directory. `test_discretion` 84 tests: 62 `PermissionError` errors from temporary
+directories (`Table`, `GlobalLabels`, `GlobalMemory` pass). `test_selfie` 46 tests: 9 failures
+and 67 errors, all because its temporary folder cannot be written here; the logical failure of
+this round (`test_now_shared_expiry_and_failure`, the "group" event was really the same private
+chat) is fixed, and with the data folder inside the worktree all 9 pass. `test_browse_wire`,
+`test_send_walls`,
+`test_recall_walls` and `test_golden` could not run here (their temporary directories are not
+writable); the `browse_cases.py` reply/trip/trip_switch/off/leak/money runs were made by hand
+with a data folder inside the worktree and all 20 `test_browse_wire` assertions pass on their
+results. The full suite was not run; the dispatcher runs it outside.
