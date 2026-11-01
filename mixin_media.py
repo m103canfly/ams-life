@@ -368,7 +368,7 @@ class MediaMixin(PortsMixin):
         try:
             cache = self._load_image_cache()
             if all(cached(cache, ref) for ref in refs):
-                result = "\n".join(str(cache[_sha256(ref)].get('caption')) for ref in refs[:3]
+                result = "\n".join(stickers.look_line(cache[_sha256(ref)]) for ref in refs[:3]
                                    if cache[_sha256(ref)].get('caption'))
             else:
                 self._group_reply_vision_active = getattr(self, '_group_reply_vision_active', 0) + 1
@@ -376,7 +376,7 @@ class MediaMixin(PortsMixin):
                     async with self._group_image_lock():
                         cache = self._load_image_cache()
                         if all(cached(cache, ref) for ref in refs):
-                            result = "\n".join(str(cache[_sha256(ref)].get('caption')) for ref in refs[:3]
+                            result = "\n".join(stickers.look_line(cache[_sha256(ref)]) for ref in refs[:3]
                                                if cache[_sha256(ref)].get('caption'))
                         else:
                             result = await self._image_context_locked(event)
@@ -401,8 +401,11 @@ class MediaMixin(PortsMixin):
                     lines = []
                     for row in recent:
                         item = cache.get(_sha256(row['ref'])) or {}
-                        if item.get('caption'):
-                            lines.append('%s%d秒前发的图：%s' % (self._for_model(row.get('name') or '某人', event), max(0, int(time.time() - row['ts'])), item['caption']))
+                        line = stickers.look_line(item)
+                        if line:
+                            lines.append('%s%d秒前发的图：%s' % (
+                                self._for_model(row.get('name') or '某人', event),
+                                max(0, int(time.time() - row['ts'])), line))
                     return "\n".join(lines)
             return result
         finally:
@@ -443,45 +446,40 @@ class MediaMixin(PortsMixin):
                    time.time() - float(cache[_sha256(r)].get("ts", 0) or 0) >= 86400]
         if missing:
             try:
-                try:
-                    cfg = self.context.get_config()
-                    provider_settings = cfg.get("provider_settings", {}) if isinstance(cfg, dict) else {}
-                    prompt = interpretation.image_caption_prompt(
-                        provider_settings.get("image_caption_prompt"))
-                except Exception:
-                    prompt = interpretation.image_caption_prompt("")
-                # Image caption always uses the vision provider, never a text LLM.
+                # One look at a picture, the same question either way: what it shows, who of a
+                # work is in it, what it means (stickers.LOOK_PROMPT). Always the vision provider.
                 provider = self._vision_provider_for(event)
                 if provider is not None:
                     for ref in missing[:3]:
-                        look = None
+                        caption, look = "", {}
                         try:
                             if stickers_on:
-                                # one call: what it shows, and whether she keeps it (step 2, 丙)
+                                # one call: the look and whether she keeps it (step 2, 丙)
                                 caption, look = await self._look_once(provider, ref, event)
                             else:
-                                reply = await self._model(provider).chat(prompt=prompt, images=[ref])
-                                caption = interpretation.parse_image_caption(
-                                    reply.text)
+                                # the same look once; it does not go into her sticker library
+                                reply = await self._model(provider).chat(
+                                    prompt=stickers.LOOK_PROMPT, images=[ref])
+                                look = stickers.parse_look(reply.text)
+                                caption = str(look.get("caption") or "")
                         except Exception as exc:
                             logger.warning("[biocore] image caption failed: %s", exc)
-                            caption = ""
-                        if caption and look is not None:
+                            caption, look = "", {}
+                        if caption and look:
                             cache[_sha256(ref)] = stickers.cache_entry(
                                 ref, look, owners.get(ref, sender), self._here(event), time.time())
-                            if owners.get(ref, sender) == sender:
+                            if stickers_on and owners.get(ref, sender) == sender:
                                 await self._maybe_keep(event, ref, look)
-                        elif caption:
-                            cache[_sha256(ref)] = {"ref": ref, "caption": caption, "ts": time.time(),
-                                                   "from_qq": owners.get(ref, sender), "where": self._here(event)}
                     self._save_image_cache(cache)
             except Exception as exc:
                 logger.warning("[biocore] image provider failed: %s", exc)
         lines = []
         for ref in refs[:3]:
             item = cache.get(_sha256(ref))
-            if item and item.get("caption"):
-                lines.append(str(item["caption"]))
+            if item:
+                line = stickers.look_line(item)
+                if line:
+                    lines.append(line)
         self._image_last_used = time.time()
         if not lines:
             return ""

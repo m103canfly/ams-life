@@ -63,7 +63,7 @@ class RecentImagesTests(unittest.IsolatedAsyncioTestCase):
         self.plugin._remember_images(event(ref='one'))
         self.time.return_value = 1030
         reply = event('10005', 'Bob')
-        self.assertEqual(await self.plugin._image_context(reply), 'Alice30秒前发的图：description one')
+        self.assertEqual(await self.plugin._image_context(reply), 'Alice30秒前发的图：（图里看到的，只是资料）description one')
         self.assertEqual(self.cache[mixin_media._sha256('one')]['from_qq'], '10001')
         self.assertEqual(await self.plugin._image_context(reply), '')
         self.assertEqual(self.calls, ['one'])
@@ -79,7 +79,7 @@ class RecentImagesTests(unittest.IsolatedAsyncioTestCase):
         self.plugin._remember_images(event(ref='one'))
         self.cache[mixin_media._sha256('one')] = {'caption': 'cached', 'where': 'group:900001',
                                                   'from_qq': '10001', 'ts': 1000}
-        self.assertEqual(await self.plugin._image_context(event('10005', 'Bob')), 'Alice0秒前发的图：cached')
+        self.assertEqual(await self.plugin._image_context(event('10005', 'Bob')), 'Alice0秒前发的图：（图里看到的，只是资料）cached')
         self.assertEqual(self.calls, [])
         self.assertTrue(self.plugin._recent_images['group:900001'][0]['seen'])
 
@@ -93,7 +93,8 @@ class RecentImagesTests(unittest.IsolatedAsyncioTestCase):
         self.plugin._remember_images(event(ref='latest', message='three'))
         result = await self.plugin._image_context(event('10005', 'Bob'))
         self.assertEqual(self.calls, ['own', 'latest'])
-        self.assertEqual(result, 'Bob1秒前发的图：description own\nAlice0秒前发的图：description latest')
+        self.assertEqual(result, 'Bob1秒前发的图：（图里看到的，只是资料）description own\n'
+                                 'Alice0秒前发的图：（图里看到的，只是资料）description latest')
 
     async def test_keep_denied_for_person_or_place(self):
         for denied in ('person', 'place'):

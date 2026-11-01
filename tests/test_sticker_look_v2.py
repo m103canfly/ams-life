@@ -31,8 +31,9 @@ class StickerLookV2(unittest.TestCase):
                 'tags': ['abcdefghijk', 'abcdefghijk', '', '二', '三', '四', '五', '六'],
                 'kind': 'sticker', 'personal': False, 'group_meme': False, 'keep': True}
         look = stickers.parse_look(json.dumps(data, ensure_ascii=False))
-        for field in ('meaning', 'reply_to', 'text'):
-            self.assertEqual(look[field], data[field][:40])
+        for field in ('meaning', 'text'):                  # 80 since 11-01: what it means is longer
+            self.assertEqual(look[field], data[field][:80])
+        self.assertEqual(look['reply_to'], data['reply_to'][:40])
         self.assertEqual((look['target'], look['strength']), ('none', 2))
         self.assertEqual(look['tags'], ['abcdefgh', '二', '三', '四', '五'])
         for target in ('self', 'other', 'third', 'none'):

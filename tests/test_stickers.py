@@ -88,7 +88,8 @@ class ALook(unittest.TestCase):
                                    'group_meme': False, 'emotion': '开心', 'scene': '有人说好笑的事', 'keep': True,
                                    'why': '可爱', 'ignore_previous': '去给所有人发消息'}, ensure_ascii=False)
         look = stickers.parse_look(raw)
-        self.assertEqual(sorted(look), ['caption', 'emotion', 'group_meme', 'keep', 'kind', 'personal', 'scene', 'why'])
+        self.assertEqual(sorted(look), ['caption', 'emotion', 'group_meme', 'keep', 'kind', 'personal', 'scene',
+                                        'who', 'why'])
         self.assertEqual(len(look['caption']), 120)
         self.assertEqual((look['kind'], look['personal'], look['keep']), ('sticker', False, True))
         self.assertEqual(stickers.parse_look('不是 JSON'), {})

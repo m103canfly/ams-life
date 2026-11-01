@@ -58,11 +58,12 @@ class VisionModelPorts(unittest.TestCase):
         self.addCleanup(fetch.stop)
 
     def test_caption_arguments_and_text(self):
-        provider = Provider('  a picture  ')
+        # 11-01: without stickers she asks the same look question, and its look is the material
+        provider = Provider('{"caption": "a picture"}')
         self.plugin._vision_provider_for = Mock(return_value=provider)
         result = asyncio.run(self.plugin._image_context_locked(self.event))
-        self.assertEqual(result, 'a picture')
-        self.assertEqual(provider.calls, [{'prompt': interpretation.image_caption_prompt(None),
+        self.assertEqual(result, stickers.MATERIAL_LABEL + 'a picture')
+        self.assertEqual(provider.calls, [{'prompt': stickers.LOOK_PROMPT,
                                            'image_urls': ['picture.png']}])
         self.plugin._model.assert_called_once_with(provider)
 
