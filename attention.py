@@ -39,7 +39,7 @@ FACES = {"惊讶": 0, "撇嘴": 1, "色": 2, "发呆": 3, "得意": 4, "流泪":
          "可爱": 21, "白眼": 22, "疑问": 32, "嘘": 33, "晕": 34, "再见": 39, "爱心": 66, "赞": 76,
          "鼓掌": 99, "坏笑": 101, "委屈": 106}
 _FACE = re.compile(r"\[表情[:：]([^\]\s]{1,6})\]")
-HER_NAMES = ("小爱", "爱弥斯")
+HER_NAMES = ("小爱",)
 # her name as a call: at the start or after a space or a stop, and followed by a stop, a space,
 # "你" or the end -- "小爱乱撞" is no call
 _STOPS = r"\s，,。.！!？?：:、~～"

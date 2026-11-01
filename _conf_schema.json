@@ -632,7 +632,7 @@
     "items": {
       "type": "string"
     },
-    "default": ["小爱", "爱弥斯"]
+    "default": ["小爱"]
   },
   "attention_level": {
     "description": "没叫她时开口的门槛",
