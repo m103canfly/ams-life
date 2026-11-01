@@ -150,9 +150,9 @@ class Review(unittest.TestCase):
 
     def test_the_nightly_material_codes_every_name_she_knows(self):
         r = run_case('material')
-        self.assertEqual(r['prompt_has'], {'大芒': False, '芒芒': False, '鹿说': False, '阿橙': False, '柠檬': False})
-        self.assertTrue(any(ln.startswith('- P2今天没来') for ln in r['lines']), r['lines'])   # 大芒: elsewhere
-        self.assertTrue(any(ln.startswith('- P2快来打本') for ln in r['lines']), r['lines'])   # 芒芒: the owner's
+        self.assertEqual(r['prompt_has'], {'大橙': False, '橙橙': False, '鹿说': False, '阿橙': False, '柠檬': False})
+        self.assertTrue(any(ln.startswith('- P2今天没来') for ln in r['lines']), r['lines'])   # 大橙: elsewhere
+        self.assertTrue(any(ln.startswith('- P2快来打本') for ln in r['lines']), r['lines'])   # 橙橙: the owner's
         self.assertTrue(any(ln.startswith('- Q1说他也去') for ln in r['lines']), r['lines'])   # 鹿
 
 

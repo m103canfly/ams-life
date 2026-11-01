@@ -127,12 +127,12 @@ def made_up_run(run):
     rec = lambda qq, name, aliases, style='话不多': {'qq': qq, 'name': name, 'aliases': aliases, 'style': style,  # noqa: E731
                                                      'topics': ['爬山'], 'stats': {'msgs': 3, 'days': 1}, 'since': '2026-10-20',
                                                      'updated': '2026-10-28', 'origin': {}}
-    store.save(G1, {'people': {'10001': rec('10001', '阿橙', ['小芒']), GONE: rec(GONE, '阿星', ['星星']),
+    store.save(G1, {'people': {'10001': rec('10001', '阿橙', ['小橙']), GONE: rec(GONE, '阿星', ['星星']),
                                TEST['probe']: rec(TEST['probe'], '测试4', []), FORMER: rec(FORMER, '旧号', [])},
                     'tried': {'2026-10-28': 1}})
     store.save(G2, {'people': {'10002': rec('10002', '柠檬', [], style='常说' + SECRETS['group']),
                                '10004': rec('10004', '桃子', ['桃桃'])}})
-    for qq, ns in (('10001', ['阿橙', '小芒']), (GONE, ['阿星']), (TEST['private'], ['测试1']), ('10004', ['桃子', '桃桃']),
+    for qq, ns in (('10001', ['阿橙', '小橙']), (GONE, ['阿星']), (TEST['private'], ['测试1']), ('10004', ['桃子', '桃桃']),
                    (FORMER, ['旧号'])):
         store.keep_names(qq, ns)
     (data / 'self_model.json').write_text(json.dumps({'heart': 1, 'who_am_i': '', 'notebook': NOTEBOOK,
@@ -162,7 +162,7 @@ def made_up_bundle(folder):
         reg.forget_person(GONE, stamp=1.0, note='legacy:test')
         reg.forget_message('m-gone', stamp=1.0, note='legacy:test')
         reg.remember_names(GONE, ['阿星'])
-    rows = [{'place': G1, 'qq': '10001', 'name': '阿橙', 'aliases': ['芒芒'], 'origin': {}}]
+    rows = [{'place': G1, 'qq': '10001', 'name': '阿橙', 'aliases': ['橙橙'], 'origin': {}}]
     (folder / 'aliases.jsonl').write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), 'utf-8')
     return folder
 
@@ -251,7 +251,7 @@ class Merge(unittest.TestCase):
         store = impressions.Store(self.out / 'people')
         g1, g2 = store.load(G1)['people'], store.load(G2)['people']
         self.assertEqual(sorted(g1), ['10001'])
-        self.assertEqual(g1['10001']['aliases'], ['芒芒', '小芒'])   # the bundle's, then the run's
+        self.assertEqual(g1['10001']['aliases'], ['橙橙', '小橙'])   # the bundle's, then the run's
         self.assertEqual(g1['10001']['style'], '话不多')              # the run's impression
         self.assertEqual(sorted(g2), ['10004'])                       # 10002's said the group's secret
         names = json.loads((self.out / 'people' / 'names.json').read_text('utf-8'))

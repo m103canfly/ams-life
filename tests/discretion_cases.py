@@ -346,8 +346,8 @@ def run():
                     return await inner.text_chat(*a, **k)
             return Meanwhile() if inner is not None else None
         plugin._provider_for = provider_that_forgets
-        mango = harness.FakeEvent('x', sender='10001', name='阿橙')
-        loop.run_until_complete(plugin._consolidate_memory(mango, plugin._core(None), force=True))
+        orange = harness.FakeEvent('x', sender='10001', name='阿橙')
+        loop.run_until_complete(plugin._consolidate_memory(orange, plugin._core(None), force=True))
         harness.drain(loop)
         out['forgot_meanwhile'] = calls
         out['after'] = snapshot(plugin)
@@ -699,7 +699,7 @@ def run():
             t(10, '小爱 晚上好', '10004', '桃子', B)
             t(10, '小爱 在吗', '10001', '阿橙')
             t(10, '小爱 在吗', '10007', '小鹿')
-            out['group_a'], out['group_b'], out['private_mango'], out['private_deer'] = [
+            out['group_a'], out['group_b'], out['private_orange'], out['private_deer'] = [
                 x['prompt'] for x in out['turns'][-4:]]
             # a restart the same day does not call again; a failed call next day counts as that day's
             plugin2 = main.BioCorePlugin(harness.FakeContext(), config=config)
@@ -1023,7 +1023,7 @@ def run():
                 forget_now()
                 return await real_embedding_for(*a, **k)
             plugin._embed_text, plugin._embedding_for = embed, embedding_for
-        mango = harness.FakeEvent('我还是好生气！！！凭什么啊！！！', sender='10001', name='阿橙')
+        orange = harness.FakeEvent('我还是好生气！！！凭什么啊！！！', sender='10001', name='阿橙')
         clock.advance(620)
         if CASE in ('wait_archive', 'wait_consolidate'):  # events archived from memory entries
             for text in ('小爱 谢谢你 我答应你以后别难过了', '对不起 以后我永远喜欢你'):  # promise words
@@ -1034,18 +1034,18 @@ def run():
                     e['importance'] = 0.9
             plugin._write_library(lib)
             plugin._last_event_archive = 0.0
-            loop.run_until_complete(plugin.on_message(mango))
+            loop.run_until_complete(plugin.on_message(orange))
             armed[0] = True
             if CASE == 'wait_archive':  # the per-turn archive (mixin_events _maybe_archive_events)
                 plugin._begin_job()  # as on_llm_request does before it starts this task
-                loop.run_until_complete(plugin._maybe_archive_events(mango, plugin._core(None)))
+                loop.run_until_complete(plugin._maybe_archive_events(orange, plugin._core(None)))
             else:  # consolidation with nothing to group: it archives events instead
-                loop.run_until_complete(plugin._consolidate_memory(mango, plugin._core(None), force=True))
+                loop.run_until_complete(plugin._consolidate_memory(orange, plugin._core(None), force=True))
             harness.drain(loop)
         else:
-            loop.run_until_complete(plugin.on_message(mango))
+            loop.run_until_complete(plugin.on_message(orange))
             armed[0] = True
-            loop.run_until_complete(plugin.on_llm_request(mango, ProviderRequest(prompt=mango.message_str,
+            loop.run_until_complete(plugin.on_llm_request(orange, ProviderRequest(prompt=orange.message_str,
                                                                               system_prompt='你是小爱。')))
             harness.drain(loop)
         out['fired'] = fired

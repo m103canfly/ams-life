@@ -1,7 +1,7 @@
 """Scripted runs for test_stickers_wire (step 2, 丙: her stickers in the plugin); prints a JSON result.
 Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/stickers_cases.py <empty data dir> <out.json> <case>
-All made up: group 900001, the owner 10009, Mango 10001, Lemon 10002; the pictures are a few bytes
+All made up: group 900001, the owner 10009, Orange 10001, Lemon 10002; the pictures are a few bytes
 made here; the model, NapCat's client and QQ's picture server are stand-ins. No network.
 """
 import asyncio

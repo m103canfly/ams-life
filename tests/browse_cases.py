@@ -1,7 +1,7 @@
 """Scripted runs for test_browse_wire (step 2, 丁: her browser in a reply); prints a JSON result.
 Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/browse_cases.py <empty data dir> <out.json> <case>
-All made up: group 900001, Mango 10001. AstrBot's tool classes and its DeepSeek search / fetch are
+All made up: group 900001, Orange 10001. AstrBot's tool classes and its DeepSeek search / fetch are
 stand-ins (no Key, no network); the resolver is a stand-in too.
 """
 import asyncio
@@ -143,7 +143,7 @@ def trip_case(plugin, ctx, loop, calls, out):
     lt = time.localtime(clock.now)
     clock.now = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 14, 0, 0, 0, 0, -1)) + 86400   # 2 p.m.
     core = plugin._core(None)
-    # Mango is known by name; he spoke long ago (the chats are quiet)
+    # Orange is known by name; he spoke long ago (the chats are quiet)
     loop.run_until_complete(plugin.on_message(harness.FakeEvent('大家好', sender='10001', name='阿橙', group=A)))
     clock.now += 3600
     core.boredom, core.novelty_need, core.info_gap = 0.1, 0.1, 0.1
@@ -166,7 +166,7 @@ def trip_case(plugin, ctx, loop, calls, out):
     core.boredom = 0.9
     out['at_night'] = loop.run_until_complete(plugin._maybe_go_browse())
     out['chat_spend'] = (mixin_attention.SPEND_PATH.read_text('utf-8') if mixin_attention.SPEND_PATH.exists() else '')
-    # a wish that names Mango; Mango deleted: his name goes out of it (the self model is swept)
+    # a wish that names Orange; Orange deleted: his name goes out of it (the self model is swept)
     plugin.self_model['share_wishes'] = browse.add_wish(plugin.self_model.get('share_wishes'),
                                                         {'url': 'https://news.example.org/cat', 'what': '阿橙说过想去的猫咖',
                                                          'group': ''}, clock.now, 'trip-x')
@@ -224,7 +224,7 @@ def run():
         OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
         return
 
-    # Mango is known by name (her phone keeps it), so his name never goes out in a search
+    # Orange is known by name (her phone keeps it), so his name never goes out in a search
     ev0 = harness.FakeEvent('大家好', sender='10001', name='阿橙', group=A)
     loop.run_until_complete(plugin.on_message(ev0))
 
@@ -296,7 +296,7 @@ def run():
     # what she kept of the pages she read: by the page, never by her reply; who asked kept apart
     web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']
     out['web'] = [{'text': e['text'], 'origin': e['origin'], 'asked_in': e['asked_in'], 'url': e['web']['url']} for e in web]
-    # Mango deleted: the pages stay, who asked becomes the deleted mark
+    # Orange deleted: the pages stay, who asked becomes the deleted mark
     got = go(plugin.page_forget_person('10001'))
     out['forget_counts'] = (got.get('data') or {}).get('counts') if isinstance(got, dict) else got
     web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']

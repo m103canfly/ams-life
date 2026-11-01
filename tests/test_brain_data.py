@@ -72,11 +72,11 @@ class TheGraph(unittest.TestCase):
 
     def test_words_only_when_opened_and_qq_on_a_second_click(self):
         r = run_case('graph')
-        mango = r['people']['阿橙']
-        self.assertTrue(mango['detail']['has_qq'])
-        self.assertNotIn('10001', json.dumps(mango['detail'], ensure_ascii=False))
-        self.assertEqual(mango['qq'], {'qq': '10001'})
-        self.assertIn(['她在群1的印象', '爱分享，常聊爬山'], mango['detail']['lines'])
+        orange = r['people']['阿橙']
+        self.assertTrue(orange['detail']['has_qq'])
+        self.assertNotIn('10001', json.dumps(orange['detail'], ensure_ascii=False))
+        self.assertEqual(orange['qq'], {'qq': '10001'})
+        self.assertIn(['她在群1的印象', '爱分享，常聊爬山'], orange['detail']['lines'])
         m = r['memory_detail']['data']
         self.assertEqual(m['text'], '小爱，跟你说个悄悄话，我在准备一个惊喜')
         self.assertIn(['能在哪说', '私下：只在那个私聊里'], m['lines'])

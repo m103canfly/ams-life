@@ -140,7 +140,7 @@ class Aliases(unittest.TestCase):
         ls += [line('10001', '阿橙', '@柠檬 柠柠快来打本', 2),                 # an @ to her
                dict(line('10003', '阿星', '柠柠你抽到了吗', 4), reply_to='m1'),  # a reply to her
                line('10005', '路人', '柠柠在吗', 300),                          # far from anything she said
-               line('10001', '阿橙', '芒芒说的', 5)]
+               line('10001', '阿橙', '橙橙说的', 5)]
         return ls
 
     def test_found_twice_when_talking_to_him(self):
@@ -357,7 +357,7 @@ class OldNames(unittest.TestCase):
         bundle = [{'place': G1, 'qq': '10002', 'name': '柠檬', 'aliases': ['柠柠', '大佬', 'x']},
                   {'place': G1, 'qq': '10003', 'name': '阿星', 'aliases': ['星星']},
                   {'place': G1, 'qq': '10005', 'name': '路人', 'aliases': ['各位']},
-                  {'place': 'private:10001', 'qq': '10001', 'name': '阿橙', 'aliases': ['芒芒']}]
+                  {'place': 'private:10001', 'qq': '10001', 'name': '阿橙', 'aliases': ['橙橙']}]
         with tempfile.TemporaryDirectory() as tmp, fr.ForgetRegistry() as reg:
             reg.forget_person('10003', G1, stamp=0)
             store = im.Store(Path(tmp) / 'people')

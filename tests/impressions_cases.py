@@ -70,7 +70,7 @@ ctx = harness.FakeContext()
 ctx.provider = Model()
 config = {'member_aliases': ['10002:小柠']} if CASE in ('views', 'anon') else {}
 if CASE == 'material':
-    config = {'member_aliases': ['10001:芒芒']}
+    config = {'member_aliases': ['10001:橙橙']}
 if CASE == 'red_on':
     config = {'redline_filter': True}
 config.update(owner_qq='10001', reply_private=['10002', '10003', '10004', '10005', '10006'])
@@ -170,16 +170,16 @@ if CASE == 'card_here':
     result['other_group'] = turn('小爱 晚上好', '10002', '小柠檬', group=G2, reply='晚上好')
 
 if CASE == 'material':
-    turn('大家好', '10001', '大芒', group=G2, advance=30)                  # what he goes by elsewhere
+    turn('大家好', '10001', '大橙', group=G2, advance=30)                  # what he goes by elsewhere
     for i in range(12):
-        turn(['大芒今天没来', '芒芒快来打本', '鹿说他也去'][i % 3] + ' %d' % i, '10002', '柠檬', group=G1, advance=30)
+        turn(['大橙今天没来', '橙橙快来打本', '鹿说他也去'][i % 3] + ' %d' % i, '10002', '柠檬', group=G1, advance=30)
         if i < 6:
             turn('副本好难 %d' % i, '10001', '阿橙', group=G1, advance=30)
     turn('我也来', '10005', '鹿', group=G1, advance=30)                    # a one-character card
     plugin.llm_functions = dict(plugin.llm_functions or {}, group_impressions={'enabled': True, 'provider': 'follow_llm'})
     loop.run_until_complete(plugin._maybe_update_impressions(now=EVENING + 3.5 * 3600))
     prompt = getattr(ctx.provider, 'last', '')
-    result['prompt_has'] = {w: w in prompt for w in ('大芒', '芒芒', '鹿说', '阿橙', '柠檬')}
+    result['prompt_has'] = {w: w in prompt for w in ('大橙', '橙橙', '鹿说', '阿橙', '柠檬')}
     result['lines'] = [ln for ln in prompt.splitlines() if ln.startswith('- ')]
 
 if CASE in ('red', 'red_on'):

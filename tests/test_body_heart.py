@@ -314,7 +314,7 @@ class Notebook(unittest.TestCase):
         book = {x['text']: x for x in r['notebook']}
         for text in ('朋友在准备一个甜甜的秘密', '阿橙在准备惊喜蛋糕，要保密'):
             self.assertEqual(book[text]['origin']['where'], 'private:10001')
-            self.assertIn(text, r['private_mango'])
+            self.assertIn(text, r['private_orange'])
             for prompt in (r['group_a'], r['group_b'], r['private_deer']):
                 self.assertNotIn(text, prompt)
         self.assertEqual(book['周末大家要去爬山']['origin']['where'], 'group:900001')

@@ -2,7 +2,7 @@
 JSON result. Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/send_check_cases.py <empty data dir> <out.json> <case>
 
-Mango (10001) tells her a secret in his private chat; then, in group 900001, Lemon (10002)
+Orange (10001) tells her a secret in his private chat; then, in group 900001, Lemon (10002)
 asks, and the fake model answers with the secret (or not). All made up; no network.
 """
 import asyncio

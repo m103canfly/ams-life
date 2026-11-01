@@ -110,7 +110,7 @@ class Look(unittest.TestCase):
 
 
 class InThePlugin(unittest.TestCase):
-    """send_check_cases.py: global_memory on; mango tells her a secret in private; then in a
+    """send_check_cases.py: global_memory on; orange tells her a secret in private; then in a
     group the (fake) model answers with it."""
 
     def test_admission_is_redone_and_only_safe_words_are_kept(self):
