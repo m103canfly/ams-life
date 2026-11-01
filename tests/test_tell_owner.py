@@ -26,7 +26,8 @@ class OwnerMaterialsTest(unittest.TestCase):
         self.assertEqual(life_loop.owner_unanswered(plugin), 3)
 
     def test_materials_show_unanswered_count(self):
-        rows = [{'role': 'user'}] + [{'role': 'assistant'} for _ in range(3)]
+        # The card takes the unanswered count out of the prompt: she sees the chat itself.
+        rows = [{'role': 'user'}] + [{'role': 'assistant'}] * 3
         plugin = SimpleNamespace(config={'owner_qq': '900001', 'proactive_owner_enabled': True},
                                  self_model={}, _read_window=lambda place: {'recent': rows})
         core = SimpleNamespace(sleepiness=0, hunger=0, physical_fatigue=0,
@@ -35,7 +36,8 @@ class OwnerMaterialsTest(unittest.TestCase):
                 patch.object(life_loop.her_days, 'Store') as store:
             store.return_value.day.return_value = []
             text = life_loop.materials(plugin, {}, {}, core, 'test', 100, ['休息'], False)
-        self.assertIn('家人还没回的有 3 条', text)
+        self.assertNotIn('还没回的有', text)
+        self.assertIn('要是想跟家人说点什么就写在 tell，不写也行', text)
 
 
 class OwnerSendingTest(unittest.IsolatedAsyncioTestCase):

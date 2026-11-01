@@ -431,7 +431,8 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.tick()
         row = self.rows()[0]
         self.assertNotIn('虚构小甲', row['detail'])
-        self.assertEqual(row['related_users'], ['10001', '10003'])
+        # The card writes the public line in its own call, only for 发说说.
+        self.assertEqual(row['related_users'], ['10001'])
         self.assertEqual(row['origin']['where'], 'self')
         self.assertEqual(her_days.Store(self.root).forget('10001'), 1)
         self.assertEqual(self.rows(), [])
