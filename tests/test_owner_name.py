@@ -4,6 +4,7 @@
 import asyncio
 import base64
 import json
+import shutil
 import struct
 import sys
 import tempfile
@@ -450,7 +451,9 @@ class HerOwnWords(unittest.IsolatedAsyncioTestCase):
 
 class HerStickers(unittest.IsolatedAsyncioTestCase):
     def test_old_captions_are_left_alone_and_new_ones_use_the_name(self):
-        library = stickers.Library(Path(tempfile.mkdtemp(prefix='ams-life-owner-')) / 'stickers')
+        made = tempfile.mkdtemp(prefix='ams-life-owner-')
+        self.addCleanup(shutil.rmtree, made, True)
+        library = stickers.Library(Path(made) / 'stickers')
         old, _why = library.add(png(b'old'), 1_793_000_000.0, source='owner', note='主人给的')
         self.assertEqual(library.rows[old]['caption'], '主人给的')      # old data: not migrated
         fresh, _why = library.add(png(b'new'), 1_793_000_000.0, source='owner', owner_name=NAMED)
@@ -458,7 +461,9 @@ class HerStickers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stickers.source_label(library.rows[fresh], {}), '主人给的')   # the page's label
 
     def test_a_line_from_him_stays_his(self):
-        library = stickers.Library(Path(tempfile.mkdtemp(prefix='ams-life-owner-')) / 'stickers')
+        made = tempfile.mkdtemp(prefix='ams-life-owner-')
+        self.addCleanup(shutil.rmtree, made, True)
+        library = stickers.Library(Path(made) / 'stickers')
         sid, _why = library.add(png(b'line'), 1_793_000_000.0, source='owner', note='你的小猫',
                                 owner_name=NAMED)
         self.assertEqual(library.rows[sid]['caption'], '你的小猫')

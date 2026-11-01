@@ -1,9 +1,10 @@
 # What she calls him: the `owner_name` setting
 
-Status on 2026-11-01: card P2 (审核 v5), rework round 1 after the first review. Implemented
-on `dsh-move-p2`, cut from main `4e27138`. No commit. The goldens are unchanged. Two files
-outside the card's list got one change each (allowed by the review: the two callers below).
-The full suite is not run here; the dispatcher runs it outside.
+Status on 2026-11-01: card P2 (审核 v5), rework round 2 after the second review. The single
+tests and the spot checks passed, but the full run had two failures; both are fixed here.
+Implemented on `dsh-move-p2`, cut from main `4e27138`. No commit. The goldens are unchanged.
+Two files outside the card's list got one change each (allowed by the reviews: the two
+callers below). The full suite is not run here; the dispatcher runs it outside.
 
 ## Why
 
@@ -75,10 +76,17 @@ production callers were missing it; the review allowed one change in each of tho
 and those are the only changes there:
 
 - `mixin_turn.py`: the `render_compact` call passes
-  `interpretation.owner_name(self.config)`, so the block every reply carries says
-  "[<name>定的规矩]" instead of "[家人定的规矩]".
+  `interpretation.owner_name(getattr(self, "config", None))`, so the block every reply
+  carries says "[<name>定的规矩]" instead of "[家人定的规矩]".
 - `mixin_impressions.py`: the `impressions.nightly` call passes the same, and `nightly` hands
   it to `parse_answer` and on to `check_alias`; the setting's name is a stopword at night.
+
+Round 2 (second review): both callers read the setting with `getattr(self, "config", None)`,
+the same way `mixin_attention.py` and `mixin_browse.py` do. A plugin built with `__new__`
+(as `tests/test_model_ports_text.py` builds it) has no `config`; the plain `self.config`
+raised `AttributeError`, the surrounding `try` swallowed it, and the night's impressions never
+asked the model, so `test_impressions_arguments_parsing_and_error` failed. With `getattr`,
+such a plugin gets the default "家人" and the call still happens.
 
 `impressions.py` is a file of the card, so `nightly`/`parse_answer` there take the new
 keyword (`""` keeps the old behaviour for every other caller).
@@ -107,6 +115,10 @@ phone labels, the sticker caption) with the setting empty and set, and that none
 says "主人"; `tell` and `tell_owner` both parsed; the sticker page passing "<name>给的";
 old "主人给的" captions kept; and the setting's name being a stopword.
 
+Round 2 (second review): the two sticker tests each remember their temp directory and add
+`self.addCleanup(shutil.rmtree, path, True)` (`import shutil` on top), so each test removes
+its directory at the end and `tests/test_temp_cleanup.py` finds the cleanup words.
+
 For rework round 1 it also checks the production callers, without writing a file:
 
 - `_prepare_turn` itself (the real `mixin_turn`, on a stand-in for the plugin whose other
@@ -118,30 +130,32 @@ For rework round 1 it also checks the production callers, without writing a file
   not keep （随便谁）; a name that is not the setting's is not a label either; and the phone
   line keeps the setting's name for that check.
 
-## Tests run here, one file at a time (rework round 1)
+## Tests run here, one file at a time (rework round 2)
 
-The sandbox cannot create the plugin (its first write is `states/` under the OS temp
-directory) and cannot write temp files at all (`PermissionError`, WinError 5). So the
-files that build a plugin or a temp directory cannot finish here; that is the sandbox, not
-the change. No assertion failed in any file that could run. Only the files the review named
-were run.
+The sandbox still cannot write under the OS temp directory (`PermissionError`, WinError 5).
+So the files that build a plugin or a temp directory cannot finish here; that is the
+sandbox, not the change. No assertion failed in any file that could run. Only the files the
+review named were run.
 
+- `python -m unittest tests.test_model_ports_text`: OK (8 tests), including
+  `test_impressions_arguments_parsing_and_error`, the test that failed in the full run.
+- `python -m unittest tests.test_temp_cleanup`: OK (1 test).
 - `python -m unittest tests.test_owner_name`: Ran 22, 20 passed. The 2 sticker-caption
-  tests error on the temp write (the same two as last round). The new tests all pass,
-  including `_prepare_turn` through the real `mixin_turn` and the night's aliases.
-- `python -m unittest tests.test_turn_tools`: OK (10 tests).
-- `python -m unittest tests.test_basics`: Ran 11, 2 errors (plugin creation writes
-  `states/`); the method count (511) and the schema checks pass.
+  tests error on the sandbox temp write (they now also clean their temp directory).
+- `python -m unittest tests.test_impressions_wiring`: Ran 17, 3 passed, 14 errors, all
+  `PermissionError` from `tempfile`.
 - `python -m unittest tests.test_impressions`: Ran 28, 15 passed, 13 errors, all
-  `PermissionError` from `tempfile` (the same 13 as last round; the `parse_answer` checks
-  pass).
+  `PermissionError` from `tempfile`.
+- `python -m unittest tests.test_golden`: Ran 2, 2 errors (the temp directory cannot be
+  made); the goldens were not touched.
+- `python -m unittest tests.test_golden_standalone`: Ran 6, 2 passed, 4 errors, all
+  `PermissionError` from `tempfile`.
+- `python -m unittest tests.test_basics`: Ran 11, 2 errors (plugin creation writes
+  `states/`); the method count, the licence and the metadata checks pass.
 - `python -m unittest tests.test_owner_rules_copy`: Ran 6, 6 errors, all `PermissionError`
   (the plugin cannot be created).
 - `python -m unittest tests.test_reply_provenance`: Ran 7, 7 errors, all `PermissionError`
   (the plugin cannot be created).
-- `python -m unittest tests.test_jailbreak_boundaries`: Ran 7, 14 errors (set-up and
-  tear-down), all `PermissionError`.
-- `python -m unittest tests.test_golden`: Ran 2, 2 errors (the temp directory cannot be
-  made); the goldens were not touched.
+- `python -m unittest tests.test_turn_tools`: OK (10 tests).
 
 The dispatcher runs the full suite and the golden files outside.

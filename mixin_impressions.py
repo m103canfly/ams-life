@@ -249,7 +249,7 @@ class ImpressionsMixin(PortsMixin):
                                                         extra_names=self._material_names(place, lines),
                                                         red=self._red_lines_for("impressions"),
                                                         judge=self._judgements_for("impressions"),
-                                                        owner_name=interpretation.owner_name(self.config),
+                                                        owner_name=interpretation.owner_name(getattr(self, "config", None)),
                                                         still_current=lambda: getattr(self, "_privacy_epochs", {}).get(place, 0) == epoch)
             except Exception as exc:
                 logger.warning("[ams-life] impressions for %s failed: %s", place, exc)
