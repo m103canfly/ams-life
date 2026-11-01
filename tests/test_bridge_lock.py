@@ -76,20 +76,22 @@ class BridgeLockTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_vision_429_retries_and_releases_lock_during_sleep(self):
         error = urllib.error.HTTPError('https://image.invalid/', 429, 'busy', {}, None)
-        async def sleep(delay):
-            self.assertEqual(delay, 10)
-            self.assertFalse(vision.bridge_lock(self.plugin).locked())
-        for failures in (1, 3):
+        busy = [5, 10, 20, 40, 60]
+        for failures in (1, len(busy) + 1):
+            got = []
+            async def sleep(delay):
+                got.append(delay)
+                self.assertFalse(vision.bridge_lock(self.plugin).locked())
             with self.subTest(failures=failures), \
                     patch('urllib.request.urlopen', side_effect=[error] * failures + [Response()]) as request, \
-                    patch.object(vision.asyncio, 'sleep', new=AsyncMock(side_effect=sleep)) as wait:
+                    patch.object(vision, '_rest', new=AsyncMock(side_effect=sleep)):
                 if failures == 1:
                     self.assertEqual((await self.api.text_chat()).completion_text, 'seen')
                 else:
                     with self.assertRaises(RuntimeError):
                         await self.api.text_chat()
-                self.assertEqual(request.call_count, min(failures + 1, 3))
-                self.assertEqual(wait.await_count, min(failures, 2))
+                self.assertEqual(request.call_count, min(failures + 1, len(busy) + 1))
+                self.assertEqual(got, busy[:min(failures, len(busy))])
 
     async def test_cancelled_photo_keeps_lock_until_request_finishes(self):
         started, finish = asyncio.Event(), asyncio.Event()
