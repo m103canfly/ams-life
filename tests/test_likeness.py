@@ -78,13 +78,52 @@ class Samples(unittest.TestCase):
             self.assertEqual(first_ids, [row['id'] for row in second.samples(WEEK)])
             self.assertEqual(len(set(first_ids)), 2)
 
-    def test_forget_removes_samples_and_selection_without_refill(self):
-        self.add('10003')
-        self.add('10001')
-        self.store.select(WEEK)
-        self.assertEqual(self.store.forget('10003'), 2)
-        self.assertEqual(len(self.store.samples(WEEK)), 1)
-        self.assertEqual(len(self.store.select(WEEK)), 1)
+    def test_current_week_fills_and_preserves_ratings(self):
+        for i in range(3):
+            self.add(text=str(i))
+        first = self.store.select(WEEK, now=STAMP)
+        ids = {row['id'] for row in first}
+        self.assertEqual(len(ids), 3)
+        self.assertTrue(self.store.rate(WEEK, first[0]['id'], 'like', 'clear'))
+        for i in range(3, 28):
+            self.add(text=str(i))
+        state = random.getstate()
+        chosen = self.store.select(WEEK, now=STAMP)
+        self.assertEqual(len(chosen), 20)
+        self.assertTrue(ids <= {row['id'] for row in chosen})
+        self.assertEqual((chosen[0]['rating'], chosen[0]['reason']), ('like', 'clear'))
+        self.assertEqual(chosen, self.store.select(WEEK, now=STAMP))
+        self.assertEqual(random.getstate(), state)
+
+    def test_past_week_selection_stays_fixed(self):
+        for i in range(3):
+            self.add(text=str(i))
+        first = self.store.select(WEEK, now=STAMP + 8 * 86400)
+        for i in range(3, 28):
+            self.add(text=str(i))
+        self.assertEqual(self.store.select(WEEK, now=STAMP + 8 * 86400), first)
+
+    def test_empty_current_week_fills_on_later_read(self):
+        self.assertEqual(self.store.select(WEEK, now=STAMP), [])
+        self.add()
+        self.assertEqual(len(self.store.select(WEEK, now=STAMP)), 1)
+
+    def test_forget_removes_samples_and_refills_only_current_week(self):
+        for current in (False, True):
+            with self.subTest(current=current), tempfile.TemporaryDirectory(dir=self.root) as tmp:
+                store = likeness.Store(tmp, random.Random(7))
+                for i in range(25):
+                    store.add('group:900001', 'reply',
+                              [{'sender_id': str(10000 + i), 'name': 'Alice', 'text': 'hello'}], STAMP)
+                now = STAMP if current else STAMP + 8 * 86400
+                selected = store.select(WEEK, now=now)
+                person = selected[0]['context'][0]['sender_id']
+                self.assertEqual(store.forget(person), 2)
+                self.assertEqual(len(store.samples(WEEK)), 24)
+                chosen = store.select(WEEK, now=now)
+                self.assertEqual(len(chosen), 20 if current else 19)
+                self.assertTrue({row['id'] for row in selected[1:]} <= {row['id'] for row in chosen})
+                self.assertTrue(all(row['context'][0]['sender_id'] != person for row in chosen))
 
 
 class Admission(unittest.TestCase):

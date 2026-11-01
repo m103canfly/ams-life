@@ -73,10 +73,20 @@ class Store:
                 rows[index] = row
         _write(self._samples(week), ''.join(json.dumps(x, ensure_ascii=False) + '\n' for x in rows))
 
-    def select(self, week):
+    def select(self, week, *, now=None):
         path = self._selection(week)
         if path.exists():
-            return _read(path, [])
+            chosen = _read(path, [])
+            now = time.time() if now is None else now
+            if week != week_of(now) or len(chosen) >= 20:
+                return chosen
+            selected_ids = {row['id'] for row in chosen}
+            candidates = [row for row in self.samples(week) if row['id'] not in selected_ids]
+            added = self.rng.sample(candidates, min(20 - len(chosen), len(candidates)))
+            if added:
+                chosen.extend(added)
+                _write(path, json.dumps(chosen, ensure_ascii=False) + '\n')
+            return chosen
         rows = self.samples(week)
         chosen = self.rng.sample(rows, min(20, len(rows)))
         _write(path, json.dumps(chosen, ensure_ascii=False) + '\n')
