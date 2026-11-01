@@ -53,6 +53,16 @@ def _response(text):
     return types.SimpleNamespace(completion_text=text)
 
 
+def _error_body(exc, key):
+    try:
+        body = exc.read(4096).decode('utf-8', errors='replace')
+    except Exception:
+        return ''
+    if key:
+        body = body.replace(key, '***')  # before cutting, so no piece of a key is left at the end
+    return body.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').strip()[:200]
+
+
 def _bytes(ref):
     try:
         if ref.startswith('data:') and ';base64,' in ref:
@@ -165,7 +175,11 @@ class ImageAPI:
                     usage=types.SimpleNamespace(input_other=usage.get('prompt_tokens', 0),
                                                 input_cached=0, output=usage.get('completion_tokens', 0)))
             except urllib.error.HTTPError as exc:
-                logger.warning('[ams-life] vision request status %d', exc.code)
+                body = _error_body(exc, key)
+                if body:
+                    logger.warning('[ams-life] vision request status %d: %s', exc.code, body)
+                else:
+                    logger.warning('[ams-life] vision request status %d', exc.code)
             except Exception:
                 logger.warning('[ams-life] vision request status %d', 0)
             raise RuntimeError('vision request failed') from None
