@@ -128,10 +128,9 @@ def request(path, params, device_id, cookies, *, get=None, now=None):
              'x_os_type': 'Windows', 'device_info': 'Chrome', 'device_id': device_id,
              'app': APP}
     query.update(params)
-    if path not in LOGIN_PATHS:
-        signer = XiaoHeiHeSign()
-        signer._offset = SIGN_OFFSET
-        query.update(signer.sign(path))
+    signer = XiaoHeiHeSign()
+    signer._offset = SIGN_OFFSET
+    query.update(signer.sign(path))
     url = BASE_URL + path + '?' + urlencode(query)
     if not browse.check_url(url)[0]:
         return None, []

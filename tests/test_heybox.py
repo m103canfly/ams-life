@@ -15,6 +15,7 @@ from email.message import Message
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_basics  # noqa: E402,F401
@@ -132,6 +133,51 @@ class ReadOnlyTest(unittest.TestCase):
         self.assertTrue(heybox.status_snapshot()['first_signed_ok'])
         heybox.handle_status('failed', now=101, path='/bbs/app/link/tree')
         self.assertFalse(heybox.status_snapshot().get('review_required'))
+
+    def test_login_requests_are_signed_and_do_not_log_secrets(self):
+        class Response(io.BytesIO):
+            status = 200
+            headers = Message()
+
+        Response.headers['Set-Cookie'] = 'fictional-response-cookie'
+        for path in sorted(heybox.LOGIN_PATHS):
+            with self.subTest(path=path):
+                sent = {}
+                def fake_open(req, timeout):
+                    sent.update(parse_qs(urlsplit(req.full_url).query))
+                    return Response(json.dumps({'status': 'failed', 'msg': 'failed',
+                                                'result': {'qr_url': 'https://example.test/fictional-qr'}}).encode())
+                with patch('heybox.time.time', return_value=1700000000), \
+                        patch('heybox.random.random', return_value=0.25), \
+                        self.assertLogs('ams-life.heybox', level='INFO') as logs:
+                    heybox.request(path, {'x_xhh_tokenid': 'fictional-token'}, 'fictional-device',
+                                   'fictional-request-cookie', get=fake_open, now=100)
+                    signer = heybox.XiaoHeiHeSign()
+                    signer._offset = heybox.SIGN_OFFSET
+                    expected = signer.sign(path)
+                for key in ('hkey', '_time', 'nonce'):
+                    self.assertEqual(sent[key], [str(expected[key])])
+                for secret in (sent['hkey'][0], sent['nonce'][0], 'fictional-token',
+                               'fictional-request-cookie', 'fictional-response-cookie',
+                               'https://example.test/fictional-qr'):
+                    self.assertNotIn(secret, str(logs.output))
+                self.assertFalse(heybox.status_snapshot().get('review_required'))
+                self.assertFalse(heybox.status_snapshot().get('first_signed_ok'))
+
+    def test_login_requests_allowed_when_review_required(self):
+        class Response(io.BytesIO):
+            status = 200
+            headers = Message()
+
+        heybox.handle_status('failed', now=100, path='/bbs/app/feeds')
+        self.assertTrue(heybox.status_snapshot()['review_required'])
+        for path in sorted(heybox.LOGIN_PATHS):
+            with self.subTest(path=path):
+                get = Mock(return_value=Response(b'{"status":"ok","result":{}}'))
+                self.assertEqual(heybox.request(path, {}, 'device', '', get=get, now=101), ({}, []))
+                get.assert_called_once()
+                self.assertTrue(heybox.status_snapshot()['review_required'])
+                self.assertFalse(heybox.status_snapshot().get('first_signed_ok'))
 
     def test_login_failure_status_requests_scan(self):
         self.assertFalse(heybox.handle_status('lack_token', now=100))
