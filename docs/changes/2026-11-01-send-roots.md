@@ -27,3 +27,13 @@ the fixture updates.
 Follow-up checks passed: `test_send_roots` (7), `test_onebot_messenger` (41),
 `test_send_neutral` (6), `test_vision_neutral` (8), `test_vision_channel` (14),
 `test_app` (16, 10 skipped), `test_golden` (2), and `test_basics` (11).
+
+## Quote review fix
+
+Private replies may quote her own message as well as the other person's. When an own message
+includes `target_id` or `peer_id`, every such field must match the other person; if neither is
+present, the quote is accepted. The actual NapCat response fields were not available here, so
+the check uses these named fields and the existing fake response shape.
+
+Review fix checks passed: `test_send_roots` (7), `test_app` (16, 10 skipped),
+`test_golden` (2), and `test_basics` (11).

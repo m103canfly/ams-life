@@ -208,8 +208,14 @@ class App:
                         field = 'group_id' if kind == 'group' else 'user_id'
                         place = frame.get(field)
                         other = quoted.get(field)
+                        self_id = frame.get('self_id')
+                        own_private = (kind == 'private' and self_id is not None and str(self_id)
+                                       and other is not None and str(other) == str(self_id))
+                        recipients_match = all(str(quoted[key]) == str(place)
+                                               for key in ('target_id', 'peer_id') if key in quoted)
                         if (kind not in ('group', 'private') or quoted.get('message_type') != kind
-                                or place is None or other is None or not str(place) or str(place) != str(other)):
+                                or place is None or other is None or not str(place)
+                                or (str(place) != str(other) and not (own_private and recipients_match))):
                             quoted = None
                 elif part.get('type') == 'at' and frame.get('message_type') == 'group':
                     qq = str(data.get('qq') or '')

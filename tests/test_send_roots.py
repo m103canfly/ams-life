@@ -152,6 +152,16 @@ class SendRoots(unittest.TestCase):
                          'sender': {'user_id': 10001}}
                 result = asyncio.run(run(kind, place, quote))
                 self.assertEqual('made up quote' in str(result), expected)
+        for extra, expected in (({}, True), ({'target_id': 10001}, True),
+                                ({'peer_id': '10001'}, True), ({'target_id': 10003}, False),
+                                ({'peer_id': 10003}, False),
+                                ({'target_id': 10001, 'peer_id': 10003}, False),
+                                ({'target_id': None}, False)):
+            with self.subTest(extra=extra):
+                quote = {'message_type': 'private', 'user_id': 20002, 'message': message,
+                         'sender': {'user_id': 20002}, **extra}
+                result = asyncio.run(run('private', 10001, quote))
+                self.assertEqual('made up quote' in str(result), expected)
 
     def test_app_does_not_allow_the_whole_root(self):
         self.assertNotIn('roots=[root]', (ROOT / 'app.py').read_text(encoding='utf-8'))
