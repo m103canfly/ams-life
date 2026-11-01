@@ -1860,6 +1860,7 @@
     if(brainFrame) brainFrame.onView(name);
     if(memoryList) memoryList.onView(name);
     if(likenessPage) likenessPage.onView(name);
+    if(heyboxPage) heyboxPage.onView(name);
   }
   // ams-life: "她的脑子" (brain_frame.js): reads go through this panel's bridge, read only
   const brainFrame=window.BioBrainFrame?window.BioBrainFrame.attach({bridge:()=>bridge,dark:()=>document.documentElement.dataset.theme==="dark"}):null;
@@ -1869,6 +1870,8 @@
   const likenessPage=window.BioLikeness?window.BioLikeness.attach({bridge:()=>bridge}):null;
   // ams-life move 5e-6: "钥匙" in 设置 (keys.js): only on our own panel server, where the owner fills her keys
   if(window.BioKeys) window.BioKeys.attach();
+  // ams-life 1d: "小黑盒" in 钥匙 (heybox.js): scan to sign her account in; the code is drawn on this page
+  const heyboxPage=window.BioHeybox?window.BioHeybox.attach({bridge:()=>bridge}):null;
   document.querySelectorAll(".nav-item[data-view]").forEach(a=>a.addEventListener("click",()=>switchView(a.dataset.view)));
   // ams-life: "她的表情包" is a page of its own (pages/stickers/). AstrBot lets a plugin page neither change the
   // window's address nor open another page of the plugin, so a copy of it in ./stickers/ opens in this frame,

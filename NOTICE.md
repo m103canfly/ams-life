@@ -54,6 +54,13 @@ The brain map page (`pages/starmap/brain.bundle.js`, and the same file in `pages
 
 The license text of each is in `pages/starmap/licenses/` (and `pages/dashboard/brain/licenses/`).
 
+The panel's 小黑盒 sign-in code (`pages/dashboard/qrcodegen.js`, used by `pages/dashboard/heybox.js`)
+is drawn by the **QR Code generator library** v1.8.0 (<https://github.com/nayuki/QR-Code-generator>,
+commit `720f62bddb7226106071d4728c292cb1df519ceb`, `typescript-javascript/qrcodegen.ts`),
+Copyright (c) Project Nayuki, MIT License. It is turned into plain JavaScript by Node.js's
+`module.stripTypeScriptTypes` (types and comments dropped, nothing else changed); its MIT notice
+is kept at the top of the file.
+
 ## ParseHub
 
 XiaoHeiHeSign is from https://github.com/z-mio/ParseHub, commit
