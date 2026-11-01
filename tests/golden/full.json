@@ -296,9 +296,9 @@
     "session": "private:10001",
     "small_summary": "真的受够了！",
     "source_check": {
-     "coverage": 0.2,
+     "coverage": 1.0,
      "cross_ref": 2,
-     "length_ratio": 0.007,
+     "length_ratio": 1.05,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -548,9 +548,9 @@
     "session": "group:900001",
     "small_summary": "小爱 我们约好下周一起打副本吧",
     "source_check": {
-     "coverage": 0.237,
+     "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 0.01,
+     "length_ratio": 1.0,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -696,9 +696,9 @@
     "session": "group:900001",
     "small_summary": "记得提醒我明天交报告",
     "source_check": {
-     "coverage": 0.179,
+     "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 0.006,
+     "length_ratio": 1.0,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -942,9 +942,9 @@
     "session": "group:900001",
     "small_summary": "小爱 我们约好下周一起打副本吧",
     "source_check": {
-     "coverage": 0.237,
+     "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 0.01,
+     "length_ratio": 1.0,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -1090,9 +1090,9 @@
     "session": "group:900001",
     "small_summary": "记得提醒我明天交报告",
     "source_check": {
-     "coverage": 0.179,
+     "coverage": 1.0,
      "cross_ref": 1,
-     "length_ratio": 0.006,
+     "length_ratio": 1.0,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -1348,9 +1348,9 @@
     "session": "private:10001",
     "small_summary": "真的受够了！",
     "source_check": {
-     "coverage": 0.2,
+     "coverage": 1.0,
      "cross_ref": 2,
-     "length_ratio": 0.007,
+     "length_ratio": 1.05,
      "novelty": 0.0,
      "overlap": 1.0,
      "source_items": [
@@ -9628,9 +9628,9 @@
      "session": "group:900001",
      "small_summary": "记得提醒我明天交报告",
      "source_check": {
-      "coverage": 0.179,
+      "coverage": 1.0,
       "cross_ref": 1,
-      "length_ratio": 0.006,
+      "length_ratio": 1.0,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
@@ -9771,9 +9771,9 @@
      "session": "group:900001",
      "small_summary": "小爱 我们约好下周一起打副本吧",
      "source_check": {
-      "coverage": 0.237,
+      "coverage": 1.0,
       "cross_ref": 1,
-      "length_ratio": 0.01,
+      "length_ratio": 1.0,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
@@ -10027,9 +10027,9 @@
      "session": "private:10001",
      "small_summary": "真的受够了！",
      "source_check": {
-      "coverage": 0.2,
+      "coverage": 1.0,
       "cross_ref": 2,
-      "length_ratio": 0.007,
+      "length_ratio": 1.05,
       "novelty": 0.0,
       "overlap": 1.0,
       "source_items": [
