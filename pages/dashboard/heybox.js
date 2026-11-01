@@ -84,7 +84,8 @@
     const tickMs = (opts && opts.tickMs) || 1000;
     const encoder = () => (opts && opts.qrcodegen) || (typeof window !== "undefined" && window.qrcodegen) || null;
     const el = (cls) => box.querySelector("." + cls);
-    let mode = null, gen = 0, poll = null, tick = null, deadline = 0, pending = false;
+    let mode = null, gen = 0, poll = null, tick = null, deadline = 0, pending = false, keysShown = false;
+    const KEYS_PARTS = ["settingsKeysTab", "settingsKeysTitle", "settingsKeys"];
 
     /** "live" on our own server, "sample" with no bridge at all, "off" inside AstrBot. */
     function modeNow() {
@@ -206,6 +207,32 @@
       }
     }
 
+    /** 设置 or 钥匙 opened: which mode it is now, and the state asked once when live. The mode is
+     *  worked out again each time: a panel opened straight on 设置 (?view=settings) gets there before
+     *  app.js has its bridge, and must not stay on the invented code once the bridge is there. */
+    function enter() {
+      const now = modeNow();
+      if (now !== mode) {
+        const was = mode;
+        mode = now;
+        if (mode === "off") {
+          stop(); box.hidden = true;
+          if (keysShown) { KEYS_PARTS.forEach((id) => { if ($(id)) $(id).hidden = true; }); keysShown = false; }
+          return;
+        }
+        box.hidden = false;
+        if (mode === "sample") {
+          // a static preview has no 钥匙 tab of its own (keys.js needs our server): show it for this block
+          KEYS_PARTS.forEach((id) => { if ($(id)) $(id).hidden = false; });
+          keysShown = true;
+          sample();
+          return;
+        }
+        if (was === "sample") { el("hb-badge").hidden = true; el("hb-badge").textContent = ""; }
+      }
+      if (mode === "live" && !poll && !tick) refresh();
+    }
+
     box.addEventListener("click", (ev) => {
       const btn = ev.target && ev.target.closest ? ev.target.closest("[data-hb]") : null;
       if (!btn) return;
@@ -221,7 +248,7 @@
     if (tabs) tabs.addEventListener("click", (ev) => {
       const tab = ev.target && ev.target.closest ? ev.target.closest(".settings-tab") : null;
       if (!tab) return;
-      if (tab.dataset.settingsTarget === "settingsKeys") { if (!poll && !tick) refresh(); }
+      if (tab.dataset.settingsTarget === "settingsKeys") { if (!poll && !tick) enter(); }
       else if (poll || tick) { stop(); show("idle", { text: "离开了这一页，这边不再等扫码", action: "login" }); }
     });
 
@@ -232,15 +259,7 @@
           if (poll || tick) { stop(); show("idle", { text: "离开了这一页，这边不再等扫码", action: "login" }); }
           return;
         }
-        if (mode === null) {
-          mode = modeNow();
-          if (mode === "off") { box.hidden = true; return; }
-          box.hidden = false;
-          // a static preview has no 钥匙 tab of its own (keys.js needs our server): show it for this block
-          ["settingsKeysTab", "settingsKeysTitle", "settingsKeys"].forEach((id) => { if ($(id)) $(id).hidden = false; });
-          if (mode === "sample") { sample(); return; }
-        }
-        if (mode === "live" && !poll && !tick) refresh();
+        enter();
       },
       stop,
     };

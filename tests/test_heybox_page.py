@@ -231,8 +231,29 @@ global.window = { confirm: (q) => { asked.push(q); return answerConfirm; }, qrco
     v2.onView('settings'); await sleep(5);
     out.astrbot = { hidden: p2.els.heyboxBox.hidden, tab: !p2.els.settingsKeysTab.hidden, calls };
   }
+  // 8. the panel opened straight on 设置 (?view=settings): 设置 comes before app.js has its bridge.
+  //    Once the bridge is there, the next 设置 or 钥匙 is the real block, not the invented code.
+  out.lateBridge = {};
+  for (const how of ['view', 'tab', 'astrbot']) {
+    const p = page(), calls = [];
+    let cur = null;
+    const real = bridgeOf({ 'page/heybox/status': [{ state: 'logged_in' }], 'page/heybox/login': [{ state: 'waiting', qr_url: url, expire: 120 }] },
+      calls, how !== 'astrbot');
+    const view = M.attach({ bridge: () => cur, pollMs: 30, tickMs: 20 });
+    view.onView('settings'); await sleep(5);
+    const before = { badge: !p.parts['hb-badge'].hidden, tab: !p.els.settingsKeysTab.hidden };
+    cur = real;
+    if (how === 'tab') p.els.settingsTabs.listeners.click({ target: { closest: () => ({ dataset: { settingsTarget: 'settingsKeys' } }) } });
+    else { view.onView('overview'); view.onView('settings'); }
+    await sleep(5);
+    out.lateBridge[how] = { before, badge: !p.parts['hb-badge'].hidden, tab: !p.els.settingsKeysTab.hidden, calls: calls.slice(), shown: seen(p) };
+    if (how === 'tab') {
+      answerConfirm = true;
+      out.lateBridge.tabLogout = await click(p, 'logout').then(() => calls.slice(), (e) => e.message);
+    }
+  }
   out.logged = logged;
-  process.stdout.write(JSON.stringify(out));
+  process.stdout.write(JSON.stringify(out), () => process.exit(0));
 })().catch((e) => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
 """
         run = subprocess.run(['node', '-e', script, str(JS), str(QR), URL], capture_output=True, text=True,
@@ -325,6 +346,18 @@ global.window = { confirm: (q) => { asked.push(q); return answerConfirm; }, qrco
         self.assertNotIn('xiaoheihe', s['encoded'][0])
         a = self.out['astrbot']
         self.assertEqual((a['hidden'], a['tab'], a['calls']), (True, False, []))
+
+    def test_a_bridge_that_comes_late_is_used(self):
+        for how in ('view', 'tab'):
+            got = self.out['lateBridge'][how]
+            self.assertEqual(got['before'], {'badge': True, 'tab': True}, how)
+            self.assertFalse(got['badge'], how)
+            self.assertEqual(got['calls'], ['page/heybox/status'], how)
+            s = got['shown']
+            self.assertEqual((s['state'], s['button'], s['qr'], s['tip'], s['hidden']), ('已登录', 'logout', False, '', False), how)
+        self.assertEqual(self.out['lateBridge']['tabLogout'], ['page/heybox/status', 'page/heybox/logout'])
+        a = self.out['lateBridge']['astrbot']
+        self.assertEqual((a['shown']['hidden'], a['tab'], a['calls']), (True, False, []))
 
 
 if __name__ == '__main__':
