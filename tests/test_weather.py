@@ -62,6 +62,7 @@ class FetchTests(unittest.TestCase):
         self.assertIsNone(weather.NoRedirect().redirect_request(None, None, 302, '', {}, 'https://example.invalid'))
 
     def test_describe_and_line(self):
+        self.assertEqual([weather.describe(x) for x in (85, 86)], ['阵雪', '阵雪'])
         self.assertEqual([weather.describe(x) for x in (0, 61, 95, 999)], ['晴', '小雨', '雷雨', ''])
         self.assertEqual(weather.line({'code': 61, 'min': 15, 'max': 22, 'rain': 20}, '示例城'),
                          '天气：示例城 小雨 15–22℃，降水 20%')
@@ -143,6 +144,25 @@ class WeatherTests(unittest.IsolatedAsyncioTestCase):
             await plugin._autonomy_loop()
         tick.assert_awaited_once()
         self.assertEqual(tick.await_args.args[0]['weather_lat'], 0.0)
+
+    async def test_weather_failure_does_not_stop_loop(self):
+        plugin = her.Her(harness.FakeContext(), config=dict(self.config))
+        test_basics.PLUGINS.append(plugin)
+        plugin._autonomy_task.cancel()
+        calls = 0
+
+        async def sleep(_seconds):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                plugin.enabled = False
+
+        with patch.object(mixin_autonomy.asyncio, 'sleep', side_effect=sleep), \
+             patch.object(weather, 'tick', new_callable=AsyncMock, side_effect=RuntimeError('detail')) as tick, \
+             patch.object(mixin_autonomy.logger, 'warning') as warning:
+            await plugin._autonomy_loop()
+        self.assertEqual(tick.await_count, 2)
+        self.assertEqual(warning.call_args_list[0].args, ('[ams-life] weather tick failed: %s', 'RuntimeError'))
 
     async def test_prepare_turn_offline_with_and_without_photo(self):
         config = dict(self.config, photo_enabled=False)

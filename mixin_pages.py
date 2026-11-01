@@ -637,13 +637,13 @@ class PagesMixin:
                 if existed:
                     original.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(dest, original)
-                os.replace(stage.joinpath('new', *rel), dest)
+                atomic_file.replace(stage.joinpath('new', *rel), dest)
                 changed.append((dest, original, existed))
                 count += 1
         except Exception as exc:
             for dest, original, existed in reversed(changed):
                 if existed:
-                    os.replace(original, dest)
+                    atomic_file.replace(original, dest)
                 else:
                     dest.unlink()
             for directory in reversed(created_dirs):

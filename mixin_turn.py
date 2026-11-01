@@ -54,20 +54,10 @@ def _one_line_history(contexts):
 def _has_non_sticker_image(event):
     """Whether this message or its quote contains an image other than a QQ sticker."""
     segments = adapter_astrbot_turn.incoming_of(event).segments
-    raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
-    raw_stickers = stickers.stickers_in_raw(raw) if raw is not None else []
+    def is_image(segment):
+        return segment.type == "image" and not stickers.stickers_in_segments((segment,))
 
-    def is_image(segment, check_raw=False):
-        if segment.type != "image" or stickers.stickers_in_segments((segment,)):
-            return False
-        if check_raw:
-            data = segment.data
-            for item in raw_stickers:
-                if any(data.get(key) and data.get(key) == item.get(key) for key in ("url", "file")):
-                    return False
-        return True
-
-    return any(is_image(segment, True) or
+    return any(is_image(segment) or
                (segment.type == "reply" and any(is_image(child) for child in
                                                  (segment.data.get("chain") or ())))
                for segment in segments)

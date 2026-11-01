@@ -38,7 +38,7 @@ class StickerPorts(unittest.TestCase):
         self.plugin._may_speak_in = Mock(return_value=True)
         self.plugin._note_sent = Mock()
         self.lib = Mock()
-        self.lib.rows = {'sticker': {'file': 'picture'}}
+        self.lib.rows = {'sticker': {'file': 'picture', 'source': 'old'}}
         self.data = b'sticker picture'
         self.b64 = base64.b64encode(self.data).decode('ascii')
         self.lib.path_of.return_value.read_bytes.return_value = self.data

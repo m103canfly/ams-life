@@ -70,10 +70,7 @@ class RecentImagesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_sticker_is_not_remembered(self):
         self.plugin._remember_images(event(ref='sticker', sticker=True))
-        raw_event = event(ref='raw-file')
-        raw_event.message_obj = types.SimpleNamespace(raw_message={'message': [
-            {'type': 'image', 'data': {'sub_type': 1, 'url': 'raw-url', 'file': 'raw-file'}}]})
-        self.plugin._remember_images(raw_event)
+        self.plugin._remember_images(event(ref='another-sticker', sticker=True))
         self.assertEqual(self.plugin._recent_images, {})
         self.assertEqual(await self.plugin._image_context(event('10005', 'Bob')), '')
         self.assertEqual(self.calls, [])

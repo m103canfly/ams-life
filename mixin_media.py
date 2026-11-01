@@ -95,9 +95,7 @@ class MediaMixin(PortsMixin):
         except Exception:
             return
         sticker_refs = set(self._sticker_refs(event))
-        raw = getattr(getattr(event, 'message_obj', None), 'raw_message', None)
-        found = stickers.stickers_in_raw(raw) if raw is not None else []
-        for item in found + stickers.stickers_in_segments(messages):
+        for item in stickers.stickers_in_segments(messages):
             sticker_refs.update(ref for ref in (item.get('url'), item.get('file')) if ref)
         rows = state.setdefault(here, [])
         for msg in messages:
