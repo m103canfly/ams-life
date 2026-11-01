@@ -14,6 +14,7 @@ import events
 import harness
 import her
 import interpretation
+import stickers
 import turn
 
 
@@ -33,7 +34,7 @@ class Provider:
 
     async def text_chat(self, **kwargs):
         self.calls.append(kwargs)
-        return harness.FakeResponse('图里是一只猫')
+        return harness.FakeResponse('{"caption": "图里是一只猫"}')
 
 
 class ImageContextStandalone(unittest.IsolatedAsyncioTestCase):
@@ -60,7 +61,8 @@ class ImageContextStandalone(unittest.IsolatedAsyncioTestCase):
         first = await self.plugin._image_context(self.event)
         self.assertIn('猫', first)
         self.assertEqual(len(self.provider.calls), 1)
-        self.assertEqual(self.provider.calls[0]['prompt'], interpretation.image_caption_prompt(''))
+        # 11-01: both paths ask the same look question (who is in it, what it means)
+        self.assertEqual(self.provider.calls[0]['prompt'], stickers.LOOK_PROMPT)
         self.assertEqual(await self.plugin._image_context(self.event), first)
         self.assertEqual(len(self.provider.calls), 1)
 
@@ -68,9 +70,9 @@ class ImageContextStandalone(unittest.IsolatedAsyncioTestCase):
         self.context.get_config = lambda: {'provider_settings': {'image_caption_prompt': 'Describe this drawing.'}}
         self.assertIn('猫', await self.plugin._image_context(self.event))
         self.assertEqual(len(self.provider.calls), 1)
-        self.assertEqual(self.provider.calls[0]['prompt'], interpretation.image_caption_prompt('Describe this drawing.'))
+        self.assertEqual(self.provider.calls[0]['prompt'], stickers.LOOK_PROMPT)   # 11-01: the look's question
 
     async def test_config_error_uses_default_prompt(self):
         self.context.get_config = Mock(side_effect=RuntimeError('unavailable'))
         self.assertIn('猫', await self.plugin._image_context(self.event))
-        self.assertEqual(self.provider.calls[0]['prompt'], interpretation.image_caption_prompt(''))
+        self.assertEqual(self.provider.calls[0]['prompt'], stickers.LOOK_PROMPT)

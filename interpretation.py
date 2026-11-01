@@ -101,10 +101,13 @@ def image_caption_prompt(base_prompt: str = "") -> str:
     """Prompt used for the vision model caption request.
 
     The caller may supply an AstrBot/user configured prompt; the deterministic
-    fallback lives here so main.py never assembles prompt text itself.
+    fallback lives here so main.py never assembles prompt text itself. The fallback
+    also asks who of a work is in the picture, and never a real person in a photo.
     """
     text = str(base_prompt or "").strip()
-    return text or "请客观描述这张图片，供角色扮演聊天使用。"
+    return text or ("请客观描述这张图片，供角色扮演聊天使用。图里作品（动漫、游戏、小说……）的角色，"
+                    "认得出就写“作品名的角色名”，认不准就写“像是作品名的角色名”，不认得就不写，不要猜；"
+                    "照片里的真人一律不认、不写名字。")
 
 
 def event_summary_prompt(texts) -> str:
@@ -350,7 +353,7 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
     if loop_text:
         out.append("[没做完的] " + loop_text)
     if _line(image):
-        out.append("[图片里是] " + _line(image, 160))
+        out.append("[图片里是] " + _line(image, 480))
     if _line(voice):
         out.append("[语音说的是] " + _line(voice, 120))
     if _line(kb):
