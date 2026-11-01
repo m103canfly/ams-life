@@ -206,7 +206,9 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         group._group = '900001'
         with patch.object(phone.time, 'time', clock):
             self.assertEqual(await self.p._tool_set_now(self.event, '学院', '上课'), '记下了')
-            self.assertEqual(self.p._now_line(self.event), self.p._now_line(group))
+            # set in this private chat, shown in a group: only the rough where/doing
+            self.assertIn('正在上课', self.p._now_line(group))
+            self.assertNotIn('从 09:30', self.p._now_line(group))
             self.assertEqual(self.p._now_line(group), Phone()._now_line(group))
             self.assertEqual(await self.p._tool_set_now(group, '地' * 21, '上课'), '不能更新此刻')
             clock.advance(3 * 3600)

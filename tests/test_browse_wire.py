@@ -126,19 +126,27 @@ class Money(unittest.TestCase):
 class Kept(unittest.TestCase):
     def test_a_page_read_in_a_reply_is_kept_by_the_page_not_her_reply(self):
         r = run_case('reply')
-        self.assertEqual([w['url'] for w in r['web']], ['https://example.com/a', 'https://news.example.org/cat'])
+        self.assertEqual(sorted(w['url'] for w in r['web']),
+                         ['https://example.com/a', 'https://news.example.org/cat'])
         for w in r['web']:
             self.assertTrue(w['text'].startswith('一页：正文'))
             self.assertNotIn('找到啦', w['text'])                        # her reply is not in it
             self.assertNotIn('（资料完）', w['text'])
-            self.assertEqual(w['origin']['where'], 'web:' + w['url'])     # the page: public
-            self.assertEqual(w['origin']['people'], [])
             self.assertEqual((w['asked_in']['where'], w['asked_in']['people']), ('group:900001', ['10001']))
+        by_url = {w['url']: w for w in r['web']}
+        # a link Mango gave in the group: the group's, openly (who asked is in asked_in)
+        self.assertEqual(by_url['https://example.com/a']['origin']['where'], 'group:900001')
+        self.assertEqual(by_url['https://example.com/a']['origin']['people'], [])
+        self.assertEqual(by_url['https://example.com/a']['origin']['visibility'], 'public')
+        # a page her own search found: hers, anywhere
+        self.assertEqual(by_url['https://news.example.org/cat']['origin']['where'], 'self')
+        self.assertEqual(by_url['https://news.example.org/cat']['origin']['visibility'], 'self')
 
     def test_who_asked_deleted_the_page_stays_who_asked_is_the_mark(self):
         r = run_case('reply')
         self.assertEqual(r['forget_counts']['asked_in'], 2)
-        self.assertEqual([w['url'] for w in r['web_after']], ['https://example.com/a', 'https://news.example.org/cat'])
+        self.assertEqual(sorted(w['url'] for w in r['web_after']),
+                         ['https://example.com/a', 'https://news.example.org/cat'])
         for w in r['web_after']:
             self.assertEqual(w['asked_in'], {'where': 'gone', 'people': [], 'source_ids': [], 'visibility': 'private'})
 
@@ -174,7 +182,7 @@ class Trip(unittest.TestCase):
         r = run_case('trip')
         self.assertEqual(r['web'], [{'text': '猫咖开业：看着挺可爱的（https://news.example.org/cat）',
                                      'asked_in': {'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'},
-                                     'where': 'web:https://news.example.org/cat'}])   # a page she did not read: not kept
+                                     'where': 'self'}])   # her own trip: hers; a page she did not read: not kept
         self.assertEqual(r['wishes'], [{'url': 'https://news.example.org/cat', 'what': '新开了猫咖', 'group_hint': '群1'}])
         self.assertEqual(r['boredom_after'], 0.7)
 

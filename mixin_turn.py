@@ -400,10 +400,6 @@ class TurnMixin:
                 self._browse_after_reply(event, reply)
             except Exception as exc:
                 logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
-            try:   # and the pages she read, as web memories (who asked kept apart)
-                await self._browse_keep_reply(event)
-            except Exception as exc:
-                logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
         self._continue_job(self._here(event))
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
@@ -432,6 +428,13 @@ class TurnMixin:
                 _reply = await self._look_at_reply(event, reply, _reply)
             except Exception as exc:
                 _reply = self._check_failed(event, exc, reply)
+            if self._browse_on():
+                # step 2 (丁): after the last look. The pages are her own reading, not the
+                # reply's words, so they are kept even when the reply is held back.
+                try:
+                    await self._browse_keep_reply(event)
+                except Exception as exc:
+                    logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
             if not _reply:
                 self._phone_queue(event).clear()
                 self._stop(event)

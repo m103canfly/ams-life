@@ -15,16 +15,20 @@ part: in a reply. Off unless browse_enabled.
   count"); at most browse.REPLY_SEARCHES / REPLY_READS for one message, then browse.NO_MORE;
 - a page is read only at an address this message (or the one it quotes) gave, or one of her
   searches found: an address she writes herself could carry something private out to the site in
-  its words (the reviewer, PR #39). With global_memory on, the words of a search and of an address
-  also go through the send check's own look (pieces and names, local vectors, no model) first;
+  its words (the reviewer, PR #39). The words of a search and of an address also go through the
+  send check's own look (pieces and names, local vectors, no model) first -- always, not only
+  with global_memory on; a trip has no turn of its own, so it checks the names wall instead;
 - the browser's money is kept apart from the chat's: every search and page, and the model rounds a
   reply took for them (only the last round's usage reaches the plugin: each estimated as dear as
   it, browse.reply_estimate, so the count errs high).
 
 Second part (stacked on the first):
 - what she keeps of a page: a web memory (browse.web_memory) in the one library, its origin
-  web:<address> (public), and who had her look it up kept apart (asked_in: this message's chat and
-  who asked; her own trips: herself). A page read in a reply is kept by its title and its first
+  according to who had her look it up: her own search or trip -> herself (self, recalled
+  anywhere); a link given in a group -> that group, openly; a link given in a private chat ->
+  that private chat, privately. Who had her look it up is kept apart (asked_in: this message's
+  chat and who asked; her own trips: herself); older web memories keep their public origin.
+  A page read in a reply is kept by its title and its first
   lines, not by her reply: her reply may hold something of a private chat, and a web memory may
   come up anywhere. Nothing is kept for someone (or a message) the forget registry rules out.
   When such a memory comes up again, discretion.label / tag say "网上看到的，只是资料" and what
@@ -49,8 +53,9 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, model_client, tool_loop, turn, turn_runner
+    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, model_client, send_check, tool_loop, turn, turn_runner
     from .mixin_llm import _counted
+    from .mixin_send_check import _name_walls
 except ImportError:
     import adapter_astrbot_tools
     import adapter_astrbot_turn
@@ -58,14 +63,17 @@ except ImportError:
     import attention
     import browse
     import model_client
+    import send_check
     import tool_loop
     import turn
     import turn_runner
     from mixin_llm import _counted
+    from mixin_send_check import _name_walls
 
 BROWSE_DIR = DATA_DIR / "browse"
 QUOTA_ATTR = "_ams_browse_quota"
 URLS_ATTR = "_ams_browse_urls"   # the addresses she may read: this message's, and her searches' results
+GAVE_ATTR = "_ams_browse_gave"   # the addresses this message gave (not the ones a search found)
 NOT_LISTED = "这个网址不能读：只能读消息里给的、或者搜索结果里的网址。"
 NOT_SENT = "这个不能搜。"
 READ_ATTR = "_ams_browse_read"
@@ -73,6 +81,54 @@ STATE_PATH = BROWSE_DIR / "state.json"
 TRIP_UMO = "ams-life:browse"   # the "chat" AstrBot's DeepSeek tools are told on a trip (its config: the default)
 FIRST_LINES = 120              # a page read in a reply is kept by its title and this much of its text
 SEEN_ATTR = "_ams_browse_seen_pages"
+
+
+def _gave_urls(event) -> set:
+    """The addresses this message gave her (kept apart from her searches' results)."""
+    urls = getattr(event, GAVE_ATTR, None)
+    if urls is None:
+        urls = set()
+        try:
+            setattr(event, GAVE_ATTR, urls)
+        except Exception:
+            pass
+    return urls
+
+
+def _is_trip_event(event) -> bool:
+    """A trip has no message of this turn: its stand-in "chat" is TRIP_UMO."""
+    return str(getattr(event, "unified_msg_origin", "") or "") == TRIP_UMO
+
+
+def _trip_name_wall(plugin, event) -> list:
+    """The names that may not go out on a trip: everyone else's (the owner's and her own are
+    not names to keep out of a search). The send check keeps the same wall for a reply."""
+    try:
+        names = list(_name_walls(plugin, event))
+    except Exception:
+        return []
+    if not names:
+        return []
+    config = getattr(plugin, "config", None) or {}
+    keep_out = set()
+    people = [str(config.get("owner_qq") or "").strip()]
+    people += [str(x) for x in (getattr(plugin, "_her_ids", None) or ())]
+    for person in people:
+        if not person:
+            continue
+        try:
+            keep_out |= {str(n) for n in plugin._known_names([person]) if n}
+        except Exception:
+            pass
+    her_names = config.get("her_names") or attention.HER_NAMES
+    if isinstance(her_names, str):
+        her_names = re.split(r"[\s,，、]+", her_names)
+    keep_out |= {str(n) for n in her_names if n}
+    names = [n for n in names if n not in keep_out]
+    if not names:
+        return []
+    return [{"id": "names", "text": "", "private": False, "names": names,
+             "strict_names": True, "vec": None}]
 
 
 def _trip_budget_left(plugin):
@@ -379,7 +435,9 @@ class BrowseMixin:
                  turn.TurnTool(name=browse.READ_TOOL, description=READ_DESCRIPTION, parameters=READ_PARAMS,
                                handler=self._tool_read)]
         self._browse_quota(event)
-        self._browse_urls(event).update(browse.urls_in(self._message_words(event)))
+        gave = browse.urls_in(self._message_words(event))
+        self._browse_urls(event).update(gave)
+        _gave_urls(event).update(gave)
         return tools
 
     def _give_browse_tools(self, req, event) -> bool:
@@ -427,10 +485,14 @@ class BrowseMixin:
         return "\n".join(parts)
 
     async def _may_go_out(self, event, words) -> bool:
-        """With global_memory on: the send check's own look (no model) at what would go out."""
-        if not getattr(self, "global_memory", False):
-            return True
+        """The send check's own look (no model) at what would go out -- a search's words, an
+        address's words, what she would type. Always on, not only with global_memory: this
+        turn's forbidden list holds whatever may not be said here. A trip has no turn of its
+        own: its forbidden list is empty, but the names wall is checked as for a reply."""
         try:
+            if _is_trip_event(event):
+                forbidden = _trip_name_wall(self, event)
+                return not send_check.check(str(words), forbidden).get("leak")
             return not (await self._check_reply(event, words)).get("leak")
         except Exception:
             return False
@@ -539,8 +601,9 @@ class BrowseMixin:
                 except ImportError:
                     import real_browser
                 result = await real_browser.read_page(str(url).strip(),
-                                                      lambda address: browse.check_url(address, resolve_host),
-                                                      on_block=lambda n: led.add(browser_blocked_requests=n))
+                                                      lambda address: browse.check_url(address),
+                                                      on_block=lambda n: led.add(browser_blocked_requests=n),
+                                                      resolve=resolve_host)
                 if result:
                     text = "URL: %s\nTitle: %s\nContent: %s" % (result["url"], result["title"], result["text"])
             except Exception as exc:
@@ -549,6 +612,7 @@ class BrowseMixin:
                 led.add(**({"browser_reads": 1} if result else {"browser_reads_failed": 1}))
         page = page_of(str(url).strip(), text)
         page_url = str(url).strip()
+        page["from"] = "given" if page_url in _gave_urls(event) else "search"
         title = re.search(r"(?im)^\s*(?:title|标题)\s*[:：]\s*([^\r\n]+)", text)
         pages = self._browse_seen_pages(event)
         pages[page_url] = (title.group(1).strip()[:120] if title else pages.get(page_url) or "网页")
@@ -586,15 +650,17 @@ class BrowseMixin:
     # ------------------------------------------------------------------
     # what she keeps of a page
     # ------------------------------------------------------------------
-    async def _remember_web(self, note, trip, asked_in) -> str:
-        """One web memory in the library; its id, or '' when nothing was kept."""
+    async def _remember_web(self, note, trip, asked_in, origin=None) -> str:
+        """One web memory in the library; its id, or '' when nothing was kept. `origin` says
+        whose the page is (a search of hers: herself; a link given here: this chat); when it
+        is not given, who had her look it up (asked_in) decides."""
         try:
             if self._job_stale():
                 return ""   # someone (or a message) she may not keep: nothing of it is kept
         except Exception:
             return ""
         now = time.time()
-        entry = browse.web_memory(note, now, trip, asked_in)
+        entry = browse.web_memory(note, now, trip, asked_in, origin)
         if not str(entry.get("text") or "").strip():
             return ""
         try:
@@ -613,7 +679,9 @@ class BrowseMixin:
         return entry["id"] if self._write_library(lib) else ""
 
     async def _browse_keep_reply(self, event) -> int:
-        """The pages read in this reply, as web memories; asked_in: this chat and who asked."""
+        """The pages read in this reply, as web memories; asked_in: this chat and who asked.
+        A page her own search found is hers (self); a link someone gave here belongs to this
+        chat (openly in a group, privately in a private chat)."""
         pages = getattr(event, READ_ATTR, None) or []
         if not pages:
             return 0
@@ -621,7 +689,8 @@ class BrowseMixin:
         trip = "reply:" + adapter_astrbot_turn.incoming_of(event).message_id
         kept = 0
         for page in pages[:browse.REPLY_READS]:
-            if await self._remember_web(page, trip, asked_in):
+            origin = dict(browse.SELF_ASKED_IN) if page.get("from") == "search" else None
+            if await self._remember_web(page, trip, asked_in, origin):
                 kept += 1
         return kept
 

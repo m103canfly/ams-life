@@ -270,6 +270,21 @@ class SelfieMixin(PortsMixin):
                 _write_json(NOW_PATH, state)
             elapsed = int((now - start).total_seconds() // 60)
             duration = "%d 小时 %d 分钟" % divmod(elapsed, 60) if elapsed >= 60 else "%d 分钟" % elapsed
+            place = state.get("place") if isinstance(state, dict) else None
+            try:
+                here = self._here(event)
+            except Exception:
+                here = adapter_astrbot_turn.incoming_of(event).place
+            if isinstance(place, str) and place.startswith("private:") and place != here:
+                # set in someone's private chat, shown elsewhere: only the rough where/doing,
+                # never the sentence, and no one else's business in it
+                names = []
+                try:
+                    names = self._browse_names()
+                except Exception:
+                    names = []
+                doing = discretion.anonymize(str(state["doing"]), names)
+                return "此刻：在%s，正在%s。" % (state["where"], doing)
             line = "此刻：在%s，正在%s（从 %s 开始，已经 %s）。" % (state["where"], state["doing"], start.strftime("%H:%M"), duration)
             minutes = state.get("minutes")
             if state["source"] == "her" and isinstance(minutes, int) and not isinstance(minutes, bool) and elapsed > minutes:
