@@ -18,7 +18,7 @@ The lunar table uses Gregorian dates in this order: 除夕, 春节, 元宵, 端�
 | --- | --- |
 | 2026 | 02-16, 02-17, 03-03, 06-19, 08-19, 09-25, 10-18 |
 | 2027 | 02-05, 02-06, 02-20, 06-09, 08-08, 09-15, 10-08 |
-| 2028 | 01-25, 01-26, 02-09, 05-28, 08-26, 10-03, 10-27 |
+| 2028 | 01-25, 01-26, 02-09, 05-28, 08-26, 10-03, 10-26 |
 | 2029 | 02-12, 02-13, 02-27, 06-16, 08-16, 09-22, 10-16 |
 | 2030 | 02-02, 02-03, 02-17, 06-05, 08-05, 09-12, 10-05 |
 
@@ -50,3 +50,5 @@ Validation: `test_calendar_cn` 4, `test_time_sense` 2, `test_her_look` 5,
 `test_basics` 11 all passed. The full suite was not run as instructed;
 `test_golden_standalone` is reserved for the owner outside the sandbox. No
 pages or other out-of-scope files were edited.
+
+审核用香港天文台公历农历对照表逐年核了 2026–2030，改正一处：2028 年重阳是 10-26（原表 10-27）。

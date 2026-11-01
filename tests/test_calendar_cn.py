@@ -18,7 +18,8 @@ class CalendarTests(unittest.TestCase):
         for day, expected in ((date(2026, 2, 17), '今天春节。'),
                               (date(2026, 2, 14), '今天情人节。'),
                               (date(2026, 9, 22), '再过 3 天是中秋。'),
-                              (date(2027, 2, 6), '今天春节。')):
+                              (date(2027, 2, 6), '今天春节。'),
+                              (date(2028, 10, 26), '今天重阳。')):
             self.assertEqual(calendar_cn.today_line(day), expected)
 
     def test_term_and_look(self):
