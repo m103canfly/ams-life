@@ -258,7 +258,7 @@ class Actions(unittest.TestCase):
         self.assertEqual(bot.seen, [('get_msg', {'message_id': 'm-2'})])
 
     def test_an_action_not_in_the_list_is_refused(self):
-        for action in ('send_like', 'delete_msg', 'set_qq_profile', 'send_qzone_msg'):
+        for action in ('send_like', 'delete_msg', 'set_qq_profile', 'set_group_kick'):
             with self.subTest(action=action):
                 bot = _BotWithApi({'message_id': 'm-1'})
                 with self.assertRaises(messenger.ActionRefused):

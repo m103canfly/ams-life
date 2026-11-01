@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 from pathlib import Path
 
 try:
@@ -139,6 +140,45 @@ def _target(place):
     return None
 
 
+def _qzone_params(action, params):
+    if action == "delete_qzone_msg":
+        tid = params.get("tid")
+        if set(params) != {"tid"} or not isinstance(tid, str) or not re.fullmatch(r"[A-Za-z0-9]{1,64}", tid):
+            raise messenger.ActionRefused(action)
+        return dict(params)
+    content, targets = params.get("content"), params.get("target_uins")
+    if (set(params) - {"content", "images", "ugc_right", "target_uins"}
+            or not isinstance(content, str) or not 1 <= len(content.strip()) <= 300
+            or type(params.get("ugc_right")) is not int or params["ugc_right"] != 16
+            or not isinstance(targets, list) or len(targets) != 1
+            or not isinstance(targets[0], str) or not targets[0]
+            or any(c not in _DIGITS for c in targets[0])):
+        raise messenger.ActionRefused(action)
+    result = dict(params, content=content.strip())
+    if "images" in params:
+        try:
+            from . import mixin_selfie
+        except ImportError:
+            import mixin_selfie
+        images = params["images"]
+        if not isinstance(images, list) or len(images) > 1:
+            raise messenger.ActionRefused(action)
+        converted = []
+        for image in images:
+            try:
+                if not isinstance(image, str) or ".." in Path(image).parts:
+                    raise ValueError()
+                path = Path(image)
+                match = mixin_selfie.GENERATED.fullmatch(path.name)
+                if path.resolve().parent != mixin_selfie.SELFIE_DIR.resolve() or not match or match.group(1) != "photo":
+                    raise ValueError()
+                converted.append(_file_ref(image, (mixin_selfie.SELFIE_DIR,)))
+            except (OSError, ValueError):
+                raise messenger.ActionRefused(action) from None
+        result["images"] = converted
+    return result
+
+
 class OneBotMessenger(messenger.Messenger):
     """Messenger over NapCat: one API call, and her own folders for local files.
 
@@ -173,6 +213,8 @@ class OneBotMessenger(messenger.Messenger):
         """One allowed action with these parameters; its data, or ActionFailed."""
         if action not in messenger.ALLOWED_ACTIONS:
             raise messenger.ActionRefused(action)
+        if action in ("send_qzone_msg", "delete_qzone_msg"):
+            params = _qzone_params(action, params)
         if action in _SEND_ACTION.values() and not _safe_message(params.get("message")):
             raise messenger.ActionRefused(action)
         frame = await self.call_api(action, dict(params))
