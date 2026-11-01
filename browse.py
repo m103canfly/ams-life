@@ -445,7 +445,8 @@ def web_origin(url, shared_in=None) -> dict:
 def _origin_of_asked(url, asked_in) -> dict:
     """Where a page she read belongs: the page (web:<url>), and, when a link was given in a
     private chat, that chat (shared_in). Who asked stays in asked_in: a page is never
-    deleted with them, it becomes a page nobody may say who for."""
+    deleted with them; a page given in a private chat stays only of that chat, so once that
+    person is forgotten it may be brought up nowhere."""
     asked = dict(asked_in or SELF_ASKED_IN)
     return web_origin(url, asked.get("where"))
 

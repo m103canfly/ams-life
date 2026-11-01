@@ -53,6 +53,7 @@ HOP_HEADERS = ("connection", "keep-alive", "proxy-connection", "transfer-encodin
 # (or a slow name) may not take the threads embeddings, pictures and voice use.
 FETCH_WORKERS = 4
 HOP_SECONDS = OPEN_SECONDS          # one hop's whole budget: name, connect, send, read
+MAX_ADDRESSES = 4                   # a name may give many addresses: a hop tries these at most
 READ_CHUNK = 65536
 PROXY_SCHEMES = ("http",)           # the only proxy kind we speak ourselves
 _lock = asyncio.Lock()
@@ -198,12 +199,16 @@ def _pin_address(url, check, resolve) -> tuple:
 
 
 def _connect(ip, port, hostname, tls, timeout):
-    """A socket to the address checked; the hostname is only TLS's SNI and certificate check."""
-    sock = socket.create_connection((ip, int(port)), timeout=timeout)
+    """A socket to the address checked; the hostname is only TLS's SNI and certificate check.
+    `timeout` covers the connect and the TLS handshake together, not each of them."""
+    budget = max(0.001, float(timeout or OPEN_SECONDS))
+    deadline = time.monotonic() + budget
+    sock = socket.create_connection((ip, int(port)), timeout=budget)
     if not tls:
         return sock
     try:
         context = ssl.create_default_context()
+        _set_timeout(sock, _remaining(deadline))    # the handshake gets what the connect left
         return context.wrap_socket(sock, server_hostname=_ascii_host(hostname))
     except BaseException:
         try:
@@ -214,8 +219,8 @@ def _connect(ip, port, hostname, tls, timeout):
 
 
 def _read_all(sock, limit, deadline=None) -> bytes:
-    """Everything up to `limit` bytes, a chunk at a time, until the hop's `deadline`; the socket
-    is left for the caller to close, so a slow server cannot keep it (or a thread) alive."""
+    """Up to `limit` bytes, a chunk at a time, until the hop's `deadline`; the socket is left
+    for the caller to close, so a slow server cannot keep it (or a thread) alive."""
     out, total = [], 0
     while total < limit:
         left = _remaining(deadline) if deadline is not None else None
@@ -255,6 +260,41 @@ def _read_head(sock, deadline=None, limit=65536) -> bytes:
             break
         out += piece
     return out
+
+
+def _content_length(head):
+    """The Content-Length a response head gives, or None when it gives none (or is chunked):
+    with it, the body is read up to that many bytes instead of waiting for the server to close."""
+    try:
+        text = bytes(head).partition(b"\r\n\r\n")[0]
+        found = {}
+        for line in text.split(b"\r\n")[1:]:
+            if b":" not in line:
+                continue
+            name, value = line.split(b":", 1)
+            found[name.strip().lower()] = value.strip()
+        if b"chunked" in found.get(b"transfer-encoding", b"").lower():
+            return None
+        value = found.get(b"content-length", b"")
+        return int(value) if value.isdigit() else None
+    except Exception:
+        return None
+
+
+def _read_response(sock, deadline, limit) -> bytes:
+    """One response's head and body: the body only up to its Content-Length (and `limit`), so a
+    server that keeps the connection open after its answer is not waited for."""
+    head = _read_head(sock, deadline)
+    if b"\r\n\r\n" not in head:
+        return head
+    length = _content_length(head)
+    if length is None:
+        want = max(0, limit - len(head))
+    else:
+        want = max(0, min(length, limit) - len(head.partition(b"\r\n\r\n")[2]))
+    if want <= 0:
+        return head
+    return head + _read_all(sock, want, deadline)
 
 
 def _status_of(raw) -> int:
@@ -315,8 +355,17 @@ def _parse_response(raw) -> tuple:
     return status, headers, body
 
 
-def _host_header(host, port, scheme) -> str:
+def _host_in_url_form(host) -> str:
+    """A host as it goes in a Host header, a CONNECT line or a proxy's absolute form: an IPv6
+    address keeps its brackets (the URL parser drops them from the name)."""
     name = _ascii_host(host)
+    if ":" in name and not name.startswith("["):
+        return "[" + name + "]"
+    return name
+
+
+def _host_header(host, port, scheme) -> str:
+    name = _host_in_url_form(host)
     if int(port) != (443 if str(scheme).lower() == "https" else 80):
         name += ":" + str(port)
     return name
@@ -360,7 +409,7 @@ def _fetch_once(url, ip, timeout=OPEN_SECONDS, connect=None) -> tuple:
     try:
         _set_timeout(sock, _remaining(deadline))
         sock.sendall(request)
-        raw = _read_all(sock, MAX_RESPONSE_BYTES + 65536, deadline)
+        raw = _read_response(sock, deadline, MAX_RESPONSE_BYTES)
     finally:
         try:
             sock.close()
@@ -508,7 +557,7 @@ def _fetch_once_proxy(url, proxy, timeout=OPEN_SECONDS, connect=None) -> tuple:
     scheme = parts.scheme.lower()
     host = parts.hostname or ""
     port = parts.port or (443 if scheme == "https" else 80)
-    authority = "%s:%d" % (_ascii_host(host), int(port))
+    authority = "%s:%d" % (_host_in_url_form(host), int(port))
     sock = connect(proxy_host, proxy_port, "", False, max(0.001, _remaining(deadline)))
     try:
         if scheme == "https":
@@ -524,7 +573,7 @@ def _fetch_once_proxy(url, proxy, timeout=OPEN_SECONDS, connect=None) -> tuple:
         request = _get_request(url, via_proxy=(scheme != "https"))
         _set_timeout(sock, _remaining(deadline))
         sock.sendall(request)
-        raw = _read_all(sock, MAX_RESPONSE_BYTES + 65536, deadline)
+        raw = _read_response(sock, deadline, MAX_RESPONSE_BYTES)
     finally:
         try:
             sock.close()
@@ -705,6 +754,7 @@ class _RequestGate:
         self.blocked = 0
         self.document_url = ""
         self.main_frame = None
+        self.checked = {}   # url -> (addresses, reason), so the last look need not resolve again
 
     def block(self, reason) -> None:
         self.blocked += 1
@@ -731,11 +781,17 @@ class _RequestGate:
 
 async def _get_direct(url, addresses):
     """One hop to the addresses checked, trying them in order (an IPv6 address a home cannot
-    reach does not lose the site). Every attempt is on the fetch pool, bounded."""
+    reach does not lose the site). Every attempt is on the fetch pool; the hop has one deadline
+    shared by its addresses, and only the first few are tried, so a name that gives many
+    addresses cannot multiply the hop's time."""
     last = None
-    for address in list(addresses or ()):
+    deadline = time.monotonic() + HOP_SECONDS
+    for address in list(addresses or ())[:MAX_ADDRESSES]:
+        left = _remaining(deadline)
+        if left <= 0:
+            break
         try:
-            return await _pool_call(_fetch_once, url, address, HOP_SECONDS)
+            return await _pool_call(_fetch_once, url, address, left)
         except FetchBusy:
             raise
         except Exception as exc:
@@ -750,16 +806,34 @@ async def _get_proxied(url, proxy):
     return await _pool_call(_fetch_once_proxy, url, proxy, HOP_SECONDS)
 
 
-async def _checked(url, gate) -> tuple:
+def _check_url(url, gate) -> tuple:
     """(addresses, reason) for one address: through the proxy when the system sets one, else
-    the addresses checked here; (None, why) when the page may not be read or no thread is
-    free. FetchBusy is raised for the caller to abort with its own reason."""
+    the addresses checked here; (None, why) when the page may not be read."""
     proxy, why = _proxy_for(url)
     if why:
         return None, why
     if proxy:
-        return await _pool_call(_pin_proxied, url, gate.check, gate.resolve)
-    return await _pool_call(_pin_addresses, url, gate.check, gate.resolve)
+        return _pin_proxied(url, gate.check, gate.resolve)
+    return _pin_addresses(url, gate.check, gate.resolve)
+
+
+async def _checked(url, gate) -> tuple:
+    """The rules on one address, on the fetch pool (a name lookup may block). FetchBusy is
+    raised for the caller to abort with its own reason."""
+    found = await _pool_call(_check_url, url, gate)
+    gate.checked[str(url)] = found
+    return found
+
+
+async def _checked_free(url, gate) -> tuple:
+    """The final look at a page's address after it was read: the same rules, but it takes no
+    fetch slot (a page that timed out may still hold every thread), so a name lookup is put on
+    the default thread instead. Without this the last look could fail a page that was read.
+    An address already checked in this visit is not resolved again."""
+    found = gate.checked.get(str(url))
+    if found is None:
+        found = await asyncio.to_thread(_check_url, url, gate)
+    return found
 
 
 async def _route_pinned(route, gate):
@@ -919,9 +993,9 @@ async def _visit(url, check, shot_path, on_block, resolve=None):
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
             try:
-                addresses, reason = await _checked(final_url, gate)
+                addresses, reason = await _checked_free(final_url, gate)
             except Exception:
-                addresses, reason = None, "busy"
+                addresses, reason = None, "unchecked"
             if addresses is None:
                 logger.info("[ams-life] browser: redirect refused (%s)", reason)
                 return None
@@ -941,9 +1015,9 @@ async def _visit(url, check, shot_path, on_block, resolve=None):
                 await asyncio.gather(*list(pending), return_exceptions=True)
             for address_to_check in list(dict.fromkeys([final_url, end_url])):
                 try:
-                    addresses, reason = await _checked(address_to_check, gate)
+                    addresses, reason = await _checked_free(address_to_check, gate)
                 except Exception:
-                    addresses, reason = None, "busy"
+                    addresses, reason = None, "unchecked"
                 if addresses is None:
                     logger.info("[ams-life] browser: redirect refused (%s)", reason)
                     return None

@@ -33,7 +33,8 @@ Second part (stacked on the first):
   come up anywhere. Nothing is kept for someone (or a message) the forget registry rules out.
   When such a memory comes up again, discretion.label / tag say "网上看到的，只是资料" and what
   she may say of who asked (part 己); deleting the person who asked turns asked_in into the
-  deleted mark (mixin_discretion._forget);
+  deleted mark (mixin_discretion._forget), and a page given in that private chat is then
+  brought up nowhere (its shared_in stays);
 - her going out by herself: in the 5-minute loop, when browse.should_go says so (not at night --
   part 甲's night --, trips and money left, 40 minutes since the last, the chats quiet for 10, and
   curious or bored), one trip: a few topics (today's public events, her own notes), the same two

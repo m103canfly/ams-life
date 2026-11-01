@@ -8,7 +8,9 @@ Every memory, event and note carries an ``origin``:
      "people": [qq, ...],          # who it is about / whose messages it came from
      "source_ids": [msg id, ...],  # the messages it was distilled from (forgetting deletes by these)
      "visibility": "public" | "private" | "self",
-     "shared_in": "private:<qq>"}  # a web page given in that private chat: only there
+     "shared_in": "private:<qq>"}  # a web page given in that private chat: only there, and
+                                   # still only there once that chat is gone (the page is kept,
+                                   # it may be brought up nowhere)
 
 and ``verdict(origin, here)`` applies the discretion table of the plan:
 
@@ -100,12 +102,11 @@ def origin_of(item, fallback_where="") -> dict:
         return make_origin("")
     stored = item.get("origin")
     if isinstance(stored, dict) and "where" in stored:
-        asked = item.get("asked_in") if isinstance(item.get("asked_in"), dict) else {}
-        shared = stored.get("shared_in")
-        if str(asked.get("where") or "") == GONE:
-            shared = None   # the chat the page was given in is gone: the page is material again
+        # shared_in is kept as it is, even when the one who gave the page was forgotten
+        # (asked_in is the gone mark): the page stays private to that chat, so it is dropped
+        # everywhere, instead of becoming material she may bring up anywhere.
         result = make_origin(stored.get("where"), stored.get("people"), stored.get("source_ids"),
-                             stored.get("visibility"), shared)
+                             stored.get("visibility"), stored.get("shared_in"))
         if isinstance(stored.get("recall_sources"), list):
             result["recall_sources"] = stored["recall_sources"]
         return result
@@ -252,7 +253,8 @@ def label(origin, here, speaker="", present=(), said_by="", asked_in=None) -> di
     web, self it is from a web page / her own
     asked     for a web page: what she may say of who asked her to look (asked_in, an
               origin; someone deleted is gone_origin()); a page given in a private chat
-              (origin["shared_in"]) may be brought up only there
+              (origin["shared_in"]) may be brought up only there, and nowhere when that
+              chat is gone (the one who gave it was forgotten)
     """
     o = origin if isinstance(origin, dict) else {}
     where = str(o.get("where") or "")

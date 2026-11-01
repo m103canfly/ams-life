@@ -258,11 +258,17 @@ class OutboundChecks(Sealed):
         inside = discretion.label(origin, 'private:10003', '10003', asked_in=asked)
         self.assertEqual((inside['may'], inside['web'], inside['self']), (discretion.SAY, True, False))
         self.assertEqual(discretion.may_recall(origin, 'private:10003'), discretion.SAY)
-        # once the chat is gone (the one who gave it was forgotten), the page is material again
+        # once the one who gave it is forgotten, the page does not become material again: it
+        # stays private to that chat, and that chat is nobody's, so it is dropped everywhere
         forgotten = dict({'origin': origin}, asked_in=discretion.gone_origin())
-        self.assertNotIn('shared_in', discretion.origin_of(forgotten))
-        self.assertEqual(discretion.may_recall(discretion.origin_of(forgotten), 'group:900001'),
-                         discretion.SAY)
+        kept = discretion.origin_of(forgotten)
+        self.assertEqual(kept['shared_in'], 'private:10003')
+        for here in ('group:900001', 'private:10005'):
+            lab = discretion.label(kept, here, '10001', asked_in=discretion.gone_origin())
+            self.assertEqual((lab['may'], lab['web']), (discretion.NO, True), here)
+            self.assertIn('这里不能讲', discretion.tag(lab, partner='小甲'))
+            self.assertEqual(discretion.may_recall(kept, here), discretion.DROP, here)
+            self.assertEqual(discretion.verdict(kept, here), discretion.DROP, here)
 
     def test_a_web_page_is_not_a_rooms_memory(self):
         class FakeMemory(mixin_memory.MemoryMixin):
@@ -448,6 +454,22 @@ def http_response(status=200, headers=(), body=b'ok'):
         head += '%s: %s\r\n' % (name, value)
     head += 'Content-Length: %d\r\nConnection: close\r\n\r\n' % len(body)
     return head.encode() + body
+
+
+class EndlessSocket(FakeSocket):
+    """A server that answers, keeps the connection open and dribbles a byte at a time: a read
+    that does not look at Content-Length waits for the deadline, one that does stops at once."""
+
+    def __init__(self, raw):
+        super().__init__(raw)
+        self.reads = 0
+
+    def recv(self, size):
+        self.reads += 1
+        if self.raw:
+            return super().recv(size)
+        time.sleep(0.005)
+        return b'x'
 
 
 class PinnedBrowser(Sealed):
@@ -671,6 +693,37 @@ class ResponseLimits(Sealed):
         self.assertEqual(sockets[0][1][:3], (PUBLIC, 443, 'example.com'))
         self.assertTrue(sockets[0][0].closed)
 
+    def test_the_body_is_read_only_up_to_its_content_length(self):
+        # the answer says two bytes; the server then keeps the connection open and dribbles
+        sock = EndlessSocket(http_response(body=b'ok'))
+        started = time.monotonic()
+        status, headers, body = real_browser._fetch_once(URL, PUBLIC, 5, lambda *args: sock)
+        self.assertLess(time.monotonic() - started, 1)   # did not wait for the server to close
+        self.assertEqual((status, body), (200, b'ok'))
+        self.assertLess(sock.reads, 4)                   # did not dribble on to the deadline
+        self.assertTrue(sock.closed)
+
+    def test_an_ipv6_address_keeps_its_brackets_in_host_and_connect(self):
+        self.assertEqual(real_browser._host_header(PUBLIC_V6, 443, 'https'), '[%s]' % PUBLIC_V6)
+        self.assertEqual(real_browser._host_header(PUBLIC_V6, 8443, 'https'),
+                         '[%s]:8443' % PUBLIC_V6)
+        # the absolute form a proxy is asked for
+        request = real_browser._get_request('http://[%s]:8080/a?b=1' % PUBLIC_V6, via_proxy=True)
+        self.assertIn(('GET http://[%s]:8080/a?b=1 HTTP/1.1\r\n' % PUBLIC_V6).encode('ascii'), request)
+        # the CONNECT line for an https page through a proxy
+        plain = FakeSocket(b'HTTP/1.1 200 Connection established\r\n\r\n')
+
+        class FakeTLS:
+            def wrap_socket(self, sock, server_hostname=None):
+                return FakeSocket(http_response(body=b'page'))
+
+        with mock.patch.object(real_browser.ssl, 'create_default_context', return_value=FakeTLS()):
+            status, headers, body = real_browser._fetch_once_proxy(
+                'https://[%s]/a' % PUBLIC_V6, 'http://proxy.example.test:8080', 5,
+                lambda *args: plain)
+        self.assertEqual((status, body), (200, b'page'))
+        self.assertIn(('CONNECT [%s]:443 HTTP/1.1\r\n' % PUBLIC_V6).encode('ascii'), plain.sent)
+
 
 class ProxyRule(Sealed):
     def test_only_an_http_proxy_is_spoken(self):
@@ -850,7 +903,8 @@ class FetchPool(Sealed):
                 real_browser._pool_call(real_browser._fetch_once, URL, PUBLIC, 0.3, connect))
             # the default pool is untouched while a page dribbles
             other = await asyncio.wait_for(asyncio.to_thread(lambda: 'done'), 2)
-            result = await slow
+            # a deadline that is not watched must fail here, not after hours of dribbling
+            result = await asyncio.wait_for(slow, 2)
             return other, result, time.monotonic() - started
 
         other, result, elapsed = asyncio.run(exercise())
@@ -880,6 +934,37 @@ class FetchPool(Sealed):
             asyncio.run(exercise())
         finally:
             release.set()
+
+    def test_the_final_look_at_a_page_takes_no_fetch_thread(self):
+        # a page that timed out keeps every fetch thread; the last look must still find the page
+        resolved = []
+
+        def resolve(host):
+            resolved.append(host)
+            return [PUBLIC]
+
+        gate = real_browser._RequestGate(browse.check_url, resolve, lambda reason: None)
+        self.assertEqual(asyncio.run(real_browser._checked(URL, gate)), ([PUBLIC], ''))
+        taken = 0
+        try:
+            while real_browser._take_fetch_slot():
+                taken += 1
+            self.assertEqual(taken, real_browser.FETCH_WORKERS)
+            with self.assertRaises(real_browser.FetchBusy):
+                asyncio.run(real_browser._checked('https://example.com/other', gate))
+            # an address this visit already checked: answered, not resolved again
+            self.assertEqual(asyncio.run(real_browser._checked_free(URL, gate)), ([PUBLIC], ''))
+            self.assertEqual(len(resolved), 1)
+            # an address it never checked: resolved, but never on a fetch thread
+            started = time.monotonic()
+            self.assertEqual(asyncio.run(real_browser._checked_free('https://example.com/other', gate)),
+                             ([PUBLIC], ''))
+            self.assertLess(time.monotonic() - started, 1)
+            self.assertEqual(resolved, ['example.com', 'example.com'])
+        finally:
+            for _ in range(taken):
+                real_browser._release_fetch_slot()
+        self.assertEqual(real_browser._active_fetches, 0)
 
     def test_a_subrequest_that_cannot_get_a_thread_is_aborted(self):
         release = threading.Event()

@@ -320,8 +320,8 @@ class Browser(unittest.TestCase):
         fake = FakePlaywright()
         original = asyncio.to_thread
         async def slow_thread(*args, **kwargs):
-            if args[0] in (real_browser._pin_address, real_browser._fetch_once):
-                return await original(*args, **kwargs)
+            if args[0] in (real_browser._fetch_once, real_browser._check_url):
+                return await original(*args, **kwargs)   # the browser's own lookups are not slowed
             await asyncio.sleep(1)
         with mock.patch.object(real_browser, 'EXTRACT_SECONDS', 0.01), \
              mock.patch.object(real_browser.asyncio, 'to_thread', side_effect=slow_thread):
