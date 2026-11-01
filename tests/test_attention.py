@@ -59,11 +59,16 @@ class MoodAttention(unittest.TestCase):
 
 class HerName(unittest.TestCase):
     def test_her_name_as_a_call(self):
-        for t in ('小爱，在吗', '小爱 你看这个', '好吧 小爱', '小爱你好', '小爱', '爱弥斯？', '@小爱 来'):
+        for t in ('小爱，在吗', '小爱 你看这个', '好吧 小爱', '小爱你好', '小爱', '@小爱 来'):
             self.assertTrue(at.names_her(t), t)
         for t in ('小爱乱撞', '看到她我心里小爱乱撞', '可爱的小爱乱跑', '我爱弥斯特', ''):
             self.assertFalse(at.names_her(t), t)
         self.assertTrue(at.names_her('阿爱，在吗', ['阿爱']))
+
+    def test_character_name_is_not_her_name(self):
+        for t in ('爱弥斯伤害好高', '我最喜欢爱弥斯', '爱弥斯，好帅', '爱弥斯！', '爱弥斯？'):
+            self.assertFalse(at.names_her(t), t)
+        self.assertTrue(at.names_her('小爱 你喜欢爱弥斯吗'))
 
 
 class Night(unittest.TestCase):
