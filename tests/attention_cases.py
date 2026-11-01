@@ -28,7 +28,7 @@ A = '900001'
 
 
 class Event(harness.FakeEvent):
-    def __init__(self, text, sender='10001', name='芒果', group=A, wake=False):
+    def __init__(self, text, sender='10001', name='阿橙', group=A, wake=False):
         super().__init__(text, sender=sender, name=name, group=group)
         self.is_at_or_wake_command = wake
         self.stopped = False

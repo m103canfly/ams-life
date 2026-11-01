@@ -187,7 +187,7 @@ class Trip(unittest.TestCase):
     def test_a_wish_loses_the_name_of_someone_deleted(self):
         r = run_case('trip')
         self.assertTrue(r['wishes_after'])
-        self.assertFalse(any('芒果' in w for w in r['wishes_after']), r['wishes_after'])
+        self.assertFalse(any('阿橙' in w for w in r['wishes_after']), r['wishes_after'])
 
 
 if __name__ == '__main__':

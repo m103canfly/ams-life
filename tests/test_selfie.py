@@ -513,7 +513,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_real_send_check_blocks_private_media_text(self):
         plugin = main.BioCorePlugin(harness.FakeContext(), config={'global_memory': True})
-        secret = '芒果私下说我的暗号是蓝鲸三号下周三去医院复查'
+        secret = '阿橙私下说我的暗号是蓝鲸三号下周三去医院复查'
         plugin._check_note(self.event)['forbidden'] = [
             {'id': 'synthetic', 'text': secret, 'private': True, 'names': [], 'vec': None}]
         plugin._embed_text = AsyncMock(return_value=None)

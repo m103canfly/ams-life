@@ -113,7 +113,7 @@ class Replay(unittest.TestCase):
         """Step 2: with global_memory, private words elsewhere pass only labelled "这里不能讲";
         no QQ number at all in a reply prompt."""
         busy = 'group:' + fake.G_BUSY
-        no = '[她想起来的] （这里，小鱼说过）你好；（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）'
+        no = '[她想起来的] （这里，小鱼说过）你好；（阿橙私下跟你说的，只能在跟阿橙私聊时提，这里不能讲）'
         with tempfile.TemporaryDirectory() as tmp:
             ok = self.plant(tmp, [('reply', busy, no + fake.PRIVATE_SECRET)])
             meta = json.loads((ok / 'replay.json').read_text('utf-8'))
@@ -125,7 +125,7 @@ class Replay(unittest.TestCase):
             shutil.copytree(ok, off)
             with open(off / 'prompts.jsonl', 'a', encoding='utf-8') as f:
                 for text in ('[她想起来的] （这里，小鱼说过）你好；' + fake.PRIVATE_SECRET,
-                             '[她想起来的] （别的群里芒果说过，可以提，不点名、不说是哪个群）' + fake.PRIVATE_SECRET,
+                             '[她想起来的] （别的群里阿橙说过，可以提，不点名、不说是哪个群）' + fake.PRIVATE_SECRET,
                              '她记得 %s 说过' % fake.PEACH):
                     f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9100, 'place': busy, 'text': text},
                                        ensure_ascii=False) + '\n')
@@ -328,8 +328,8 @@ class Replay(unittest.TestCase):
     def test_frames_left_in_a_reply_prompt_are_counted(self):
         # the reply model sees names without frames: any left is counted (not a failure)
         with tempfile.TemporaryDirectory() as tmp:
-            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '[最近的事] 「柠檬」约「芒果」打副本'),
-                                   ('model', 'nightly', '「柠檬」约「芒果」打副本', {'call': 'daily_digest'})])
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '[最近的事] 「柠檬」约「阿橙」打副本'),
+                                   ('model', 'nightly', '「柠檬」约「阿橙」打副本', {'call': 'daily_digest'})])
             names = audit_replay.audit(bad, self.chat)['checks']['names']
             self.assertTrue(names['pass'])
             self.assertEqual(names['warnings'], {'framed_name_in_reply_prompt': 2})
@@ -744,7 +744,7 @@ class ReplayOptions(unittest.TestCase):
             raw = ('[CQ:at,qq=%s] ' % fake.BOT if i == 12 else '') + text
             rows.append((i + 1, str(9100 + i), fake.BOT, who, fake.G_SMALL, 'group', 'normal', 'message', raw, text,
                          info, int(night + i * 200), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))
-        # and 芒果 in a private chat just before
+        # and 阿橙 in a private chat just before
         info = json.dumps({'user_id': int(fake.MANGO), 'nickname': fake.NAMES[fake.MANGO]}, ensure_ascii=False)
         rows.append((14, '9113', fake.BOT, fake.MANGO, None, 'private', 'friend', 'message', '小爱 今天的副本你打了吗',
                      '小爱 今天的副本你打了吗', info, int(night - 120), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))

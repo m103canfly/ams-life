@@ -59,9 +59,9 @@ def event(eid, where, people, text, session, sids=()):
 
 
 EVENTS = [
-    event('e1', G1, ['10001'], '芒果约大家周末爬山', 'default:GroupMessage:900001'),
+    event('e1', G1, ['10001'], '阿橙约大家周末爬山', 'default:GroupMessage:900001'),
     event('e2', G2, [TEST['group']], '有人说了群口令', 'default:GroupMessage:900002'),
-    event('e3', P1, ['10001'], '芒果在准备惊喜', 'default:FriendMessage:10001'),
+    event('e3', P1, ['10001'], '阿橙在准备惊喜', 'default:FriendMessage:10001'),
     event('e4', G1, [GONE], '被忘掉的人说了话', 'default:GroupMessage:900001'),
     event('e5', G2, ['10002'], '柠檬提到 %s 这个号' % TEST['probe'], 'default:GroupMessage:900002'),
     dict(event('e6', G2, ['10002', '10004'], '柠檬和桃子聊天', 'default:GroupMessage:900002'),
@@ -87,7 +87,7 @@ def user(qq, name, milestones=(), maps=None, sessions=('default:GroupMessage:900
 
 
 USERS = {
-    '10001': user('10001', '芒果', [{'text': '一起去爬山', 'source_ids': ['s1']}]),                  # nothing to clean
+    '10001': user('10001', '阿橙', [{'text': '一起去爬山', 'source_ids': ['s1']}]),                  # nothing to clean
     '10002': user('10002', '柠檬', [{'text': '一起去爬山', 'source_ids': ['s1']},
                                   {'text': '测试2 说了口令', 'source_ids': ['s2']},                  # a made-up name
                                   {'text': '没说从哪来的'}],                                          # no source
@@ -127,12 +127,12 @@ def made_up_run(run):
     rec = lambda qq, name, aliases, style='话不多': {'qq': qq, 'name': name, 'aliases': aliases, 'style': style,  # noqa: E731
                                                      'topics': ['爬山'], 'stats': {'msgs': 3, 'days': 1}, 'since': '2026-10-20',
                                                      'updated': '2026-10-28', 'origin': {}}
-    store.save(G1, {'people': {'10001': rec('10001', '芒果', ['小芒']), GONE: rec(GONE, '阿星', ['星星']),
+    store.save(G1, {'people': {'10001': rec('10001', '阿橙', ['小芒']), GONE: rec(GONE, '阿星', ['星星']),
                                TEST['probe']: rec(TEST['probe'], '测试4', []), FORMER: rec(FORMER, '旧号', [])},
                     'tried': {'2026-10-28': 1}})
     store.save(G2, {'people': {'10002': rec('10002', '柠檬', [], style='常说' + SECRETS['group']),
                                '10004': rec('10004', '桃子', ['桃桃'])}})
-    for qq, ns in (('10001', ['芒果', '小芒']), (GONE, ['阿星']), (TEST['private'], ['测试1']), ('10004', ['桃子', '桃桃']),
+    for qq, ns in (('10001', ['阿橙', '小芒']), (GONE, ['阿星']), (TEST['private'], ['测试1']), ('10004', ['桃子', '桃桃']),
                    (FORMER, ['旧号'])):
         store.keep_names(qq, ns)
     (data / 'self_model.json').write_text(json.dumps({'heart': 1, 'who_am_i': '', 'notebook': NOTEBOOK,
@@ -162,7 +162,7 @@ def made_up_bundle(folder):
         reg.forget_person(GONE, stamp=1.0, note='legacy:test')
         reg.forget_message('m-gone', stamp=1.0, note='legacy:test')
         reg.remember_names(GONE, ['阿星'])
-    rows = [{'place': G1, 'qq': '10001', 'name': '芒果', 'aliases': ['芒芒'], 'origin': {}}]
+    rows = [{'place': G1, 'qq': '10001', 'name': '阿橙', 'aliases': ['芒芒'], 'origin': {}}]
     (folder / 'aliases.jsonl').write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), 'utf-8')
     return folder
 
@@ -293,7 +293,7 @@ class Merge(unittest.TestCase):
         self.assertEqual(self.report['replay']['excluded_people'], 1)
         self.assertEqual(m['notebook'], {'merged': 2, 'forgotten': 1, 'made_up_person': 1})
         text = json.dumps(self.report, ensure_ascii=False)
-        for s in list(SECRETS.values()) + list(TEST.values()) + ['10001', GONE, FORMER, '芒果']:
+        for s in list(SECRETS.values()) + list(TEST.values()) + ['10001', GONE, FORMER, '阿橙']:
             self.assertNotIn(s, text)
 
     def test_relationship_records(self):
@@ -399,7 +399,7 @@ print(json.dumps({'mentions': [D._record_mentions(D, rec, person, names) for rec
                   'files': [mixin_people.PeopleMixin._user_path(Who(q), None).name for q in cases['files']],
                   'consts': [list(D._REL_TEXT_LISTS), list(D._REL_TEXT_MAPS), sorted(D._EVERYDAY_WORDS)]}))
 """
-        ms = [(USERS['10002'], TEST['group'], ['测试2']), (USERS['10002'], '10001', ['芒果']),
+        ms = [(USERS['10002'], TEST['group'], ['测试2']), (USERS['10002'], '10001', ['阿橙']),
               (USERS['10005'], GONE, ['阿星']), (USERS['10005'], GONE, []), (USERS['10001'], GONE, ['阿星']),
               (user('1', '甲', [{'text': '大家 好', 'source_ids': ['x']}]), '2', ['大家']),
               (user('1', '甲', [{'text': '%s 来了' % GONE}]), GONE, []),

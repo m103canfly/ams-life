@@ -28,10 +28,10 @@ def window():
     lines = []
     for i in range(12):   # 柠檬: 12 lines, a pet phrase on most of them
         lines.append(line('10002', '柠檬', ['又歪了 冲鸭', '冲鸭 今天也要抽', '这期角色好看', '冲鸭冲鸭',
-                                            '我工资好低', '@芒果 你抽了吗', '我的号是 123456789',
+                                            '我工资好低', '@阿橙 你抽了吗', '我的号是 123456789',
                                             '[图片]', '副本打不过', '冲鸭', '晚上一起副本', '好耶'][i], i))
-    for i in range(6):    # 芒果: 6 lines, no impression yet
-        lines.append(line('10001', '芒果', '今天的副本好难 %d' % i, 20 + i))
+    for i in range(6):    # 阿橙: 6 lines, no impression yet
+        lines.append(line('10001', '阿橙', '今天的副本好难 %d' % i, 20 + i))
     for i in range(4):    # 路人: too few
         lines.append(line('10005', '路人', '路过', 40 + i))
     for i in range(15):   # 昨天的：不算今天
@@ -45,7 +45,7 @@ class Pick(unittest.TestCase):
         picked = im.pick_people(window(), DAY)
         self.assertEqual([p['qq'] for p in picked], ['10002', '10001'])
         self.assertEqual([p['count'] for p in picked], [12, 6])
-        # 芒果 already has an impression and only said 6 lines: not tonight
+        # 阿橙 already has an impression and only said 6 lines: not tonight
         self.assertEqual([p['qq'] for p in im.pick_people(window(), DAY, known={'10001'})], ['10002'])
 
     def test_at_most_twelve_and_registry(self):
@@ -68,7 +68,7 @@ class Pick(unittest.TestCase):
         picked = im.pick_people(window(), DAY)
         text, codes = im.material(picked)
         self.assertEqual(codes, {'P1': '10002', 'P2': '10001'})
-        for gone in ('柠檬', '芒果', '10002', '123456789', '工资', '[图片]'):
+        for gone in ('柠檬', '阿橙', '10002', '123456789', '工资', '[图片]'):
             self.assertNotIn(gone, text)
         self.assertIn('@P2 你抽了吗', text)
         self.assertIn('我的号是 #', text)
@@ -99,7 +99,7 @@ class Pick(unittest.TestCase):
         picked = im.pick_people(lines, DAY)
         text, codes = im.material(picked, names)
         self.assertEqual(codes, {'P1': '10002', 'P2': '10001'})   # only the picked are asked about
-        for name in ('阿星', '桃桃', '小鱼儿', '路人', '柠檬', '芒果'):
+        for name in ('阿星', '桃桃', '小鱼儿', '路人', '柠檬', '阿橙'):
             self.assertNotIn(name, text)
         self.assertRegex(text, r'Q\d昨天说他也歪了')
         self.assertRegex(text, r'Q\d今天没来')
@@ -137,31 +137,31 @@ class Answer(unittest.TestCase):
 class Aliases(unittest.TestCase):
     def lines(self):
         ls = [line('10002', '柠檬', '我来啦', i * 30, msg_id='m%d' % i) for i in range(3)]
-        ls += [line('10001', '芒果', '@柠檬 柠柠快来打本', 2),                 # an @ to her
+        ls += [line('10001', '阿橙', '@柠檬 柠柠快来打本', 2),                 # an @ to her
                dict(line('10003', '阿星', '柠柠你抽到了吗', 4), reply_to='m1'),  # a reply to her
                line('10005', '路人', '柠柠在吗', 300),                          # far from anything she said
-               line('10001', '芒果', '芒芒说的', 5)]
+               line('10001', '阿橙', '芒芒说的', 5)]
         return ls
 
     def test_found_twice_when_talking_to_him(self):
-        cards = {'10002': ['柠檬'], '10001': ['芒果'], '10003': ['阿星'], '10005': ['路人']}
+        cards = {'10002': ['柠檬'], '10001': ['阿橙'], '10003': ['阿星'], '10005': ['路人']}
         got = im.verify_aliases({'10002': ['柠柠', '冲冲']}, self.lines(), cards, DAY)
         self.assertEqual(got, {'10002': ['柠柠']})                          # 冲冲: nobody called her that
         once = [ln for ln in self.lines() if ln['sender_id'] != '10003']
         self.assertEqual(im.verify_aliases({'10002': ['柠柠']}, once, cards, DAY), {})   # only once near her
 
     def test_two_people_one_name_goes_for_both_and_cards_win(self):
-        cards = {'10002': ['柠檬'], '10001': ['芒果']}
+        cards = {'10002': ['柠檬'], '10001': ['阿橙']}
         self.assertEqual(im.verify_aliases({'10002': ['柠柠'], '10001': ['柠柠']}, self.lines(), cards, DAY), {})
-        self.assertEqual(im.verify_aliases({'10002': ['芒果']}, self.lines(), cards, DAY), {})
+        self.assertEqual(im.verify_aliases({'10002': ['阿橙']}, self.lines(), cards, DAY), {})
 
     def test_the_model_sees_what_others_said_to_them_as_codes(self):
         picked = im.pick_people([line('10002', '柠檬', '在的', i, msg_id='m%d' % i) for i in range(12)], DAY)
         said_to = im.addressed(self.lines(), picked, DAY)
-        text, _codes = im.material(picked, {'10001': {'芒果'}, '10003': {'阿星'}}, said_to)
+        text, _codes = im.material(picked, {'10001': {'阿橙'}, '10003': {'阿星'}}, said_to)
         self.assertIn('别人对他们说的话', text)
         self.assertIn('@P1 柠柠快来打本', text)       # the unknown name stays for the model to find
-        self.assertNotIn('芒果', text)
+        self.assertNotIn('阿橙', text)
 
 
 class Nightly(unittest.TestCase):
@@ -321,7 +321,7 @@ class StoreAndForget(unittest.TestCase):
             first['people'].clear()                                   # a copy: the cache is untouched
             self.assertEqual(store.load(G1)['people'], {'10002': {'name': '柠檬'}})
             other = im.Store(Path(tmp) / 'people')                    # written by someone else
-            other.save(G1, {'people': {'10002': {'name': '柠檬'}, '10001': {'name': '芒果'}}})
+            other.save(G1, {'people': {'10002': {'name': '柠檬'}, '10001': {'name': '阿橙'}}})
             self.assertEqual(sorted(store.load(G1)['people']), ['10001', '10002'])
 
     def test_another_groups_file_is_not_read(self):
@@ -357,7 +357,7 @@ class OldNames(unittest.TestCase):
         bundle = [{'place': G1, 'qq': '10002', 'name': '柠檬', 'aliases': ['柠柠', '大佬', 'x']},
                   {'place': G1, 'qq': '10003', 'name': '阿星', 'aliases': ['星星']},
                   {'place': G1, 'qq': '10005', 'name': '路人', 'aliases': ['各位']},
-                  {'place': 'private:10001', 'qq': '10001', 'name': '芒果', 'aliases': ['芒芒']}]
+                  {'place': 'private:10001', 'qq': '10001', 'name': '阿橙', 'aliases': ['芒芒']}]
         with tempfile.TemporaryDirectory() as tmp, fr.ForgetRegistry() as reg:
             reg.forget_person('10003', G1, stamp=0)
             store = im.Store(Path(tmp) / 'people')

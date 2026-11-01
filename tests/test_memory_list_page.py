@@ -161,7 +161,7 @@ out.badge = M.SAMPLE_BADGE;
         self.assertTrue(r['removed'])
 
 
-def _row(i, ts, kind='memory', place='w:1', vis='public', raw='话', who=('芒果',)):
+def _row(i, ts, kind='memory', place='w:1', vis='public', raw='话', who=('阿橙',)):
     return {'id': 'm:%02d' % i, 'kind': kind, 'place': place, 'where': '群1', 'ts': float(ts), 'vis': vis,
             'who': list(who), 'raw': raw, 'entry': 'e%d' % i if kind == 'memory' else ''}
 
@@ -201,7 +201,7 @@ class Paging(unittest.TestCase):
         self.assertEqual(ids(memory_list.select(rows, place='w:2')), ['m:03'])
         self.assertEqual(ids(memory_list.select(rows, q='1234567')), [])            # not by a hidden number
         self.assertEqual(ids(memory_list.select(rows, q='号码')), ['m:01'])
-        self.assertEqual(ids(memory_list.select(rows, q='芒果')), ['m:03', 'm:01'])  # by name too
+        self.assertEqual(ids(memory_list.select(rows, q='阿橙')), ['m:03', 'm:01'])  # by name too
         self.assertEqual(ids(memory_list.select(rows, start='15', end='30')), ['m:02'])
         shown = memory_list.page(memory_list.select(rows), '', 50)['items']
         first = [s for s in shown if s['id'] == 'm:01'][0]

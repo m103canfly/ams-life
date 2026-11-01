@@ -13,8 +13,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import send_check as sc  # noqa: E402
 
-SECRET = '芒果私下说：我的暗号是蓝鲸三号，下周三去医院复查'
-NO = [{'id': 'memory:m1', 'text': SECRET, 'private': True, 'names': ['芒果'], 'vec': [1.0, 0.0, 0.0]}]
+SECRET = '阿橙私下说：我的暗号是蓝鲸三号，下周三去医院复查'
+NO = [{'id': 'memory:m1', 'text': SECRET, 'private': True, 'names': ['阿橙'], 'vec': [1.0, 0.0, 0.0]}]
 _CACHE = {}
 
 
@@ -45,7 +45,7 @@ class Look(unittest.TestCase):
             with self.subTest(hint=hint):
                 self.assertIn('hint', sc.check(hint, NO)['why'].get('memory:m1', []))
                 self.assertFalse(sc.check(hint, [])['leak'])
-                names_only = [{'id': 'anon', 'text': '', 'private': False, 'names': ['芒果']}]
+                names_only = [{'id': 'anon', 'text': '', 'private': False, 'names': ['阿橙']}]
                 self.assertFalse(sc.check(hint, names_only)['leak'])
 
     def test_ordinary_inconvenience_and_privacy_principles(self):
@@ -80,9 +80,9 @@ class Look(unittest.TestCase):
         self.assertEqual(r['close'][0][0], 'memory:m1')
 
     def test_a_name_from_it(self):
-        self.assertTrue(sc.check('芒果最近还好吗', NO, '')['leak'])
+        self.assertTrue(sc.check('阿橙最近还好吗', NO, '')['leak'])
         # his name said here already (he is in this chat's talk): not a leak by itself
-        self.assertFalse(sc.check('芒果最近还好吗', NO, '芒果：大家好')['leak'])
+        self.assertFalse(sc.check('阿橙最近还好吗', NO, '阿橙：大家好')['leak'])
 
     def test_what_may_be_said_here_is_not_held_back(self):
         allowed = '（这里，柠檬说过）我下周三去医院复查'
@@ -106,7 +106,7 @@ class Look(unittest.TestCase):
     def test_names_as_names(self):
         self.assertTrue(sc.mentions('@鹿 你好', '鹿'))
         self.assertFalse(sc.mentions('小鹿乱撞', '鹿'))
-        self.assertTrue(sc.mentions('「芒果」来了', '芒果'))
+        self.assertTrue(sc.mentions('「阿橙」来了', '阿橙'))
 
 
 class InThePlugin(unittest.TestCase):

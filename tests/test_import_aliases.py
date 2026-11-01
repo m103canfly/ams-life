@@ -26,7 +26,7 @@ def made_up_bundle(folder):
         reg.forget_person(GONE, stamp=1.0, note='legacy:test')
         reg.forget_message('m-5003', stamp=1.0, note='legacy:test')
         reg.remember_names(GONE, ['阿星'])
-    rows = [{'place': G, 'qq': KEPT, 'name': '芒果', 'aliases': ['小芒', '芒芒', '你'], 'origin': {}},
+    rows = [{'place': G, 'qq': KEPT, 'name': '阿橙', 'aliases': ['小芒', '芒芒', '你'], 'origin': {}},
             {'place': G, 'qq': GONE, 'name': '阿星', 'aliases': ['星星'], 'origin': {}}]
     (folder / 'aliases.jsonl').write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), 'utf-8')
     (folder / 'manifest.json').write_text('{}', 'utf-8')
@@ -92,7 +92,7 @@ class Stage(unittest.TestCase):
         self.assertEqual(r['registry']['names'], {'people': 1, 'name_hashes': 1})
         self.assertEqual(self.printed, r)
         text = json.dumps(r, ensure_ascii=False)
-        for secret in (KEPT, GONE, '芒果', '小芒', '阿星', '星星', 'm-5003'):
+        for secret in (KEPT, GONE, '阿橙', '小芒', '阿星', '星星', 'm-5003'):
             self.assertNotIn(secret, text)
 
 

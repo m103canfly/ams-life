@@ -58,7 +58,7 @@ class Model(harness.FakeProvider):
                 return harness.FakeResponse(json.dumps({
                     'P1': {'style': '性格开朗，说话很快', 'topics': ['靠谱攻略'], 'aliases': []}}, ensure_ascii=False))
             return harness.FakeResponse(json.dumps({
-                # P1 is 芒果, P2 is 柠檬 (most lines first, then by number); a name is kept only
+                # P1 is 阿橙, P2 is 柠檬 (most lines first, then by number); a name is kept only
                 # where others really called someone that: 柠柠 for her, nothing for him
                 'P1': {'style': '说话慢慢的', 'topics': ['副本'], 'aliases': ['柠柠子']},
                 'P2': {'style': '爱用语气词，常接别人的梗', 'topics': ['抽卡'], 'aliases': ['柠柠']}},
@@ -105,12 +105,12 @@ if CASE == 'views':
     result['other_group_absent'] = turn('小爱 你好', '10004', '桃子', group=G3, reply='你好呀')
     turn('最近副本好难打', '10002', '柠檬')
     result['her_private'] = turn('小爱 陪我聊聊', '10002', '柠檬', reply='好呀')
-    result['someone_elses_private'] = turn('小爱 你好', '10001', '芒果', reply='你好')
+    result['someone_elses_private'] = turn('小爱 你好', '10001', '阿橙', reply='你好')
 
 if CASE == 'nightly':
     for i in range(12):
         turn('今天抽卡又歪了 %d' % i, '10002', '柠檬', group=G1, advance=30, msg_id='a%d' % i)
-        turn('@柠檬 柠柠别灰心' if i < 2 else '我也是 %d' % i, '10001', '芒果', group=G1, advance=30)
+        turn('@柠檬 柠柠别灰心' if i < 2 else '我也是 %d' % i, '10001', '阿橙', group=G1, advance=30)
         turn('阿星路过 %d' % i, '10003', '阿星', group=G1, advance=30)
     late = EVENING + 3.5 * 3600   # 23:30
     off = loop.run_until_complete(plugin._maybe_update_impressions(now=late))
@@ -119,7 +119,7 @@ if CASE == 'nightly':
     first = loop.run_until_complete(plugin._maybe_update_impressions(now=late))
     again = loop.run_until_complete(plugin._maybe_update_impressions(now=late + 600))
     result['on'] = {'first': first, 'again': again, 'calls': Model.impressions_calls}
-    result['prompt_has'] = {w: w in getattr(ctx.provider, 'last', '') for w in ('柠檬', '芒果', '阿星', '柠柠', '10002')}
+    result['prompt_has'] = {w: w in getattr(ctx.provider, 'last', '') for w in ('柠檬', '阿橙', '阿星', '柠柠', '10002')}
     store = plugin._impression_store()
     result['people'] = store.load('group:' + G1)['people']
     status = loop.run_until_complete(plugin.page_status())
@@ -174,12 +174,12 @@ if CASE == 'material':
     for i in range(12):
         turn(['大芒今天没来', '芒芒快来打本', '鹿说他也去'][i % 3] + ' %d' % i, '10002', '柠檬', group=G1, advance=30)
         if i < 6:
-            turn('副本好难 %d' % i, '10001', '芒果', group=G1, advance=30)
+            turn('副本好难 %d' % i, '10001', '阿橙', group=G1, advance=30)
     turn('我也来', '10005', '鹿', group=G1, advance=30)                    # a one-character card
     plugin.llm_functions = dict(plugin.llm_functions or {}, group_impressions={'enabled': True, 'provider': 'follow_llm'})
     loop.run_until_complete(plugin._maybe_update_impressions(now=EVENING + 3.5 * 3600))
     prompt = getattr(ctx.provider, 'last', '')
-    result['prompt_has'] = {w: w in prompt for w in ('大芒', '芒芒', '鹿说', '芒果', '柠檬')}
+    result['prompt_has'] = {w: w in prompt for w in ('大芒', '芒芒', '鹿说', '阿橙', '柠檬')}
     result['lines'] = [ln for ln in prompt.splitlines() if ln.startswith('- ')]
 
 if CASE in ('red', 'red_on'):

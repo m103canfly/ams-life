@@ -56,7 +56,7 @@ const M = require(process.argv[1]);
 const out = {};
 out.weeks = ['2026-11-01', '2026-10-26', '2026-01-01', '2024-12-30', '2021-01-03'].map((s) => {
   const [y, m, d] = s.split('-').map(Number); return M.weekOf(new Date(y, m - 1, d, 12)); });
-const reply = { id: 'r1', ts: 1793000000, place: 'group', context: [{ name: '<i>芒果</i>', text: '去爬山吗' }], reply: '去呀 [number]', rating: null, reason: '' };
+const reply = { id: 'r1', ts: 1793000000, place: 'group', context: [{ name: '<i>阿橙</i>', text: '去爬山吗' }], reply: '去呀 [number]', rating: null, reason: '' };
 const day = { id: 'day-2026-10-29', kind: 'day', date: '2026-10-29', rating: 'like', reason: '"像"', rows: [
   { time: '11:00', do: '听歌', detail: '', minutes: 30, feel: '耳熟' }, { time: '20:15', do: '<b>翻相册</b>', detail: '号码 [number]', minutes: null, feel: '' }] };
 out.split = [M.split({ status: 'ok', data: [reply], days: [day] }), M.split({ status: 'ok', data: { status: 'ok', data: [reply], days: [] } }),
@@ -129,7 +129,7 @@ out.reply = M.replyHtml(reply);
         self.assertIn('lk-pick on primary" data-rating="like"', self.out['day'])
 
     def test_a_reply_escaped(self):
-        self.assertIn('&lt;i&gt;芒果&lt;/i&gt;', self.out['reply'])
+        self.assertIn('&lt;i&gt;阿橙&lt;/i&gt;', self.out['reply'])
         self.assertIn('去呀 [号码]', self.out['reply'])
         self.assertIn('>群里 · ', self.out['reply'])
 

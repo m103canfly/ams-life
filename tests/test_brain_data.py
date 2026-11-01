@@ -72,7 +72,7 @@ class TheGraph(unittest.TestCase):
 
     def test_words_only_when_opened_and_qq_on_a_second_click(self):
         r = run_case('graph')
-        mango = r['people']['芒果']
+        mango = r['people']['阿橙']
         self.assertTrue(mango['detail']['has_qq'])
         self.assertNotIn('10001', json.dumps(mango['detail'], ensure_ascii=False))
         self.assertEqual(mango['qq'], {'qq': '10001'})
@@ -80,7 +80,7 @@ class TheGraph(unittest.TestCase):
         m = r['memory_detail']['data']
         self.assertEqual(m['text'], '小爱，跟你说个悄悄话，我在准备一个惊喜')
         self.assertIn(['能在哪说', '私下：只在那个私聊里'], m['lines'])
-        self.assertEqual(r['window_titles'], ['群1', '群2', '跟芒果的私聊'])
+        self.assertEqual(r['window_titles'], ['群1', '群2', '跟阿橙的私聊'])
         self.assertEqual(r['missing']['status'], 'error')
 
     def test_a_card_of_digits_is_no_name(self):
@@ -91,7 +91,7 @@ class TheGraph(unittest.TestCase):
         self.assertNotIn('10006', r['people'][him[0]]['detail'])
         self.assertNotIn('10006', r['text'])
         self.assertEqual(r['search'], [])                      # nor found by them
-        self.assertIn('芒果', r['people'])                      # others keep their names
+        self.assertIn('阿橙', r['people'])                      # others keep their names
 
     def test_numbers_kept_in_her_words_are_not_shown(self):
         # what she keeps keeps its numbers (the owner, 10-29); the page as before: a QQ number
@@ -111,7 +111,7 @@ class TheGraph(unittest.TestCase):
 
     def test_frames_round_names_are_shown_as_kept(self):
         r = run_case('frames')
-        self.assertTrue([t for t in r['details'] if '「柠檬」约「芒果」' in t], r['details'])
+        self.assertTrue([t for t in r['details'] if '「柠檬」约「阿橙」' in t], r['details'])
 
     def test_search_gives_ids_only(self):
         r = run_case('graph')
@@ -158,9 +158,9 @@ class Turns(unittest.TestCase):
         self.assertFalse([t for t in after if t['where'] == 'private:10001'])
         self.assertTrue(all(x in r['library_ids'] for t in after for x in t['recalled'] + t['held']))
         self.assertEqual(r['after_search']['吉他'], [])
-        self.assertEqual(r['after_search']['芒果'], [])
+        self.assertEqual(r['after_search']['阿橙'], [])
         self.assertEqual(r['old_ids_open'], ['error'])
-        self.assertNotIn('芒果', r['after_text'])
+        self.assertNotIn('阿橙', r['after_text'])
 
     def test_not_noted_when_something_was_forgotten_meanwhile(self):
         r = run_case('stale')
@@ -223,12 +223,12 @@ class Memories(unittest.TestCase):
 
     def test_where_when_who_and_where_it_may_be_said(self):
         by_text = {i['text']: i for i in self.items}
-        note = by_text['芒果好像在准备惊喜']
-        self.assertEqual((note['kind'], note['where'], note['vis'], note['who']), ('note', '私聊1', 'private', ['芒果']))
+        note = by_text['阿橙好像在准备惊喜']
+        self.assertEqual((note['kind'], note['where'], note['vis'], note['who']), ('note', '私聊1', 'private', ['阿橙']))
         self.assertEqual(note['may'], '私下：只在那个私聊里')
         own = by_text['想多听听大家在聊什么']
         self.assertEqual((own['where'], own['vis'], own['who']), ('她自己', 'self', []))
-        imp = by_text['叫“芒果”；说话：爱分享；常聊：爬山']
+        imp = by_text['叫“阿橙”；说话：爱分享；常聊：爬山']
         self.assertEqual((imp['kind'], imp['where'], imp['vis']), ('impression', '群1', 'public'))
         self.assertTrue(all(i['date'] for i in self.items))
         self.assertEqual([p['label'] for p in self.r['places']], ['群1', '群2', '私聊1'])

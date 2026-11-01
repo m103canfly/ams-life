@@ -11,7 +11,7 @@ T0 = 1_793_000_000.0
 BOT = '20002'
 G_BUSY, G_SMALL, G_TEST = '900001', '900002', '900009'
 MANGO, LEMON, STAR, PEACH, FISH = '10001', '10002', '10003', '10004', '10005'   # STAR asked to be forgotten
-NAMES = {MANGO: '芒果', LEMON: '柠檬', STAR: '阿星', PEACH: '桃子', FISH: '小鱼'}
+NAMES = {MANGO: '阿橙', LEMON: '柠檬', STAR: '阿星', PEACH: '桃子', FISH: '小鱼'}
 PRIVATE_SECRET = '我下周要去外地看极光三天'
 HER_PRIVATE_REPLY = '好呀，你去外地看极光要多穿点衣服哦'
 
