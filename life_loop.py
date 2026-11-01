@@ -205,7 +205,7 @@ def observe_messages(plugin):
 
 
 def quiet_chats(plugin, state, now):
-    """Observe reply timestamps and silence in the same window, once per exchange."""
+    """Observe silence once per exchange, and only after the other side has spoken."""
     consumed = state.setdefault('quiet_seen', {})
     called = state.setdefault('called', {})
     due = []
@@ -214,8 +214,10 @@ def quiet_chats(plugin, state, now):
         rows = plugin._read_window(here).get('recent') or []
         last = max([float(x.get('ts', 0) or 0) for x in rows] or [0])
         replies = max([float(x.get('ts', 0) or 0) for x in rows if x.get('role') == 'assistant'] or [0])
-        exchange = max(replies, called.get(here, 0))
-        if exchange > consumed.get(here, 0) and now - max(last, exchange) >= 600:
+        theirs = max([float(x.get('ts', 0) or 0) for x in rows if x.get('role') == 'user'] or [0])
+        spoke = max(theirs, called.get(here, 0))
+        exchange = max(replies, spoke)
+        if spoke > consumed.get(here, 0) and now - max(last, exchange) >= 600:
             due.append((here, exchange))
     # Keep only windows still present; no names or words enter this state.
     state['quiet_seen'] = {k: v for k, v in consumed.items() if k in places}
