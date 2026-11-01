@@ -25,7 +25,7 @@ except ImportError:
 # Short enough to describe a just-sent picture, bounded per conversation to limit memory.
 RECENT_IMAGE_SECONDS = 120
 RECENT_IMAGE_LIMIT = 10
-RECENT_IMAGE_LOOK_LIMIT = 3
+RECENT_IMAGE_LOOK_LIMIT = 2
 
 class MediaMixin(PortsMixin):
     @staticmethod
@@ -79,7 +79,8 @@ class MediaMixin(PortsMixin):
             if not state[place]:
                 del state[place]
         here = self._here(event)
-        sender = str(self._speaker(event)[0] or '')
+        speaker = self._speaker(event)
+        sender, name = str(speaker[0] or ''), str(speaker[1] or '')
         self_id = adapter_astrbot_turn.incoming_of(event).self_id
         if not here or not sender or sender == self_id or self._job_stale():
             return
@@ -93,11 +94,16 @@ class MediaMixin(PortsMixin):
             messages = adapter_astrbot_turn.incoming_of(event).segments
         except Exception:
             return
+        sticker_refs = set(self._sticker_refs(event))
+        raw = getattr(getattr(event, 'message_obj', None), 'raw_message', None)
+        found = stickers.stickers_in_raw(raw) if raw is not None else []
+        for item in found + stickers.stickers_in_segments(messages):
+            sticker_refs.update(ref for ref in (item.get('url'), item.get('file')) if ref)
         rows = state.setdefault(here, [])
         for msg in messages:
             ref = events.image_ref(msg)
-            if ref and not any(row['ref'] == ref and row['id'] == (ids[0] if ids else '') for row in rows):
-                rows.append({'ref': ref, 'sender': sender, 'id': ids[0] if ids else '', 'ts': now, 'seen': False})
+            if ref and ref not in sticker_refs and not any(row['ref'] == ref and row['id'] == (ids[0] if ids else '') for row in rows):
+                rows.append({'ref': ref, 'sender': sender, 'name': name, 'id': ids[0] if ids else '', 'ts': now, 'seen': False})
         del rows[:-RECENT_IMAGE_LIMIT]
         if not rows:
             state.pop(here, None)
@@ -339,8 +345,9 @@ class MediaMixin(PortsMixin):
             now = time.time()
             sender = str(self._speaker(event)[0] or '')
             recent = [row for row in reversed(getattr(self, '_recent_images', {}).get(self._here(event), []))
-                      if sender and row['sender'] == sender and not row['seen']
+                      if not row['seen']
                       and 0 <= now - row['ts'] <= RECENT_IMAGE_SECONDS][:RECENT_IMAGE_LOOK_LIMIT]
+            recent.sort(key=lambda row: row['sender'] != sender)
             refs = list(dict.fromkeys(row['ref'] for row in recent))
         if sticker_refs:
             refs = list(dict.fromkeys(refs + sticker_refs))
@@ -352,12 +359,14 @@ class MediaMixin(PortsMixin):
                 return False
             if item.get('where') and item['where'] != self._here(event):
                 return False
-            if item.get('from_qq') and str(item['from_qq']) != str(self._speaker(event)[0] or ''):
+            owner = next((row['sender'] for row in recent if row['ref'] == ref), str(self._speaker(event)[0] or ''))
+            if item.get('from_qq') and str(item['from_qq']) != owner:
                 return False
             return not item.get('ts') or 0 <= time.time() - float(item['ts']) < 86400
 
         # Keep one selection through the lock; fetching a quote twice could change it.
         setattr(event, '_ams_image_refs', refs)
+        setattr(event, '_ams_image_owners', {row['ref']: row['sender'] for row in recent})
         try:
             cache = self._load_image_cache()
             if all(cached(cache, ref) for ref in refs):
@@ -382,7 +391,7 @@ class MediaMixin(PortsMixin):
                 here = self._here(event)
                 sender = str(self._speaker(event)[0] or '')
                 for row in getattr(self, '_recent_images', {}).get(here, []):
-                    if row['sender'] == sender and row['ref'] in seen:
+                    if row['ref'] in seen and (row in recent or row['sender'] == sender):
                         row['seen'] = True
                 if here.startswith('group:'):
                     group = getattr(self, '_group_state', lambda: {})().get(here, {})
@@ -395,11 +404,12 @@ class MediaMixin(PortsMixin):
                     for row in recent:
                         item = cache.get(_sha256(row['ref'])) or {}
                         if item.get('caption'):
-                            lines.append('他%d秒前发的图：%s' % (max(0, int(time.time() - row['ts'])), item['caption']))
+                            lines.append('%s%d秒前发的图：%s' % (self._for_model(row.get('name') or '某人', event), max(0, int(time.time() - row['ts'])), item['caption']))
                     return "\n".join(lines)
             return result
         finally:
             delattr(event, '_ams_image_refs')
+            delattr(event, '_ams_image_owners')
 
     async def _image_context_locked(self, event) -> str:
         refs = getattr(event, '_ams_image_refs', None)
@@ -424,10 +434,11 @@ class MediaMixin(PortsMixin):
         cache = self._load_image_cache()
         where = self._here(event)
         sender = str(self._speaker(event)[0] or "")
+        owners = getattr(event, '_ams_image_owners', {})
         for ref in refs:
             item = cache.get(_sha256(ref))
             if isinstance(item, dict) and (not item.get("where") or item.get("where") != where or
-                                           str(item.get("from_qq") or "") != sender or
+                                           str(item.get("from_qq") or "") != owners.get(ref, sender) or
                                            time.time() - float(item.get("ts", 0) or 0) >= 86400):
                 cache.pop(_sha256(ref), None)
         missing = [r for r in refs if _sha256(r) not in cache or
@@ -459,11 +470,12 @@ class MediaMixin(PortsMixin):
                             caption = ""
                         if caption and look is not None:
                             cache[_sha256(ref)] = stickers.cache_entry(
-                                ref, look, self._speaker(event)[0], self._here(event), time.time())
-                            await self._maybe_keep(event, ref, look)
+                                ref, look, owners.get(ref, sender), self._here(event), time.time())
+                            if owners.get(ref, sender) == sender:
+                                await self._maybe_keep(event, ref, look)
                         elif caption:
                             cache[_sha256(ref)] = {"ref": ref, "caption": caption, "ts": time.time(),
-                                                   "from_qq": self._speaker(event)[0], "where": self._here(event)}
+                                                   "from_qq": owners.get(ref, sender), "where": self._here(event)}
                     self._save_image_cache(cache)
             except Exception as exc:
                 logger.warning("[biocore] image provider failed: %s", exc)
