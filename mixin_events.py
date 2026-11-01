@@ -19,6 +19,10 @@ except ImportError:
     import events
 
 
+def _source_text(item):
+    return str(item.get("text", "")) if isinstance(item, dict) else str(item)
+
+
 def _merged_origin(item, other) -> dict:
     """ams-life: the origin of `item` once `other` has been merged into it: every person and
     every source id of both, the stricter visibility; it stays where `item` was."""
@@ -2169,7 +2173,7 @@ class EventsMixin(PortsMixin):
                 # ams-life: the sources are the entries this event was made of (BioCore took
                 # the last 24 of all), and the origin takes in each one's origin
                 prov = self._event_provenance(event, seg_entries, ts=now)
-                check = self._source_check(body, [str(t) for t in seg_entries],
+                check = self._source_check(body, [_source_text(t) for t in seg_entries],
                                            provenance=prov, record_ts=now)
                 # task-56: duplicate detection compares the real message time
                 # (time_span end), not the archival moment, so a delayed
