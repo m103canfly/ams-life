@@ -29,7 +29,7 @@ def _image_key(plugin, api):
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse, daily, discretion, events, mixin_ports
+    from . import tts, browse, daily, discretion, events, mixin_ports, look
     from . import adapter_astrbot_tools, adapter_astrbot_turn, turn
     from .mixin_ports import PortsMixin
 except ImportError:
@@ -40,6 +40,7 @@ except ImportError:
     import discretion
     import events
     import mixin_ports
+    import look
     import adapter_astrbot_tools
     import adapter_astrbot_turn
     import turn
@@ -49,6 +50,7 @@ SELFIE_DIR = DATA_DIR / "selfie"
 REF_DIR = SELFIE_DIR / "refs"
 SPEND_PATH = STATE_DIR / "spend.json"
 NOW_PATH = STATE_DIR / "now.json"
+LOOK_PATH = STATE_DIR / "look.json"
 PHOTO_QUEUED = "照片和你配的那句会一起发出去，排在你的话后面；正文里别再提照片。"
 LINK_QUEUED = "链接和你配的那句会在你的话后面一起发出去，正文里别再提。"
 SEND_DELAY = 1.5
@@ -62,13 +64,13 @@ SHOT_DIR = DATA_DIR / "browser" / "shots"
 SHOT_RETENTION = 20
 SHOT_NAME = re.compile(r"^ams-browser-[0-9a-f]{32}\.jpg$")
 SELFIE_PROMPT = ("真人质感的手机照片，真实皮肤和光影，有实感、有生活气息，不要动漫画风，不要塑料感，不要摆拍感。\n"
-                 "参考图1是她本人：不管什么角度，脸、发型、头饰都照参考图1，同一个人，不要增减头饰，不要加光环。\n"
-                 "粉色长发，后脑勺高处扎一束很长的高马尾（只有一束，不是双马尾），头顶一小撮呆毛；琥珀色眼睛。\n"
+                 "参考图1是她本人：参考图只管脸型、眼睛（琥珀色，神态）、身高体态和原本的粉色发色，不管发型、发饰和衣服；不要加光环。\n"
+                 "原本的发色是粉色；发型、发饰、衣服照下面“今天的打扮”和“最近的样子”。\n"
                  "这是她自己拿 iPhone 拍的自拍：前置镜头，手臂伸出去那么远，平视或略微俯视，有前置镜头那点广角感；或者对着镜子用 iPhone 拍，画面里看得到她手里的手机。不是别人给她拍的，画面里没有第二个拍照的人。\n"
                  "角度和姿势照下面写的来，不一定正对镜头。光线就是当时的自然光，不精修，不加滤镜。\n"
                  "衣服按场景来，身上没有发光的花纹。竖构图 4:3。\n这张照片：")
 SNAP_PROMPT = ("她自己用 iPhone 随手拍的照片（后置镜头），真实，有生活气息，不是摄影作品，不要精修，不要广告感。\n"
-               "画面里没有人脸，也没有人物正面；最多露出拍照人的一只手或袖口（浅色宽松毛衣袖子，手指纤细）。\n"
+               "画面里没有人脸，也没有人物正面；最多露出拍照人的一只手或袖口（袖子照她今天的打扮，手指纤细）。\n"
                "构图随意，可能有点歪、有点糊，光线就是当时的自然光，有手机照片的噪点。\n"
                "不要出现文字水印、门牌号、车牌、能认出具体地点的招牌。竖构图 3:4。\n拍的是：")
 PHOTO_GUIDE = ("你像普通人一样在家、出门、吃饭，拍照由你自己决定。自拍：新衣发型、节日、出门、心情好、被夸或熟人问近况时可以拍；"
@@ -148,8 +150,18 @@ async def _prepare_photo(plugin, event, queue):
         logger.info("[ams-life] photo not ready; reply sent alone")
 
 
+def _her_now_valid(state, now):
+    try:
+        start = datetime.fromisoformat(state["start"])
+        earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
+        boundary = daily.next_period(earliest - timedelta(microseconds=1))
+        return start <= now < min(boundary, start + timedelta(hours=daily.HER_MAX_HOURS))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
+
 class SelfieMixin(PortsMixin):
-    def _set_now(self, where, doing, now=None, event=None):
+    def _set_now(self, where, doing, now=None, event=None, minutes=None):
         values = [str(value or "").strip() for value in (where, doing)]
         if any(re.search(r"http|www\.|://|@|\d{5,}", value, re.IGNORECASE) for value in values):
             raise ValueError("invalid now text")
@@ -160,8 +172,15 @@ class SelfieMixin(PortsMixin):
         now = now or datetime.fromtimestamp(time.time())
         here = getattr(self, "_here", None)
         place = here(event) if here else adapter_astrbot_turn.incoming_of(event).place
-        _write_json(NOW_PATH, {"where": where, "doing": doing,
-                               "start": now.isoformat(), "source": "her", "place": place})
+        previous = _read_json(NOW_PATH, {})
+        same = (isinstance(previous, dict) and previous.get("source") == "her"
+                and previous.get("where") == where and previous.get("doing") == doing
+                and _her_now_valid(previous, now))
+        state = dict(previous) if same else {"where": where, "doing": doing,
+                                              "start": now.isoformat(), "source": "her", "place": place}
+        if isinstance(minutes, int) and not isinstance(minutes, bool):
+            state["minutes"] = max(5, min(240, minutes))
+        _write_json(NOW_PATH, state)
 
     def _now_line(self, event):
         try:
@@ -176,9 +195,7 @@ class SelfieMixin(PortsMixin):
             valid = (start is not None and start <= now and state.get("source") in ("her", "schedule")
                      and all(isinstance(state.get(k), str) and 0 < len(state[k]) <= 20 for k in ("where", "doing")))
             if valid and state["source"] == "her":
-                earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
-                boundary = daily.next_period(earliest - timedelta(microseconds=1))
-                valid = now < min(boundary, start + timedelta(hours=daily.HER_MAX_HOURS))
+                valid = _her_now_valid(state, now)
             elif valid:
                 valid = start == daily.period_start(now)
             if not valid:
@@ -186,12 +203,18 @@ class SelfieMixin(PortsMixin):
                 where, doing, start = daily.schedule(now, float(body["energy"]), float(body["v"]), float(body["stress"]))
                 state = {"where": where, "doing": doing, "start": start.isoformat(), "source": "schedule"}
                 _write_json(NOW_PATH, state)
-            return "此刻：在%s，正在%s（从%s开始）。" % (state["where"], state["doing"], start.strftime("%H:%M"))
+            elapsed = int((now - start).total_seconds() // 60)
+            duration = "%d 小时 %d 分钟" % divmod(elapsed, 60) if elapsed >= 60 else "%d 分钟" % elapsed
+            line = "此刻：在%s，正在%s（从 %s 开始，已经 %s）。" % (state["where"], state["doing"], start.strftime("%H:%M"), duration)
+            minutes = state.get("minutes")
+            if state["source"] == "her" and isinstance(minutes, int) and not isinstance(minutes, bool) and elapsed > minutes:
+                line += "这件事按说已经做完了，现在干什么由你定。"
+            return line
         except Exception as exc:
             logger.debug("[ams-life] now unavailable: %s", type(exc).__name__)
             return ""
 
-    async def _tool_set_now(self, event, where="", doing=""):
+    async def _tool_set_now(self, event, where="", doing="", minutes=None):
         where, doing = str(where or "").strip(), str(doing or "").strip()
         if not self.enabled:
             return "不能更新此刻"
@@ -200,7 +223,7 @@ class SelfieMixin(PortsMixin):
         if len(where) > 20 or len(doing) > 20:
             return "不能更新此刻"
         try:
-            self._set_now(where, doing, event=event)
+            self._set_now(where, doing, event=event, minutes=minutes)
             return "记下了"
         except ValueError:
             return "不能这样写"
@@ -244,10 +267,16 @@ class SelfieMixin(PortsMixin):
             return []
         cfg = self.config or {}
         context = self._phone_context(event) + COMMON_GUIDE
-        tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
+        tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。同一件事接着做不用再记；做完了、换了事再记。",
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
-            "doing": {"type": "string", "maxLength": 12}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
+            "doing": {"type": "string", "maxLength": 12}, "minutes": {"type": "integer", "description": "大概做多久（分钟，5–240）"}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
+            async def set_look(event, today="", change=""):
+                return await look.set_look(self, event, LOOK_PATH, today, change)
+
+            tools.append(turn.TurnTool(name="set_look", description="定今天的打扮，也可以记下样子的变化。" + context,
+                parameters={"type": "object", "properties": {"today": {"type": "string", "maxLength": 30},
+                "change": {"type": "string", "maxLength": 30}}, "required": ["today"]}, handler=set_look))
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
             except Exception:
@@ -295,6 +324,8 @@ class SelfieMixin(PortsMixin):
         queue = self._phone_queue(event)
         if "photo" in queue:
             return "这次已经有了"
+        if self.enabled and self.config.get("photo_enabled") and kind == "selfie" and not look.read_look(LOOK_PATH, datetime.now().date()):
+            return "先用 set_look 定今天的打扮再拍"
         what = str(what or "").strip()
         where, doing, caption = (str(x or "").strip() for x in (where, doing, caption))
         if (not self.enabled or not self.config.get("photo_enabled") or kind not in ("selfie", "snap")
@@ -429,7 +460,19 @@ class SelfieMixin(PortsMixin):
                 if kind == "selfie" and not ref.is_file():
                     logger.info("[ams-life] phone reference missing")
                     return None
-                prompt = (SELFIE_PROMPT if kind == "selfie" else SNAP_PROMPT) + what
+                outfit = look.read_look(LOOK_PATH, datetime.now().date())
+                recent = look.changes(getattr(self, "self_model", {}) or {})
+                if kind == "selfie":
+                    prompt = SELFIE_PROMPT
+                    if outfit:
+                        prompt += "今天的打扮：" + outfit + "\n"
+                    if recent:
+                        prompt += "最近的样子：" + "；".join(str(item["text"]) for item in recent) + "\n"
+                else:
+                    prompt = SNAP_PROMPT
+                    if outfit:
+                        prompt += "她今天穿：" + outfit + "\n"
+                prompt += what
                 for attempt in range(PHOTO_RETRIES):
                     try:
                         if kind == "selfie":
