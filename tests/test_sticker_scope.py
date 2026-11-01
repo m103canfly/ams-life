@@ -64,6 +64,31 @@ class Scope(unittest.IsolatedAsyncioTestCase):
         fetch.assert_called_once()
         model.chat.assert_not_awaited()
 
+    async def test_group_sticker_shared_then_restricted(self):
+        lib = stickers.Library(Path(self.tmp.name) / 'group-library')
+        sid, why = lib.add(PNG, time.time(), source='self', from_where='group:900001')
+        self.assertEqual(why, '')
+        self.assertEqual(lib.rows[sid]['scope'], 'all')
+        self.assertEqual(stickers.pick_candidates(lib.rows, 2, place='group:900002'), [sid])
+        self.assertEqual(stickers.pick_candidates(lib.rows, 2, place='private:10001'), [sid])
+        self.plugin._sticker_lib = Mock(return_value=lib)
+        result = await self.plugin.page_sticker_scope({'id': sid, 'scope': 'here'})
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(stickers.pick_candidates(lib.rows, 2, place='group:900002'), [])
+        self.assertEqual(stickers.pick_candidates(lib.rows, 2, place='group:900001'), [sid])
+
+    def test_legacy_scope_inference_and_saved_scope(self):
+        group = {'source': 'self', 'from_where': 'group:900001'}
+        private = {'source': 'self', 'from_where': 'private:10001'}
+        self.assertEqual(stickers.scope_of(group), 'all')
+        self.assertEqual(stickers.scope_of(private), 'private:10001')
+        self.assertEqual(stickers.scope_of({'source': 'self'}), '')
+        group['scope'] = 'group:900001'
+        self.assertEqual(stickers.scope_of(group), 'group:900001')
+        self.assertFalse(stickers.may_send(group, 'group:900002'))
+        private['scope'] = 'all'
+        self.assertTrue(stickers.may_send(private, 'group:900002'))
+
     async def test_old_rows_and_listing(self):
         for source in ('old', 'owner'):
             row = {'source': source}
