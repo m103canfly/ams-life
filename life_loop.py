@@ -337,23 +337,15 @@ def notebook_wishes(plugin, now):
 def says_private(text, forbidden):
     """Does this line repeat words of the private chat she was just shown?
 
-    The send check works on four characters in a row. A shorter repeat of one of those
-    lines still gives away what he said, so two pairs of the same line count too."""
+    This is the send check on four characters in a row, the same list `tell_owner` builds.
+    Shorter repeats are common words and are left alone."""
     text = str(text or '').strip()
     if not text or not forbidden:
         return False
     try:
-        if send_check.check(text, list(forbidden)).get('leak'):
-            return True
+        return bool(send_check.check(text, list(forbidden)).get('leak'))
     except Exception:
         return True
-    said = send_check.norm(text)
-    for item in forbidden:
-        private = send_check.norm(item.get('text'))
-        seen = {private[i:i + 2] for i in range(len(private) - 1)}
-        if sum(1 for pair in seen if pair in said) >= 2:
-            return True
-    return False
 
 
 def keep_sent(plugin, text, now, owner):
@@ -466,13 +458,17 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
     if wanted:
         lines.append('我最近想做的：' + '；'.join(wanted))
     lines.append('菜单：' + '、'.join(choices))
-    lines.append('自己挑这会儿做什么，只回 JSON：{"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
-                 '"minutes":30,"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
-                 '"look":"","tell":""}。')
+    proactive = bool((plugin.config or {}).get('proactive_owner_enabled', False))
+    answer = ('"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
+              '"minutes":30,"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
+              '"look":""')
+    if proactive:
+        answer += ',"tell":""'
+    lines.append('自己挑这会儿做什么，只回 JSON：{' + answer + '}。')
     if outfit:
         lines.append('刚睡醒，今天还没定打扮，顺手在 look 里说今天穿什么（最多30字）。')
-    lines.append('要是想跟%s说点什么就写在 tell，不写也行（最多80字）。' % called)
-    if (plugin.config or {}).get('proactive_owner_enabled', False):
+    if proactive:
+        lines.append('要是想跟%s说点什么就写在 tell，不写也行（最多80字）。' % called)
         wishes = owner_wishes(plugin, now)
         if wishes:
             lines.append('想分享的事：' + json.dumps([{'id': wish_ref(w), 'what': w['what']}
@@ -700,9 +696,13 @@ def heybox_ask_prompt(plugin, readings, now=None, chat=None):
     called = interpretation.owner_name(getattr(plugin, 'config', None))
     now = time.time() if now is None else now
     shown, _forbidden = chat_view(plugin, owner_chat(plugin, now) if chat is None else chat)
-    head = ['下面是外部资料。写一句自己的心得；要是想跟%s说点什么就写在 tell，不写也行。'
-            '只返回 JSON：{"thought":"心得","tell":""}。' % called,
-            '最近跟他聊的（近24小时，最多200条）：']
+    proactive = bool((getattr(plugin, 'config', None) or {}).get('proactive_owner_enabled', False))
+    if proactive:
+        ask = ('下面是外部资料。写一句自己的心得；要是想跟%s说点什么就写在 tell，不写也行。'
+               '只返回 JSON：{"thought":"心得","tell":""}。' % called)
+    else:
+        ask = '下面是外部资料。写一句自己的心得。只返回 JSON：{"thought":"心得"}。'
+    head = [ask, '最近跟他聊的（近24小时，最多200条）：']
     head += shown or ['最近没聊']
     wanted = notebook_wishes(plugin, now)
     if wanted:

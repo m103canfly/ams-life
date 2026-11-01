@@ -156,6 +156,42 @@ class LifeContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('想和%s说什么就在 tell 写一句' % NAMED, text)
         self.assertIn('要是想跟%s说点什么就写在 tell，不写也行' % NAMED, text)
 
+    async def test_tell_is_only_asked_for_when_the_owner_switch_is_on(self):
+        self.p.config['proactive_owner_enabled'] = False
+        text = self.materials()
+        self.assertNotIn('tell', text)
+        self.p.config['proactive_owner_enabled'] = True
+        text = self.materials()
+        self.assertIn('"tell"', text)
+        self.assertIn('要是想跟%s说点什么就写在 tell，不写也行' % NAMED, text)
+
+    async def test_heybox_asks_for_tell_only_when_the_owner_switch_is_on(self):
+        reading = [{'title': '假标题', 'text': '假正文', 'comments': ['假评论']}]
+        self.p.config['proactive_owner_enabled'] = False
+        text = life.heybox_ask_prompt(self.p, reading, now=self.clock())
+        self.assertNotIn('tell', text)
+        self.p.config['proactive_owner_enabled'] = True
+        text = life.heybox_ask_prompt(self.p, reading, now=self.clock())
+        self.assertIn('"tell"', text)
+
+    async def test_chat_window_keeps_the_last_day_only(self):
+        now = self.clock()
+        self.chat([{'role': 'user', 'ts': now - 25 * 3600, 'text': '很久以前说的那句'},
+                   {'role': 'user', 'ts': now - 23 * 3600, 'text': '昨天夜里说的那句'}])
+        text = self.materials()
+        self.assertIn('昨天夜里说的那句', text)
+        self.assertNotIn('很久以前说的那句', text)
+
+    async def test_chat_window_keeps_the_last_two_hundred_lines(self):
+        now = self.clock()
+        self.chat([{'role': 'user', 'ts': now - index * 60, 'text': '第%d行' % index}
+                   for index in range(1, 251)])
+        text = self.materials()
+        self.assertIn('第250行', text)
+        self.assertIn('第51行', text)
+        self.assertNotIn('第50行', text)
+        self.assertNotIn('第1行', text)
+
     async def test_public_line_is_a_separate_call_without_the_chat_or_now(self):
         now = self.clock()
         self.chat([{'role': 'user', 'ts': now - 60, 'text': '秘密私聊字眼'}])
@@ -173,7 +209,8 @@ class LifeContextTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_private_detail_is_not_kept_but_an_unrelated_one_is(self):
         self.chat([{'role': 'user', 'ts': self.clock() - 120, 'text': PRIVATE_SECRET}])
-        self.p.answer = {'do': '休息', 'detail': '在担心明天复查', 'minutes': 10}
+        # "明天去医院" is four characters in a row of his line, so it may not be kept.
+        self.p.answer = {'do': '休息', 'detail': '在担心明天去医院', 'minutes': 10}
         self.assertTrue(await life.tick(self.p))
         self.assertEqual(life.current()['doing'], '休息')
         self.assertEqual(self.rows()[0]['detail'], '')
@@ -226,7 +263,8 @@ class LifeContextTests(unittest.IsolatedAsyncioTestCase):
     async def test_heybox_thought_that_repeats_the_chat_is_not_kept(self):
         self.chat([{'role': 'user', 'ts': self.clock() - 60, 'text': PRIVATE_SECRET}])
         entries = []
-        await self.run_heybox('在担心明天复查', entries)
+        # "明天去医院" is four characters in a row of his line, so the thought is dropped.
+        await self.run_heybox('在担心明天去医院', entries)
         self.assertEqual(entries, [])
         await self.run_heybox('这个帖子讲的是虚构的故事', entries)
         self.assertEqual([entry['text'] for entry in entries], ['这个帖子讲的是虚构的故事'])
