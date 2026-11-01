@@ -32,6 +32,16 @@ class HistoryOneLineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(contexts[1]['content'],
                          '（历史消息，发言人和时间未核实）（原文）hello\n（原文）there')
 
+    async def test_switch_off_keeps_assistant_lines(self):
+        self.her.config['history_one_line'] = False
+        contexts = await self.prepare([{'role': 'assistant', 'content': 'a\nb'}])
+        self.assertEqual(contexts[0]['content'], 'a\nb')
+
+    async def test_missing_switch_defaults_to_on(self):
+        self.her.config.pop('history_one_line', None)
+        contexts = await self.prepare([{'role': 'assistant', 'content': 'a\nb'}])
+        self.assertEqual(contexts[0]['content'], 'a b')
+
     async def test_code_and_list_blocks(self):
         contexts = await self.prepare([
             {'role': 'assistant', 'content': '看这个\n- 一\n- 二\n再看\n```\na\nb\n```'},

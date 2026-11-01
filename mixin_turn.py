@@ -173,7 +173,8 @@ class TurnMixin:
                 for _part in _content:
                     if isinstance(_part, dict) and isinstance(_part.get("text"), str):
                         _part["text"] = _history_original(_part["text"])
-        _one_line_history(getattr(turn_request, "contexts", None))
+        if bool(self.config.get("history_one_line", True)):
+            _one_line_history(getattr(turn_request, "contexts", None))
         self._numbers_out_of_request(turn_request, event)
         if not self.inject_intent:
             _now = self._now_line(event)

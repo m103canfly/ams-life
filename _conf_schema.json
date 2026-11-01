@@ -585,6 +585,12 @@
     "type": "float",
     "default": 5.0
   },
+  "history_one_line": {
+    "description": "给模型看的历史里，把她分几条发的话合成一行",
+    "hint": "开着时，新程序只改交给模型的历史，存下的聊天记录不动；AstrBot 可能把处理后的历史写回记录。关掉后原样给模型。修改后要重启新程序才生效。",
+    "type": "bool",
+    "default": true
+  },
   "reply_in_pieces": {
     "description": "分条连发回话",
     "hint": "一条回话按换行和【下一条】拆成几条连发，最多 5 条。",
