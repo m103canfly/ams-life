@@ -9,9 +9,10 @@ import re
 from datetime import datetime
 
 try:
-    from . import discretion, redline, mixin_turn
+    from . import atomic_file, discretion, redline, mixin_turn
     from .common import STATE_DIR
 except ImportError:
+    import atomic_file
     import discretion
     import redline
     import mixin_turn
@@ -39,7 +40,7 @@ def _write(data):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix('.tmp')
     temp.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
-    temp.replace(path)
+    atomic_file.replace(temp, path)
 
 
 def _blocked(reason):

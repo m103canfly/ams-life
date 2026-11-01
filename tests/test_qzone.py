@@ -77,7 +77,13 @@ class QzoneTests(unittest.TestCase):
         self.assertNotIn('hello', json.dumps(state))
 
     def test_bad_photos_are_refused(self):
-        for photo in (self.root / 'shots' / self.name, self.selfies / 'refs' / self.name,
+        refs = self.selfies / 'refs'
+        refs.mkdir()
+        ref_photo = refs / self.name
+        ref_photo.write_bytes(b'fake photo')
+        voice = self.selfies / self.name.replace('-photo-', '-voice-').replace('.png', '.wav')
+        voice.write_bytes(b'fake voice')
+        for photo in (self.root / 'shots' / self.name, ref_photo, voice,
                       'https://example.invalid/a.png', self.selfies / '..' / 'selfie' / self.name):
             with self.subTest(photo=photo):
                 params = {'content': 'hello', 'images': [str(photo)], 'ugc_right': 16, 'target_uins': ['10001']}
