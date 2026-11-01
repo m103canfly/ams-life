@@ -322,7 +322,8 @@ def scope_of(row) -> str:
         return scope if scope == "all" or scope == str(row.get("from_where") or "") else ""
     if row.get("source") in ("old", "owner"):
         return "all"
-    return str(row.get("from_where") or "")
+    where = str(row.get("from_where") or "")
+    return "all" if where.startswith("group:") else where
 
 
 def may_send(row, place) -> bool:
@@ -445,8 +446,8 @@ class Library:
                "emotion": str(look.get("emotion") or "")[:12], "scene": str(look.get("scene") or "")[:20],
                "why": str(look.get("why") or "")[:60], "source": source,
                "from_qq": str(from_qq or ""), "from_where": str(from_where or ""),
-               "scope": "all" if source in ("old", "owner") else str(from_where or ""),
                "saved_at": float(now), "last_used": float(now), "uses": 0}
+        row["scope"] = scope_of(row)
         new_fields = ("meaning", "reply_to", "text", "target", "strength", "tags")
         row.update({k: look[k] for k in new_fields if k in look})
         if any(k in look for k in new_fields):
