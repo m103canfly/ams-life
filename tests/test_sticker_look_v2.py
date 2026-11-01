@@ -42,7 +42,8 @@ class StickerLookV2(unittest.TestCase):
 
     def test_old_fields_and_keep(self):
         look = stickers.parse_look(json.dumps({'caption': '猫', 'kind': 'sticker', 'keep': True}))
-        self.assertTrue(stickers.should_keep(look))
+        self.assertFalse(stickers.should_keep(look))
+        self.assertTrue(stickers.should_keep(dict(look, personal=False, group_meme=False)))
         self.assertNotIn('meaning', look)
         self.assertNotIn('tags', look)
         self.assertFalse(stickers.should_keep(dict(look, personal=True)))
@@ -77,6 +78,8 @@ class StickerOfferV2(unittest.IsolatedAsyncioTestCase):
             'd': {'caption': '群梗', 'group_meme': True},
             'e': {'meaning': '长' * 100, 'emotion': '开心', 'tags': ['好']},
         }
+        for row in rows.values():
+            row['source'] = 'old'
         plugin = main.BioCorePlugin.__new__(main.BioCorePlugin)
         plugin._sticker_lib = Mock(return_value=SimpleNamespace(rows=rows))
         event = SimpleNamespace()

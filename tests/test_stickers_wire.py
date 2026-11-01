@@ -119,7 +119,7 @@ class Looked(unittest.TestCase):
         r = run_case('look')
         self.assertEqual(r['looks_before_open'], 0)
         self.assertEqual(len(r['looks']), 3)                          # at most three a message
-        self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png', 'https://gchat.qpic.cn/a.png',
+        self.assertEqual(r['fetched'], ['https://gchat.qpic.cn/a.png',
                                         'https://gchat.qpic.cn/b.png', 'https://gchat.qpic.cn/c.png'])
         self.assertEqual(len(r['content_cache']), 3)
         self.assertEqual(r['kept'], [['一只在笑的猫', '10001', 'group:900001', 'self']])

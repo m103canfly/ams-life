@@ -286,7 +286,11 @@ def parse_look(raw) -> dict:
         out["tags"] = tags
     kind = str(data.get("kind") or "").strip().lower()
     out["kind"] = kind if kind in KINDS else "other"
-    for k in ("personal", "group_meme", "keep"):
+    for k in ("personal", "group_meme"):
+        v = data.get(k)
+        out[k] = v if isinstance(v, bool) else ({"true": True, "false": False}.get(v.strip().lower())
+                                                   if isinstance(v, str) else None)
+    for k in ("keep",):
         v = data.get(k)
         out[k] = v is True or (isinstance(v, str) and v.strip().lower() == "true")
     return out
@@ -298,7 +302,7 @@ def should_keep(look, sender_gone=False) -> bool:
     if not look or sender_gone or not look.get("caption"):
         return False
     return (look.get("keep") is True and look.get("kind") in ("sticker", "other")
-            and not look.get("personal") and not look.get("group_meme"))
+            and look.get("personal") is False and look.get("group_meme") is False)
 
 
 def material(caption) -> str:
@@ -310,6 +314,22 @@ def material(caption) -> str:
 # ----------------------------------------------------------------------
 # The library
 # ----------------------------------------------------------------------
+def scope_of(row) -> str:
+    if row.get("source") not in SOURCES:
+        return ""
+    scope = row.get("scope")
+    if isinstance(scope, str):
+        return scope if scope == "all" or scope == str(row.get("from_where") or "") else ""
+    if row.get("source") in ("old", "owner"):
+        return "all"
+    return str(row.get("from_where") or "")
+
+
+def may_send(row, place) -> bool:
+    scope = scope_of(row)
+    return scope == "all" or bool(scope and place and scope == place)
+
+
 class Library:
     """Her stickers: <folder>/index.json (id -> row) and <folder>/img/<id>.<format>."""
 
@@ -379,6 +399,7 @@ class Library:
                "emotion": str(look.get("emotion") or "")[:12], "scene": str(look.get("scene") or "")[:20],
                "why": str(look.get("why") or "")[:60], "source": source,
                "from_qq": str(from_qq or ""), "from_where": str(from_where or ""),
+               "scope": "all" if source in ("old", "owner") else str(from_where or ""),
                "saved_at": float(now), "last_used": float(now), "uses": 0}
         new_fields = ("meaning", "reply_to", "text", "target", "strength", "tags")
         row.update({k: look[k] for k in new_fields if k in look})
@@ -391,6 +412,14 @@ class Library:
         self.rows[sid] = row
         self._save()
         return sid, ""
+
+    def set_scope(self, sid, scope) -> bool:
+        row = self.rows.get(sid)
+        if row is None or not isinstance(scope, str) or scope not in ("all", str(row.get("from_where") or "")):
+            return False
+        row["scope"] = scope
+        self._save()
+        return True
 
     def remove(self, sid) -> bool:
         """Delete one: the index first, then the file."""
@@ -458,12 +487,12 @@ def _tone(emotion) -> float:
     return (1.0 if any(w in e for w in _HAPPY) else 0.0) - (1.0 if any(w in e for w in _SAD) else 0.0)
 
 
-def pick_candidates(rows, now, valence=0.0, similarity=None, k=CANDIDATES, recent=RECENT_SECONDS) -> list:
+def pick_candidates(rows, now, valence=0.0, similarity=None, k=CANDIDATES, recent=RECENT_SECONDS, place="") -> list:
     """A few to offer: how near the talk is (`similarity`: row -> 0..1, e.g. local vectors)
     and how near her mood (valence -1..1); none sent in the last `recent` seconds."""
     scored = []
     for sid, r in (rows or {}).items():
-        if r.get("personal") or r.get("group_meme"):
+        if not may_send(r, place) or r.get("personal") or r.get("group_meme"):
             continue
         if now - float(r.get("last_used", 0) or 0) < recent and int(r.get("uses", 0) or 0) > 0:
             continue
@@ -547,7 +576,8 @@ def allowed(action, params, place) -> bool:
 # What a look leaves in image_cache.json
 # ----------------------------------------------------------------------
 def cache_entry(ref, look, from_qq, where, now) -> dict:
-    return {"ref": str(ref), "caption": str((look or {}).get("caption") or ""), "look": look or {},
+    public_look = {k: v for k, v in (look or {}).items() if k not in ("_picture", "_picture_sha256")}
+    return {"ref": str(ref), "caption": str(public_look.get("caption") or ""), "look": public_look,
             "from_qq": str(from_qq or ""), "where": str(where or ""), "ts": float(now)}
 
 
@@ -602,7 +632,8 @@ def view(sid, row, labels, now) -> dict:
             "scene": str(row.get("scene") or ""), "why": str(row.get("why") or ""),
             "from": source_label(row, labels), "owner": owner, "type": str(row.get("type") or ""),
             "saved_at": float(row.get("saved_at", 0) or 0), "last_used": float(row.get("last_used", 0) or 0),
-            "uses": int(row.get("uses", 0) or 0), "days_left": left}
+            "uses": int(row.get("uses", 0) or 0), "days_left": left,
+            "scope": "all" if scope_of(row) == "all" else "here"}
 
 
 def listing(rows, now, sort="saved", emotion="", scene="", source="", after=0, n=PAGE_SIZE) -> dict:
