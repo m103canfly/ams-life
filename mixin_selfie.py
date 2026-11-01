@@ -149,10 +149,19 @@ async def _prepare_photo(plugin, event, queue):
 
 
 class SelfieMixin(PortsMixin):
-    def _set_now(self, where, doing, now=None):
+    def _set_now(self, where, doing, now=None, event=None):
+        values = [str(value or "").strip() for value in (where, doing)]
+        if any(re.search(r"http|www\.|://|@|\d{5,}", value, re.IGNORECASE) for value in values):
+            raise ValueError("invalid now text")
+        names = self._browse_names()
+        where, doing = (browse.clean_query(value, names=names) for value in values)
+        if any(not value or len(value) > 12 for value in (where, doing)):
+            raise ValueError("invalid now text")
         now = now or datetime.fromtimestamp(time.time())
+        here = getattr(self, "_here", None)
+        place = here(event) if here else adapter_astrbot_turn.incoming_of(event).place
         _write_json(NOW_PATH, {"where": where, "doing": doing,
-                               "start": now.isoformat(), "source": "her"})
+                               "start": now.isoformat(), "source": "her", "place": place})
 
     def _now_line(self, event):
         try:
@@ -184,11 +193,17 @@ class SelfieMixin(PortsMixin):
 
     async def _tool_set_now(self, event, where="", doing=""):
         where, doing = str(where or "").strip(), str(doing or "").strip()
-        if not self.enabled or not where or not doing or len(where) > 20 or len(doing) > 20:
+        if not self.enabled:
+            return "不能更新此刻"
+        if any(re.search(r"http|www\.|://|@|\d{5,}", value, re.IGNORECASE) for value in (where, doing)):
+            return "不能这样写"
+        if len(where) > 20 or len(doing) > 20:
             return "不能更新此刻"
         try:
-            self._set_now(where, doing)
+            self._set_now(where, doing, event=event)
             return "记下了"
+        except ValueError:
+            return "不能这样写"
         except Exception as exc:
             logger.debug("[ams-life] now update failed: %s", type(exc).__name__)
             return "不能更新此刻"
@@ -230,8 +245,8 @@ class SelfieMixin(PortsMixin):
         cfg = self.config or {}
         context = self._phone_context(event) + COMMON_GUIDE
         tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。",
-            parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 20},
-            "doing": {"type": "string", "maxLength": 20}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
+            parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
+            "doing": {"type": "string", "maxLength": 12}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
@@ -242,8 +257,8 @@ class SelfieMixin(PortsMixin):
             tools.append(turn.TurnTool(name="take_photo", description=PHOTO_GUIDE + context + photo_context,
                 parameters={"type": "object", "properties": {"kind": {"type": "string", "enum": ["selfie", "snap"]},
                 "what": {"type": "string", "description": "拍什么、在哪、光线，60字以内"},
-                "where": {"type": "string", "maxLength": 20, "description": "与此刻相符的地点"},
-                "doing": {"type": "string", "maxLength": 20, "description": "与此刻相符的事情"},
+                "where": {"type": "string", "maxLength": 12, "description": "与此刻相符的地点"},
+                "doing": {"type": "string", "maxLength": 12, "description": "与此刻相符的事情"},
                 "caption": {"type": "string", "maxLength": 20, "description": "发照片时配的那一句"}},
                 "required": ["kind", "what", "where", "doing", "caption"]}, handler=self._tool_take_photo))
         if cfg.get("screenshot_enabled", False) and self._browse_on():
@@ -287,7 +302,7 @@ class SelfieMixin(PortsMixin):
                 or len(caption) > 20):
             return "不能拍这张"
         try:
-            self._set_now(where, doing)
+            self._set_now(where, doing, event=event)
         except Exception as exc:
             logger.debug("[ams-life] now update failed: %s", type(exc).__name__)
             return "不能拍这张"
