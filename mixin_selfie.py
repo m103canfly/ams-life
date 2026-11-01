@@ -133,6 +133,20 @@ async def _browser_screenshot(plugin, event, url):
     return (path, description) if description else None
 
 
+async def _prepare_photo(plugin, event, queue):
+    kind, what = queue["photo"][:2]
+    caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
+    queue["photo_path"] = None
+    if not await plugin._phone_clear(event, what) or (caption and not await plugin._phone_clear(event, caption)):
+        return
+    try:
+        queue["photo_path"] = await wait_for(plugin._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
+    except Exception:
+        pass
+    if not queue["photo_path"]:
+        logger.info("[ams-life] photo not ready; reply sent alone")
+
+
 class SelfieMixin(PortsMixin):
     def _set_now(self, where, doing, now=None):
         now = now or datetime.fromtimestamp(time.time())
@@ -502,19 +516,23 @@ class SelfieMixin(PortsMixin):
             if "photo" in queue:
                 kind, what = queue["photo"][:2]
                 caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
-                if await self._phone_clear(event, what) and (not caption or await self._phone_clear(event, caption)):
+                if "photo_path" in queue:
+                    path = queue["photo_path"]
+                elif await self._phone_clear(event, what) and (not caption or await self._phone_clear(event, caption)):
                     try:
                         path = await wait_for(self._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
                     except AsyncTimeoutError:
                         logger.info("[ams-life] phone: photo timed out")
                         path = None
-                    if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                        segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
-                        segments.append(events.Segment("image", {"path": str(path)}))
-                        await self._messenger(event, as_event=True).send(here, tuple(segments))
-                        self._phone_account(kind, sent=True)
-                        self._note_she_sent(event, kind)
-                        self._phone_prune("photo")
+                else:
+                    path = None
+                if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
+                    segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
+                    segments.append(events.Segment("image", {"path": str(path)}))
+                    await self._messenger(event, as_event=True).send(here, tuple(segments))
+                    self._phone_account(kind, sent=True)
+                    self._note_she_sent(event, kind)
+                    self._phone_prune("photo")
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
                 if queue.get("voice_tone"):
                     path = await self._make_voice(queue["voice"], tone=queue["voice_tone"])
