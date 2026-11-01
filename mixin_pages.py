@@ -849,7 +849,7 @@ class PagesMixin:
         if key not in ("proactive_reply", "memory_dedup_embedding", "inject_intent",
                        "hybrid_retrieval", "safety_enabled", "llm_memory_candidates",
                        "llm_only_reply_summary", "persona_id",
-                       "insight_auto_enabled"):
+                       "insight_auto_enabled", "history_one_line"):
             return {"status": "error", "message": "unknown setting"}
         if key == "persona_id":
             _val = str(data.get("value") or "").strip()
