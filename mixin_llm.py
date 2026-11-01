@@ -16,6 +16,10 @@ try:
 except ImportError:
     import digest
 try:
+    from . import her_days
+except ImportError:
+    import her_days
+try:
     from .mixin_phone import _phone_line
 except ImportError:
     from mixin_phone import _phone_line
@@ -599,7 +603,13 @@ class LLMMixin(PortsMixin):
                 else:
                     continue
                 night["changes"] = int(night.get("changes", 0) or 0) + 1
-            self.self_model["notebook"] = [x for i, x in enumerate(entries) if i not in gone][:NOTEBOOK_MAX]
+            kept = [x for i, x in enumerate(entries) if i not in gone]
+            try:
+                her_days.archive_notebook(DATA_DIR, [x for i, x in enumerate(entries) if i in gone]
+                                          + kept[NOTEBOOK_MAX:], now)
+            except Exception as exc:
+                logger.warning('[ams-life] notebook archive failed (%s)', type(exc).__name__)
+            self.self_model["notebook"] = kept[:NOTEBOOK_MAX]
             self._save_self_model()
             logger.info("[ams-life] notebook (%s): %d change(s)", "group" if sitting == "group" else "private",
                         len(changes))
