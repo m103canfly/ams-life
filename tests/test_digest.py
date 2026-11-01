@@ -52,10 +52,10 @@ class Registry:
 
 
 LINES = [line(0, '10002', '柠檬', '周末一起打副本吗'),
-         line(1, '10001', '芒果', '我来 @柠檬 柠柠别鸽'),
+         line(1, '10001', '阿橙', '我来 @柠檬 柠柠别鸽'),
          line(2, '', '', '好呀', role='assistant'),
          line(3, '10003', '阿星', '我家猫叫团子'),
-         line(4, '10001', '芒果', '我的号码是13812345678'),
+         line(4, '10001', '阿橙', '我的号码是13812345678'),
          line(5, '10002', '柠檬', '昨天的事', day_offset=-1)]
 
 
@@ -81,7 +81,7 @@ class Material(unittest.TestCase):
         self.assertEqual(text.splitlines(), ['1 P1：周末一起打副本吗', '2 P2：我来 @P1 P1别鸽', '3 她：好呀',
                                              '4 P3：我家猫叫团子', '5 P2：我的号码是#'])
         self.assertEqual(len(shown), 5)
-        for word in ('柠檬', '芒果', '阿星', '柠柠', '1381234', '10002'):
+        for word in ('柠檬', '阿橙', '阿星', '柠柠', '1381234', '10002'):
             self.assertNotIn(word, text)
 
     def test_red_lines_by_the_switch(self):
@@ -142,7 +142,7 @@ class Answer(unittest.TestCase):
         # a code in the text counts as someone it is about
         in_text = dict(named_lines, what='P1约了P2', who=['P1'])
         self.assertEqual(digest.sources(in_text, codes, shown, kept)[0], ['10001', '10002'])
-        self.assertEqual(digest.named('P1约了P2和Q1', codes, {'10002': '柠檬', '10001': '芒果'}), '「柠檬」约了「芒果」和某人')   # framed (the owner, 10-29); 某人 not
+        self.assertEqual(digest.named('P1约了P2和Q1', codes, {'10002': '柠檬', '10001': '阿橙'}), '「柠檬」约了「阿橙」和某人')   # framed (the owner, 10-29); 某人 not
 
 
 def ev(title, where, people=(), digest_kind=True, importance=0.5, ts=0.0, what=''):
@@ -170,7 +170,7 @@ class WhereTheyAreUsed(unittest.TestCase):
         self.assertEqual(got, ['2', '5'])                           # the windows of the weightiest
 
     def test_only_here_only_to_do_with_it_at_most_two(self):
-        events = [ev('柠檬约周末打副本', 'g1'), ev('大家聊抽卡', 'g1'), ev('芒果的副本攻略', 'g1', what='周末副本的打法'),
+        events = [ev('柠檬约周末打副本', 'g1'), ev('大家聊抽卡', 'g1'), ev('阿橙的副本攻略', 'g1', what='周末副本的打法'),
                   ev('副本开荒', 'g1', what='大家约好周末副本开荒'), ev('桃子也想打副本', 'g2', what='周末也想打副本'),
                   ev('周末打副本', 'g1', digest_kind=False)]
         got = [e['title'] for e in digest.for_reply('周末的副本几点开始', events, 'g1')]
@@ -196,7 +196,7 @@ class Nightly(unittest.TestCase):
         self.assertIn('一个群今天', group)
         self.assertIn('一个私聊今天', private)
         for prompt in (group, private):
-            for word in ('柠檬', '芒果', '阿星', '桃子', '10001', '10002', '10004', '900001'):
+            for word in ('柠檬', '阿橙', '阿星', '桃子', '10001', '10002', '10004', '900001'):
                 self.assertNotIn(word, prompt)
         # the person and the message the registry rules out are not there at all
         self.assertNotIn('团子', group)
@@ -205,13 +205,13 @@ class Nightly(unittest.TestCase):
 
     def test_origins(self):
         evs = {e['title']: e for e in run_case('nightly')['events']}
-        self.assertEqual(sorted(evs), sorted(['「柠檬」约周末打副本', '有人在聊抽卡', '「桃子」说了蓝莓计划', '「芒果」说了件事']))
+        self.assertEqual(sorted(evs), sorted(['「柠檬」约周末打副本', '有人在聊抽卡', '「桃子」说了蓝莓计划', '「阿橙」说了件事']))
         one = evs['「柠檬」约周末打副本']
-        self.assertEqual(one['event'], '「柠檬」约大家周末一起打副本，「芒果」说要来')
+        self.assertEqual(one['event'], '「柠檬」约大家周末一起打副本，「阿橙」说要来')
         self.assertEqual(one['origin'], {'where': 'group:900001', 'people': ['10001', '10002'],
                                          'source_ids': ['g1', 'g2'], 'visibility': 'public'})
         # no lines named / a wrong one: the whole day (but nothing ruled out)
-        for title in ('有人在聊抽卡', '「芒果」说了件事'):
+        for title in ('有人在聊抽卡', '「阿橙」说了件事'):
             self.assertEqual(evs[title]['origin'], {'where': 'group:900001', 'people': ['10001', '10002'],
                                                     'source_ids': ['g1', 'g2', 'g3', 'g4'], 'visibility': 'public'})
         self.assertEqual(evs['「桃子」说了蓝莓计划']['origin'], {'where': 'private:10004', 'people': ['10004'],
@@ -227,7 +227,7 @@ class Nightly(unittest.TestCase):
 
     def test_her_notebook_uses_them(self):
         nb = run_case('nightly')['notebook']
-        self.assertIn('事件：「柠檬」约周末打副本：「柠檬」约大家周末一起打副本，「芒果」说要来', nb['group'])
+        self.assertIn('事件：「柠檬」约周末打副本：「柠檬」约大家周末一起打副本，「阿橙」说要来', nb['group'])
         self.assertNotIn('蓝莓', ''.join(nb['group']))
         self.assertIn('事件：「桃子」说了蓝莓计划：「桃子」跟她说起蓝莓计划的安排', nb['private'])
 
@@ -276,7 +276,7 @@ class Nightly(unittest.TestCase):
         self.assertIn('2 P1：周末打副本 某人来不来', r['prompt'])
         # what names him is not kept; the rest is
         self.assertEqual(r['night'], {'group:900001': {'called': 1, 'written': 1}})
-        self.assertEqual(r['events'], ['「芒果」说好呀'])
+        self.assertEqual(r['events'], ['「阿橙」说好呀'])
         self.assertFalse(r['registry_has_name'])                   # only hashes of his names
 
     def test_a_deleted_persons_name_everywhere_at_once(self):

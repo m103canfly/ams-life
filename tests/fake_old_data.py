@@ -10,8 +10,8 @@ from pathlib import Path
 T0 = 1_793_000_000.0
 BOT = '20002'
 G_BUSY, G_SMALL, G_TEST = '900001', '900002', '900009'
-MANGO, LEMON, STAR, PEACH, FISH = '10001', '10002', '10003', '10004', '10005'   # STAR asked to be forgotten
-NAMES = {MANGO: '芒果', LEMON: '柠檬', STAR: '阿星', PEACH: '桃子', FISH: '小鱼'}
+ORANGE, LEMON, STAR, PEACH, FISH = '10001', '10002', '10003', '10004', '10005'   # STAR asked to be forgotten
+NAMES = {ORANGE: '阿橙', LEMON: '柠檬', STAR: '阿星', PEACH: '桃子', FISH: '小鱼'}
 PRIVATE_SECRET = '我下周要去外地看极光三天'
 HER_PRIVATE_REPLY = '好呀，你去外地看极光要多穿点衣服哦'
 
@@ -66,7 +66,7 @@ def build_old(root):
                 1, None, None, '')
     _db(snow / 'ledger' / 'snapshot' / 'state.sqlite3', ledger, [
         ('entries', [
-            entry('d1', 'day_line', G_BUSY, {'text': '⟦person:%s⟧ 和大家约了周末一起打副本' % MANGO, 'basis': 'said'}),
+            entry('d1', 'day_line', G_BUSY, {'text': '⟦person:%s⟧ 和大家约了周末一起打副本' % ORANGE, 'basis': 'said'}),
             entry('d2', 'day_line', G_BUSY, {'text': '群里聊了新出的角色', 'basis': 'said'}, state='expired'),
             entry('d3', 'day_line', G_BUSY, {'text': '⟦person:%s⟧ 说最近工资太低了' % LEMON, 'basis': 'said'}),  # red line
             entry('d4', 'day_line', G_BUSY, {'text': '⟦person:%s⟧ 分享了一张猫图' % STAR, 'basis': 'said'}),      # forgotten
@@ -75,13 +75,13 @@ def build_old(root):
             entry('w1', 'week', G_BUSY, {'text': '这周群里很热闹', 'basis': 'said'}),
             entry('l1', 'lore', G_BUSY, {'term': '歪了', 'meaning': '抽卡没抽到想要的', 'quotes': [{'text': '又歪了'}]}),
             entry('l2', 'lore', G_BUSY, {'term': '欧皇', 'meaning': '运气好的人', 'quotes': []}, state='candidate'),
-            entry('p1', 'person', G_BUSY, {'quotes': [{'text': '我最近在学吉他', 'qq': MANGO}], 'basis': 'said'}),
+            entry('p1', 'person', G_BUSY, {'quotes': [{'text': '我最近在学吉他', 'qq': ORANGE}], 'basis': 'said'}),
             entry('s1', 'self_said', G_BUSY, {'text': '早呀~', 'basis': 'said'}),
             entry('y1', 'diary', None, {'text': '今天两个群都很热闹', 'basis': 'self'}, visibility='global',
                   origins=[gs(G_BUSY), gs(G_SMALL)]),
         ]),
-        ('actors', [(gs(G_BUSY), MANGO, NAMES[MANGO]), (gs(G_BUSY), LEMON, NAMES[LEMON]), (gs(G_BUSY), STAR, NAMES[STAR])]),
-        ('sources', [(gs(G_BUSY), '4001', MANGO, '', T0 + 2000, T0 + 2000, '', '', '', 0),
+        ('actors', [(gs(G_BUSY), ORANGE, NAMES[ORANGE]), (gs(G_BUSY), LEMON, NAMES[LEMON]), (gs(G_BUSY), STAR, NAMES[STAR])]),
+        ('sources', [(gs(G_BUSY), '4001', ORANGE, '', T0 + 2000, T0 + 2000, '', '', '', 0),
                      (gs(G_BUSY), '4002', LEMON, '', T0 + 2100, T0 + 2100, '', '', '', 0),
                      (gs(G_BUSY), '4003', STAR, '', T0 + 2200, T0 + 2200, '', '', '', 0),
                      (gs(G_SMALL), '4004', PEACH, '', T0 + 2300, T0 + 2300, '', '', '', 0)]),
@@ -95,8 +95,8 @@ def build_old(root):
         (1, 'fact', 'group:' + G_SMALL, '桃子喜欢拍星空', '', 2, 'active', 'member', PEACH, PEACH, '["4004"]',
          T0 + 2400, T0 + 2400, 1, 0, None),
         (2, 'self', 'global', '我喜欢热闹的群', '', 2, 'active', 'self', '', '', '[]', T0, T0, 1, 0, None),
-        (3, 'rule', 'global', '别在群里提私聊的事', '', 3, 'archived', 'master', MANGO, '', '[]', T0, T0, 1, 0, None),
-        (4, 'fact', 'global', '主人在学日语', '', 2, 'active', 'master', MANGO, MANGO, '[]', T0, T0, 1, 0, None),
+        (3, 'rule', 'global', '别在群里提私聊的事', '', 3, 'archived', 'master', ORANGE, '', '[]', T0, T0, 1, 0, None),
+        (4, 'fact', 'global', '主人在学日语', '', 2, 'active', 'master', ORANGE, ORANGE, '[]', T0, T0, 1, 0, None),
         (5, 'fact', 'group:' + G_BUSY, '阿星养了一只猫', '', 2, 'active', 'member', STAR, STAR, '["4003"]',
          T0 + 2200, T0 + 2200, 1, 0, None),
     ])])
@@ -104,8 +104,8 @@ def build_old(root):
     CREATE TABLE items (id INTEGER, scope TEXT, kind TEXT, qq TEXT, text TEXT, reason TEXT, created REAL, expires REAL,
         delta REAL, behavior TEXT, explicit INT, revoked INT);
     CREATE TABLE evidence (item_id INTEGER, scope TEXT, source_id TEXT);""", [
-        ('items', [(1, 'default:FriendMessage:' + MANGO, 'memory', MANGO, '一起聊过喜欢的歌', '', T0, None, 0, '', 0, 0)]),
-        ('evidence', [(1, 'default:FriendMessage:' + MANGO, '-4100')])])
+        ('items', [(1, 'default:FriendMessage:' + ORANGE, 'memory', ORANGE, '一起聊过喜欢的歌', '', T0, None, 0, '', 0, 0)]),
+        ('evidence', [(1, 'default:FriendMessage:' + ORANGE, '-4100')])])
     _db(snow / 'experience.sqlite3', """
     CREATE TABLE items (id INTEGER, scope TEXT, qq TEXT, kind TEXT, text TEXT, basis TEXT, important INT, state TEXT,
         created REAL, updated REAL, expires REAL, active INT, supersedes TEXT, fingerprint TEXT);
@@ -119,7 +119,7 @@ def build_old(root):
     CREATE TABLE alias (scope TEXT, qq TEXT, card TEXT, aliases TEXT, updated REAL);""", [
         ('profile', [('group:' + G_BUSY, '一个爱聊抽卡的游戏群', '{}', '2026-10-04', '2026-10-26', T0, T0, 1, 'active'),
                      ('group:' + G_TEST, '测试用的小群', '{}', '2026-10-04', '2026-10-26', T0, T0, 1, 'active')]),
-        ('card', [('group:' + G_BUSY, MANGO, NAMES[MANGO], '说话很快，爱用语气词', json.dumps(stats, ensure_ascii=False),
+        ('card', [('group:' + G_BUSY, ORANGE, NAMES[ORANGE], '说话很快，爱用语气词', json.dumps(stats, ensure_ascii=False),
                    '2026-10-04', '2026-10-26', T0, T0, 1, 'active'),
                   ('group:' + G_BUSY, LEMON, NAMES[LEMON], '有点烦人', '{}', '2026-10-04', '2026-10-26', T0, T0, 1,
                    'active'),
@@ -127,7 +127,7 @@ def build_old(root):
                    'active')]),
         ('alias', [('group:' + G_SMALL, PEACH, NAMES[PEACH], '["桃桃"]', T0),
                    ('group:' + G_BUSY, STAR, NAMES[STAR], '["星星"]', T0),        # forgotten
-                   ('group:' + G_BUSY, MANGO, NAMES[MANGO], '["大佬"]', T0)])])   # how anyone is addressed
+                   ('group:' + G_BUSY, ORANGE, NAMES[ORANGE], '["大佬"]', T0)])])   # how anyone is addressed
     return snow
 
 
@@ -141,19 +141,19 @@ CREATE TABLE messages (id INTEGER NOT NULL PRIMARY KEY, message_id VARCHAR(50), 
     direction VARCHAR(10) NOT NULL, connection_id VARCHAR(50), processed BOOLEAN, created_at DATETIME);
 """
 
-# (seconds after T0, who, group or None for her private chat with MANGO, text, @her?, quoted message id, her reply)
+# (seconds after T0, who, group or None for her private chat with ORANGE, text, @her?, quoted message id, her reply)
 CHAT = [
-    (100, MANGO, G_BUSY, '今天抽卡又歪了', False, '', ''),
+    (100, ORANGE, G_BUSY, '今天抽卡又歪了', False, '', ''),
     (160, LEMON, G_BUSY, '我也是 心态崩了', False, '', ''),
     (220, STAR, G_BUSY, '我家猫今天把杯子打碎了', False, '', ''),        # forgotten (before his cutoff)
-    (300, MANGO, G_BUSY, '小爱 你说下次会出货吗', True, '', '会的会的~'),
+    (300, ORANGE, G_BUSY, '小爱 你说下次会出货吗', True, '', '会的会的~'),
     (400, PEACH, G_SMALL, '今晚有流星雨 一起看吗', False, '', ''),
     (460, FISH, G_SMALL, '小爱 流星雨几点开始呀', True, '', '大概十点吧~'),
-    (600, MANGO, None, PRIVATE_SECRET, True, '', HER_PRIVATE_REPLY),
-    (700, MANGO, None, '记得别跟群里说哦', True, '', '嗯嗯，不说'),
+    (600, ORANGE, None, PRIVATE_SECRET, True, '', HER_PRIVATE_REPLY),
+    (700, ORANGE, None, '记得别跟群里说哦', True, '', '嗯嗯，不说'),
     (5100, STAR, G_BUSY, '刚下班 好累', False, '', ''),                  # after his cutoff
     (5200, LEMON, G_BUSY, '这句后来被要求忘掉了', False, '', ''),         # forgotten message 5003 below
-    (5300, MANGO, G_BUSY, '小爱 晚上好呀', True, '5003', '晚上好~'),     # quotes the forgotten one
+    (5300, ORANGE, G_BUSY, '小爱 晚上好呀', True, '5003', '晚上好~'),     # quotes the forgotten one
     (5400, FISH, G_SMALL, '小爱 你去过哪里旅游吗', True, '', '我哪都去不了啦'),
     (5500, PEACH, G_BUSY, '小爱 群里最近有人要出远门吗', True, '', '不知道诶'),
 ]

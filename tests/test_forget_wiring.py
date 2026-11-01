@@ -48,7 +48,7 @@ class Registry(unittest.TestCase):
 class OwnerDeletes(unittest.TestCase):
     def test_a_person_everywhere(self):
         r = run_case('owner_person')
-        his = ['学弹吉他', '好厉害', '准备一个惊喜', '我帮你保密', '10001', '芒果']
+        his = ['学弹吉他', '好厉害', '准备一个惊喜', '我帮你保密', '10001', '阿橙']
         self.assertTrue(all(where(r['before'], his).values()))
         self.assertEqual(where(r['after'], his), {w: [] for w in his})
         counts = r['answer']['data']['counts']

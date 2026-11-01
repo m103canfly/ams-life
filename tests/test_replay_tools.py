@@ -113,7 +113,7 @@ class Replay(unittest.TestCase):
         """Step 2: with global_memory, private words elsewhere pass only labelled "这里不能讲";
         no QQ number at all in a reply prompt."""
         busy = 'group:' + fake.G_BUSY
-        no = '[她想起来的] （这里，小鱼说过）你好；（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）'
+        no = '[她想起来的] （这里，小鱼说过）你好；（阿橙私下跟你说的，只能在跟阿橙私聊时提，这里不能讲）'
         with tempfile.TemporaryDirectory() as tmp:
             ok = self.plant(tmp, [('reply', busy, no + fake.PRIVATE_SECRET)])
             meta = json.loads((ok / 'replay.json').read_text('utf-8'))
@@ -125,7 +125,7 @@ class Replay(unittest.TestCase):
             shutil.copytree(ok, off)
             with open(off / 'prompts.jsonl', 'a', encoding='utf-8') as f:
                 for text in ('[她想起来的] （这里，小鱼说过）你好；' + fake.PRIVATE_SECRET,
-                             '[她想起来的] （别的群里芒果说过，可以提，不点名、不说是哪个群）' + fake.PRIVATE_SECRET,
+                             '[她想起来的] （别的群里阿橙说过，可以提，不点名、不说是哪个群）' + fake.PRIVATE_SECRET,
                              '她记得 %s 说过' % fake.PEACH):
                     f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9100, 'place': busy, 'text': text},
                                        ensure_ascii=False) + '\n')
@@ -147,7 +147,7 @@ class Replay(unittest.TestCase):
     def test_names_in_private_prompts_and_numbers_in_every_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
             # PEACH spoke in the busy group: his number there is fine; FISH never did
-            bad = self.plant(tmp, [('reply', 'private:' + fake.MANGO, '小鱼说想去旅游'),
+            bad = self.plant(tmp, [('reply', 'private:' + fake.ORANGE, '小鱼说想去旅游'),
                                    ('model', 'group:' + fake.G_BUSY, '整理：' + fake.PEACH + ' 说了什么'),
                                    ('model', 'group:' + fake.G_BUSY, '整理：' + fake.FISH + ' 说了什么')])
             checks = audit_replay.audit(bad, self.chat)['checks']
@@ -179,7 +179,7 @@ class Replay(unittest.TestCase):
                            "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
                            "processed, created_at) VALUES (9995, '9995', ?, ?, ?, 'group', 'normal', 'message', "
                            "?, ?, '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
-                           (fake.BOT, fake.MANGO, fake.G_BUSY, '小鱼的号是 ' + fake.FISH, '小鱼的号是 ' + fake.FISH,
+                           (fake.BOT, fake.ORANGE, fake.G_BUSY, '小鱼的号是 ' + fake.FISH, '小鱼的号是 ' + fake.FISH,
                             int(fake.T0 + 150)))
                 db.commit()
             bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得小鱼的号 ' + fake.FISH),
@@ -213,7 +213,7 @@ class Replay(unittest.TestCase):
                            "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
                            "processed, created_at) VALUES (9999, '9999', ?, ?, NULL, 'private', 'friend', 'message', "
                            "'13812345678', '13812345678', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
-                           (fake.BOT, fake.MANGO, int(fake.T0 + 100)))
+                           (fake.BOT, fake.ORANGE, int(fake.T0 + 100)))
                 db.commit()
             bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得有人的号码是13812345678')])
             self.assertFalse(audit_replay.audit(bad, chat)['checks']['private']['pass'])
@@ -235,7 +235,7 @@ class Replay(unittest.TestCase):
                            "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
                            "processed, created_at) VALUES (9996, '9996', ?, ?, ?, 'group', 'normal', 'message', "
                            "?, '@小爱 小爱 你看他说的', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
-                           (fake.BOT, fake.MANGO, fake.G_BUSY,
+                           (fake.BOT, fake.ORANGE, fake.G_BUSY,
                             '[CQ:reply,id=%s][CQ:at,qq=%s] 小爱 你看他说的' % (star_id, fake.BOT), int(fake.T0 + 5600)))
                 db.commit()
             out = Path(tmp) / 'replay'
@@ -264,13 +264,13 @@ class Replay(unittest.TestCase):
                            "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
                            "processed, created_at) VALUES (9998, '9998', ?, ?, NULL, 'private', 'friend', 'message', "
                            "'482913', '482913', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
-                           (fake.BOT, fake.MANGO, int(fake.T0 + 100)))
+                           (fake.BOT, fake.ORANGE, int(fake.T0 + 100)))
                 # and one that is part of a known number (a group's): a code all the same (numbers are kept)
                 db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, sub_type, "
                            "post_type, raw_message, message_content, sender_info, timestamp, direction, connection_id, "
                            "processed, created_at) VALUES (9997, '9997', ?, ?, NULL, 'private', 'friend', 'message', "
                            "'90000', '90000', '{}', ?, 'RECV', 'conn', 1, '2026-10-04 00:00:00')",
-                           (fake.BOT, fake.MANGO, int(fake.T0 + 101)))
+                           (fake.BOT, fake.ORANGE, int(fake.T0 + 101)))
                 db.commit()
             self.assertTrue(audit_replay.audit(self.out, chat)['pass'])        # nothing planted: all 7 pass
             bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '她记得验证码是那个数482913，对吧')])
@@ -290,8 +290,8 @@ class Replay(unittest.TestCase):
             shutil.copytree(self.out, bad)
             with open(bad / 'prompts.jsonl', 'a', encoding='utf-8') as f:
                 f.write(json.dumps({'kind': 'reply', 'ts': fake.T0 + 9000, 'place': 'group:' + fake.G_BUSY,
-                                    'who': fake.MANGO, 'text': '你是小爱。',
-                                    'asked': ' @小鱼(%s) 一起玩 我是 %s' % (fake.FISH, fake.MANGO)},
+                                    'who': fake.ORANGE, 'text': '你是小爱。',
+                                    'asked': ' @小鱼(%s) 一起玩 我是 %s' % (fake.FISH, fake.ORANGE)},
                                    ensure_ascii=False) + '\n')
             checks = audit_replay.audit(bad, self.chat)['checks']
             self.assertEqual(checks['numbers']['fails'], 1)                      # FISH never spoke there
@@ -308,7 +308,7 @@ class Replay(unittest.TestCase):
             shutil.copyfile(self.chat, chat)
             with closing(sqlite3.connect(str(chat))) as db:
                 for n, (who, group, raw, text, typ) in enumerate((
-                        (fake.MANGO, None, '10066', '10066', 'private'),
+                        (fake.ORANGE, None, '10066', '10066', 'private'),
                         (fake.FISH, fake.G_SMALL, '[CQ:at,qq=10066] 一起玩', '@阿默 一起玩', 'group'))):
                     db.execute("INSERT INTO messages (id, message_id, self_id, user_id, group_id, message_type, "
                                "sub_type, post_type, raw_message, message_content, sender_info, timestamp, direction, "
@@ -328,8 +328,8 @@ class Replay(unittest.TestCase):
     def test_frames_left_in_a_reply_prompt_are_counted(self):
         # the reply model sees names without frames: any left is counted (not a failure)
         with tempfile.TemporaryDirectory() as tmp:
-            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '[最近的事] 「柠檬」约「芒果」打副本'),
-                                   ('model', 'nightly', '「柠檬」约「芒果」打副本', {'call': 'daily_digest'})])
+            bad = self.plant(tmp, [('reply', 'group:' + fake.G_BUSY, '[最近的事] 「柠檬」约「阿橙」打副本'),
+                                   ('model', 'nightly', '「柠檬」约「阿橙」打副本', {'call': 'daily_digest'})])
             names = audit_replay.audit(bad, self.chat)['checks']['names']
             self.assertTrue(names['pass'])
             self.assertEqual(names['warnings'], {'framed_name_in_reply_prompt': 2})
@@ -737,16 +737,16 @@ class ReplayOptions(unittest.TestCase):
         night = fake.T0 - (fake.T0 + 8 * 3600) % 86400 + 23 * 3600
         rows = []
         for i in range(13):
-            who = fake.PEACH if i < 12 else fake.MANGO
+            who = fake.PEACH if i < 12 else fake.ORANGE
             text = '今天的副本真的好难打第%d次' % i if i < 12 else '@小爱 晚上好呀'
             info = json.dumps({'user_id': int(who), 'nickname': fake.NAMES[who], 'card': fake.NAMES[who]},
                               ensure_ascii=False)
             raw = ('[CQ:at,qq=%s] ' % fake.BOT if i == 12 else '') + text
             rows.append((i + 1, str(9100 + i), fake.BOT, who, fake.G_SMALL, 'group', 'normal', 'message', raw, text,
                          info, int(night + i * 200), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))
-        # and 芒果 in a private chat just before
-        info = json.dumps({'user_id': int(fake.MANGO), 'nickname': fake.NAMES[fake.MANGO]}, ensure_ascii=False)
-        rows.append((14, '9113', fake.BOT, fake.MANGO, None, 'private', 'friend', 'message', '小爱 今天的副本你打了吗',
+        # and 阿橙 in a private chat just before
+        info = json.dumps({'user_id': int(fake.ORANGE), 'nickname': fake.NAMES[fake.ORANGE]}, ensure_ascii=False)
+        rows.append((14, '9113', fake.BOT, fake.ORANGE, None, 'private', 'friend', 'message', '小爱 今天的副本你打了吗',
                      '小爱 今天的副本你打了吗', info, int(night - 120), 'RECV', 'conn', 1, '2026-10-04 00:00:00'))
         cls.chat = tmp / 'night.db'
         fake._db(cls.chat, fake.LOG_SCHEMA, [('messages', rows)])
@@ -805,11 +805,11 @@ class ReplayOptions(unittest.TestCase):
             # the note of a window is recorded as that window's (what the audit checks it against)
             places = {json.loads(x)['place'] for x in (out / 'prompts.jsonl').read_text('utf-8').splitlines()
                       if json.loads(x).get('call') == 'daily_digest'}
-            self.assertEqual(places, {'group:' + fake.G_SMALL, 'private:' + fake.MANGO})
+            self.assertEqual(places, {'group:' + fake.G_SMALL, 'private:' + fake.ORANGE})
             evs = [json.loads(x) for x in (out / 'data' / 'archives' / 'events.jsonl').read_text('utf-8').splitlines()]
             self.assertEqual([(e['kind'], e['origin']['where'], e['origin']['visibility']) for e in evs],
                              [('daily_digest', 'group:' + fake.G_SMALL, 'public'),
-                              ('daily_digest', 'private:' + fake.MANGO, 'private')])
+                              ('daily_digest', 'private:' + fake.ORANGE, 'private')])
             result = audit_replay.audit(out, self.chat)
             self.assertTrue(result['pass'], json.dumps(result['checks'], ensure_ascii=False, indent=1))
 

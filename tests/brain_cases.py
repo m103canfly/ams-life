@@ -39,7 +39,7 @@ with forget_registry.ForgetRegistry(DATA / forget_registry.FILE_NAME) as reg:
     reg.stop_impression('10004', note='owner:panel')                                         # 桃子: no impression
 write('self_model.json', {'notebook': [
     {'id': 'n-self', 'text': '想多听听大家在聊什么', 'ts': clock.now - 50, 'origin': origin('self', [], [], 'self')},
-    {'id': 'n-priv', 'text': '芒果好像在准备惊喜', 'ts': clock.now - 40,
+    {'id': 'n-priv', 'text': '阿橙好像在准备惊喜', 'ts': clock.now - 40,
      'origin': origin('private:10001', ['10001'], ['m-secret'], 'private')},
     {'id': 'n-star', 'text': '阿星说下雨了', 'ts': clock.now - 30,
      'origin': origin('group:' + G2, ['10003'], ['m-star'], 'public')}]})
@@ -112,17 +112,17 @@ def library_ids():
 
 
 def chat():
-    turn('小爱 我最近在学弹吉他', '10001', '芒果', group=G1, reply='好厉害！', msg_id='m-guitar')
+    turn('小爱 我最近在学弹吉他', '10001', '阿橙', group=G1, reply='好厉害！', msg_id='m-guitar')
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀，记得带水~', msg_id='m-hike')
-    turn('小爱，跟你说个悄悄话，我在准备一个惊喜', '10001', '芒果', reply='我帮你保密~', msg_id='m-secret')
+    turn('小爱，跟你说个悄悄话，我在准备一个惊喜', '10001', '阿橙', reply='我帮你保密~', msg_id='m-secret')
     turn('小爱 今天下雨了', '10003', '阿星', group=G2, reply='记得带伞', msg_id='m-star')
     turn('小爱 晚上好', '10004', '桃子', group=G2, reply='晚上好呀', msg_id='m-hi')
     # the same words again: the private one is recalled in his private chat, held back in the group
-    turn('小爱 惊喜准备得怎么样了', '10001', '芒果', reply='快好了吗', msg_id='m-secret-2')
+    turn('小爱 惊喜准备得怎么样了', '10001', '阿橙', reply='快好了吗', msg_id='m-secret-2')
     turn('小爱 惊喜准备得怎么样了', '10002', '柠檬', group=G1, reply='什么惊喜呀', msg_id='m-ask')
     turn('小爱 周末去爬山吗 还去吗', '10002', '柠檬', group=G1, reply='去呀', msg_id='m-hike-2')
     store = plugin._impression_store()
-    for place, people in (('group:' + G1, {'10001': ('芒果', '爱分享', 9), '10002': ('柠檬', '很照顾人', 4)}),
+    for place, people in (('group:' + G1, {'10001': ('阿橙', '爱分享', 9), '10002': ('柠檬', '很照顾人', 4)}),
                           ('group:' + G2, {'10003': ('阿星', '总是半夜出现', 5), '10004': ('桃子', '话不多', 3)})):
         data = store.load(place)
         for qq, (name, style, msgs) in people.items():
@@ -154,7 +154,7 @@ if CASE == 'graph':
     result['people'] = people
     result['memory_detail'] = node(next(n['id'] for n in by_kind['memory'] if n['cat'] == '私下'))
     result['window_titles'] = sorted(node(w['id'])['data']['title'] for w in by_kind['window'])
-    result['search'] = {q: search(q) for q in ('吉他', '阿星', '下雨', '芒果', '想多听听')}
+    result['search'] = {q: search(q) for q in ('吉他', '阿星', '下雨', '阿橙', '想多听听')}
     result['node_ids'] = [n['id'] for n in nodes]
     result['turns_file'] = turns_file()
     result['library_ids'] = sorted(library_ids())
@@ -164,7 +164,7 @@ if CASE == 'graph':
     result['said'] = [t for t in ('我最近在学弹吉他', '周末去爬山吗', '悄悄话', '准备一个惊喜', '今天下雨了', '晚上好',
                                   '好厉害', '记得带水', '我帮你保密', '想多听听', '爱分享', '很照顾人')]
     result['numbers'] = ['10001', '10002', '10003', '10004', G1, G2]
-    result['names'] = ['芒果', '柠檬', '阿星', '桃子']
+    result['names'] = ['阿橙', '柠檬', '阿星', '桃子']
 
 if CASE == 'number_card':
     # someone whose group card is a string of digits (made up): the title is not that string
@@ -199,8 +199,8 @@ if CASE == 'frames':
     # what she keeps keeps the frames round names (the owner, 10-29): so does the page
     turn('小爱 周末爬山吗', '10002', '柠檬', group=G1, reply='好呀', msg_id='m-fr')
     plugin._append_event_archive({
-        'id': 'fr', 'ts': clock.now, 'session': 'default:GroupMessage:' + G1, 'title': '「柠檬」约「芒果」爬山',
-        'event': '「柠檬」约「芒果」周末爬山', 'event_key': 'fr',
+        'id': 'fr', 'ts': clock.now, 'session': 'default:GroupMessage:' + G1, 'title': '「柠檬」约「阿橙」爬山',
+        'event': '「柠檬」约「阿橙」周末爬山', 'event_key': 'fr',
         'origin': main.discretion.make_origin('group:' + G1, ['10002'], ['m-fr'])})
     g = graph()
     ev = [n for n in g['data']['nodes'] if n['kind'] == 'event']
@@ -276,7 +276,7 @@ if CASE == 'deletes':
     result['answer_person'] = run(plugin.page_forget_person('10001'))
     after = graph()['data']
     result['after_text'] = json.dumps(after, ensure_ascii=False)
-    result['after_search'] = {q: search(q) for q in ('吉他', '惊喜', '芒果')}
+    result['after_search'] = {q: search(q) for q in ('吉他', '惊喜', '阿橙')}
     result['old_ids_open'] = [node(i)['status'] for i in guitar_ids]
     result['turns_after_person'] = turns_file()
     result['library_ids'] = sorted(library_ids())

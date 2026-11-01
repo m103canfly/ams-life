@@ -66,7 +66,7 @@ if CASE in ('migrate', 'recall_before', 'recall_after'):
 
 if CASE == 'other_stores':
     write('memory/library.json', {'schema_version': 3, 'rooms': {}, 'entries': [
-        {'id': 'pic1', 'text': '芒果发了一张猫的照片', 'role': 'user', 'vector': vec(1), 'ts': clock.now - 100,
+        {'id': 'pic1', 'text': '阿橙发了一张猫的照片', 'role': 'user', 'vector': vec(1), 'ts': clock.now - 100,
          'attachments': [{'type': 'image', 'ref': PICTURE}],
          'origin': {'where': 'group:' + G1, 'people': ['10001'], 'source_ids': ['m-pic'], 'visibility': 'public'}},
         {'id': 'keep1', 'text': '柠檬说周末去爬山', 'role': 'user', 'vector': vec(2), 'ts': clock.now - 90,
@@ -75,12 +75,12 @@ if CASE == 'other_stores':
     write('image_cache.json', {hashlib.sha256(PICTURE.encode('utf-8')).hexdigest(): {
         'ref': PICTURE, 'caption': '一只橘猫趴在键盘上', 'ts': clock.now}})
     write('archives/events.jsonl', [
-        {'id': 'evt_cat', 'title': '芒果的猫', 'event': '芒果发了猫的照片', 'ts': clock.now - 100,
+        {'id': 'evt_cat', 'title': '阿橙的猫', 'event': '阿橙发了猫的照片', 'ts': clock.now - 100,
          'origin': {'where': 'group:' + G1, 'people': ['10001'], 'source_ids': ['m-pic'], 'visibility': 'public'}},
         {'id': 'evt_hike', 'title': '爬山', 'event': '柠檬约爬山', 'ts': clock.now - 90,
          'origin': {'where': 'group:' + G1, 'people': ['10002'], 'source_ids': ['m-hike'], 'visibility': 'public'}}])
     write('archives/dedupe_log.jsonl', [
-        {'action': 'dedupe_merge', 'kept_id': 'evt_cat', 'kept_title': '芒果的猫', 'dropped_id': 'evt_x'},
+        {'action': 'dedupe_merge', 'kept_id': 'evt_cat', 'kept_title': '阿橙的猫', 'dropped_id': 'evt_x'},
         {'action': 'dedupe_merge', 'kept_id': 'evt_hike', 'kept_title': '爬山', 'dropped_id': 'evt_y'}])
     write('users/10002.json', {'sender_id': '10002', 'sender_name': '柠檬', 'interactions': 7, 'trust': 0.6,
                                'relationship': {
@@ -237,9 +237,9 @@ if CASE in ('group_missing_api', 'group_update_error'):
     result['history'] = ctx.conversation_manager.histories['default:GroupMessage:' + G1]
 
 if CASE in ('owner_person', 'owner_memory'):
-    turn('小爱 我最近在学弹吉他', '10001', '芒果', group=G1, reply='好厉害！', msg_id='m-guitar')
+    turn('小爱 我最近在学弹吉他', '10001', '阿橙', group=G1, reply='好厉害！', msg_id='m-guitar')
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀，记得带水~', msg_id='m-hike')
-    turn('小爱，跟你说个悄悄话，我在准备一个惊喜', '10001', '芒果', reply='我帮你保密~', msg_id='m-secret')
+    turn('小爱，跟你说个悄悄话，我在准备一个惊喜', '10001', '阿橙', reply='我帮你保密~', msg_id='m-secret')
     turn('小爱 晚上好', '10004', '桃子', group=G2, reply='晚上好呀', msg_id='m-hi')
     result['before'] = all_text()
     if CASE == 'owner_person':
@@ -249,9 +249,9 @@ if CASE in ('owner_person', 'owner_memory'):
         result['astrbot'] = {'conversations': ctx.conversation_manager.deleted,
                              'history_left': [r.sender_id for r in ctx.message_history_manager.rows],
                              'group_histories': ctx.conversation_manager.histories}
-        turn('小爱 我又回来啦 还在学吉他', '10001', '芒果', group=G1, reply='欢迎回来', msg_id='m-back')
+        turn('小爱 我又回来啦 还在学吉他', '10001', '阿橙', group=G1, reply='欢迎回来', msg_id='m-back')
         result['later'] = all_text()
-        bad = loop.run_until_complete(plugin.page_forget_person('芒果'))
+        bad = loop.run_until_complete(plugin.page_forget_person('阿橙'))
         result['bad_person'] = bad
     else:
         lib = library()
@@ -316,7 +316,7 @@ if CASE == 'other_stores':
 
 if CASE == 'registry_broken':
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')
-    turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
+    turn('小爱 我在学吉他', '10001', '阿橙', group=G1, reply='好厉害', msg_id='m-guitar')
     before_lib = library()['entries']
     before_vec = sorted(plugin._vector_store().ids())
     import sqlite3
@@ -347,7 +347,7 @@ if CASE == 'mention':
 
 if CASE == 'forget_broken':
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')   # what is left is checked
-    turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
+    turn('小爱 我在学吉他', '10001', '阿橙', group=G1, reply='好厉害', msg_id='m-guitar')
     import sqlite3
     real = plugin._registry_sets
 
@@ -361,7 +361,7 @@ if CASE == 'forget_broken':
     result['gone_after_retry'] = not any('吉他' in e['text'] for e in library()['entries'])
 
 if CASE == 'restore':
-    turn('小爱 我在学吉他', '10001', '芒果', group=G1, reply='好厉害', msg_id='m-guitar')
+    turn('小爱 我在学吉他', '10001', '阿橙', group=G1, reply='好厉害', msg_id='m-guitar')
     turn('小爱 周末去爬山吗', '10002', '柠檬', group=G1, reply='好呀~', msg_id='m-hike')
     turn('小爱 我做了蛋糕', '10002', '柠檬', group=G1, reply='看起来好好吃', msg_id='m-cake')
     turn('小爱 今天下雨了', '10003', '阿星', group=G2, reply='记得带伞', msg_id='m-rain')

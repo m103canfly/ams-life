@@ -65,7 +65,7 @@ class Nightly(unittest.TestCase):
         self.assertEqual(sorted(people), ['10001', '10002'])           # 阿星 is registered: no impression
         self.assertEqual(people['10002']['aliases'], ['柠柠'])           # others called her that, twice
         self.assertEqual(people['10001']['aliases'], [])                # nobody called him 柠柠子
-        self.assertEqual(r['prompt_has'], {'柠檬': False, '芒果': False, '阿星': False, '柠柠': True, '10002': False})
+        self.assertEqual(r['prompt_has'], {'柠檬': False, '阿橙': False, '阿星': False, '柠柠': True, '10002': False})
 
     def test_the_panel(self):
         r = run_case('nightly')
@@ -150,9 +150,9 @@ class Review(unittest.TestCase):
 
     def test_the_nightly_material_codes_every_name_she_knows(self):
         r = run_case('material')
-        self.assertEqual(r['prompt_has'], {'大芒': False, '芒芒': False, '鹿说': False, '芒果': False, '柠檬': False})
-        self.assertTrue(any(ln.startswith('- P2今天没来') for ln in r['lines']), r['lines'])   # 大芒: elsewhere
-        self.assertTrue(any(ln.startswith('- P2快来打本') for ln in r['lines']), r['lines'])   # 芒芒: the owner's
+        self.assertEqual(r['prompt_has'], {'大橙': False, '橙橙': False, '鹿说': False, '阿橙': False, '柠檬': False})
+        self.assertTrue(any(ln.startswith('- P2今天没来') for ln in r['lines']), r['lines'])   # 大橙: elsewhere
+        self.assertTrue(any(ln.startswith('- P2快来打本') for ln in r['lines']), r['lines'])   # 橙橙: the owner's
         self.assertTrue(any(ln.startswith('- Q1说他也去') for ln in r['lines']), r['lines'])   # 鹿
 
 

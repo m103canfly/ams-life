@@ -1,7 +1,7 @@
 """Scripted runs for test_browse_wire (step 2, 丁: her browser in a reply); prints a JSON result.
 Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/browse_cases.py <empty data dir> <out.json> <case>
-All made up: group 900001, Mango 10001. AstrBot's tool classes and its DeepSeek search / fetch are
+All made up: group 900001, Orange 10001. AstrBot's tool classes and its DeepSeek search / fetch are
 stand-ins (no Key, no network); the resolver is a stand-in too.
 """
 import asyncio
@@ -124,7 +124,7 @@ class TripProvider:
         n = len(self.rounds)
         u = Usage(1000 * n, 0, 100)
         if n == 1:
-            return TripResponse(names=['ams_web_search'], args=[{'query': '芒果 推荐的猫咖'}], usage=u)
+            return TripResponse(names=['ams_web_search'], args=[{'query': '阿橙 推荐的猫咖'}], usage=u)
         if n == 2:
             return TripResponse(names=['ams_read_page'], args=[{'url': 'https://news.example.org/cat'}], usage=u)
         return TripResponse(json.dumps({
@@ -143,8 +143,8 @@ def trip_case(plugin, ctx, loop, calls, out):
     lt = time.localtime(clock.now)
     clock.now = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 14, 0, 0, 0, 0, -1)) + 86400   # 2 p.m.
     core = plugin._core(None)
-    # Mango is known by name; he spoke long ago (the chats are quiet)
-    loop.run_until_complete(plugin.on_message(harness.FakeEvent('大家好', sender='10001', name='芒果', group=A)))
+    # Orange is known by name; he spoke long ago (the chats are quiet)
+    loop.run_until_complete(plugin.on_message(harness.FakeEvent('大家好', sender='10001', name='阿橙', group=A)))
     clock.now += 3600
     core.boredom, core.novelty_need, core.info_gap = 0.1, 0.1, 0.1
     out['not_curious'] = loop.run_until_complete(plugin._maybe_go_browse())
@@ -166,9 +166,9 @@ def trip_case(plugin, ctx, loop, calls, out):
     core.boredom = 0.9
     out['at_night'] = loop.run_until_complete(plugin._maybe_go_browse())
     out['chat_spend'] = (mixin_attention.SPEND_PATH.read_text('utf-8') if mixin_attention.SPEND_PATH.exists() else '')
-    # a wish that names Mango; Mango deleted: his name goes out of it (the self model is swept)
+    # a wish that names Orange; Orange deleted: his name goes out of it (the self model is swept)
     plugin.self_model['share_wishes'] = browse.add_wish(plugin.self_model.get('share_wishes'),
-                                                        {'url': 'https://news.example.org/cat', 'what': '芒果说过想去的猫咖',
+                                                        {'url': 'https://news.example.org/cat', 'what': '阿橙说过想去的猫咖',
                                                          'group': ''}, clock.now, 'trip-x')
     plugin._save_self_model()
     loop.run_until_complete(plugin.page_forget_person('10001'))
@@ -224,14 +224,14 @@ def run():
         OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
         return
 
-    # Mango is known by name (her phone keeps it), so his name never goes out in a search
-    ev0 = harness.FakeEvent('大家好', sender='10001', name='芒果', group=A)
+    # Orange is known by name (her phone keeps it), so his name never goes out in a search
+    ev0 = harness.FakeEvent('大家好', sender='10001', name='阿橙', group=A)
     loop.run_until_complete(plugin.on_message(ev0))
 
     words = '小爱 帮我搜搜猫咖，看看 https://example.com/a 还有 https://example.com/empty'
     if CASE == 'leak':
         words = '小爱 看看 https://example.com/s?q=%E8%8A%92%E6%9E%9C%E7%9A%84%E7%94%9F%E6%97%A5%E6%83%8A%E5%96%9C'
-    event = harness.FakeEvent(words, sender='10001', name='芒果', group=A)
+    event = harness.FakeEvent(words, sender='10001', name='阿橙', group=A)
     req = ProviderRequest(prompt=event.message_str, system_prompt='你是小爱。')
     req.func_tool = ToolSet([FunctionTool('future_task'), FunctionTool('send_message_to_user')])
     loop.run_until_complete(plugin.on_message(event))
@@ -261,8 +261,8 @@ def run():
         OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), 'utf-8')
         return
 
-    out['search1'] = go(search(event, query='芒果说的 10001 那个猫咖'))
-    out['search_names_only'] = go(search(event, query='芒果 10001'))
+    out['search1'] = go(search(event, query='阿橙说的 10001 那个猫咖'))
+    out['search_names_only'] = go(search(event, query='阿橙 10001'))
     out['search3'] = go(search(event, query='猫咖 地址'))
     out['search4'] = go(search(event, query='再搜一次'))
     out['read_local'] = go(read(event, url='http://localhost:6185/config'))
@@ -289,14 +289,14 @@ def run():
         out['chat_spend_has_browse'] = 'browse' in spend.read_text('utf-8')
     out['panel'] = plugin._browse_for_panel()
     # a second message: its own count again
-    event2 = harness.FakeEvent('小爱 再搜', sender='10001', name='芒果', group=A)
+    event2 = harness.FakeEvent('小爱 再搜', sender='10001', name='阿橙', group=A)
     req2 = ProviderRequest(prompt=event2.message_str, system_prompt='你是小爱。')
     go(plugin.on_llm_request(event2, req2))
     out['next_message'] = go(req2.func_tool.get_tool(browse.SEARCH_TOOL).handler(event2, query='猫咖'))[:20]
     # what she kept of the pages she read: by the page, never by her reply; who asked kept apart
     web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']
     out['web'] = [{'text': e['text'], 'origin': e['origin'], 'asked_in': e['asked_in'], 'url': e['web']['url']} for e in web]
-    # Mango deleted: the pages stay, who asked becomes the deleted mark
+    # Orange deleted: the pages stay, who asked becomes the deleted mark
     got = go(plugin.page_forget_person('10001'))
     out['forget_counts'] = (got.get('data') or {}).get('counts') if isinstance(got, dict) else got
     web = [e for e in plugin._read_library(vectors=False)['entries'] if e.get('role') == 'web']

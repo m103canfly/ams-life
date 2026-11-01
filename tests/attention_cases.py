@@ -1,7 +1,7 @@
 """Scripted runs for test_attention (step 2, 甲: she decides herself whether to answer); prints a
 JSON result. Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/attention_cases.py <empty data dir> <out.json> <case>
-All made up: group 900001, the owner 10009, Mango 10001, Lemon 10002. No network, no model.
+All made up: group 900001, the owner 10009, Orange 10001, Lemon 10002. No network, no model.
 """
 import asyncio
 import json
@@ -28,7 +28,7 @@ A = '900001'
 
 
 class Event(harness.FakeEvent):
-    def __init__(self, text, sender='10001', name='芒果', group=A, wake=False):
+    def __init__(self, text, sender='10001', name='阿橙', group=A, wake=False):
         super().__init__(text, sender=sender, name=name, group=group)
         self.is_at_or_wake_command = wake
         self.stopped = False
