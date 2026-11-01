@@ -2104,8 +2104,10 @@ class MemoryMixin(PortsMixin):
             gap_days = float(absence.get("gap_days", 0.0) or 0.0)
         except Exception:
             gap_days = 0.0
+        days = int(gap_days) if 3 <= gap_days < 1000000 else 0
+        group = self._here(event).startswith("group:")
         if gap_days * 86400.0 < A4_CONTINUITY_GAP_SECONDS:
-            return {}
+            return {"gap_days": days, "group": group} if days else {}
         summary = self._continuity_summary(event, core)
         loops = []
         try:
@@ -2149,6 +2151,7 @@ class MemoryMixin(PortsMixin):
             bucket = str(absence.get("bucket") or "")
             if bucket and bucket != "same_day":
                 rel["absence"] = bucket
-        if not summary and not loops and not rel:
+        if not summary and not loops and not rel and not days:
             return {}
-        return {"summary": summary, "loops": loops, "relationship": rel}
+        return {"summary": summary, "loops": loops, "relationship": rel,
+                "gap_days": days, "group": group}
