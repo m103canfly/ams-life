@@ -76,11 +76,15 @@ async def run_turn(her, event, *, history_limit=20, max_rounds=tool_loop.MAX_ROU
     reply = reply_of(result)
     await her._after_reply(event, reply)
     her._group_reply_after(event)
+    sent = False
     if not event.is_stopped() and (reply.first_message or reply.text):
         try:
-            await her._messenger(event).send(her._here(event),
-                                             reply.first_message or messenger.text_segments(reply.text))
+            result = await her._messenger(event).send(her._here(event),
+                                                       reply.first_message or messenger.text_segments(reply.text))
+            sent = bool(result.ok)
         except Exception as exc:
             logger.warning('[ams-life] first message send failed: %s', type(exc).__name__)
     her._keep_turn(event, request, reply)
+    if sent:
+        her._keep_likeness(event, reply)
     return reply

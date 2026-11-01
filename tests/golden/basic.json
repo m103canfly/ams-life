@@ -10936,6 +10936,8 @@
   "把下面一段聊天记录总结成一个 JSON 对象，只输出 JSON、不要代码块、不要解释：\n{\"title\":\"短标题\",\"event\":\"完整事件经过\",\"mea"
  ],
  "routes": [
+  "/astrbot_plugin_ams_life/page/likeness",
+  "/astrbot_plugin_ams_life/page/likeness/rate",
   "/astrbot_plugin_ams_life/page/status",
   "/astrbot_plugin_ams_life/page/self_model",
   "/astrbot_plugin_ams_life/page/owner_rules",
