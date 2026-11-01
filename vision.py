@@ -270,7 +270,13 @@ class VisionGate:
                 if sender and sender not in senders and not p._job_stale():
                     item['from_qqs'] = senders + [sender]
                     p._save_image_cache(cache)
-                return _response(json.dumps({'caption': caption}) if prompt == stickers.LOOK_PROMPT else caption)
+                if prompt == stickers.LOOK_PROMPT:
+                    # the whole look is kept, so a second look says who and what it means too
+                    look = item.get('look')
+                    if not isinstance(look, dict) or not look.get('caption'):
+                        look = {'caption': caption}
+                    return _response(json.dumps(look, ensure_ascii=False))
+                return _response(caption)
             try:
                 day = time.strftime('%Y-%m-%d')
                 counts = _legacy_counts(day)
@@ -289,11 +295,15 @@ class VisionGate:
                 logger.warning('[ams-life] vision count could not be saved')
             resp = await self.provider.text_chat(prompt=prompt, image_urls=[item[1] for item in images], **kwargs)
             raw = str(getattr(resp, 'completion_text', '') or '')
-            caption = stickers.parse_look(raw).get('caption', '') if prompt == stickers.LOOK_PROMPT else raw.strip()[:1600]
+            look = stickers.parse_look(raw) if prompt == stickers.LOOK_PROMPT else {}
+            caption = look.get('caption', '') if prompt == stickers.LOOK_PROMPT else raw.strip()[:1600]
             if digest and caption and not p._job_stale():
                 if self.fresh:
                     cache = p._load_image_cache()
-                cache[key] = {'caption': caption, 'from_qq': sender, 'from_qqs': [sender] if sender else [],
-                              'where': place, 'ts': now}
+                entry = {'caption': caption, 'from_qq': sender, 'from_qqs': [sender] if sender else [],
+                         'where': place, 'ts': now}
+                if look:   # the whole look: who, what it means, its mood, the words on it
+                    entry['look'] = look
+                cache[key] = entry
                 p._save_image_cache(cache)
             return resp

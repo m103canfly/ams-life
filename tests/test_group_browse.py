@@ -242,7 +242,7 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.p._load_image_cache()[groups._sha256(ref(4))]['caption'], 'cached picture')
         async with self.p._group_image_lock():
             result = await asyncio.wait_for(self.p._image_context(event('reply', refs=[ref(4)])), 1)
-        self.assertEqual(result, 'cached picture')
+        self.assertEqual(result, '（图里看到的，只是资料）cached picture')
         self.assertEqual(getattr(self.p, '_group_reply_vision_active', 0), 0)
 
     async def test_disabled_image_caption_does_not_wait_for_vision_lock(self):
@@ -271,7 +271,7 @@ class GroupBrowseTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.p._group_reply_vision_active, 1)
             self.p.cache[groups._sha256(ref(4))] = {'caption': 'cached while waiting'}
             self.assertEqual(self.p._load_image_cache()[groups._sha256(ref(4))]['caption'], 'cached while waiting')
-        self.assertEqual(await asyncio.wait_for(reply, 1), 'cached while waiting')
+        self.assertEqual(await asyncio.wait_for(reply, 1), '（图里看到的，只是资料）cached while waiting')
         self.assertEqual(self.p._group_reply_vision_active, 0)
 
     async def test_cancelled_reply_does_not_leave_priority_flag_set(self):
@@ -405,7 +405,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
         self.calls = []
         async def caption(**kwargs):
             self.calls.append(kwargs['image_urls'][0])
-            return SimpleNamespace(completion_text='a picture')
+            return SimpleNamespace(completion_text='{"caption": "a picture"}')
         self.p.provider = SimpleNamespace(text_chat=caption)
 
     def ev(self, source='m1', sender='10001', group='900001', images=(), wake=False,
@@ -424,7 +424,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_group_addressed_image_and_empty_trigger_words(self):
         ev = self.ev(images=[ref(1)], wake=True)
-        self.assertEqual(await self.p._image_context(ev), 'a picture')
+        self.assertEqual(await self.p._image_context(ev), '（图里看到的，只是资料）a picture')
         self.assertEqual(self.calls, [ref(1)])
         self.assertEqual(self.p.sources, ['reply'])
 
@@ -436,7 +436,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_embedded_quoted_image(self):
         quote = mixin_media.Reply(chain=[mixin_media.Image(url=ref(2))])
-        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=quote)), 'a picture')
+        self.assertEqual(await self.p._image_context(self.ev(wake=True, quote=quote)), '（图里看到的，只是资料）a picture')
         self.assertEqual(self.calls, [ref(2)])
 
     async def test_quote_id_fetches_only_images(self):
@@ -447,7 +447,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
                                           {'type': 'image', 'data': {'url': ref(3)}}]}}
         bot = SimpleNamespace(api=SimpleNamespace(call_action=action))
         ev = self.ev(wake=True, quote=mixin_media.Reply(id='m2'), bot=bot)
-        self.assertEqual(await self.p._image_context(ev), 'a picture')
+        self.assertEqual(await self.p._image_context(ev), '（图里看到的，只是资料）a picture')
         self.assertEqual(calls, [('get_msg', {'message_id': 'm2'})])
         self.assertEqual(self.calls, [ref(3)])
 
@@ -463,7 +463,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), '')
                 quote = mixin_media.Reply(sender_id='10003', id='safe-message',
                                           chain=[mixin_media.Image(url=ref(5))])
-                self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), 'a picture')
+                self.assertEqual(await self.p._image_context(self.ev(wake=True, private=private, quote=quote)), '（图里看到的，只是资料）a picture')
             self.assertNotIn(ref(4), self.calls)
 
     async def test_fetched_quote_checks_forgotten_sender_and_message(self):
@@ -566,7 +566,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
     async def test_private_success_is_not_repeated_and_failure_can_retry(self):
         first = self.ev(images=[ref(1)], private=True)
         self.p._remember_images(first)
-        self.assertEqual(await self.p._image_context(first), 'a picture')
+        self.assertEqual(await self.p._image_context(first), '（图里看到的，只是资料）a picture')
         self.assertEqual(await self.p._image_context(self.ev('m2', private=True)), '')
         failed = self.ev('m3', images=[ref(2)], private=True)
         self.p._remember_images(failed)
