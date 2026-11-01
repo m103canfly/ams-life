@@ -12,8 +12,10 @@ import logging
 import random
 import re
 import secrets
+import threading
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
+from http.client import HTTPException
 from http.cookies import SimpleCookie
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -40,6 +42,7 @@ PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/',
                    '/bbs/app/feeds', '/bbs/app/link/tree'))
 LOGIN_PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/'))
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'
+_STATUS_LOCK = threading.RLock()
 
 
 def read_json(path):
@@ -57,32 +60,53 @@ def write_json(path, value):
     atomic_file.replace(temp, path)
 
 
+def status_snapshot():
+    with _STATUS_LOCK:
+        return read_json(STATE_DIR / 'heybox-status.json')
+
+
+def update_status(change):
+    with _STATUS_LOCK:
+        path = STATE_DIR / 'heybox-status.json'
+        state = read_json(path)
+        change(state)
+        write_json(path, state)
+        return state
+
+
 def captcha_paused(now=None):
     day = datetime.fromtimestamp(time.time() if now is None else now).date().isoformat()
-    return read_json(STATE_DIR / 'heybox-status.json').get('captcha_date') == day
+    state = status_snapshot()
+    return bool(state.get('captcha_locked') or state.get('captcha_date') == day)
 
 
 def handle_status(status, now=None, path=None):
     day = datetime.fromtimestamp(time.time() if now is None else now).date().isoformat()
-    state_path = STATE_DIR / 'heybox-status.json'
-    state = read_json(state_path)
-    if status == 'show_captcha':
-        state['captcha_date'] = day
-    if status in ('login', 'relogin', 'lack_token'):
-        state['login_required'] = True
-    if path in PATHS - LOGIN_PATHS and not state.get('first_signed_ok'):
-        if status not in ('ok', 'show_captcha', 'login', 'relogin', 'lack_token'):
-            state['review_required'] = True
+    def change(state):
+        previous = state.get('captcha_date')
+        if status == 'show_captcha':
+            if previous == (date.fromisoformat(day) - timedelta(days=1)).isoformat():
+                state['captcha_locked'] = True
+            state['captcha_date'] = day
+        elif status == 'ok' and previous and previous != day:
+            state.pop('captcha_date', None)
+        if status in ('login', 'relogin', 'lack_token'):
+            state['login_required'] = True
+        if path in PATHS - LOGIN_PATHS and status is not None and not state.get('first_signed_ok'):
+            if status == 'ok':
+                state['first_signed_ok'] = True
+            elif status not in ('show_captcha', 'login', 'relogin', 'lack_token'):
+                state['review_required'] = True
     if status != 'ok':
         logger.warning('heybox %s status: %s', path or 'status', status if status in
                        ('show_captcha', 'login', 'relogin', 'lack_token', 'failed') else 'other')
-    write_json(state_path, state)
+    update_status(change)
     return status == 'ok'
 
 
 def request(path, params, device_id, cookies, *, get=None, now=None):
     if (path not in PATHS or captcha_paused(now)
-            or (path not in LOGIN_PATHS and read_json(STATE_DIR / 'heybox-status.json').get('review_required'))):
+            or (path not in LOGIN_PATHS and status_snapshot().get('review_required'))):
         return None, []
     query = {'os_type': 'web', 'client_type': 'web', 'version': '999.0.4',
              'web_version': '2.5', 'x_client_type': 'web', 'x_app': 'heybox_website',
@@ -103,11 +127,11 @@ def request(path, params, device_id, cookies, *, get=None, now=None):
     try:
         with (get or build_opener(weather.NoRedirect()).open)(req, timeout=TIMEOUT) as response:
             if response.status != 200:
-                handle_status('other', now, path)
+                logger.warning('heybox %s response failed', path)
                 return None, []
             body = response.read(LIMIT + 1)
             if len(body) > LIMIT:
-                handle_status('other', now, path)
+                logger.warning('heybox %s response too large', path)
                 return None, []
             cookies_out = response.headers.get_all('Set-Cookie') or []
         data = json.loads(body)
@@ -116,13 +140,13 @@ def request(path, params, device_id, cookies, *, get=None, now=None):
             logger.info('heybox %s status: %s', path, status if status in
                         ('ok', 'show_captcha', 'login', 'relogin', 'lack_token', 'failed') else 'other')
         if not isinstance(data, dict):
-            handle_status('other', now, path)
+            logger.warning('heybox %s invalid response', path)
             return None, []
         if not handle_status(data.get('status'), now, path):
             return None, []
         return data.get('result'), cookies_out
-    except (OSError, ValueError, TypeError):
-        handle_status('other', now, path)
+    except (OSError, ValueError, TypeError, HTTPException) as exc:
+        logger.warning('heybox %s request failed (%s)', path, type(exc).__name__)
         return None, []
 
 
@@ -263,9 +287,10 @@ class Login:
     def status(self):
         if captcha_paused():
             return {'state': 'captcha'}
-        if read_json(STATE_DIR / 'heybox-status.json').get('review_required'):
+        state = status_snapshot()
+        if state.get('review_required'):
             return {'state': 'review_required'}
-        if read_json(STATE_DIR / 'heybox-status.json').get('login_required'):
+        if state.get('login_required'):
             return {'state': 'relogin'}
         if self.state == 'waiting':
             return {'state': 'waiting'}
@@ -279,8 +304,9 @@ class Login:
             return {'state': 'captcha'}
         if self.task and not self.task.done():
             self.task.cancel()
-        device = secrets.token_hex(16)
-        token = local_token()
+        saved = credential(self.keys)
+        device = saved['device_id'] if saved else secrets.token_hex(16)
+        token = saved['cookies']['x_xhh_tokenid'] if saved else local_token()
         result, headers = await asyncio.to_thread(request, '/account/get_qrcode_url/',
                                                   {'app': 'web', '_notip': 'true'}, device, 'x_xhh_tokenid=' + token)
         if not isinstance(result, dict):
@@ -299,10 +325,12 @@ class Login:
         self.state = 'waiting'
         pending = {'x_xhh_tokenid': token}
         pending.update(cookie_values(headers))
-        self.task = asyncio.create_task(self.poll(qr, device, pending, expire))
+        if saved:
+            pending['x_xhh_tokenid'] = token
+        self.task = asyncio.create_task(self.poll(qr, device, pending, expire, token if saved else None))
         return {'state': 'waiting', 'qr_url': url, 'expire': expire}
 
-    async def poll(self, qr, device, pending, expire):
+    async def poll(self, qr, device, pending, expire, fixed_token=None):
         deadline = time.monotonic() + expire
         try:
             while time.monotonic() < deadline:
@@ -316,6 +344,8 @@ class Login:
                                                            {'qr': qr, 'app': 'web'}, device,
                                                            cookie_header(pending))
                 pending.update(cookie_values(headers))
+                if fixed_token:
+                    pending['x_xhh_tokenid'] = fixed_token
                 if not isinstance(result, dict):
                     self.state = 'failed'
                     return
@@ -332,9 +362,7 @@ class Login:
                 if result.get('heyboxid') and not cookies.get('heybox_id'):
                     cookies['heybox_id'] = str(result['heyboxid'])
                 self.keys.set('heybox', json.dumps({'device_id': device, 'cookies': cookies}, ensure_ascii=True))
-                state = read_json(STATE_DIR / 'heybox-status.json')
-                state.pop('login_required', None)
-                write_json(STATE_DIR / 'heybox-status.json', state)
+                update_status(lambda state: state.pop('login_required', None))
                 self.state = 'logged_in'
                 return
             self.state = 'expired'
@@ -348,11 +376,10 @@ class Login:
         if self.task and not self.task.done():
             self.task.cancel()
         self.keys.clear('heybox')
-        state = read_json(STATE_DIR / 'heybox-status.json')
-        state.pop('login_required', None)
-        state.pop('review_required', None)
-        state.pop('first_signed_ok', None)
-        write_json(STATE_DIR / 'heybox-status.json', state)
+        def clear(state):
+            for key in ('login_required', 'review_required', 'first_signed_ok', 'captcha_date', 'captcha_locked'):
+                state.pop(key, None)
+        update_status(clear)
         self.state = 'idle'
         return {'state': 'idle'}
 

@@ -13,6 +13,7 @@ import test_basics  # noqa: E402,F401
 import life_loop
 import discretion
 import mixin_autonomy
+import mixin_send_check
 import send_check
 
 
@@ -76,6 +77,42 @@ class OwnerSendingTest(unittest.IsolatedAsyncioTestCase):
         with patch.object(life_loop, 'read_state', return_value={'sleep': {'end': 200}}):
             self.assertFalse(await life_loop.tell_owner(self.plugin, '你好', 100, []))
         self.sent.assert_not_awaited()
+
+    async def test_window_reordering_keeps_semantic_cache_bound_to_text(self):
+        rows = [{'ts': 1, 'role': 'user', 'text': 'private original alpha'},
+                {'ts': 2, 'role': 'user', 'text': 'private original beta'}]
+        self.plugin._read_library = lambda **kwargs: {'entries': []}
+        self.plugin._window_places = lambda: ['private:10003']
+        self.plugin._read_window = lambda place: {'recent': rows}
+        self.plugin._present_people = lambda event: []
+        self.plugin._known_names = lambda people: []
+        self.plugin._check_note = mixin_send_check.SendCheckMixin._check_note
+        self.plugin._forbid = mixin_send_check.SendCheckMixin._forbid.__get__(self.plugin)
+        self.plugin._check_reply = mixin_send_check.SendCheckMixin._check_reply.__get__(self.plugin)
+
+        async def embed(text):
+            if text == 'private original alpha':
+                return [1, 0]
+            if text in ('private original beta', 'different fictional wording'):
+                return [0, 1]
+            return [0, -1]
+
+        self.plugin._embed_text = AsyncMock(side_effect=embed)
+        with patch.object(mixin_send_check, '_local_embedding', return_value=True), \
+                patch.object(mixin_send_check, '_name_walls', return_value=[]):
+            self.assertTrue(await life_loop.tell_owner(self.plugin, 'hello there', 100, []))
+            rows.insert(0, {'ts': 0, 'role': 'user', 'text': 'private original gamma'})
+            self.assertFalse(await life_loop.tell_owner(self.plugin, 'different fictional wording', 101, []))
+        self.assertEqual(self.sent.await_count, 1)
+
+    async def test_wish_selection_is_stable_when_order_changes(self):
+        first = {'id': 'w100-0', 'ts': 100, 'what': 'first topic'}
+        selected = {'id': 'w101-0', 'ts': 101, 'what': 'second topic'}
+        marker = life_loop.wish_ref(selected)
+        self.plugin.self_model = {'share_wishes': [selected, first]}
+        self.assertEqual(life_loop.wish_ref(selected), marker)
+        self.assertTrue(await life_loop.tell_owner(self.plugin, 'hello there', 102, [selected]))
+        self.assertEqual(self.plugin.self_model['share_wishes'], [first])
 
 
 class OwnerAutonomyTest(unittest.IsolatedAsyncioTestCase):

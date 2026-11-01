@@ -2,6 +2,7 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Event-driven choices for her own day; the minute tick never invents work."""
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -121,7 +122,7 @@ def menu(plugin):
 
 def heybox_ready(plugin):
     keys = getattr(plugin, '_key_store', None)
-    status = heybox.read_json(heybox.STATE_DIR / 'heybox-status.json')
+    status = heybox.status_snapshot()
     return bool(keys and heybox.credential(keys) and not heybox.captcha_paused()
                 and not status.get('login_required') and not status.get('review_required'))
 
@@ -258,6 +259,12 @@ def owner_wishes(plugin, now):
             and 0 <= now - wish['ts'] < browse.WISH_SECONDS and wish.get('what')]
 
 
+def wish_ref(wish):
+    payload = json.dumps([wish.get('id'), wish.get('what'), wish.get('ts')], ensure_ascii=False)
+    digest = hashlib.sha256(payload.encode('utf-8')).digest()[:12]
+    return ''.join(chr(97 + (byte >> 4)) + chr(97 + (byte & 15)) for byte in digest)
+
+
 async def tell_owner(plugin, text, now, wishes):
     config = plugin.config or {}
     owner = str(config.get('owner_qq') or '').strip()
@@ -275,19 +282,23 @@ async def tell_owner(plugin, text, now, wishes):
     here = 'private:' + owner
     event = turn.TurnEvent(events.Incoming(here, owner, '', '', '', (), False, '', (), True, False, now, ''))
     try:
-        candidates = list(plugin._read_library(vectors=False).get('entries') or [])
+        candidates = [(item, None) for item in plugin._read_library(vectors=False).get('entries') or []]
         for place in plugin._window_places():
             for row in plugin._read_window(place).get('recent') or []:
                 if isinstance(row, dict):
                     row = dict(row)
                     row.setdefault('origin', discretion.make_origin(place))
-                    candidates.append(row)
-        for index, item in enumerate(candidates):
+                    candidates.append((row, place))
+        for item, place in candidates:
             if not isinstance(item, dict) or item.get('deleted'):
                 continue
             if mixin_discretion.recall_permission(plugin, item, event) == discretion.DROP:
                 origin = discretion.origin_of(item)
-                plugin._forbid(event, 'owner:%d' % index, item.get('text', ''),
+                text_value = str(item.get('text') or '')
+                digest = hashlib.sha256(text_value.encode('utf-8')).hexdigest()
+                ident = ('memory:' + str(item.get('id') or digest) if place is None else
+                         'window:' + str(place) + ':' + str(item.get('ts', '')) + ':' + digest)
+                plugin._forbid(event, ident, text_value,
                                origin.get('people') or ())
         if (await plugin._check_reply(event, text)).get('leak'):
             return False
@@ -300,9 +311,9 @@ async def tell_owner(plugin, text, now, wishes):
             return False
         plugin._window_add_reply(event, text)
         if wishes:
-            ids = {wish.get('id') for wish in wishes}
+            ids = {wish_ref(wish) for wish in wishes}
             plugin.self_model['share_wishes'] = [wish for wish in plugin.self_model.get('share_wishes', [])
-                                                  if wish.get('id') not in ids]
+                                                  if not isinstance(wish, dict) or wish_ref(wish) not in ids]
             plugin._save_self_model()
         return True
     except Exception as exc:
@@ -337,8 +348,8 @@ def materials(plugin, state, item, core, reason, now, choices, outfit):
     if (plugin.config or {}).get('proactive_owner_enabled', False):
         wishes = owner_wishes(plugin, now)
         if wishes:
-            lines.append('想分享的事：' + json.dumps([{'id': str(i + 1), 'what': w['what']}
-                                                for i, w in enumerate(wishes)], ensure_ascii=False))
+            lines.append('想分享的事：' + json.dumps([{'id': wish_ref(w), 'what': w['what']}
+                                                for w in wishes], ensure_ascii=False))
             lines.append('tell_owner 用到想分享的事时，把用到的 id 写进 used_wishes 数组。')
         lines.append('主人还没回的有 %d 条。想和主人说什么就在 tell_owner 写一句（最多80字），不想说就空。' %
                      owner_unanswered(plugin))
@@ -479,6 +490,39 @@ def heybox_impression(raw):
             'tell_owner': value.get('tell_owner', '').strip()[:80]}
 
 
+async def remember_heybox(plugin, thought, now):
+    try:
+        if plugin._job_stale():
+            return False
+    except Exception:
+        return False
+    try:
+        vector = await plugin._embed_text(thought) or []
+    except Exception:
+        vector = []
+    if plugin._job_stale():
+        return False
+    lib = plugin._read_library()
+    lib['entries'].append({'id': plugin._new_memory_id('self', now, thought),
+                           'ts': now, 'role': 'assistant', 'text': thought, 'vector': vector,
+                           'origin': discretion.make_origin(discretion.SELF),
+                           'hits': 1, 'importance': 0.4, 'memory_source': 'self',
+                           'memory_tier': 'hot', 'last_write_op': 'ADD', 'last_write_ts': now,
+                           'write_ops': {'ADD': 1}, 'last_used': now,
+                           'next_review_ts': now + 86400, 'review_count': 0})
+    return bool(plugin._write_library(lib))
+
+
+def heybox_materials(readings):
+    limit = browse.PAGE_CHARS // len(readings)
+    wrapped = []
+    for index, reading in enumerate(readings):
+        material = ('标题：' + reading['title'][:120] + '\n正文：' + reading['text'][:limit * 3 // 5]
+                    + '\n评论：' + '\n'.join(reading['comments'])[:limit // 4])
+        wrapped.append(browse.wrap('小黑盒资料 %d' % (index + 1), material, limit=limit))
+    return '\n'.join(wrapped)
+
+
 async def browse_heybox(plugin, now):
     if (not enabled(plugin) or not (plugin.config or {}).get('heybox_enabled', False)
             or budget(plugin) != 'ok' or plugin._spent_today() >= 8 or not heybox_ready(plugin)
@@ -527,26 +571,17 @@ async def browse_heybox(plugin, now):
     if not readings or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
         return False
     prompt = ('下面是外部资料。写一句自己的心得；若想对主人说，另写一句，不想就空。'
-              '只返回 JSON：{"thought":"心得","tell_owner":""}。\n' +
-              browse.wrap('小黑盒资料', json.dumps(readings, ensure_ascii=False)))
+              '只返回 JSON：{"thought":"心得","tell_owner":""}。\n'
+              '主人还没回的有 %d 条。\n' % owner_unanswered(plugin) + heybox_materials(readings))
     value = await plugin._llm_v2_call('heybox', prompt, heybox_impression,
                                        system_prompt=await plugin._persona_text(None))
     if not value or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
         return False
     thought = value['thought']
     if thought and not plugin._red_line(thought, 'heybox'):
-        lib = plugin._read_library()
-        lib['entries'].append({'id': plugin._new_memory_id('self', now, thought),
-                               'ts': now, 'role': 'assistant', 'text': thought,
-                               'origin': discretion.make_origin(discretion.SELF),
-                               'memory_source': 'self', 'memory_tier': 'hot'})
-        plugin._write_library(lib)
+        await remember_heybox(plugin, thought, now)
     if value['tell_owner']:
         await tell_owner(plugin, value['tell_owner'], now, [])
-    status_path = heybox.STATE_DIR / 'heybox-status.json'
-    status = heybox.read_json(status_path)
-    status['first_signed_ok'] = True
-    heybox.write_json(status_path, status)
     return True
 
 
@@ -643,8 +678,7 @@ async def tick(plugin, now=None):
     if not enabled(plugin) or budget(plugin) != 'ok':
         return False
     if value.get('tell_owner'):
-        wishes = [w for i, w in enumerate(owner_wishes(plugin, now))
-                  if str(i + 1) in value.get('used_wishes', [])]
+        wishes = [w for w in owner_wishes(plugin, now) if wish_ref(w) in value.get('used_wishes', [])]
         await tell_owner(plugin, value['tell_owner'], now, wishes)
     action = value['do']
     if action == '睡觉':

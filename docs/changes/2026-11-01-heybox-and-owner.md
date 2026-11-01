@@ -7,12 +7,15 @@ to false. There are no Heybox write requests. The panel provides POST routes at
 the page must render the returned `qr_url` and poll status. Existing panel host,
 origin and token checks apply. QR polling runs in Python at three-second intervals
 for at most the returned expiry, capped at three minutes. The credential bundle
-is held in the existing DPAPI key store and removed on logout.
+is held in the existing DPAPI key store and removed on logout. Rescanning keeps
+the existing device and token; logout clears them.
 
 The read path uses the fixed API host, a ten-second timeout, a 512 KiB response
-limit and no redirects. Captcha pauses requests for the day; login failures ask
-for a new scan. A failure on the first signed browsing run stops further signed
-requests for review; logout clears that review state. The feed supplies at most
+limit and no redirects. Captcha pauses requests for the day; a second captcha on
+the next day pauses them until logout. Login failures ask for a new scan. A
+non-success status on the first signed request stops signed requests for review;
+transport failures do not. The first signed success is recorded immediately.
+Logout clears the review and captcha states. The feed supplies at most
 20 unseen titles, a model may select up to two, and a second model call forms an
 impression and optional owner message. It receives only title, post text and up
 to 20 comment texts, not author fields. Seen identifiers expire after seven days;
@@ -25,7 +28,16 @@ Owner messages use the existing life call, check the owner's unanswered count,
 private material, red lines, copied owner rules, budget and sleep; only the
 owner's private place is addressed. The old autonomous templates are suppressed
 when owner-only mode is enabled. The model identifies used sharing wishes by
-their temporary positions, and only successfully used wishes are removed.
+stable content-derived identifiers, and only successfully used wishes are removed.
+
+Review round 1: owner reply checks use stable memory and window identifiers for
+their cached vectors. The Heybox status file uses one lock for read-modify-write;
+the impression uses stale-job and vector handling matching web memories while
+keeping a self origin. Each selected post receives its own half of the material
+budget. The panel LLM startup test's fake collector now supplies route registration.
+The review's 15 named test files passed separately in the sandbox; aiohttp-based
+cases were skipped where the dependency was unavailable. The full suite was not
+run in this round.
 
 The ParseHub signer is copied from commit `0ba8ba5` with its MIT notice. Fixed
 vectors were calculated with that signer and checked against an independent

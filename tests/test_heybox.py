@@ -8,7 +8,9 @@ import io
 import json
 import sys
 import tempfile
+import threading
 import unittest
+from http.client import IncompleteRead
 from email.message import Message
 from pathlib import Path
 from types import SimpleNamespace
@@ -91,6 +93,45 @@ class ReadOnlyTest(unittest.TestCase):
         with patch('heybox.build_opener') as opener:
             self.assertEqual(heybox.request('/bbs/app/feeds', {}, 'device', '', now=101), (None, []))
             opener.assert_not_called()
+
+    def test_captcha_on_consecutive_days_requires_logout(self):
+        heybox.handle_status('show_captcha', now=100)
+        self.assertFalse(heybox.captcha_paused(now=100 + 86400))
+        heybox.handle_status('show_captcha', now=100 + 86400)
+        self.assertTrue(heybox.captcha_paused(now=100 + 2 * 86400))
+        self.assertTrue(heybox.status_snapshot()['captcha_locked'])
+
+    def test_status_updates_do_not_lose_other_flags(self):
+        barrier = threading.Barrier(2)
+        def one():
+            barrier.wait()
+            heybox.handle_status('show_captcha', now=100)
+        def two():
+            barrier.wait()
+            heybox.handle_status('lack_token', now=100)
+        threads = [threading.Thread(target=fn) for fn in (one, two)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        state = heybox.status_snapshot()
+        self.assertTrue(state['login_required'])
+        self.assertTrue(state['captcha_date'])
+
+    def test_network_errors_do_not_lock_first_run(self):
+        for error in (TimeoutError(), IncompleteRead(b'')):
+            with self.subTest(error=type(error).__name__), self.assertLogs('ams-life.heybox', level='WARNING') as log:
+                def fail(request, timeout):
+                    raise error
+                self.assertEqual(heybox.request('/bbs/app/feeds', {}, 'device', '', get=fail), (None, []))
+            self.assertFalse(heybox.status_snapshot().get('review_required'))
+            self.assertIn(type(error).__name__, str(log.output))
+
+    def test_first_signed_ok_marks_success_immediately(self):
+        self.assertTrue(heybox.handle_status('ok', now=100, path='/bbs/app/feeds'))
+        self.assertTrue(heybox.status_snapshot()['first_signed_ok'])
+        heybox.handle_status('failed', now=101, path='/bbs/app/link/tree')
+        self.assertFalse(heybox.status_snapshot().get('review_required'))
 
     def test_login_failure_status_requests_scan(self):
         self.assertFalse(heybox.handle_status('lack_token', now=100))
@@ -196,6 +237,29 @@ class LoginTest(unittest.IsolatedAsyncioTestCase):
         token.assert_called_once()
         self.assertEqual(heybox.credential(self.keys)['cookies']['x_xhh_tokenid'], 'generated')
 
+    async def test_rescan_keeps_device_and_token_until_logout(self):
+        self.keys.set('heybox', json.dumps({'device_id': 'a' * 32,
+                      'cookies': {'user_pkey': 'old', 'x_xhh_tokenid': 'fixed-token'}}))
+        def fake_request(path, params, device, cookies):
+            self.assertEqual(device, 'a' * 32)
+            self.assertIn('x_xhh_tokenid=fixed-token', cookies)
+            if path == '/account/get_qrcode_url/':
+                return {'qr_url': 'https://example.test/?qr=fake', 'expire': 120}, []
+            return {'error': 'ok'}, ['user_pkey=new', 'x_xhh_tokenid=changed']
+        login = heybox.Login(self.keys)
+        with patch.object(heybox, 'request', side_effect=fake_request), \
+                patch.object(heybox, 'local_token') as generate, \
+                patch.object(heybox.asyncio, 'sleep', new_callable=AsyncMock):
+            await login.start()
+            await login.task
+        generate.assert_not_called()
+        self.assertEqual(heybox.credential(self.keys)['cookies']['x_xhh_tokenid'], 'fixed-token')
+        heybox.handle_status('show_captcha', now=100)
+        heybox.handle_status('show_captcha', now=100 + 86400)
+        await login.logout()
+        self.assertFalse(heybox.captcha_paused(now=100 + 2 * 86400))
+        self.assertIsNone(heybox.credential(self.keys))
+
     async def test_browse_limits_budget_and_excludes_names(self):
         self.keys.set('heybox', json.dumps({'device_id': 'a' * 32,
                       'cookies': {'user_pkey': 'fake', 'x_xhh_tokenid': 'fake'}}))
@@ -206,12 +270,15 @@ class LoginTest(unittest.IsolatedAsyncioTestCase):
             raw = '{"read":["10001"]}' if len(prompts) == 1 else '{"thought":"有点意思","tell_owner":""}'
             return parser(raw)
 
-        plugin = SimpleNamespace(enabled=True, config={'life_loop_enabled': True, 'heybox_enabled': True},
+        plugin = SimpleNamespace(enabled=True, config={'life_loop_enabled': True, 'heybox_enabled': True,
+                                                       'owner_qq': '900001'},
             _key_store=self.keys, _spent_today=lambda: 0, _attention_cfg=lambda: {'soft': 8, 'hard': 10},
             _llm_allowed=lambda kind: True, _persona_text=AsyncMock(return_value='fictional'),
             _llm_v2_call=model, _red_line=lambda text, where: '',
             _read_library=lambda: {'entries': entries}, _write_library=Mock(return_value=True),
-            _new_memory_id=lambda *args: 'memory')
+            _new_memory_id=lambda *args: 'memory', _job_stale=lambda: False,
+            _embed_text=AsyncMock(return_value=[0.3, 0.4]),
+            _read_window=lambda place: {'recent': [{'role': 'user'}] + [{'role': 'assistant'}] * 3})
 
         def fake_read(path, params, saved):
             if path.endswith('/feeds'):
@@ -227,9 +294,25 @@ class LoginTest(unittest.IsolatedAsyncioTestCase):
             plugin._spent_today = lambda: 8
             self.assertFalse(await life_loop.browse_heybox(plugin, 1700000001))
         self.assertEqual(len(prompts), 2)
+        self.assertIn('主人还没回的有 3 条', prompts[1])
         self.assertNotIn('虚构作者', str(prompts) + str(entries))
         self.assertNotIn('虚构评论人', str(prompts) + str(entries))
         self.assertEqual(entries[0]['origin']['where'], 'self')
+        self.assertEqual(entries[0]['vector'], [0.3, 0.4])
+
+    async def test_stale_job_does_not_keep_impression(self):
+        plugin = SimpleNamespace(_job_stale=lambda: True, _embed_text=AsyncMock())
+        self.assertFalse(await life_loop.remember_heybox(plugin, 'fictional', 100))
+        plugin._embed_text.assert_not_awaited()
+
+    def test_both_posts_get_material_space(self):
+        readings = [{'title': 'first', 'text': 'A' * 6000, 'comments': ['C' * 6000]},
+                    {'title': 'second', 'text': 'B' * 6000, 'comments': ['D' * 6000]}]
+        prompt = life_loop.heybox_materials(readings)
+        self.assertIn('A' * 100, prompt)
+        self.assertIn('B' * 100, prompt)
+        self.assertIn('C' * 100, prompt)
+        self.assertIn('D' * 100, prompt)
 
     async def test_logged_out_and_daily_limit_do_not_request(self):
         plugin = SimpleNamespace(enabled=True, config={'life_loop_enabled': True, 'heybox_enabled': True},
