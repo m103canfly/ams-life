@@ -48,6 +48,9 @@ def _sessions(event, person):
 
 
 def _name_walls(plugin, event):
+    cached = getattr(event, "_ams_name_walls", None)
+    if cached is not None:
+        return cached
     store = plugin._impression_store()
     names = {}
     for person, values in store._read(store.root / "names.json").items():
@@ -85,39 +88,8 @@ def _name_walls(plugin, event):
             blocked.append(name)
     if unknown:
         logger.info("[ams-life] send check: %d names have unknown places", unknown)
+    event._ams_name_walls = blocked
     return blocked
-
-
-def _private_source(origin):
-    sources = origin.get("recall_sources") or [origin]
-    return any(str(s.get("where") or "").startswith("private:") for s in sources if isinstance(s, dict))
-
-
-def _forbidden_private(plugin, event):
-    rows = []
-    entries = list(plugin._read_library(vectors=False).get("entries") or [])
-    entries.extend(entry for _, entry in plugin._cross_session_memory_entries(event))
-    events = plugin._event_archive(1000000, read_only=True)
-    notes = (plugin.self_model or {}).get("notebook") or []
-    fields = (("memory", entries, ("text",)),
-              ("event", events, ("title", "event", "central_details", "meaning_to_her", "reflection", "big_summary", "small_summary", "peripheral_details")),
-              ("note", notes, ("text",)))
-    seen = set()
-    for kind, items, keys in fields:
-        for index, item in enumerate(items):
-            if not isinstance(item, dict) or item.get("deleted"):
-                continue
-            origin = discretion.origin_of(item)
-            if not _private_source(origin) or mixin_discretion.recall_permission(plugin, item, event) != discretion.DROP:
-                continue
-            words = "\n".join(str(item.get(k) or "") for k in keys)
-            key = (kind, str(item.get("id") or ""), words)
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append({"id": kind + ":" + str(item.get("id") or index), "text": words,
-                         "private": True, "names": [], "vec": None})
-    return rows
 
 
 def _local_embedding(plugin):
@@ -204,14 +176,16 @@ class SendCheckMixin:
     # ------------------------------------------------------------------
     async def _check_reply(self, event, reply) -> dict:
         note = self._check_note(event)
-        forbidden = _forbidden_private(self, event)
-        forbidden.append({"id": "names", "text": "", "private": False,
-                          "names": _name_walls(self, event), "strict_names": True, "vec": None})
+        forbidden = list(note.get("forbidden") or [])
+        names = _name_walls(self, event)
+        if names:
+            forbidden.append({"id": "names", "text": "", "private": False,
+                              "names": names, "strict_names": True, "vec": None})
         if not forbidden or not str(reply or "").strip():
             return {"leak": False, "ids": [], "why": {}, "close": [], "top": 0.0}
         vec = None
         try:
-            if not _local_embedding(self):
+            if not _local_embedding(self) or not any(item.get("text") or item.get("vec") for item in forbidden):
                 return send_check.check(reply, forbidden, note.get("allowed", ""), user_text=note.get("user_text", ""))
             vec = await self._embed_text(str(reply))
             for item in forbidden:

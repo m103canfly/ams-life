@@ -224,8 +224,8 @@ def run():
                 async def hold(event, response, reply):
                     plugin._stop(event)
                     return ''
-                plugin._look_at_reply = hold
-                held, _, _ = await turn('first\nsecond')
+                with patch.object(plugin, '_look_at_reply', hold):
+                    held, _, _ = await turn('first\nsecond')
                 plugin.global_memory = False
                 plugin.self_decide = True
                 silent, _, _ = await turn('【不说】')

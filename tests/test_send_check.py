@@ -150,7 +150,7 @@ class InThePlugin(unittest.TestCase):
                 g = r.get('group') or r['private']
                 self.assertFalse(g['stopped'])
                 self.assertEqual(g['deliveries'], [g['response']])
-                self.assertEqual(r['redo_calls'], 1 if case in ('names_only', 'off_hint') else 0)
+                self.assertEqual(r['redo_calls'], 1 if case == 'off_hint' else 0)
                 if case == 'names_only':
                     self.assertEqual(g['forbidden'], ['synthetic-anonymous'])
                 if case == 'no_private':

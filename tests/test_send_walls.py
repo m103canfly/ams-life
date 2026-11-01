@@ -57,10 +57,13 @@ class SendWalls(unittest.TestCase):
         event = self.event('900002')
         with patch.object(walls.logger, 'info') as log:
             self.assertTrue(self.check(event, '紫藤旅人来了')['leak'])
-            self.assertTrue(self.check(event, '紫 藤，旅 人来了')['leak'])
             self.assertFalse(self.check(event, '青竹旅人来了')['leak'])
             self.assertFalse(self.check(event, '琥珀旅人来了')['leak'])
         self.assertTrue(any(call.args[-1] == 1 for call in log.call_args_list))
+
+    def test_one_character_name_in_ordinary_text(self):
+        self.person('10003', '鹿', ['group:900001'])
+        self.assertFalse(self.check(self.event('900002'), '小鹿乱撞')['leak'])
 
     def test_private_name_and_shared_group(self):
         self.person('10003', '紫藤旅人', ['private:20002'])
@@ -98,9 +101,10 @@ class SendWalls(unittest.TestCase):
         item = {'id': 'm', 'text': secret, 'origin': discretion.make_origin('private:10003', ['10003'])}
         self.p._read_library = lambda vectors=False: {'entries': [item]}
         group = self.event('900002')
+        self.p._forbid(group, 'memory:m', secret)
         self.assertTrue(self.check(group, '蓝 鲸 三 号')['leak'])
         self.assertTrue(self.check(group, '蓝，鲸，三，号')['leak'])
-        group._ams_check = {'user_text': '蓝鲸三号是谁的？'}
+        group._ams_check['user_text'] = '蓝鲸三号是谁的？'
         self.assertFalse(self.check(group, '蓝鲸三号是谁的？')['leak'])
         self.assertTrue(self.check(group, '蓝鲸三号是主人私聊里说的')['leak'])
         self.assertFalse(self.check(self.event(sender='10003'), secret)['leak'])
@@ -114,13 +118,60 @@ class SendWalls(unittest.TestCase):
         self.assertFalse(self.check(event, '蓝鲸三号')['leak'])
         self.assertFalse(self.check(event, '琥珀行程')['leak'])
 
+    def test_unrecalled_private_library_does_not_block_ordinary_reply(self):
+        entries = [{'id': str(i), 'text': '今天晚上吃什么呀哈哈哈哈好的',
+                    'origin': discretion.make_origin('private:10003', ['10003'])} for i in range(40)]
+        self.p._read_library = lambda vectors=False: {'entries': entries}
+        event = self.event('900002')
+        self.p._redo_reply = AsyncMock(return_value=None)
+        self.p._count_check = MagicMock()
+        self.assertEqual(asyncio.run(self.p._look_at_reply(event, LLMResponse('今天晚上一起打游戏吗'),
+                                                          '今天晚上一起打游戏吗')),
+                         '今天晚上一起打游戏吗')
+        self.p._redo_reply.assert_not_awaited()
+
+    def test_dropped_memory_with_global_memory_off_is_checked(self):
+        p = self.p
+        p.global_memory = False
+        p._usable_memory_text = lambda text: True
+        p._schedule_consolidation = lambda *args: None
+        p._save_memory = lambda *args: None
+        p._load_memory = lambda event: {'entries': []}
+        p._memory_top_k = lambda *args: 3
+        p._cosine = lambda *args: 0.8
+        p._memory_score = lambda *args, **kwargs: 1.0
+        p._restabilize_if_expired = lambda *args: False
+        p._chain_event_lines = lambda *args, **kwargs: []
+        item = {'id': 'm', 'text': '暗号蓝鲸三号', 'vector': [1.0],
+                'origin': discretion.make_origin('private:10003', ['10003'])}
+        p._cross_session_memory_entries = lambda event: [('private:10003', item)]
+        event = self.event('900002')
+        asyncio.run(p._memory_recall(event, '暗号是什么', vec=[1.0]))
+        self.assertTrue(self.check(event, '暗号蓝鲸三号')['leak'])
+        self.assertEqual(event._ams_check['forbidden'][0]['vec'], [1.0])
+
+    def test_group_private_recall_records_words_without_names(self):
+        p = self.p
+        p.global_memory = True
+        item = {'id': 'm', 'text': '暗号蓝鲸三号', 'vector': [1.0], 'sender_id': '10003',
+                'origin': discretion.make_origin('group:900001', ['10003'], visibility=discretion.PRIVATE)}
+        p._cross_session_memory_entries = lambda event: [('group:900001', item)]
+        p._cosine = lambda *args: 0.8
+        p._memory_score = lambda *args, **kwargs: 1.0
+        event = self.event('900002')
+        p._labeled_elsewhere(event, [1.0], None, [])
+        self.assertTrue(self.check(event, '暗号蓝鲸三号')['leak'])
+        self.assertEqual(event._ams_check['forbidden'][0]['names'], [])
+
     def test_remote_embedding_never_called(self):
         self.p.self_model = {'notebook': [{'id': 'n', 'text': '蓝鲸三号',
             'origin': discretion.make_origin('private:10003', ['10003'])}]}
         self.p._embed_text = AsyncMock(return_value=[1.0])
         self.p._embedding_runtime_config = lambda: {'base_url': 'https://example.invalid'}
-        self.check(self.event('900002'), '普通回话')
+        event = self.event('900002')
+        self.p._notebook_for(event)
+        self.check(event, '普通回话')
         self.p._embed_text.assert_not_awaited()
         self.p._embedding_runtime_config = lambda: {'base_url': 'http://localhost'}
-        self.check(self.event('900002'), '普通回话')
+        self.check(event, '普通回话')
         self.assertGreaterEqual(self.p._embed_text.await_count, 2)

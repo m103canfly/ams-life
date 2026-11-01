@@ -371,6 +371,9 @@ class TurnMixin:
             else:
                 turn_request.system_prompt = (_base + "\n\n" + _compact).strip()
         self._note_allowed(event, turn_request, _compact)
+        if _offer:
+            _note = self._check_note(event)
+            _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
 
     async def _after_reply(self, event, reply):
         """Her reply after the model: kept, checked, shaped and sent. Works through a reply handle only (adapter_astrbot_turn.reply_handle)."""

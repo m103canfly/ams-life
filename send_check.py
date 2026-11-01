@@ -155,8 +155,7 @@ def check(reply, forbidden, allowed="", common=(), reply_vec=None, leak=LEAK_COS
             elif c >= close:
                 out["close"].append((iid, round(c, 3)))
         for name in item.get("names") or []:
-            strict = item.get("strict_names") and norm(name) and norm(name) in norm(reply)
-            if strict or (not item.get("strict_names") and mentions(reply, name) and not mentions(allowed_text, name)):
+            if mentions(reply, name) and (item.get("strict_names") or not mentions(allowed_text, name)):
                 why.append("name")
                 break
         if why:
