@@ -302,8 +302,12 @@ class AutonomyMixin(PortsMixin):
             current = float(now if now is not None else time.time())
         except Exception:
             current = time.time()
+        owner_only = bool((getattr(self, 'config', None) or {}).get('proactive_owner_enabled', False))
+        owner = str((getattr(self, 'config', None) or {}).get('owner_qq') or '').strip()
         for umo, info in list(getattr(self, "_autonomy_private_sessions", {}).items()):
             try:
+                if owner_only and (not owner or str(info.get('sender_id') or '') != owner):
+                    continue
                 if current - float(info.get("ts", 0.0) or 0.0) > 86400:
                     continue
                 cores = getattr(self, "cores", None)
@@ -334,7 +338,7 @@ class AutonomyMixin(PortsMixin):
                     acted, loop_on, proactive_on,
                     bool(getattr(self, "proactive_send", False)),
                     bool(getattr(self, "autonomy_loop_token_only", True)))
-                if plan == "send":
+                if plan == "send" and not owner_only:
                     if await self._maybe_proactive_send(target, core, now=current):
                         sent.append(umo)
             except Exception:

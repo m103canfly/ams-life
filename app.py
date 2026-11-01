@@ -145,6 +145,14 @@ class App:
                     self.her._neutral_model = DeepSeekModel(api_key=deepseek, model=self.args.model)
                 logger.info('[ams-life] chat model: %s', panel_llm[1] if panel_llm else self.args.model)
             self.her._key_store = keys
+            import heybox
+            self.her._heybox_login = heybox.Login(keys)
+            collector.register_web_api('/astrbot_plugin_ams_life/page/heybox/login',
+                                       self.her._heybox_login.start, ('POST',), 'Heybox login')
+            collector.register_web_api('/astrbot_plugin_ams_life/page/heybox/status',
+                                       self.her._heybox_login.panel_status, ('POST',), 'Heybox status')
+            collector.register_web_api('/astrbot_plugin_ams_life/page/heybox/logout',
+                                       self.her._heybox_login.logout, ('POST',), 'Heybox logout')
             self.her._history = self.history
             self.history.gate = self.her._history_gate
             self.her._neutral_persona = persona
@@ -239,6 +247,10 @@ class App:
             if self.her is not None:
                 import life_loop
                 await life_loop.stop(self.her)
+                login = getattr(self.her, '_heybox_login', None)
+                if login is not None and login.task is not None:
+                    login.task.cancel()
+                    await asyncio.gather(login.task, return_exceptions=True)
             tasks = [getattr(self.her, name, None) for name in (
                 '_autonomy_task', '_sticker_vector_task', '_sticker_relook_task', '_image_idle_task')]
             tasks = [task for task in tasks if task is not None and not task.done()]

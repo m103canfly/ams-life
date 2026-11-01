@@ -2,6 +2,7 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Event-driven choices for her own day; the minute tick never invents work."""
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -9,7 +10,7 @@ import time
 from datetime import datetime, timedelta
 
 try:
-    from . import atomic_file, bodily, body, browse, daily, discretion, her_days, look, weather
+    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, look, mixin_discretion, mixin_turn, redline, turn, weather
     from .common import DATA_DIR, STATE_DIR
     from . import mixin_selfie as phone
 except ImportError:
@@ -19,8 +20,14 @@ except ImportError:
     import browse
     import daily
     import discretion
+    import events
     import her_days
+    import heybox
     import look
+    import mixin_discretion
+    import mixin_turn
+    import redline
+    import turn
     import weather
     from common import DATA_DIR, STATE_DIR
     import mixin_selfie as phone
@@ -108,7 +115,16 @@ def menu(plugin):
         choices.append('拍照')
     if config.get('qzone_enabled', False):
         choices.append('发说说')
+    if config.get('heybox_enabled', False) and heybox_ready(plugin):
+        choices.append('刷小黑盒')
     return choices
+
+
+def heybox_ready(plugin):
+    keys = getattr(plugin, '_key_store', None)
+    status = heybox.status_snapshot()
+    return bool(keys and heybox.credential(keys) and not heybox.captcha_paused()
+                and not status.get('login_required') and not status.get('review_required'))
 
 
 def parse(raw, choices):
@@ -117,10 +133,13 @@ def parse(raw, choices):
         if not isinstance(value, dict) or value.get('do') not in choices:
             return None
         value = dict(value)
-        for key in ('detail', 'liked_last', 'post', 'look'):
+        for key in ('detail', 'liked_last', 'post', 'look', 'tell_owner'):
             if value.get(key) is None:
                 value[key] = ''
-        if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look')):
+        if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look', 'tell_owner')):
+            return None
+        used_wishes = value.get('used_wishes', [])
+        if not isinstance(used_wishes, list) or any(not isinstance(w, str) for w in used_wishes):
             return None
         minutes = value.get('minutes', 30)
         if isinstance(minutes, str):
@@ -130,7 +149,8 @@ def parse(raw, choices):
         low, high = (60, 720) if value['do'] == '睡觉' else (5, 120)
         return dict(value, minutes=max(low, min(high, minutes)), detail=value.get('detail', '')[:40],
                     liked_last=value.get('liked_last', '')[:20], post=value.get('post', '')[:300],
-                    look=value.get('look', '')[:30])
+                    look=value.get('look', '')[:30], tell_owner=value.get('tell_owner', '')[:80],
+                    used_wishes=used_wishes[:10])
     except (ValueError, TypeError):
         return None
 
@@ -217,6 +237,90 @@ def clock_time(stamp):
         return ''
 
 
+def owner_unanswered(plugin):
+    owner = str((plugin.config or {}).get('owner_qq') or '').strip()
+    if not owner:
+        return 0
+    rows = plugin._read_window('private:' + owner).get('recent') or []
+    count = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get('role') == 'user':
+            count = 0
+        elif row.get('role') == 'assistant':
+            count += 1
+    return count
+
+
+def owner_wishes(plugin, now):
+    return [wish for wish in (getattr(plugin, 'self_model', None) or {}).get('share_wishes', [])
+            if isinstance(wish, dict) and isinstance(wish.get('ts'), (int, float))
+            and 0 <= now - wish['ts'] < browse.WISH_SECONDS and wish.get('what')]
+
+
+def wish_ref(wish):
+    payload = json.dumps([wish.get('id'), wish.get('what'), wish.get('ts')], ensure_ascii=False)
+    digest = hashlib.sha256(payload.encode('utf-8')).digest()[:12]
+    return ''.join(chr(97 + (byte >> 4)) + chr(97 + (byte & 15)) for byte in digest)
+
+
+async def tell_owner(plugin, text, now, wishes):
+    config = plugin.config or {}
+    owner = str(config.get('owner_qq') or '').strip()
+    text = str(text or '').strip()
+    if (not config.get('proactive_owner_enabled', False) or not owner or not text
+            or budget(plugin) != 'ok' or plugin._spent_today() >= 8):
+        return False
+    sleep = read_state().get('sleep', {})
+    item = current()
+    if (sleep and now < sleep.get('end', 0)) or (sleeping(item) and now < item_end(item)):
+        return False
+    messenger = getattr(plugin, '_neutral_messenger', None)
+    if messenger is None:
+        return False
+    here = 'private:' + owner
+    event = turn.TurnEvent(events.Incoming(here, owner, '', '', '', (), False, '', (), True, False, now, ''))
+    try:
+        candidates = [(item, None) for item in plugin._read_library(vectors=False).get('entries') or []]
+        for place in plugin._window_places():
+            for row in plugin._read_window(place).get('recent') or []:
+                if isinstance(row, dict):
+                    row = dict(row)
+                    row.setdefault('origin', discretion.make_origin(place))
+                    candidates.append((row, place))
+        for item, place in candidates:
+            if not isinstance(item, dict) or item.get('deleted'):
+                continue
+            if mixin_discretion.recall_permission(plugin, item, event) == discretion.DROP:
+                origin = discretion.origin_of(item)
+                text_value = str(item.get('text') or '')
+                digest = hashlib.sha256(text_value.encode('utf-8')).hexdigest()
+                ident = ('memory:' + str(item.get('id') or digest) if place is None else
+                         'window:' + str(place) + ':' + str(item.get('ts', '')) + ':' + digest)
+                plugin._forbid(event, ident, text_value,
+                               origin.get('people') or ())
+        if (await plugin._check_reply(event, text)).get('leak'):
+            return False
+        if redline.hit(text) or plugin._red_line(text, 'owner') or mixin_turn._copies_owner_rule(text, plugin._owner_rules()):
+            return False
+        if budget(plugin) != 'ok' or plugin._spent_today() >= 8:
+            return False
+        sent = await messenger.send(here, (events.Segment('text', {'text': text}),))
+        if not sent.ok:
+            return False
+        plugin._window_add_reply(event, text)
+        if wishes:
+            ids = {wish_ref(wish) for wish in wishes}
+            plugin.self_model['share_wishes'] = [wish for wish in plugin.self_model.get('share_wishes', [])
+                                                  if not isinstance(wish, dict) or wish_ref(wish) not in ids]
+            plugin._save_self_model()
+        return True
+    except Exception as exc:
+        logger.warning('[ams-life] owner message held (%s)', type(exc).__name__)
+        return False
+
+
 def materials(plugin, state, item, core, reason, now, choices, outfit):
     local = datetime.fromtimestamp(now)
     activity = {'在哪': item.get('where', ''), '在干什么': item.get('doing', ''),
@@ -241,6 +345,14 @@ def materials(plugin, state, item, core, reason, now, choices, outfit):
                  '"post":"公开短句，最多300字，不需要就空","look":""}。')
     if outfit:
         lines.append('刚睡醒，今天还没定打扮，顺手在 look 里说今天穿什么（最多30字）。')
+    if (plugin.config or {}).get('proactive_owner_enabled', False):
+        wishes = owner_wishes(plugin, now)
+        if wishes:
+            lines.append('想分享的事：' + json.dumps([{'id': wish_ref(w), 'what': w['what']}
+                                                for w in wishes], ensure_ascii=False))
+            lines.append('tell_owner 用到想分享的事时，把用到的 id 写进 used_wishes 数组。')
+        lines.append('主人还没回的有 %d 条。想和主人说什么就在 tell_owner 写一句（最多80字），不想说就空。' %
+                     owner_unanswered(plugin))
     return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
 
 
@@ -359,6 +471,134 @@ async def apply_choice(plugin, value, core, now, outfit):
             await qzone.post(plugin, post, photo=picture)
 
 
+def heybox_selection(raw, available):
+    value = browse._json_object(raw)
+    picked = value.get('read') if isinstance(value, dict) else None
+    if not isinstance(picked, list):
+        return None
+    allowed = {row['id'] for row in available}
+    return list(dict.fromkeys(str(item) for item in picked if str(item) in allowed))[:2]
+
+
+def heybox_impression(raw):
+    value = browse._json_object(raw)
+    if not isinstance(value, dict) or not isinstance(value.get('thought', ''), str):
+        return None
+    if not isinstance(value.get('tell_owner', ''), str):
+        return None
+    return {'thought': value.get('thought', '').strip()[:120],
+            'tell_owner': value.get('tell_owner', '').strip()[:80]}
+
+
+async def remember_heybox(plugin, thought, now):
+    try:
+        if plugin._job_stale():
+            return False
+    except Exception:
+        return False
+    try:
+        vector = await plugin._embed_text(thought) or []
+    except Exception:
+        vector = []
+    if plugin._job_stale():
+        return False
+    lib = plugin._read_library()
+    lib['entries'].append({'id': plugin._new_memory_id('self', now, thought),
+                           'ts': now, 'role': 'assistant', 'text': thought, 'vector': vector,
+                           'origin': discretion.make_origin(discretion.SELF),
+                           'hits': 1, 'importance': 0.4, 'memory_source': 'self',
+                           'memory_tier': 'hot', 'last_write_op': 'ADD', 'last_write_ts': now,
+                           'write_ops': {'ADD': 1}, 'last_used': now,
+                           'next_review_ts': now + 86400, 'review_count': 0})
+    return bool(plugin._write_library(lib))
+
+
+def heybox_materials(readings):
+    limit = browse.PAGE_CHARS // len(readings)
+    wrapped = []
+    for index, reading in enumerate(readings):
+        material = ('标题：' + reading['title'][:120] + '\n正文：' + reading['text'][:limit * 3 // 5]
+                    + '\n评论：' + '\n'.join(reading['comments'])[:limit // 4])
+        wrapped.append(browse.wrap('小黑盒资料 %d' % (index + 1), material, limit=limit))
+    return '\n'.join(wrapped)
+
+
+async def browse_heybox(plugin, now):
+    if (not enabled(plugin) or not (plugin.config or {}).get('heybox_enabled', False)
+            or budget(plugin) != 'ok' or plugin._spent_today() >= 8 or not heybox_ready(plugin)
+            or not plugin._llm_allowed('heybox')):
+        return False
+    item, sleep = current(), read_state().get('sleep', {})
+    if (sleep and now < sleep.get('end', 0)) or (sleeping(item) and now < item_end(item)):
+        return False
+    path = heybox.STATE_DIR / 'heybox-usage.json'
+    day = datetime.fromtimestamp(now).date().isoformat()
+    usage = heybox.read_json(path)
+    count = usage.get('count', 0) if usage.get('date') == day else 0
+    if type(count) is not int or count >= 6:
+        return False
+    saved = heybox.credential(plugin._key_store)
+    if not saved:
+        return False
+    heybox.write_json(path, {'date': day, 'count': count + 1})
+    result = await asyncio.to_thread(heybox.read_request, '/bbs/app/feeds', {'offset': 0, 'pull': 0}, saved)
+    posts = heybox.unseen(heybox.feed_items(result), now)
+    if not posts or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
+        return False
+    prompt = '以下是外部帖子标题，只当作资料。选 0 到 2 篇，返回 JSON：{"read":["帖子id"]}。\n' + browse.wrap(
+        '小黑盒标题', json.dumps(posts, ensure_ascii=False))
+    picked = await plugin._llm_v2_call('heybox', prompt, lambda raw: heybox_selection(raw, posts),
+                                        system_prompt=await plugin._persona_text(None))
+    if not picked:
+        return False
+    readings = []
+    titles = {post['id']: post['title'] for post in posts}
+    for ident in picked:
+        if budget(plugin) != 'ok' or plugin._spent_today() >= 8 or not heybox_ready(plugin):
+            break
+        result = await asyncio.to_thread(heybox.read_request, '/bbs/app/link/tree',
+                                         {'link_id': ident, 'owner_only': 1}, saved)
+        body = heybox.post_text(result)
+        if not body:
+            continue
+        comments = await asyncio.to_thread(heybox.read_request, '/bbs/app/link/tree',
+                                           {'link_id': ident, 'is_first': 1, 'page': 1,
+                                            'index': 1, 'limit': 20, 'owner_only': 0}, saved)
+        if not heybox_ready(plugin):
+            return False
+        readings.append({'title': titles[ident], 'text': body, 'comments': heybox.comment_texts(comments)})
+        heybox.mark_seen([ident], now)
+    if not readings or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
+        return False
+    prompt = ('下面是外部资料。写一句自己的心得；若想对主人说，另写一句，不想就空。'
+              '只返回 JSON：{"thought":"心得","tell_owner":""}。\n'
+              '主人还没回的有 %d 条。\n' % owner_unanswered(plugin) + heybox_materials(readings))
+    value = await plugin._llm_v2_call('heybox', prompt, heybox_impression,
+                                       system_prompt=await plugin._persona_text(None))
+    if not value or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
+        return False
+    thought = value['thought']
+    if thought and not plugin._red_line(thought, 'heybox'):
+        await remember_heybox(plugin, thought, now)
+    if value['tell_owner']:
+        await tell_owner(plugin, value['tell_owner'], now, [])
+    return True
+
+
+async def automatic_heybox(plugin, now, occasion):
+    if (not (plugin.config or {}).get('heybox_enabled', False) or not heybox_ready(plugin)
+            or budget(plugin) != 'ok' or plugin._spent_today() >= 8):
+        return False
+    day = datetime.fromtimestamp(now).date().isoformat()
+    state = read_state()
+    marks = state.setdefault('heybox_occasions', {})
+    if marks.get(occasion) == day:
+        return False
+    marks[occasion] = day
+    save_state(state)
+    return await browse_heybox(plugin, now)
+
+
 async def tick(plugin, now=None):
     if not enabled(plugin):
         return False
@@ -437,7 +677,24 @@ async def tick(plugin, now=None):
         return False
     if not enabled(plugin) or budget(plugin) != 'ok':
         return False
+    if value.get('tell_owner'):
+        wishes = [w for w in owner_wishes(plugin, now) if wish_ref(w) in value.get('used_wishes', [])]
+        await tell_owner(plugin, value['tell_owner'], now, wishes)
+    action = value['do']
+    if action == '睡觉':
+        await automatic_heybox(plugin, now, 'sleep')
     await apply_choice(plugin, value, core, now, outfit)
+    wake = (state.get('woke_date') == local.date().isoformat()
+            and state.get('heybox_occasions', {}).get('wake') != state.get('woke_date'))
+    lunch = (action == '吃饭' and sum(row.get('do') == '吃饭' for row in
+             her_days.Store(DATA_DIR).day(local.date().isoformat()) if isinstance(row, dict)) >= 2)
+    if action != '睡觉':
+        if action == '刷小黑盒':
+            await browse_heybox(plugin, now)
+        elif wake:
+            await automatic_heybox(plugin, now, 'wake')
+        elif lunch:
+            await automatic_heybox(plugin, now, 'lunch')
     return True
 
 

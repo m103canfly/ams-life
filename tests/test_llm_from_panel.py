@@ -38,10 +38,11 @@ class StartupTests(unittest.IsolatedAsyncioTestCase):
         keys.get.return_value = 'made-up-key'
         history = Mock()
         panel = types.SimpleNamespace(start=AsyncMock(return_value=1), stop=AsyncMock())
+        collector = types.SimpleNamespace(routes=[], register_web_api=Mock())
         modules = {
             'app_config': types.SimpleNamespace(load_schema=lambda: {}, load=lambda path, schema: ({}, [])),
             'persona_file': types.SimpleNamespace(NAME='persona.md', load=lambda path: types.SimpleNamespace(text='')),
-            'panel_api': types.SimpleNamespace(RouteCollector=lambda: types.SimpleNamespace(routes=[]),
+            'panel_api': types.SimpleNamespace(RouteCollector=lambda: collector,
                                                install_request_shim=lambda: None, aiohttp_routes=lambda routes: []),
             'her': types.SimpleNamespace(Her=FakeHer),
             'history_store': types.SimpleNamespace(HistoryStore=lambda path: history),

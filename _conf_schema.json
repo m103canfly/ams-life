@@ -755,6 +755,21 @@
     },
     "default": []
   },
+  "heybox_enabled": {
+    "description": "Enable Heybox reading",
+    "type": "bool",
+    "default": false
+  },
+  "heybox_write_enabled": {
+    "description": "Enable Heybox writing (not implemented)",
+    "type": "bool",
+    "default": false
+  },
+  "proactive_owner_enabled": {
+    "description": "Allow her to initiate messages to the owner",
+    "type": "bool",
+    "default": false
+  },
   "notebook_time": {
     "description": "她写本子的时间",
     "hint": "每天本地时间到点以后写一次（HH:MM，默认 23:30）。开关在面板的模型功能里（“她的本子”），默认关闭；每天最多调 1 次模型，失败也算。",
