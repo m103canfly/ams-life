@@ -1855,15 +1855,18 @@
   function switchView(name){
     document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.view===name));
     document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));
-    const names={overview:"情绪概览",brain:"她的脑子",memories:"她记住了什么",intent:"表达意图",persona:"人格自我",sessions:"活动会话",settings:"设置"};
+    const names={overview:"情绪概览",brain:"她的脑子",memories:"她记住了什么",intent:"表达意图",persona:"人格自我",sessions:"活动会话",likeness:"像不像",settings:"设置"};
     $("crumbView").textContent=names[name]||name;
     if(brainFrame) brainFrame.onView(name);
     if(memoryList) memoryList.onView(name);
+    if(likenessPage) likenessPage.onView(name);
   }
   // ams-life: "她的脑子" (brain_frame.js): reads go through this panel's bridge, read only
   const brainFrame=window.BioBrainFrame?window.BioBrainFrame.attach({bridge:()=>bridge,dark:()=>document.documentElement.dataset.theme==="dark"}):null;
   // ams-life: "她记住了什么" (memories.js): read only, but for a confirmed delete of one memory
   const memoryList=window.BioMemoryList?window.BioMemoryList.attach({bridge:()=>bridge}):null;
+  // ams-life L1/L2: "像不像" (likeness.js): reads one week, writes only the owner's 像 / 不像 / 说不准
+  const likenessPage=window.BioLikeness?window.BioLikeness.attach({bridge:()=>bridge}):null;
   // ams-life move 5e-6: "钥匙" in 设置 (keys.js): only on our own panel server, where the owner fills her keys
   if(window.BioKeys) window.BioKeys.attach();
   document.querySelectorAll(".nav-item[data-view]").forEach(a=>a.addEventListener("click",()=>switchView(a.dataset.view)));
