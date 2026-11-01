@@ -194,6 +194,9 @@ class TurnMixin:
             _day = calendar_cn.today_line(datetime.now().date())
             if _day:
                 _now = (_now + "\n[日子] " + _day).strip()
+            _our_days = mixin_selfie._our_days_line(self, event, datetime.now().date())
+            if _our_days:
+                _now = (_now + "\n" + _our_days).strip()
             if _now:
                 # The system prompt is not stored in AstrBot's conversation history.
                 turn_request.system_prompt = (str(getattr(turn_request, "system_prompt", "") or "") + "\n\n" + _now).strip()
@@ -336,6 +339,9 @@ class TurnMixin:
         _day = calendar_cn.today_line(datetime.now().date())
         if _day:
             _compact = (_compact + "\n[日子] " + _day).strip()
+        _our_days = mixin_selfie._our_days_line(self, event, datetime.now().date())
+        if _our_days:
+            _compact = (_compact + "\n" + _our_days).strip()
         _slang = self._slang_prompt(event)
         if _slang:
             _compact = (_compact + "\n" + _slang).strip()

@@ -32,7 +32,7 @@ def _image_key(plugin, api):
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse, daily, discretion, events, mixin_ports, look
+    from . import tts, browse, daily, discretion, events, mixin_ports, look, our_days
     from . import adapter_astrbot_tools, adapter_astrbot_turn, turn
     from .mixin_ports import PortsMixin
 except ImportError:
@@ -44,6 +44,7 @@ except ImportError:
     import events
     import mixin_ports
     import look
+    import our_days
     import adapter_astrbot_tools
     import adapter_astrbot_turn
     import turn
@@ -67,6 +68,43 @@ PHOTO_WAITING = 3
 SHOT_DIR = DATA_DIR / "browser" / "shots"
 SHOT_RETENTION = 20
 SHOT_NAME = re.compile(r"^ams-browser-[0-9a-f]{32}\.jpg$")
+
+
+def _day_owner(plugin, event):
+    owner = str((plugin.config or {}).get('owner_qq') or '').strip()
+    if not owner:
+        return ''
+    speaker = getattr(plugin, '_speaker', None)
+    here = getattr(plugin, '_here', None)
+    if not callable(speaker) or not callable(here):
+        return ''
+    sender = str(speaker(event)[0] or '').strip()
+    return owner if sender == owner and here(event) == 'private:' + owner else ''
+
+
+def _our_days_line(plugin, event, today):
+    owner = _day_owner(plugin, event)
+    if not owner:
+        return ''
+    try:
+        return our_days.line(DATA_DIR, owner, today)
+    except Exception as exc:
+        logger.warning('[ams-life] our days read failed (%s)', type(exc).__name__)
+        return ''
+
+
+async def _remember_day(plugin, event, date='', what=''):
+    owner = _day_owner(plugin, event)
+    if not owner:
+        return '这里只能在和主人的私聊里记。'
+    try:
+        our_days.remember(DATA_DIR, owner, date, what)
+    except ValueError:
+        return '日期或内容不对，请再写一次。'
+    except Exception as exc:
+        logger.warning('[ams-life] our days write failed (%s)', type(exc).__name__)
+        return '没有记下来。'
+    return '记下了。'
 SELFIE_PROMPT = ("真人质感的手机照片，真实皮肤和光影，有实感、有生活气息，不要动漫画风，不要塑料感，不要摆拍感。\n"
                  "参考图1是她本人：参考图只管脸型、眼睛（琥珀色，神态）、身高体态和原本的粉色发色，不管发型、发饰和衣服；不要加光环。\n"
                  "原本的发色是粉色；发型、发饰、衣服照下面“今天的打扮”和“最近的样子”。\n"
@@ -341,6 +379,11 @@ class SelfieMixin(PortsMixin):
         tools = [turn.TurnTool(name="set_now", description="你自己换了地方或换了事时用一下，跟你说的对得上。同一件事接着做不用再记；做完了、换了事再记。",
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
             "doing": {"type": "string", "maxLength": 12}, "minutes": {"type": "integer", "description": "大概做多久（分钟，5–240）"}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
+        if _day_owner(self, event):
+            tools.append(turn.TurnTool(name='remember_day', description='记下你和主人之间重要的日子。',
+                parameters={'type': 'object', 'properties': {'date': {'type': 'string', 'description': 'MM-DD 或 YYYY-MM-DD'},
+                'what': {'type': 'string', 'maxLength': 20}}, 'required': ['date', 'what']},
+                handler=self._tool_remember_day))
         if cfg.get("photo_enabled", False):
             tools.append(turn.TurnTool(name="set_look", description="定今天的打扮，也可以记下样子的变化。" + context,
                 parameters={"type": "object", "properties": {"today": {"type": "string", "maxLength": 30},
@@ -390,6 +433,9 @@ class SelfieMixin(PortsMixin):
 
     async def _tool_set_look(self, event, today="", change=""):
         return await look.set_look(self, event, LOOK_PATH, today, change)
+
+    async def _tool_remember_day(self, event, date='', what=''):
+        return await _remember_day(self, event, date, what)
 
     async def _tool_take_photo(self, event, kind="", what="", where="", doing="", caption=""):
         queue = self._phone_queue(event)

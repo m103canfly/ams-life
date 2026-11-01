@@ -2,6 +2,7 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Weekly reply samples, their privacy gates and panel routes."""
 import importlib.util
+import datetime
 import json
 import random
 import sys
@@ -17,6 +18,7 @@ import test_basics  # noqa: E402,F401
 import adapter_astrbot
 import forget_registry
 import harness
+import her_days
 import likeness
 import messenger
 import mixin_discretion
@@ -125,6 +127,49 @@ class Samples(unittest.TestCase):
                 self.assertTrue({row['id'] for row in selected[1:]} <= {row['id'] for row in chosen})
                 self.assertTrue(all(row['context'][0]['sender_id'] != person for row in chosen))
 
+    def day(self, offset, person='10003', detail='Alice 900001', feel='Alice'):
+        monday = datetime.date.fromisocalendar(int(WEEK[:4]), int(WEEK[6:]), 1)
+        date = monday + datetime.timedelta(days=offset)
+        stamp = datetime.datetime.combine(date, datetime.time(12, 34)).timestamp()
+        her_days.Store(self.root).add({'ts': stamp, 'do': 'walk', 'detail': detail,
+                                       'minutes': 15, 'feel': feel, 'related_users': [person]})
+
+    def test_days_selection_is_stable_and_past_week_frozen(self):
+        for offset in range(5):
+            self.day(offset)
+        first = self.store.select(WEEK, now=STAMP + 8 * 86400)
+        self.assertEqual(len(first), 2)
+        self.assertEqual(first, likeness.Store(self.root, random.Random(99)).select(WEEK, now=STAMP))
+        self.day(5)
+        self.assertEqual(first, self.store.select(WEEK, now=STAMP + 8 * 86400))
+
+    def test_days_fill_current_week_and_empty_preserves_replies(self):
+        for i in range(25):
+            self.add(text=str(i))
+        self.assertEqual(len(self.store.select(WEEK, now=STAMP)), 20)
+        self.day(0)
+        first = self.store.select(WEEK, now=STAMP)
+        self.assertEqual(sum(row.get('kind') == 'day' for row in first), 1)
+        self.day(1)
+        second = self.store.select(WEEK, now=STAMP)
+        self.assertEqual(sum(row.get('kind') == 'day' for row in second), 2)
+        self.assertEqual(len(second), 22)
+        self.assertEqual(first[-1], second[-2])
+
+    def test_day_rating_privacy_and_forget(self):
+        self.day(0)
+        self.day(0, person='10005', detail='other', feel='fine')
+        row = self.store.select(WEEK, now=STAMP)[0]
+        self.assertTrue(self.store.rate(WEEK, row['id'], 'like', 'clear'))
+        self.assertFalse(self.store.rate(WEEK, 'day-2000-01-01', 'like', 'clear'))
+        shown = likeness.public(self.store.select(WEEK, now=STAMP), lambda people: ['Alice'])[0]
+        self.assertEqual(shown['rating'], 'like')
+        self.assertNotIn('Alice', json.dumps(shown))
+        self.assertNotIn('900001', json.dumps(shown))
+        self.assertNotIn('related_users', json.dumps(shown))
+        self.assertEqual(self.store.forget('10003'), 1)
+        self.assertEqual(len(self.store.select(WEEK, now=STAMP)[0]['rows']), 1)
+
 
 class Admission(unittest.TestCase):
     def setUp(self):
@@ -222,6 +267,22 @@ class PanelHandlers(unittest.IsolatedAsyncioTestCase):
                 request.get_json.return_value = {'week': WEEK, 'id': row['id'], 'rating': 'unsure', 'reason': 'maybe'}
                 self.assertEqual((await plugin.page_likeness_rate())['status'], 'ok')
                 self.assertEqual((await plugin.page_likeness())['data'][0]['rating'], 'unsure')
+
+    async def test_days_are_public_and_use_known_names(self):
+        with tempfile.TemporaryDirectory(dir=test_basics.DATA) as tmp:
+            plugin = test_basics.make_plugin(harness.FakeContext())
+            her_days.Store(tmp).add({'ts': STAMP, 'do': 'walk', 'detail': 'Alice 900001',
+                                     'feel': 'Alice', 'related_users': ['10003']})
+            request = types.SimpleNamespace(args={'week': WEEK})
+            with patch.object(mixin_pages, 'DATA_DIR', Path(tmp)), \
+                    patch.object(plugin, '_known_names', return_value=['Alice']), \
+                    patch.dict(sys.modules, {'quart': types.SimpleNamespace(request=request)}):
+                result = await plugin.page_likeness()
+            self.assertEqual(result['data'], [])
+            self.assertEqual(len(result['days']), 1)
+            self.assertNotIn('Alice', json.dumps(result['days']))
+            self.assertNotIn('900001', json.dumps(result['days']))
+            self.assertNotIn('10003', json.dumps(result['days']))
 
 
 HAS_AIOHTTP = importlib.util.find_spec('aiohttp') is not None
