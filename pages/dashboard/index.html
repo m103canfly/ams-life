@@ -617,10 +617,11 @@
         <div class="repo-addr" id="repoAddr" hidden><input type="text" id="repoAddrText" readonly aria-label="仓库地址" spellcheck="false"><button type="button" class="btn mini fb-skip" id="repoCopyBtn">复制</button><span class="api-note" id="repoCopyNote" role="status" aria-live="polite"></span></div>
         <p class="api-note about-line" id="aboutLine">小爱的身体和记忆用的是 ams-life（AGPL-3.0），基于 BioCore v1.2.99（Johnhmzm，AGPL-3.0）。源码：https://github.com/m103canfly/ams-life</p>
       </div>
-      <div class="section-title mt" data-settings-title="settingsBackup"><div><div class="eyebrow">BACKUP</div><h2>核心备份</h2></div><span class="hint">含记忆/人设/API KEY</span></div>
+      <div class="section-title mt" data-settings-title="settingsBackup"><div><div class="eyebrow">BACKUP</div><h2>核心备份</h2></div><span class="hint">含记忆/人设，不含钥匙</span></div>
       <div class="panel settings settings-panel" id="settingsBackup">
         <div class="setting-row"><div><b>下载核心备份</b><small>插件代码 + data/ 打包成 zip，可用于迁移或恢复。</small></div><button type="button" class="btn" id="backupBtn">下载备份</button></div>
-        <p class="api-note" id="backupState">备份包含 API Key、persona、memory、states，不要外发。</p>
+        <p class="api-note" id="backupKeysNote">备份里不含钥匙，恢复后要在“钥匙”里重填。</p>
+        <p class="api-note" id="backupState">备份里有记忆、人设和聊天记录，不要外发。</p>
         <div class="setting-row"><div><b>加载核心备份</b><small>选择备份 zip；连续点击两次确认，会覆盖当前 data/。</small></div></div>
         <input type="file" id="restoreFile" accept=".zip,application/zip" style="margin:8px 0">
         <button type="button" class="btn danger" id="restoreBtn">加载备份（需点两次）</button>
@@ -631,5 +632,5 @@
   </main>
 </div>
 <script src="./ams-bridge.js"></script><script src="./feedback.js"></script><script src="./look.js?v=20261029-1"></script><script src="./brain/panel-page.js"></script><script src="./brain_frame.js"></script><script src="./memories.js"></script><script src="./keys.js"></script><script src="./repo_link.js"></script>
-<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261101-1"></script><script src="./orb.js?v=20261027-0215"></script>
+<script src="./orb_math.js?v=20261027-0215"></script><script src="./app.js?v=20261101-2"></script><script src="./orb.js?v=20261027-0215"></script>
 </body></html>
