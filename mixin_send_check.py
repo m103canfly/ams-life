@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 # ams-life (AGPL-3.0); see NOTICE.md.
-"""Step 2 (global_memory): the last look at a reply before it is sent (send_check.py).
+"""The last look at a reply before it is sent (send_check.py).
 
-What she is shown but may not say here is noted on the event while the reply prompt is
-built (_forbid*); the rest of the prompt is what may be said (_note_allowed). The reply is
+Private sources and names are checked for every reply. The reply is
 looked at in on_llm_response (_look_at_reply): it leaks -> the model is asked once more
 (_redo_reply, with the same request and one line more); it still leaks -> nothing is sent
 and nothing of it is kept. on_agent_done (_settle_history) then makes the conversation
@@ -21,10 +20,113 @@ except ImportError:
     from common import *  # noqa: F401,F403
 
 try:
-    from . import adapter_astrbot_turn, send_check
+    from . import adapter_astrbot_turn, send_check, mixin_discretion
 except ImportError:
     import adapter_astrbot_turn
     import send_check
+    import mixin_discretion
+
+import ipaddress
+from urllib.parse import urlparse
+
+
+def _sessions(event, person):
+    cache = getattr(event, "_ams_member_of", None)
+    if not isinstance(cache, dict):
+        cache = event._ams_member_of = {}
+    person = str(person or "")
+    if person not in cache:
+        cache[person] = set()
+        if person.isascii() and person.isdigit():
+            try:
+                data = json.loads((mixin_discretion.USER_DIR / (person + ".json")).read_text(encoding="utf-8"))
+                rows = data.get("sessions") or []
+                cache[person] = {discretion.place_of(s) for s in rows if isinstance(s, str)}
+            except (OSError, ValueError, AttributeError, TypeError):
+                pass
+    return cache[person]
+
+
+def _name_walls(plugin, event):
+    store = plugin._impression_store()
+    names = {}
+    for person, values in store._read(store.root / "names.json").items():
+        if isinstance(values, list):
+            for name in values:
+                names.setdefault(str(name), set()).add(str(person))
+    for place in store.places():
+        for person, rec in store.load(place)["people"].items():
+            if isinstance(rec, dict):
+                for name in [rec.get("name")] + list(rec.get("aliases") or []):
+                    if name:
+                        names.setdefault(str(name), set()).add(str(person))
+    here = plugin._here(event)
+    speaker = str(plugin._speaker(event)[0] or "")
+    present = set(plugin._present_people(event)) | {speaker}
+    acceptable = {here}
+    if here.startswith("group:"):
+        group = here.split(":", 1)[1]
+        for row in (plugin.config or {}).get("shared_groups", []):
+            if isinstance(row, (list, tuple)) and group in row:
+                acceptable.update("group:" + str(x) for x in row)
+    elif here.startswith("private:"):
+        acceptable = {x for x in _sessions(event, speaker) if x.startswith("group:")}
+    blocked, unknown = [], 0
+    for name, owners in names.items():
+        name = name.strip()
+        if len(name) < 2 or discretion.plain_word(name) or name in send_check.everyday_words.WORDS:
+            continue
+        if owners & present:
+            continue
+        sessions = [_sessions(event, person) for person in owners]
+        if any(not places for places in sessions):
+            unknown += 1
+        elif not any(places & acceptable for places in sessions):
+            blocked.append(name)
+    if unknown:
+        logger.info("[ams-life] send check: %d names have unknown places", unknown)
+    return blocked
+
+
+def _private_source(origin):
+    sources = origin.get("recall_sources") or [origin]
+    return any(str(s.get("where") or "").startswith("private:") for s in sources if isinstance(s, dict))
+
+
+def _forbidden_private(plugin, event):
+    rows = []
+    entries = list(plugin._read_library(vectors=False).get("entries") or [])
+    entries.extend(entry for _, entry in plugin._cross_session_memory_entries(event))
+    events = plugin._event_archive(1000000, read_only=True)
+    notes = (plugin.self_model or {}).get("notebook") or []
+    fields = (("memory", entries, ("text",)),
+              ("event", events, ("title", "event", "central_details", "meaning_to_her", "reflection", "big_summary", "small_summary", "peripheral_details")),
+              ("note", notes, ("text",)))
+    seen = set()
+    for kind, items, keys in fields:
+        for index, item in enumerate(items):
+            if not isinstance(item, dict) or item.get("deleted"):
+                continue
+            origin = discretion.origin_of(item)
+            if not _private_source(origin) or mixin_discretion.recall_permission(plugin, item, event) != discretion.DROP:
+                continue
+            words = "\n".join(str(item.get(k) or "") for k in keys)
+            key = (kind, str(item.get("id") or ""), words)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({"id": kind + ":" + str(item.get("id") or index), "text": words,
+                         "private": True, "names": [], "vec": None})
+    return rows
+
+
+def _local_embedding(plugin):
+    conf = plugin._embedding_runtime_config() or {}
+    try:
+        host = urlparse(str(conf.get("base_url") or "")).hostname or ""
+        return host.lower() == "localhost" or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 SEND_CHECK_PATH = STATE_DIR / "send_check.json"
 _SEGMENT = re.compile(r"\n|；(?=（)")
@@ -66,18 +168,20 @@ class SendCheckMixin:
         labelled "这里不能讲", AstrBot's message, system prompt and history; and the request,
         for asking once more."""
         note = self._check_note(event)
-        keep = [s for s in _SEGMENT.split(str(compact or "")) if "这里不能讲" not in s]
         system = str(getattr(req, "system_prompt", "") or "")
         if compact:   # with no user parts the block is in the system prompt: only its "keep" counts
             system = system.replace(str(compact), "")
-        parts = [str(getattr(req, "prompt", "") or ""), system]
+        parts = [system]
         for msg in getattr(req, "contexts", None) or []:
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
             content = msg.get("content") if isinstance(msg, dict) else None
             if isinstance(content, str):
                 parts.append(content)
             elif isinstance(content, list):
                 parts.extend(str(p.get("text") or "") for p in content if isinstance(p, dict))
-        note["allowed"] = "\n".join(keep + parts)
+        note["allowed"] = "\n".join(parts)
+        note["user_text"] = adapter_astrbot_turn.incoming_of(event).text
         note["req"] = req
         note["compact"] = str(compact or "")
 
@@ -100,11 +204,15 @@ class SendCheckMixin:
     # ------------------------------------------------------------------
     async def _check_reply(self, event, reply) -> dict:
         note = self._check_note(event)
-        forbidden = note.get("forbidden") or []
+        forbidden = _forbidden_private(self, event)
+        forbidden.append({"id": "names", "text": "", "private": False,
+                          "names": _name_walls(self, event), "strict_names": True, "vec": None})
         if not forbidden or not str(reply or "").strip():
             return {"leak": False, "ids": [], "why": {}, "close": [], "top": 0.0}
         vec = None
         try:
+            if not _local_embedding(self):
+                return send_check.check(reply, forbidden, note.get("allowed", ""), user_text=note.get("user_text", ""))
             vec = await self._embed_text(str(reply))
             for item in forbidden:
                 if item.get("vec") is None and item.get("text"):
@@ -116,7 +224,7 @@ class SendCheckMixin:
                     item["vec"] = cache[item["id"]] or None
         except Exception as exc:
             logger.warning("[ams-life] send check: no vectors (%s); local checks only", type(exc).__name__)
-        return send_check.check(reply, forbidden, note.get("allowed", ""), self._common_pieces(), vec)
+        return send_check.check(reply, forbidden, note.get("allowed", ""), reply_vec=vec, user_text=note.get("user_text", ""))
 
     async def _redo_reply(self, event):
         """Ask the chat model once more with the same request and one line more. Returns the

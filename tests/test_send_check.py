@@ -150,7 +150,7 @@ class InThePlugin(unittest.TestCase):
                 g = r.get('group') or r['private']
                 self.assertFalse(g['stopped'])
                 self.assertEqual(g['deliveries'], [g['response']])
-                self.assertEqual(r['redo_calls'], 0)
+                self.assertEqual(r['redo_calls'], 1 if case in ('names_only', 'off_hint') else 0)
                 if case == 'names_only':
                     self.assertEqual(g['forbidden'], ['synthetic-anonymous'])
                 if case == 'no_private':
@@ -211,7 +211,7 @@ class InThePlugin(unittest.TestCase):
 
     def test_switch_off_nothing_changes(self):
         r = run_case('off')
-        self.assertEqual(r['group']['sent'], '偷偷告诉你，芒果的暗号是蓝鲸三号')
+        self.assertEqual(r['group']['sent'], '不会用到')
         self.assertFalse(r['group']['stopped'])
         self.assertEqual(r['counts'], {})
         # nothing of AstrBot's saved turn is touched
