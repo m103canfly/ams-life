@@ -103,8 +103,8 @@ class OnlyGivenAddresses(unittest.TestCase):
 
     def test_with_global_memory_nothing_private_goes_out(self):
         r = run_case('leak')
-        self.assertEqual(r['search_leak'], '这个不能搜。')
-        self.assertEqual(r['read_leak'], '这个不能搜。')      # even an address the message gave
+        self.assertEqual(r['search_leak'], '这个不能拿去搜。')
+        self.assertEqual(r['read_leak'], '这个不能拿去搜。')      # even an address the message gave
         self.assertTrue(r['search_ok'].startswith('下面是网页上的资料'))
         self.assertEqual(r['calls'], [{'query': '猫咖', 'count': 5}])   # only the harmless one went out
 
@@ -126,7 +126,8 @@ class Money(unittest.TestCase):
 class Kept(unittest.TestCase):
     def test_a_page_read_in_a_reply_is_kept_by_the_page_not_her_reply(self):
         r = run_case('reply')
-        self.assertEqual([w['url'] for w in r['web']], ['https://example.com/a', 'https://news.example.org/cat'])
+        # Room saves may regroup entries; both pages must remain exactly once.
+        self.assertCountEqual([w['url'] for w in r['web']], ['https://example.com/a', 'https://news.example.org/cat'])
         for w in r['web']:
             self.assertTrue(w['text'].startswith('一页：正文'))
             self.assertNotIn('找到啦', w['text'])                        # her reply is not in it

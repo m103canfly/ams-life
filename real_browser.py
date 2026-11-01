@@ -21,6 +21,8 @@ OPEN_SECONDS = 20
 LOCK_WAIT_SECONDS = 3
 # Limit redirect chains to bound work and reject loops.
 MAX_HOPS = 5
+# One main document and at most sixty subrequests.
+MAX_REQUESTS = 61
 # Script-driven pages may fetch their visible content after DOMContentLoaded.
 SETTLE_SECONDS = 8
 TEXT_SECONDS = 10
@@ -64,7 +66,7 @@ async def _launch_browser(playwright, shot_path=None, pinned=False):
             proxies = getproxies()
         except Exception:
             proxies = {}
-        server = proxies.get("https") or proxies.get("http")
+        server = (proxies.get("https") or proxies.get("http")) if not pinned else None
         if server:
             proxy = {"server": server}
             bypass = proxies.get("no", "")
@@ -125,8 +127,6 @@ def _pinned_get(url, address, headers, proxy=None):
             proxy_headers["Proxy-Authorization"] = "Basic " + base64.b64encode(credentials).decode("ascii")
         if parts.scheme == "https":
             conn.set_tunnel(host, port, headers=proxy_headers)
-            conn.connect()
-            conn.sock = ssl.create_default_context().wrap_socket(conn.sock, server_hostname=host)
         else:
             target = parts._replace(fragment="").geturl()
             outgoing.update(proxy_headers)
@@ -141,13 +141,11 @@ def _pinned_get(url, address, headers, proxy=None):
             sock.close()
             raise
         conn.sock = sock
-        if parts.scheme == "https":
-            try:
-                conn.sock = ssl.create_default_context().wrap_socket(conn.sock, server_hostname=host)
-            except BaseException:
-                conn.close()
-                raise
     try:
+        if parts.scheme == "https":
+            if proxy:
+                conn.connect()
+            conn.sock = ssl.create_default_context().wrap_socket(conn.sock, server_hostname=host)
         conn.request("GET", target, headers=outgoing)
         response = conn.getresponse()
         body = response.read(HTML_MAX_BYTES + 1)
@@ -156,6 +154,28 @@ def _pinned_get(url, address, headers, proxy=None):
         return response.status, dict(response.getheaders()), body
     finally:
         conn.close()
+
+
+def _resolve_addresses(host):
+    """Resolve once; the transport connects to an address from this result."""
+    return list(dict.fromkeys(info[4][0] for info in socket.getaddrinfo(host, None)))
+
+
+def _proxy_for(host):
+    try:
+        proxies = getproxies()
+    except Exception:
+        proxies = {}
+    server = proxies.get("https") or proxies.get("http")
+    if not server or proxy_bypass(host):
+        return None
+    parsed = urlsplit(server if "://" in server else "http://" + server)
+    if parsed.scheme != "http":
+        logger.info("[ams-life] browser: unsupported proxy protocol (%s)", parsed.scheme)
+        raise ValueError("unsupported proxy protocol")
+    if not parsed.hostname:
+        raise ValueError("invalid proxy")
+    return server
 
 
 def _fetch_checked(url, headers, check=browse.check_url):
@@ -167,16 +187,12 @@ def _fetch_checked(url, headers, check=browse.check_url):
         if not ok:
             raise ValueError(reason)
         parts = urlsplit(url)
-        addresses = list(dict.fromkeys(info[4][0] for info in socket.getaddrinfo(parts.hostname, None)))
+        addresses = _resolve_addresses(parts.hostname)
         for address in addresses:
             ipaddress.ip_address(address.split("%", 1)[0])
         if not addresses or any(browse._bad_address(address) for address in addresses):
             raise ValueError("local or unresolved address")
-        try:
-            proxies = getproxies()
-            proxy = None if not proxies or proxy_bypass(parts.hostname) else (proxies.get("https") or proxies.get("http"))
-        except Exception:
-            proxy = None
+        proxy = _proxy_for(parts.hostname)
         status, response_headers, body = _pinned_get(url, addresses[0], headers, proxy)
         location = next((value for key, value in response_headers.items() if key.lower() == "location"), None)
         if 300 <= status < 400:
@@ -187,31 +203,38 @@ def _fetch_checked(url, headers, check=browse.check_url):
                 headers = {k: v for k, v in headers.items() if k.lower() not in ("cookie", "authorization")}
             url = next_url
             continue
-        return status, response_headers, body
+        return status, response_headers, body, url
     raise ValueError("redirect limit")
 
 
 async def _pinned_route(route, on_block, count, check=browse.check_url):
-    request = route.request
-    scheme = urlsplit(request.url).scheme.lower()
-    if scheme in ("data", "blob"):
-        await route.continue_()
-        return
-    count[0] += 1
-    if count[0] > 61 or request.method.upper() != "GET" or scheme not in ("http", "https"):
-        on_block("request refused")
-        await route.abort()
-        return
+    counted = False
+
+    def record(reason):
+        nonlocal counted
+        counted = True
+        on_block(reason)
+
     try:
-        status, headers, body = await asyncio.wait_for(
+        request = route.request
+        scheme = urlsplit(request.url).scheme.lower()
+        if scheme in ("data", "blob"):
+            await route.continue_()
+            return
+        count[0] += 1
+        if count[0] > MAX_REQUESTS or request.method.upper() != "GET" or scheme not in ("http", "https"):
+            record("request refused")
+            await route.abort()
+            return
+        status, headers, body, final_url = await asyncio.wait_for(
             asyncio.to_thread(_fetch_checked, request.url, dict(getattr(request, "headers", {}) or {}), check),
             timeout=OPEN_SECONDS)
         headers = {k: v for k, v in headers.items()
                    if k.lower() not in ("connection", "transfer-encoding", "content-length")}
         await route.fulfill(status=status, headers=headers, body=body)
-    except Exception:
-        on_block("request failed")
-        await route.abort()
+        return final_url
+    except Exception as exc:
+        await _route_failed(route, exc, record, counted)
 
 
 def _strict_url(url, check):
@@ -357,6 +380,7 @@ async def _visit(url, check, shot_path, on_block):
         pending = set()
         blocked = 0
         count = [0]
+        fetched_urls = {}
 
         def track(coro):
             task = asyncio.create_task(coro)
@@ -370,7 +394,9 @@ async def _visit(url, check, shot_path, on_block):
                 logger.info("[ams-life] browser: blocked request (%s)", reason)
 
         async def route_request(route):
-            await _pinned_route(route, note_block, count, check)
+            final_url = await _pinned_route(route, note_block, count, check)
+            if final_url:
+                fetched_urls[route.request.url] = final_url
 
         async def read(context):
             nonlocal blocked
@@ -385,7 +411,8 @@ async def _visit(url, check, shot_path, on_block):
                                                         timeout=OPEN_SECONDS * 1000), timeout=OPEN_SECONDS)
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
-            if response is None or not 200 <= response.status < 300 or urlsplit(page.url).scheme.lower() not in ("http", "https"):
+            if (response is None or not 200 <= response.status < 300
+                    or page.url not in fetched_urls or not browse.check_url(page.url)[0]):
                 logger.info("[ams-life] browser: navigation failed")
                 return None
             try:
@@ -402,7 +429,7 @@ async def _visit(url, check, shot_path, on_block):
                 return None
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
-            final_url = page.url
+            final_url = fetched_urls.get(page.url, page.url)
             # Safety 9: short challenge pages are not read or photographed.
             if len(body.strip()) < CHALLENGE_MAX_CHARS and any(
                     marker in (title + "\n" + body).lower() for marker in CHALLENGE_MARKERS):
@@ -410,13 +437,15 @@ async def _visit(url, check, shot_path, on_block):
                 return None
             if shot_path is not None:
                 await _take_screenshot(page, shot_path)
-                final_url = page.url
+                final_url = fetched_urls.get(page.url, page.url)
             else:
                 body = await _article_text(page, body)
             # Stop further responses before deciding whether every response was safe.
             await context.close()
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
+            if page.url not in fetched_urls or not browse.check_url(final_url)[0]:
+                return None
             return shot_path if shot_path is not None else {"url": final_url, "title": title, "text": body}
 
         result = None

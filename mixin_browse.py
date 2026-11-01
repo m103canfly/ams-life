@@ -48,7 +48,7 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, model_client, send_check, tool_loop, turn, turn_runner
+    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, mixin_send_check, model_client, send_check, tool_loop, turn, turn_runner
     from .mixin_llm import _counted
 except ImportError:
     import adapter_astrbot_tools
@@ -57,6 +57,7 @@ except ImportError:
     import attention
     import browse
     import model_client
+    import mixin_send_check
     import send_check
     import tool_loop
     import turn
@@ -67,7 +68,7 @@ BROWSE_DIR = DATA_DIR / "browse"
 QUOTA_ATTR = "_ams_browse_quota"
 URLS_ATTR = "_ams_browse_urls"   # the addresses she may read: this message's, and her searches' results
 NOT_LISTED = "这个网址不能读：只能读消息里给的、或者搜索结果里的网址。"
-NOT_SENT = "这个不能搜。"
+NOT_SENT = "这个不能拿去搜。"
 READ_ATTR = "_ams_browse_read"
 STATE_PATH = BROWSE_DIR / "state.json"
 TRIP_UMO = "ams-life:browse"   # the "chat" AstrBot's DeepSeek tools are told on a trip (its config: the default)
@@ -431,6 +432,12 @@ class BrowseMixin:
     async def _may_go_out(self, event, words) -> bool:
         """Check what would go out, including the names wall."""
         try:
+            if getattr(event, "unified_msg_origin", None) == TRIP_UMO:
+                people = set(getattr(self, "_her_ids", None) or [])
+                people.add(str((getattr(self, "config", None) or {}).get("owner_qq") or ""))
+                exempt = set(self._known_names(people - {""}))
+                names = [name for name in mixin_send_check._name_walls(self, event) if name not in exempt]
+                return not send_check.check(words, [{"id": "names", "names": names, "strict_names": True}])["leak"]
             forbidden = self._check_note(event).get("forbidden") or []
             if send_check.check(words, forbidden).get("leak"):
                 return False

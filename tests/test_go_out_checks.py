@@ -189,7 +189,7 @@ class Outbound(unittest.IsolatedAsyncioTestCase):
         plugin = Plugin()
         event = types.SimpleNamespace()
         result = await plugin._tool_search(event, "蓝鲸三号是什么")
-        self.assertEqual(result, mixin_browse.NOT_SENT)
+        self.assertEqual(result, "这个不能拿去搜。")
         plugin.search.assert_not_awaited()
         await plugin._tool_search(event, "今天天气")
         plugin.search.assert_awaited_once()
@@ -234,15 +234,30 @@ class Outbound(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kept, [(link, asked, asked), (search, asked, browse.SELF_ASKED_IN)])
 
     async def test_trip_uses_name_wall_with_no_forbidden_items(self):
+        names = {"10001": ["虚构主人"], "10003": ["虚构角色"], "20002": ["阿星"]}
+        store = types.SimpleNamespace(root=Path("unused"), _read=lambda path: names, places=lambda: [])
         class Plugin:
             global_memory = False
+            config = {"owner_qq": "10001"}
+            _her_ids = {"10003"}
+            def _impression_store(self):
+                return store
+            def _here(self, event):
+                return "self"
+            def _speaker(self, event):
+                return "", ""
+            def _present_people(self, event):
+                return []
+            def _known_names(self, people):
+                return [name for person in people for name in names.get(person, [])]
             def _check_note(self, event):
                 return {"forbidden": []}
-            async def _check_reply(self, event, words):
-                return send_check.check(words, [{"id": "names", "names": ["阿星"], "strict_names": True}])
         plugin = Plugin()
-        self.assertFalse(await mixin_browse.BrowseMixin._may_go_out(plugin, object(), "阿星是什么"))
-        self.assertTrue(await mixin_browse.BrowseMixin._may_go_out(plugin, object(), "今天天气"))
+        event = mixin_browse._trip_stand_in()
+        with mock.patch.object(mixin_browse.mixin_send_check, "_sessions", return_value={"group:900001"}):
+            self.assertFalse(await mixin_browse.BrowseMixin._may_go_out(plugin, event, "阿星是什么"))
+            for words in ("今天天气", "虚构主人是什么", "虚构角色是什么"):
+                self.assertTrue(await mixin_browse.BrowseMixin._may_go_out(plugin, event, words))
 
 
 class NowLine(unittest.TestCase):
