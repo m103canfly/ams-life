@@ -2,6 +2,7 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """One platform-neutral turn: getting it ready, and her reply after the model."""
 import unicodedata
+from datetime import datetime
 
 try:
     from .common import *  # noqa: F401,F403
@@ -87,7 +88,7 @@ class TurnMixin:
             logger.warning("[ams-life] reply tools could not be taken out, none given: %s", exc)
         else:
             try:
-                for name in ("take_photo", "share_screenshot", "say_aloud", "set_now"):
+                for name in ("take_photo", "share_screenshot", "say_aloud", "set_now", "set_look"):
                     turn_request.remove_tool(name)
                 if self.enabled:
                     await self._ensure_profile(event)
@@ -340,6 +341,11 @@ class TurnMixin:
             _compact = (_compact + "\n" + _slang).strip()
         if not _img.replace("[BioCore Image]", "").strip() and _has_non_sticker_image(event):
             _compact = (_compact + "\n[图] " + attention.UNSEEN_IMAGE_NOTE).strip()
+        if (self.config or {}).get("photo_enabled", False):
+            _weather = getattr(self, "_weather_line", lambda: "")()
+            _outfit = mixin_selfie.look.read_look(mixin_selfie.LOOK_PATH, datetime.now().date())
+            _compact = (_compact + "\n" + mixin_selfie.look.look_line(
+                datetime.now().date(), _outfit, getattr(self, "self_model", {}) or {}, _weather)).strip()
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
