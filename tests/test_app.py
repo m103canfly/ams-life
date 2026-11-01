@@ -5,6 +5,7 @@ import ast
 import asyncio
 import importlib.util
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -23,6 +24,23 @@ HAS_AIOHTTP = importlib.util.find_spec('aiohttp') is not None
 
 
 class EntryTests(unittest.TestCase):
+    def test_log_data_directory_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'logs' / 'app.log'
+            self.assertEqual(app.main(['--data', str(test_basics.DATA / 'other'), '--log', str(path)]), 2)
+            self.assertIn('data directory differs', path.read_text('utf-8'))
+            path.unlink()
+
+    def test_log_repeated_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'app.log'
+            handlers = logging.getLogger().handlers[:]
+            for _ in range(2):
+                self.assertEqual(app.main(['--data', str(test_basics.DATA / 'other'), '--log', str(path)]), 2)
+                self.assertEqual(logging.getLogger().handlers, handlers)
+            self.assertEqual(path.read_text('utf-8').count('data directory differs'), 2)
+            path.unlink()
+
     def test_refuses_live_and_different_data(self):
         original = os.environ.get('AMS_LIFE_DATA_DIR')
         self.addCleanup(self.restore_env, original)
@@ -108,6 +126,27 @@ class AppTests(unittest.IsolatedAsyncioTestCase):
                 return
             await asyncio.sleep(.01)
         self.fail('event was not processed')
+
+    async def test_log_file_and_close(self):
+        path = self.root / 'logs' / 'app.log'
+        self.app.args.log = str(path)
+        await self.start()
+        logging.getLogger('ams-life').warning('Made up warning')
+        content = path.read_text('utf-8')
+        self.assertIn('OneBot port:', content)
+        self.assertIn('Made up warning', content)
+        self.assertNotIn('test-deepseek-key', content)
+        self.assertNotIn('test-napcat-key', content)
+        handler = self.app._log_handler
+        await self.app.stop()
+        self.assertNotIn(handler, logging.getLogger().handlers)
+        self.assertIsNone(handler.stream)
+        path.unlink()
+
+    async def test_no_log_file_by_default(self):
+        await self.start()
+        self.assertIsNone(self.app._log_handler)
+        self.assertFalse((self.root / 'logs').exists())
 
     async def test_group_turn_and_history(self):
         from fake_napcat import FakeNapCat
