@@ -32,6 +32,10 @@ try:
     from .mixin_ports import PortsMixin
 except ImportError:
     from mixin_ports import PortsMixin
+try:
+    from .history_store import CONTEXT_ROWS, CONTEXT_SECONDS
+except ImportError:
+    from history_store import CONTEXT_ROWS, CONTEXT_SECONDS
 
 WINDOW_MAX = 1000                   # lines per window, everyone's (AstrBot's group context keeps 1000 too)
 WINDOW_SECONDS = 24 * 3600          # every line stays 24 hours, hers too; older things live in memory
@@ -495,6 +499,40 @@ class PhoneMixin(PortsMixin):
                     del lines[i]
                     break
         return lines[-n:]
+
+    def _reply_context(self, event, *, limit=CONTEXT_ROWS, hours=CONTEXT_SECONDS / 3600) -> list:
+        """What one reply sees: this place's last `hours`, at most `limit` lines, in time order.
+
+        The rows she answered come from her history store, her words in full. The window
+        adds the lines others said and she did not answer, each as one user line with its
+        speaker and time (_phone_line), so a busy group is not cut out. Her own lines come
+        from the store only: the window keeps just WINDOW_LINE_CHARS of them."""
+        place = self._here(event)
+        store = self._history_store()
+        if not place or store is None or limit <= 0:
+            return []
+        since = time.time() - float(hours) * 3600
+        rows = store.recent(place, limit, since=since)
+        answered = {str(row.get("message_id") or "") for row in rows} - {""}
+        current = self._message_id(event)
+        others = []
+        for line in self._read_window(place)["recent"]:
+            if line.get("role") != "user":
+                continue
+            if not str(line.get("text") or "").strip():
+                continue
+            stamp = float(line.get("ts", 0) or 0)
+            if stamp < since:
+                continue
+            message_id = str(line.get("msg_id") or "")
+            if message_id and message_id in answered:
+                continue  # her answered turns already come from the store
+            if current and message_id == current:
+                continue  # the message this reply is to, not history
+            others.append({"role": "user", "content": _phone_line(self, event, line), "ts": stamp})
+        merged = list(rows) + others
+        merged.sort(key=lambda row: float(row.get("ts", 0) or 0))
+        return [{"role": row["role"], "content": row["content"]} for row in merged[-limit:]]
 
     def _window_replies(self, event, n=6) -> list:
         """Her last `n` replies in the window she is in now (dicts with text and origin)."""

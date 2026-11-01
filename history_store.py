@@ -10,7 +10,8 @@ so can a message; nothing has to be cleared whole.
 - `append` writes one line, and keeps at most `keep_per_place` lines per place,
   dropping the oldest;
 - `recent` gives the last lines of a place, oldest first, ready to be a model's
-  `messages`;
+  `messages`; `since` narrows it to the last day and lets the phone's window lines
+  join it;
 - `forget_person` / `forget_messages` / `clear_place` delete for good:
   `PRAGMA secure_delete = ON` overwrites what is deleted, and the default journal
   leaves no copy in a WAL file;
@@ -31,6 +32,10 @@ from pathlib import Path
 
 KEEP_PER_PLACE = 200     # rows kept per place; the oldest go first
 RECENT_DEFAULT = 20      # rows recent() gives when not told
+# One ruler for what a reply sees: this place's last day, at most this many lines.
+# The reply's history store rows and the phone window's unanswered lines share it.
+CONTEXT_SECONDS = 24 * 3600
+CONTEXT_ROWS = 200
 ROLES = ("user", "assistant")
 
 _SCHEMA = """
@@ -153,8 +158,13 @@ class HistoryStore:
         self._db.commit()
         return row_id
 
-    def recent(self, place, limit=RECENT_DEFAULT) -> list:
-        """The last `limit` lines of a place, oldest first, as {"role", "content"}."""
+    def recent(self, place, limit=RECENT_DEFAULT, since=None) -> list:
+        """The last `limit` lines of a place, oldest first, as {"role", "content"}.
+
+        `since`: only lines at or after that time; each one then also carries its
+        `ts` and `message_id`, so a reply can put the window's own lines among them
+        and skip the ones already here. Calls without `since` are unchanged.
+        """
         place = _text(place)
         try:
             limit = int(limit)
@@ -162,10 +172,21 @@ class HistoryStore:
             return []
         if not place or limit <= 0:
             return []
+        if since is None:
+            rows = self._db.execute(
+                "SELECT role, content FROM history WHERE place = ? ORDER BY id DESC LIMIT ?",
+                (place, limit)).fetchall()
+            return [{"role": role, "content": content} for role, content in reversed(rows)]
+        try:
+            since = float(since)
+        except (TypeError, ValueError):
+            return []
         rows = self._db.execute(
-            "SELECT role, content FROM history WHERE place = ? ORDER BY id DESC LIMIT ?",
-            (place, limit)).fetchall()
-        return [{"role": role, "content": content} for role, content in reversed(rows)]
+            "SELECT role, content, ts, message_id FROM history"
+            " WHERE place = ? AND ts >= ? ORDER BY id DESC LIMIT ?",
+            (place, since, limit)).fetchall()
+        return [{"role": role, "content": content, "ts": ts, "message_id": message_id}
+                for role, content, ts, message_id in reversed(rows)]
 
     def forget_person(self, person) -> int:
         """Delete every line a person said or is about (her replies to them too)."""
