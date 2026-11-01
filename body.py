@@ -21,9 +21,19 @@ def ate(core, now):
     core.last_meal = float(now)
 
 
+# How fast sleepiness moves, in points per hour. Awake it rises 0.035 in the
+# day (07:00-23:00) and 0.06 at night (23:00-07:00), so a late night makes her
+# sleepier sooner. Asleep it falls 0.066: from 0.7 down to 0.15 takes 8.3
+# hours, so a night begun at about 22:45 ends at about 07:00 and the day stays
+# 24 hours long.
+SLEEPINESS_RISE_DAY = 0.035
+SLEEPINESS_RISE_NIGHT = 0.06
+SLEEPINESS_FALL_SLEEP = 0.066
+
+
 def slept(core, start, end):
     hours = max(0.0, (float(end) - float(start)) / 3600.0)
-    core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
+    core.sleepiness = _clip(core.sleepiness - SLEEPINESS_FALL_SLEEP * hours, 0, 1)
     core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
     core.last_sleep_end = float(end)
 
@@ -54,7 +64,9 @@ def _chosen_needs(core):
             start = datetime.fromisoformat(item['start'])
             sleeping = item.get('kind', item.get('doing')) == '睡觉'
             if sleeping and item.get('kind') and type(item.get('minutes')) is int:
-                end = start + timedelta(minutes=max(60, min(720, item['minutes'])))
+                # A day nap can be as short as 20 minutes, so the item's own
+                # minutes is the length; only absurd values are cut.
+                end = start + timedelta(minutes=max(20, min(720, item['minutes'])))
             else:
                 earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
                 end = min(daily.next_period(earliest - timedelta(microseconds=1)),
@@ -65,14 +77,21 @@ def _chosen_needs(core):
     return intervals
 
 
+def _sleeps_by_choice(core):
+    """The life loop decides when she sleeps; only with it off does the schedule.
+
+    The loop's paths are set while it is enabled and removed while it is not."""
+    return getattr(core, '_life_now_path', None) is not None
+
+
 def _advance_needs(core, start, end):
     cursor = datetime.fromtimestamp(start)
     finish = datetime.fromtimestamp(end)
     chosen = _chosen_needs(core)
     while cursor < finish:
         boundary = daily.next_period(cursor)
-        # Split at 06:00 and 23:00 for the night waking rate.
-        for hour in (6, 23):
+        # Split at 07:00 and 23:00 where the awake rate changes.
+        for hour in (7, 23):
             candidate = cursor.replace(hour=hour, minute=0, second=0, microsecond=0)
             if cursor < candidate < boundary:
                 boundary = candidate
@@ -90,11 +109,14 @@ def _advance_needs(core, start, end):
                     boundary = point
         stop = min(boundary, finish)
         hours = (stop - cursor).total_seconds() / 3600.0
-        sleeping = daily.period_start(cursor).hour == 0 or doing == '睡觉'
+        # With the life loop on, sleep is only what she chose: the schedule's
+        # "the 00:00-07:00 stretch is sleep" is used only when the loop is off.
+        sleeping = (not _sleeps_by_choice(core)
+                    and (daily.period_start(cursor).hour == 0 or doing == '睡觉'))
         if selected:
             sleeping = selected[2]
         if sleeping:
-            core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
+            core.sleepiness = _clip(core.sleepiness - SLEEPINESS_FALL_SLEEP * hours, 0, 1)
             core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
             if selected and int(stop.timestamp()) >= int(selected[1]) and core.last_sleep_end < int(selected[1]):
                 # The rates above already recovered this interval. Mark only the wake.
@@ -102,7 +124,8 @@ def _advance_needs(core, start, end):
             elif not selected and stop == period_end:
                 core.last_sleep_end = stop.timestamp()
         else:
-            rate = 0.10 if cursor.hour >= 23 or cursor.hour < 6 else 0.06
+            rate = (SLEEPINESS_RISE_NIGHT if cursor.hour >= 23 or cursor.hour < 7
+                    else SLEEPINESS_RISE_DAY)
             core.sleepiness = _clip(core.sleepiness + rate * hours, 0, 1)
             core.physical_fatigue = _clip(core.physical_fatigue + 0.02 * hours, 0, 1)
         core.hunger = _clip(core.hunger + 0.08 * hours, 0, 1)

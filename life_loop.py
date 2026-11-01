@@ -183,6 +183,29 @@ def sleeping(item):
     return item.get('source') == 'her' and item.get('kind', item.get('doing')) == '睡觉'
 
 
+# Sleep lasts as long as it takes sleepiness to fall to a waking line, never as
+# long as she says. A sleep begun in 20:00-05:59 is the night's: it runs to
+# 0.15 and at most 10 hours. Any other sleep is a nap: it runs to 0.45 and at
+# most 90 minutes. 20 minutes is the floor for both.
+NIGHT_SLEEP_START_HOUR = 20
+NIGHT_SLEEP_END_HOUR = 6
+NIGHT_SLEEP_WAKE_LINE = 0.15
+NAP_WAKE_LINE = 0.45
+NIGHT_SLEEP_MAX_MINUTES = 10 * 60
+NAP_MAX_MINUTES = 90
+SLEEP_MIN_MINUTES = 20
+
+
+def sleep_minutes(sleepiness, now):
+    """How long she sleeps: ((sleepiness - waking line) / 0.066) hours, within limits."""
+    local = datetime.fromtimestamp(now)
+    night = local.hour >= NIGHT_SLEEP_START_HOUR or local.hour < NIGHT_SLEEP_END_HOUR
+    line, longest = ((NIGHT_SLEEP_WAKE_LINE, NIGHT_SLEEP_MAX_MINUTES) if night
+                     else (NAP_WAKE_LINE, NAP_MAX_MINUTES))
+    hours = max(0.0, float(sleepiness) - line) / body.SLEEPINESS_FALL_SLEEP
+    return max(SLEEP_MIN_MINUTES, min(longest, int(round(hours * 60.0))))
+
+
 def note_called(plugin, event):
     """Remember an actual addressed event, without examining its words."""
     if not enabled(plugin) or event is None or not plugin._addresses_her(event):
@@ -460,7 +483,8 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
     lines.append('菜单：' + '、'.join(choices))
     proactive = bool((plugin.config or {}).get('proactive_owner_enabled', False))
     answer = ('"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
-              '"minutes":30,"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
+              '"minutes":"睡觉不用写，别的事写大概多久",'
+              '"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
               '"look":""')
     if proactive:
         answer += ',"tell":""'
@@ -578,6 +602,8 @@ async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden
     state = read_state()
     action = value['do']
     started = int(now) if action == '睡觉' else now
+    # Sleeping is not timed by her answer: how sleepy she is decides when she wakes.
+    minutes = sleep_minutes(core.sleepiness, now) if action == '睡觉' else value['minutes']
     detail, users = anonymized(plugin, value['detail'])
     if says_private(detail, forbidden):
         detail = ''
@@ -592,12 +618,18 @@ async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden
     # Prefer an explicit place; otherwise keep her at home.
     match = re.search(r'(?:^|[，,；;])在([^，,；;。]{1,12})(?:[，,；;。]|$)', detail)
     where = browse.clean_query(match.group(1)) if match else '家里'
-    plugin._set_now(where or '家里', doing, now=datetime.fromtimestamp(started), minutes=value['minutes'],
+    plugin._set_now(where or '家里', doing, now=datetime.fromtimestamp(started),
+                    minutes=None if action == '睡觉' else minutes,
                     source='her', kind=value['do'])
+    if action == '睡觉':
+        # _set_now keeps a sleeping item at an hour or more; the computed length is the point.
+        item = current()
+        item['minutes'] = minutes
+        phone._write_json(phone.NOW_PATH, item)
     store = her_days.Store(DATA_DIR)
     if liked and state.get('last_item_id'):
         store.set_liked(state['last_item_id'], liked)
-    row = store.add({'ts': now, 'do': value['do'], 'detail': detail, 'minutes': value['minutes'],
+    row = store.add({'ts': now, 'do': value['do'], 'detail': detail, 'minutes': minutes,
                      'origin': discretion.make_origin(discretion.SELF),
                      'related_users': sorted(set(users + post_users))})
     state['last_item_id'] = row['id']
@@ -607,7 +639,7 @@ async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden
     elif action == '休息':
         body.rested(core, value['minutes'], now)
     elif action == '睡觉':
-        state['sleep'] = {'start': int(started), 'end': int(started + value['minutes'] * 60)}
+        state['sleep'] = {'start': int(started), 'end': int(started + minutes * 60)}
         hour = datetime.fromtimestamp(now).hour
         if hour >= 18 or hour < 3:
             state['notebook_sleep'] = notebook_day(now)
@@ -830,8 +862,13 @@ async def tick(plugin, now=None):
     if item.get('source') == 'schedule':
         valid = item.get('start') == daily.period_start(local).isoformat()
     startup = startup and not valid
+    # What she is busy with has not ended yet (and is not just dazing); only her
+    # body crossing a line, a plan coming due, or a fresh start may interrupt it.
+    dazing = str(item.get('kind') or item.get('doing') or '') == '什么都不干'
+    busy = bool(item.get('source') == 'her' and end and now < end and not dazing)
     reason = ('刚才那件事到时候了' if finished or sleep else '程序刚起来，此刻是空的或过期了' if startup
-              else '跟人聊完了，那个地方静下来了' if quiet else '身体有了新的感觉' if crossed else '到点了' if due else '')
+              else '身体有了新的感觉' if crossed else '到点了' if due
+              else '跟人聊完了，那个地方静下来了' if quiet and not busy else '')
     if gate == 'soft':
         fallback(plugin, core, now)
         state['pending'] = {'group_browse': False, 'go_browse': False}
