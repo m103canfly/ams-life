@@ -103,6 +103,7 @@ class App:
         from history_store import HistoryStore
         from key_store import KeyStore, KeyStoreError
         from panel_server import PanelServer
+        from mixin_selfie import SELFIE_DIR, SHOT_DIR
 
         try:
             keys = KeyStore(root / 'keys.dat')
@@ -154,7 +155,7 @@ class App:
                 from onebot_server import OneBotServer
                 self.onebot = OneBotServer(token=napcat, on_event=self.on_event,
                                            host='127.0.0.1', port=self.args.onebot_port)
-                self.her._neutral_messenger = self.onebot.messenger(roots=[root])
+                self.her._neutral_messenger = self.onebot.messenger(roots=[SELFIE_DIR, SHOT_DIR])
                 onebot_port = await self.onebot.start()
             else:
                 print('Please fill in the keys in the panel.')

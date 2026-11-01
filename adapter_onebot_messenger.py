@@ -15,12 +15,16 @@ the computer.
 from __future__ import annotations
 
 import base64
+import ipaddress
 import os
+import socket
 from pathlib import Path
+from urllib.parse import urlsplit
 
 try:
-    from . import messenger
+    from . import browse, messenger
 except ImportError:
+    import browse
     import messenger
 
 MAX_FILE_BYTES = 20 * 1024 * 1024   # one picture or voice she sends
@@ -68,6 +72,29 @@ def _file_ref(path, roots) -> str:
     return _PREFIX + base64.b64encode(payload).decode("ascii")
 
 
+def resolve_host(host):
+    """Resolve a host to addresses for a URL image."""
+    return [item[4][0] for item in socket.getaddrinfo(host, None)]
+
+
+def _public_image_url(url) -> bool:
+    if not browse.check_url(url)[0]:
+        return False
+    try:
+        addresses = list(resolve_host(urlsplit(url).hostname))
+        if not addresses:
+            return False
+        for address in addresses:
+            ip = ipaddress.ip_address(address.split("%", 1)[0])
+            if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+                ip = ip.ipv4_mapped
+            if not ip.is_global or ip.is_multicast:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def _image_ref(data, roots) -> str:
     """The image's OneBot reference: base64 for a local file or given data, the url for a url."""
     if "path" in data:
@@ -75,7 +102,27 @@ def _image_ref(data, roots) -> str:
     if "base64" in data:
         given = str(data["base64"])
         return given if given.startswith(_PREFIX) else _PREFIX + given
-    return str(data["url"])
+    url = str(data["url"])
+    if not _public_image_url(url):
+        raise ValueError("image url is not public")
+    return url
+
+
+def _safe_message(message) -> bool:
+    """Allow only simple segments and base64 media in raw send actions."""
+    if not isinstance(message, list):
+        return False
+    for part in message:
+        if not isinstance(part, dict) or part.get("type") not in ("text", "face", "image", "record"):
+            return False
+        data = part.get("data")
+        if not isinstance(data, dict):
+            return False
+        if part["type"] in ("image", "record"):
+            file = data.get("file")
+            if not isinstance(file, str) or not file.startswith(_PREFIX):
+                return False
+    return True
 
 
 def to_onebot(segments, roots) -> list:
@@ -136,6 +183,8 @@ class OneBotMessenger(messenger.Messenger):
     async def call(self, action: str, **params) -> dict:
         """One allowed action with these parameters; its data, or ActionFailed."""
         if action not in messenger.ALLOWED_ACTIONS:
+            raise messenger.ActionRefused(action)
+        if action in _SEND_ACTION.values() and not _safe_message(params.get("message")):
             raise messenger.ActionRefused(action)
         frame = await self.call_api(action, dict(params))
         frame = frame if isinstance(frame, dict) else {}
