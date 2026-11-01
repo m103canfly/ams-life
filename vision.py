@@ -25,6 +25,24 @@ _pillow_warning_lock = threading.Lock()
 _pillow_warned = False
 
 
+def bridge_lock(plugin):
+    lock = getattr(plugin, '_bridge_lock', None)
+    if lock is None:
+        lock = plugin._bridge_lock = asyncio.Lock()
+    return lock
+
+
+async def bridge_call(lock, awaitable):
+    async def run():
+        try:
+            return await awaitable
+        finally:
+            lock.release()
+    task = asyncio.create_task(run())
+    task.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+    return await asyncio.shield(task)
+
+
 def _legacy_counts(day):
     path = DATA_DIR / 'vision_counts.json'
     try:
@@ -195,10 +213,24 @@ class ImageAPI:
                     logger.warning('[ams-life] vision request status %d: %s', exc.code, body)
                 else:
                     logger.warning('[ams-life] vision request status %d', exc.code)
+                if exc.code == 429:
+                    raise
             except Exception:
                 logger.warning('[ams-life] vision request status %d', 0)
             raise RuntimeError('vision request failed') from None
-        return await asyncio.to_thread(request)
+        lock = bridge_lock(self.plugin)
+        for attempt in range(3):
+            try:
+                await asyncio.wait_for(lock.acquire(), timeout=150)
+            except asyncio.TimeoutError:
+                logger.warning('[ams-life] vision request timed out waiting for bridge')
+                raise RuntimeError('vision request failed') from None
+            try:
+                return await bridge_call(lock, asyncio.to_thread(request))
+            except urllib.error.HTTPError as exc:
+                if exc.code != 429 or attempt == 2:
+                    raise RuntimeError('vision request failed') from None
+            await asyncio.sleep(10)
 
 
 class VisionGate:
