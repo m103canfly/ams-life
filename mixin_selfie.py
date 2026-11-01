@@ -311,8 +311,7 @@ class SelfieMixin(PortsMixin):
             here = getattr(self, "_here", None)
             here = here(event) if here else adapter_astrbot_turn.incoming_of(event).place
             if place.startswith("private:") and place != discretion.place_of(here):
-                doing = discretion.anonymize(state["doing"], self._browse_names())
-                return "此刻：在%s，正在%s。" % (state["where"], doing)
+                return "此刻：在%s，正在跟人私聊。" % state["where"]
             duration = "%d 小时 %d 分钟" % divmod(elapsed, 60) if elapsed >= 60 else "%d 分钟" % elapsed
             line = "此刻：在%s，正在%s（从 %s 开始，已经 %s）。" % (state["where"], state["doing"], start.strftime("%H:%M"), duration)
             minutes = state.get("minutes")

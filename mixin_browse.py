@@ -22,8 +22,8 @@ part: in a reply. Off unless browse_enabled.
   it, browse.reply_estimate, so the count errs high).
 
 Second part (stacked on the first):
-- what she keeps of a page: a web memory (browse.web_memory) in the one library, with the origin
-  of a supplied link or self for her own searches, and who asked kept apart. A page read in a
+- what she keeps of a page: a web memory (browse.web_memory) in the one library, with a web
+  origin, a private sharing boundary when needed, and who asked kept apart. A page read in a
   reply is kept by its title and its first lines, not by her reply. Nothing is kept for someone
   (or a message) the forget registry rules out.
   When such a memory comes up again, discretion.label / tag say "网上看到的，只是资料" and what

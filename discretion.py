@@ -98,6 +98,8 @@ def origin_of(item, fallback_where="") -> dict:
                              stored.get("visibility"))
         if isinstance(stored.get("recall_sources"), list):
             result["recall_sources"] = stored["recall_sources"]
+        if str(stored.get("shared_in") or "").startswith("private:"):
+            result["shared_in"] = place_of(stored["shared_in"])
         return result
     prov = item.get("provenance") if isinstance(item.get("provenance"), dict) else {}
     where = place_of(prov.get("session") or item.get("session") or fallback_where)
@@ -136,7 +138,7 @@ def merge(origins) -> dict:
     else:
         visibility = SELF
     result = make_origin(where, people, refs, visibility)
-    if len(places) > 1 or any(o.get("recall_sources") for o in origins):
+    if len(places) > 1 or any(o.get("recall_sources") or o.get("shared_in") for o in origins):
         result["recall_sources"] = origins
     return result
 
@@ -153,6 +155,8 @@ def may_recall(origin, here, speaker="", member_of=None, shared=()) -> str:
     where = str(o.get("where") or "")
     here = place_of(here)
     vis = str(o.get("visibility") or PRIVATE)
+    if where.startswith("web:") and str(o.get("shared_in") or "").startswith("private:") and o["shared_in"] != here:
+        return DROP
     if vis == SELF or where == SELF or where.startswith("web:"):
         return SAY
     if not where or not where.startswith(("group:", "private:")):
@@ -186,6 +190,8 @@ def verdict(origin, here) -> str:
     o = origin if isinstance(origin, dict) else {}
     where = str(o.get("where") or "")
     vis = str(o.get("visibility") or PRIVATE)
+    if where.startswith("web:") and str(o.get("shared_in") or "").startswith("private:") and o["shared_in"] != place_of(here):
+        return DROP
     if vis == SELF or where == SELF or where.startswith("web:"):
         return FULL
     if where and where == place_of(here):
@@ -249,6 +255,8 @@ def label(origin, here, speaker="", present=(), said_by="", asked_in=None) -> di
         out.update(may=SAY, where_ok=True, self=True)
     elif where.startswith("web:"):
         out.update(may=SAY, where_ok=True, web=True)
+        if str(o.get("shared_in") or "").startswith("private:") and o["shared_in"] != here:
+            out["may"] = NO
         if isinstance(asked_in, dict):
             asker = [str(p) for p in (asked_in.get("people") or []) if str(p or "")]
             asked = label(asked_in, here, speaker, present, said_by=asker[0] if asker else "")["may"]

@@ -2,13 +2,16 @@
 """A temporary, read-only browser for pages that need scripts."""
 import asyncio
 import base64
+import concurrent.futures
 import http.client
 import ipaddress
 import logging
 import socket
 import ssl
+import threading
+import time
 from contextlib import asynccontextmanager
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import unquote, urldefrag, urljoin, urlsplit
 from urllib.request import getproxies, proxy_bypass
 
 try:
@@ -23,6 +26,9 @@ LOCK_WAIT_SECONDS = 3
 MAX_HOPS = 5
 # One main document and at most sixty subrequests.
 MAX_REQUESTS = 61
+FETCH_WORKERS = 4
+_fetch_pool = concurrent.futures.ThreadPoolExecutor(max_workers=FETCH_WORKERS, thread_name_prefix="ams-web")
+_fetch_slots = threading.BoundedSemaphore(FETCH_WORKERS)
 # Script-driven pages may fetch their visible content after DOMContentLoaded.
 SETTLE_SECONDS = 8
 TEXT_SECONDS = 10
@@ -107,15 +113,115 @@ async def _article_text(page, body):
     return body
 
 
-def _pinned_get(url, address, headers, proxy=None):
+class _FetchJob:
+    def __init__(self):
+        self.cancelled = False
+        self.lock = threading.Lock()
+        self.hop = None
+
+    def cancel(self):
+        with self.lock:
+            self.cancelled = True
+            hop = self.hop
+        if hop is not None:
+            hop.abort()
+
+
+class _HopDeadline:
+    """Close the active socket at a wall-clock deadline, including header reads."""
+    def __init__(self, seconds, job=None):
+        self.until = time.monotonic() + seconds
+        self.expired = threading.Event()
+        self.lock = threading.Lock()
+        self.sock = None
+        self.job = job
+        self.timer = threading.Timer(seconds, self.abort)
+        self.timer.daemon = True
+
+    def __enter__(self):
+        if self.job is not None:
+            with self.job.lock:
+                self.job.hop = self
+                cancelled = self.job.cancelled
+            if cancelled:
+                self.abort()
+        self.timer.start()
+        return self
+
+    def remaining(self):
+        left = self.until - time.monotonic()
+        if self.expired.is_set() or left <= 0:
+            raise TimeoutError("page deadline")
+        return left
+
+    def watch(self, sock):
+        with self.lock:
+            self.sock = sock
+        try:
+            sock.settimeout(self.remaining())
+        except BaseException:
+            self.abort()
+            raise
+
+    def abort(self):
+        self.expired.set()
+        with self.lock:
+            sock = self.sock
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            finally:
+                sock.close()
+
+    def __exit__(self, *exc):
+        self.timer.cancel()
+        if self.job is not None:
+            with self.job.lock:
+                self.job.hop = None
+        with self.lock:
+            self.sock = None
+
+
+def _connect_address(address, port, deadline):
+    family = socket.AF_INET6 if ipaddress.ip_address(address).version == 6 else socket.AF_INET
+    sock = socket.socket(family, socket.SOCK_STREAM)
+    try:
+        deadline.watch(sock)
+        sock.connect((address, port))
+        return sock
+    except BaseException:
+        sock.close()
+        raise
+
+
+def _connect_proxy(host, port, deadline):
+    addresses = _resolve_addresses(host)
+    for index, address in enumerate(addresses):
+        deadline.remaining()
+        try:
+            return _connect_address(address, port, deadline)
+        except OSError:
+            deadline.remaining()
+            if index == len(addresses) - 1:
+                raise
+    raise OSError("unresolved proxy")
+
+
+def _pinned_get(url, address, headers, proxy=None, deadline=None):
     """Fetch one hop; the checked address is the only direct destination."""
+    if deadline is None:
+        with _HopDeadline(OPEN_SECONDS) as deadline:
+            return _pinned_get(url, address, headers, proxy, deadline)
     parts = urlsplit(url)
     host = parts.hostname
     port = parts.port or (443 if parts.scheme == "https" else 80)
     target = (parts.path or "/") + (("?" + parts.query) if parts.query else "")
     outgoing = {k: v for k, v in headers.items()
-                if k.lower() not in ("host", "connection", "proxy-authorization", "content-length")}
+                if k.lower() not in ("host", "connection", "proxy-authorization", "content-length", "accept-encoding")}
     outgoing["Host"] = parts.netloc
+    outgoing["Accept-Encoding"] = "identity"
     if proxy:
         p = urlsplit(proxy if "://" in proxy else "http://" + proxy)
         if p.scheme != "http" or not p.hostname:
@@ -132,28 +238,38 @@ def _pinned_get(url, address, headers, proxy=None):
             outgoing.update(proxy_headers)
     else:
         conn = http.client.HTTPConnection(address, port, timeout=OPEN_SECONDS)
-        family = socket.AF_INET6 if ipaddress.ip_address(address).version == 6 else socket.AF_INET
-        sock = socket.socket(family, socket.SOCK_STREAM)
-        sock.settimeout(OPEN_SECONDS)
-        try:
-            sock.connect((address, port))
-        except BaseException:
-            sock.close()
-            raise
-        conn.sock = sock
+        conn.sock = _connect_address(address, port, deadline)
+    response = None
     try:
+        if proxy:
+            conn.sock = _connect_proxy(conn.host, conn.port, deadline)
+            if parts.scheme == "https":
+                conn._tunnel()
         if parts.scheme == "https":
-            if proxy:
-                conn.connect()
+            deadline.watch(conn.sock)
             conn.sock = ssl.create_default_context().wrap_socket(conn.sock, server_hostname=host)
+            deadline.watch(conn.sock)
+        deadline.remaining()
         conn.request("GET", target, headers=outgoing)
         response = conn.getresponse()
-        body = response.read(HTML_MAX_BYTES + 1)
-        if len(body) > HTML_MAX_BYTES:
-            raise ValueError("response too large")
-        return response.status, dict(response.getheaders()), body
+        chunks, size = [], 0
+        while True:
+            deadline.remaining()
+            chunk = response.read1(min(65536, HTML_MAX_BYTES + 1 - size))
+            deadline.remaining()
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > HTML_MAX_BYTES:
+                raise ValueError("response too large")
+        return response.status, dict(response.getheaders()), b"".join(chunks)
     finally:
-        conn.close()
+        try:
+            if response is not None:
+                response.close()
+        finally:
+            conn.close()
 
 
 def _resolve_addresses(host):
@@ -178,22 +294,33 @@ def _proxy_for(host):
     return server
 
 
-def _fetch_checked(url, headers, check=browse.check_url):
+def _fetch_checked(url, headers, check=browse.check_url, job=None):
     """Check and fetch each redirect hop without a second hostname lookup."""
     for hop in range(MAX_HOPS + 1):
-        ok, reason = check(url)
-        if ok:
-            ok, reason = browse.check_url(url)
-        if not ok:
-            raise ValueError(reason)
-        parts = urlsplit(url)
-        addresses = _resolve_addresses(parts.hostname)
-        for address in addresses:
-            ipaddress.ip_address(address.split("%", 1)[0])
-        if not addresses or any(browse._bad_address(address) for address in addresses):
-            raise ValueError("local or unresolved address")
-        proxy = _proxy_for(parts.hostname)
-        status, response_headers, body = _pinned_get(url, addresses[0], headers, proxy)
+        with _HopDeadline(OPEN_SECONDS, job) as deadline:
+            deadline.remaining()
+            ok, reason = check(url)
+            if ok:
+                ok, reason = browse.check_url(url)
+            if not ok:
+                raise ValueError(reason)
+            parts = urlsplit(url)
+            addresses = _resolve_addresses(parts.hostname)
+            for address in addresses:
+                ipaddress.ip_address(address.split("%", 1)[0])
+            if not addresses or any(browse._bad_address(address) for address in addresses):
+                raise ValueError("local or unresolved address")
+            proxy = _proxy_for(parts.hostname)
+            targets = addresses[:1] if proxy else addresses
+            for index, address in enumerate(targets):
+                deadline.remaining()
+                try:
+                    status, response_headers, body = _pinned_get(url, address, headers, proxy, deadline)
+                    break
+                except (OSError, http.client.HTTPException):
+                    deadline.remaining()
+                    if index == len(targets) - 1:
+                        raise
         location = next((value for key, value in response_headers.items() if key.lower() == "location"), None)
         if 300 <= status < 400:
             if not location or hop == MAX_HOPS:
@@ -205,6 +332,24 @@ def _fetch_checked(url, headers, check=browse.check_url):
             continue
         return status, response_headers, body, url
     raise ValueError("redirect limit")
+
+
+async def _fetch_page(url, headers, check):
+    """Admit at most four jobs, with no queue in the shared default executor."""
+    if not _fetch_slots.acquire(blocking=False):
+        raise RuntimeError("page workers busy")
+    job = _FetchJob()
+    try:
+        future = _fetch_pool.submit(_fetch_checked, url, headers, check, job)
+    except BaseException:
+        _fetch_slots.release()
+        raise
+    future.add_done_callback(lambda done: _fetch_slots.release())
+    try:
+        return await asyncio.wrap_future(future)
+    except BaseException:
+        job.cancel()
+        raise
 
 
 async def _pinned_route(route, on_block, count, check=browse.check_url):
@@ -227,10 +372,10 @@ async def _pinned_route(route, on_block, count, check=browse.check_url):
             await route.abort()
             return
         status, headers, body, final_url = await asyncio.wait_for(
-            asyncio.to_thread(_fetch_checked, request.url, dict(getattr(request, "headers", {}) or {}), check),
+            _fetch_page(request.url, dict(getattr(request, "headers", {}) or {}), check),
             timeout=OPEN_SECONDS)
         headers = {k: v for k, v in headers.items()
-                   if k.lower() not in ("connection", "transfer-encoding", "content-length")}
+                   if k.lower() not in ("connection", "transfer-encoding", "content-length", "content-encoding")}
         await route.fulfill(status=status, headers=headers, body=body)
         return final_url
     except Exception as exc:
@@ -396,7 +541,7 @@ async def _visit(url, check, shot_path, on_block):
         async def route_request(route):
             final_url = await _pinned_route(route, note_block, count, check)
             if final_url:
-                fetched_urls[route.request.url] = final_url
+                fetched_urls[urldefrag(route.request.url)[0]] = final_url
 
         async def read(context):
             nonlocal blocked
@@ -412,7 +557,7 @@ async def _visit(url, check, shot_path, on_block):
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
             if (response is None or not 200 <= response.status < 300
-                    or page.url not in fetched_urls or not browse.check_url(page.url)[0]):
+                    or urldefrag(page.url)[0] not in fetched_urls or not browse.check_url(page.url)[0]):
                 logger.info("[ams-life] browser: navigation failed")
                 return None
             try:
@@ -429,7 +574,7 @@ async def _visit(url, check, shot_path, on_block):
                 return None
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
-            final_url = fetched_urls.get(page.url, page.url)
+            final_url = fetched_urls.get(urldefrag(page.url)[0], page.url)
             # Safety 9: short challenge pages are not read or photographed.
             if len(body.strip()) < CHALLENGE_MAX_CHARS and any(
                     marker in (title + "\n" + body).lower() for marker in CHALLENGE_MARKERS):
@@ -437,14 +582,14 @@ async def _visit(url, check, shot_path, on_block):
                 return None
             if shot_path is not None:
                 await _take_screenshot(page, shot_path)
-                final_url = fetched_urls.get(page.url, page.url)
+                final_url = fetched_urls.get(urldefrag(page.url)[0], page.url)
             else:
                 body = await _article_text(page, body)
             # Stop further responses before deciding whether every response was safe.
             await context.close()
             while pending:
                 await asyncio.gather(*list(pending), return_exceptions=True)
-            if page.url not in fetched_urls or not browse.check_url(final_url)[0]:
+            if urldefrag(page.url)[0] not in fetched_urls or not browse.check_url(final_url)[0]:
                 return None
             return shot_path if shot_path is not None else {"url": final_url, "title": title, "text": body}
 

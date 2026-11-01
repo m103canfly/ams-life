@@ -1,5 +1,7 @@
 # Outbound checks and web memory (card 1h)
 
+Fifth repair of PR #180, based on merged head `7dd533e` and main `8e90f89`.
+
 ## Behavior
 
 Search words, addresses and typed text use the current turn's forbidden items
@@ -8,32 +10,34 @@ A refusal says only `这个不能拿去搜。`. A trip has no forbidden items fr
 reply, but uses the existing names wall. Owner and character names are exempt
 from that trip wall. Query cleaning and URL admission remain in place.
 
-A link supplied in a private chat produces a private memory from that chat.
-A group-supplied link produces a public memory from that group. Her own search
-and trip pages have a self origin. `asked_in` still records who asked her.
-Deduplication includes the origin so separate private sources cannot collide.
+All pages keep their `web:<url>` origin and public visibility. Only privately
+supplied links add `origin.shared_in = private:<id>`. Group links, her own
+searches and trips have no sharing boundary. `asked_in` still records who
+asked her. Deduplication includes the origin and its private sharing boundary.
 Existing public web memories are not migrated or rewritten.
 
 The reply order is: account for browsing, check the registry, shape the reply,
-run the send check, then keep the pages by their own origins. Pages are kept
+run the send check, then keep the pages with their sharing boundaries. Pages are kept
 before returning when the check holds the reply back. Silent and empty replies
 also keep their pages. Page text never comes from her reply. A private now
-state is generalized outside its own chat; doing is anonymized and extra detail
-is omitted. Self and empty now origins keep the existing rendering.
+state says only where she is and that she is chatting privately outside its
+own chat. The doing and detail are omitted. Self and empty now origins keep
+the existing rendering.
 
-## Memory list order
+## Fifth repair: B1 and B2
 
-The remaining wire-test failure concerned list position. `_save_memory` in
-`mixin_memory.py` regroups entries by room when it saves that room. A newly
-group-scoped web memory therefore moves relative to a self-scoped page on the
-next room save. The list has no chronological contract here.
+The fourth repair incorrectly changed web origins into room/self origins.
+That removed the web label and requester discretion. It also admitted pages
+to room documents, where trimming, summarization and whole-room replacement
+could affect them. The changed list order was a symptom of this mistake.
 
-The approved assertion option was chosen: `assertCountEqual` checks that both
-URLs remain exactly once. The origin, text and requester assertions remain.
-`mixin_memory.py` is unchanged. This avoids changing other memory behavior just
-to preserve incidental positions. Older origin and forgetting assertions now
-expect chat/self origins; forgetting the supplier removes the supplied page,
-while a self-sourced search page remains with a forgotten-requester marker.
+The fifth repair restores `web:<url>` and the original ordered wire assertion.
+`mixin_memory.py` and its room replacement algorithm are unchanged. Pages never
+enter a room document. `origin_of` preserves `shared_in`; label, verdict and
+recall permission enforce it. Merge retains the source boundaries. The actual
+recall test covers both global-memory settings, private recall with the web
+tag, denial elsewhere, requester-name protection and room save isolation.
+Group pages again survive forgetting the requester with an `asked_in` marker.
 
 ## Browser requests and proxies
 
@@ -48,8 +52,31 @@ verification use the original hostname. The bridge follows at most five
 redirects and fulfills the final response. It reports the final fetched URL.
 Cross-host redirects drop cookie and authorization request headers. A page
 allows one document and sixty subrequests. Requests retain the twenty-second
-timeout; response bodies use the existing two-MiB byte limit. Other browser
-timeouts and screenshot limits are unchanged.
+outer timeout; response bodies use the existing two-MiB byte limit. Other
+browser timeouts and screenshot limits are unchanged.
+
+## Fifth repair: B3 and small items
+
+Network fetches use a dedicated four-worker executor. A nonblocking admission
+gate rejects work when all four slots are occupied. No browser fetch enters
+the shared default executor or waits in an unbounded queue. Slots stay occupied
+until the worker actually exits, including after coroutine cancellation.
+
+Each redirect hop has a monotonic total deadline. Its watchdog shuts down and
+closes the active socket, including during connect, proxy CONNECT, TLS/header
+and chunked body reads. Cancellation closes the same socket. Responses and
+connections close on completion or failure. Address retries share that hop's
+deadline and try only the original checked batch. Proxy connections also use
+watched sockets. OS DNS work remains confined to the bounded browser executor.
+
+Requests force `Accept-Encoding: identity`. Fulfilled responses remove
+`Content-Encoding`; the bridge never decompresses a response. Fetched URL
+comparisons ignore fragments. IPv4-compatible, 6to4 and the well-known NAT64
+prefix reject embedded non-public IPv4 addresses; the local NAT64 /48 is also
+rejected. The private now test starts at `_set_now` and requires the generic
+private-chat line outside that chat.
+
+## Proxies and remaining boundaries
 
 HTTP system proxies are supported. HTTPS uses CONNECT to the target hostname;
 HTTP uses an absolute request URL without its fragment. A local proxy address
@@ -60,6 +87,11 @@ the system bypass list connect directly through the checked-IP transport.
 Chromium itself receives no proxy configuration in the read-only path because
 the bridge performs every network request.
 
+The proxy still resolves the target hostname again. That resolver is outside
+the local checked-IP guarantee, as accepted in the card. This is a remaining
+DNS rebinding risk at the proxy. pushState and relative paths after redirects
+are deferred usability issues; this repair does not change them.
+
 DeepSeek's remote page fetch resolves and connects on DeepSeek's own machines;
 that path is outside this change. Interactive browsing keeps its existing
 launch and routing helpers. AstrBot-specific behavior is not maintained under
@@ -68,10 +100,10 @@ The merged main already expects 511 methods; `test_basics` is unchanged.
 
 ## Offline test changes
 
-`test_go_out_checks` adds fourteen tests for the off-switch send check, blocked
+`test_go_out_checks` has eighteen tests for the off-switch send check, blocked
 searches, trip names and exemptions, memory origins, blocked-reply save order,
-private now rendering, DNS pinning, Host/SNI, methods, redirects, request count
-and proxy tunneling.
+private now rendering, actual recall, room isolation, DNS pinning, Host/SNI,
+embedded addresses, methods, redirects, request count and proxy tunneling.
 
 The new test names are:
 
@@ -84,12 +116,16 @@ PinnedBrowser.test_local_and_non_get_requests_abort
 PinnedBrowser.test_redirects_are_checked_and_bounded
 PinnedBrowser.test_sixty_first_subrequest_aborts
 WebOrigin.test_private_group_and_self_recall
+WebOrigin.test_real_recall_keeps_private_pages_outside_rooms
+WebOrigin.test_shared_origin_survives_origin_copy_and_merge
 Outbound.test_forbidden_words_checked_when_global_memory_off
 Outbound.test_search_does_not_send_forbidden_words
 Outbound.test_blocked_reply_keeps_pages_after_check
 Outbound.test_link_origin_and_search_origin_are_distinct
 Outbound.test_trip_uses_name_wall_with_no_forbidden_items
-NowLine.test_private_now_is_anonymized_elsewhere
+NowLine.test_private_now_from_set_now_is_generic_elsewhere
+EmbeddedAddresses.test_embedded_private_ipv4_is_refused
+EmbeddedAddresses.test_public_nat64_is_allowed
 ```
 
 The shared `test_real_browser` fake now intercepts our resolver and IP
@@ -97,8 +133,15 @@ transport. Playwright fetch/get are forbidden. Real `getaddrinfo`, socket
 connect/connect_ex and create_connection throw and must remain unused.
 Windows asyncio's wake-up socketpair and thread dispatch are also replaced in
 these tests so its internal loopback channel never reaches a real socket.
-Two initial fixture runs exposed that wake-up setup; the corrected fixture
-passed all 61 tests with the network guards untouched.
+Most browser tests run the fake bridge inline. The executor regression test
+uses real dedicated/default worker threads with in-process fake sockets and a
+timer pulse instead of a Windows loopback wake-up pipe. It proves that slow
+bytes expire, the socket closes, the default executor works, excess work aborts
+and the browser worker slot is released. All 66 tests pass with the real network
+guards untouched.
+Both test executors have one worker, so using the default executor for the slow
+fetch would prevent its other job from completing. The second request must be
+rejected while the first is still active, rather than after waiting in a queue.
 
 Existing test intentions are retained. The changed cases are:
 
@@ -133,26 +176,46 @@ Their added names are `test_unsupported_proxy_logs_only_protocol_and_never_conne
 `test_direct_connection_uses_numeric_socket_host_and_tls_name` and
 `test_tls_failure_and_oversize_response_close_connection`.
 
+Fifth-repair browser tests add:
+
+```text
+Browser.test_fragment_does_not_hide_fetched_document
+Browser.test_response_encoding_is_removed_before_fulfill
+Transport.test_other_checked_addresses_are_tried_without_resolving_again
+Transport.test_deadline_closes_socket_during_slow_headers
+FetchLimits.test_slow_body_expires_without_using_default_pool_or_queuing
+```
+
 ## Validation (2026-11-01)
 
 The designated sandbox runner ran one file at a time. Final summaries:
 
 ```text
-tests.test_browse_wire: Ran 20 tests in 2.654s | OK
-tests.test_go_out_checks: Ran 14 tests in 0.049s | OK
-tests.test_real_browser: Ran 61 tests in 1.027s | OK
-tests.test_interactive_browser: Ran 60 tests in 0.697s | OK
+tests.test_browse_wire: Ran 20 tests in 2.640s | OK
+tests.test_go_out_checks: Ran 18 tests in 0.085s | OK
+tests.test_real_browser: Ran 66 tests in 1.623s | OK
+tests.test_interactive_browser: Ran 60 tests in 0.741s | OK
 tests.test_browse: Ran 20 tests in 0.016s | OK
-tests.test_turn_tools: Ran 10 tests in 0.016s | OK
-tests.test_selfie: Ran 46 tests in 1.841s | OK
-tests.test_golden: Ran 2 tests in 3.838s | OK
-tests.test_basics: Ran 11 tests in 0.040s | OK
+tests.test_turn_tools: Ran 10 tests in 0.017s | OK
+tests.test_selfie: Ran 46 tests in 1.942s | OK
+tests.test_send_walls: Ran 10 tests in 0.081s | OK
+tests.test_recall_walls: Ran 10 tests in 0.064s | OK
+tests.test_browse_standalone: Ran 6 tests in 0.105s | OK
+tests.test_golden: Ran 2 tests in 4.026s | OK
+tests.test_golden_standalone: Ran 6 tests in 0.371s | FAILED (failures=4)
+tests.test_basics: Ran 11 tests in 0.041s | OK
 ```
 
-The golden fixtures are unchanged. The full suite was not run.
-`test_golden_standalone` remains assigned to the owner outside the sandbox.
+The standalone golden file was attempted as requested for this repair. Its
+basic/full scenarios in both runners failed at `panel_api` import because the
+designated Python lacks `aiohttp`. All four failures have the same missing
+dependency; they did not reach golden comparison. Two other tests passed.
+No dependency was installed, no fixture was changed and no retry was made.
+The owner must run that file in the environment with the dependency available.
+The other twelve files passed. The golden fixtures are unchanged and
+`test_golden` passed. The full suite remains assigned to the reviewer.
 No pages, live data, dependencies or service settings were changed. No network
 requests, commits, permission changes or elevated commands were used.
-Added-line scans found only the fictional long numbers 10001, 10003, 20002
-and 900001, no username paths and no token/private-key literal patterns.
-`git diff --check` passed. Both new files have exactly one final newline.
+Added-line scans check fictional identities, username paths and token/private-key
+literal patterns. No real credentials or identifiers are used in the fixtures.
+`git diff --check` passed. The test and change-note files end in one newline.

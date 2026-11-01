@@ -2,12 +2,11 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Offline checks for outbound browsing and pinned browser requests."""
 import asyncio
-import json
 import socket
 import sys
+import tempfile
 import types
 import unittest
-from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -16,6 +15,8 @@ import test_basics  # noqa: E402,F401
 
 import browse
 import discretion
+import harness
+import main
 import mixin_browse
 import mixin_selfie
 import mixin_turn
@@ -43,6 +44,13 @@ class Route:
 
 
 class PinnedBrowser(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        async def inline_fetch(url, headers, check):
+            return real_browser._fetch_checked(url, headers, check)
+        patcher = mock.patch.object(real_browser, "_fetch_page", new=inline_fetch)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     async def test_launch_disables_browser_dns(self):
         class Fake:
             chromium = None
@@ -75,7 +83,7 @@ class PinnedBrowser(unittest.IsolatedAsyncioTestCase):
         conn = mock.MagicMock()
         sock = mock.MagicMock()
         conn.getresponse.return_value.status = 200
-        conn.getresponse.return_value.read.return_value = b"ok"
+        conn.getresponse.return_value.read1.side_effect = [b"ok", b""]
         conn.getresponse.return_value.getheaders.return_value = []
         tls = mock.MagicMock()
         with mock.patch.object(real_browser.http.client, "HTTPConnection", return_value=conn) as connection, \
@@ -91,10 +99,13 @@ class PinnedBrowser(unittest.IsolatedAsyncioTestCase):
         conn = mock.MagicMock()
         conn.sock = object()
         conn.getresponse.return_value.status = 200
-        conn.getresponse.return_value.read.return_value = b"ok"
+        conn.getresponse.return_value.read1.side_effect = [b"ok", b""]
         conn.getresponse.return_value.getheaders.return_value = []
+        conn.host, conn.port = "proxy.invalid", 80
         tls = mock.MagicMock()
         with mock.patch.object(real_browser.http.client, "HTTPConnection", return_value=conn) as connection, \
+             mock.patch.object(real_browser, "_resolve_addresses", return_value=["93.184.216.34"]), \
+             mock.patch.object(real_browser.socket, "socket", return_value=mock.MagicMock()), \
              mock.patch.object(real_browser.ssl, "create_default_context", return_value=tls):
             real_browser._pinned_get("https://example.com/path", "93.184.216.34", {}, "http://proxy.invalid")
         self.assertEqual(connection.call_args.args, ("proxy.invalid", 80))
@@ -150,10 +161,68 @@ class WebOrigin(unittest.TestCase):
         note = {"url": "https://example.com/", "said": "sample"}
         private = discretion.make_origin("private:10001", ["10001"])
         group = discretion.make_origin("group:900001", ["10001"])
-        for origin, expected in ((private, discretion.DROP), (group, discretion.ANON),
+        for origin, expected in ((private, discretion.DROP), (group, discretion.FULL),
                                  (browse.SELF_ASKED_IN, discretion.FULL)):
             memory = browse.web_memory(note, 1, "reply", origin)
             self.assertEqual(discretion.verdict(memory["origin"], "group:20002"), expected)
+            lab = discretion.label(discretion.origin_of(memory), "group:20002", asked_in=origin)
+            self.assertTrue(lab["web"])
+            self.assertEqual(lab["may"], discretion.NO if origin == private else discretion.SAY)
+            self.assertIn("网上看到的", discretion.tag(lab))
+
+    def test_real_recall_keeps_private_pages_outside_rooms(self):
+        plugin = main.BioCorePlugin(harness.FakeContext(), config={})
+        test_basics.PLUGINS.append(plugin)
+        asked = discretion.make_origin("private:10001", ["10001"])
+        memory = browse.web_memory({"url": "https://example.com/doc", "said": "虚构文档正文"}, 1, "trip", asked)
+        memory.update(id="page", vector=[1.0], ts=1)
+        library = {"entries": [memory], "rooms": {}}
+        plugin._read_library = lambda **kwargs: library
+        plugin._write_library = lambda lib: True
+        plugin._job_stale = lambda: False
+        plugin._cosine = lambda *args: 1.0
+        plugin._memory_score = lambda *args, **kwargs: 1.0
+        plugin._known_names = lambda people: ["阿星"]
+        plugin._present_people = lambda event: []
+        for event, allowed in ((harness.FakeEvent("hello", sender="10001"), True),
+                               (harness.FakeEvent("hello", sender="10003"), False),
+                               (harness.FakeEvent("hello", sender="10001", group="900001"), False)):
+            self.assertEqual(plugin._load_memory(event)["entries"], [])
+            plugin._save_memory(event, {"entries": []})
+            self.assertIn(memory, library["entries"])
+            lines, _, _ = plugin._labeled_elsewhere(event, [1.0], None, [])
+            text = "\n".join(lines)
+            self.assertEqual("虚构文档正文" in text, allowed)
+            if allowed:
+                self.assertIn("网上看到的", text)
+                self.assertNotIn("对方说过", text)
+        plugin.memory_dedup_embedding = True
+        plugin._usable_memory_text = lambda text: True
+        plugin._schedule_consolidation = lambda *args: None
+        plugin._memory_top_k = lambda *args: 3
+        plugin._restabilize_if_expired = lambda *args: False
+        plugin._chain_event_lines = lambda *args, **kwargs: []
+        for enabled in (False, True):
+            plugin.global_memory = enabled
+            for event, allowed in ((harness.FakeEvent("hello", sender="10001"), True),
+                                   (harness.FakeEvent("hello", sender="10003", group="900001"), False)):
+                text = asyncio.run(plugin._memory_recall(event, "普通提问", vec=[1.0]))
+                self.assertEqual("虚构文档正文" in text, allowed)
+                if enabled and allowed:
+                    self.assertIn("网上看到的", text)
+        # A self-found page still protects who requested it in private.
+        memory["origin"].pop("shared_in")
+        event = harness.FakeEvent("hello", sender="10003", group="900001")
+        lines, _, _ = plugin._labeled_elsewhere(event, [1.0], None, [])
+        self.assertIn("网上看到的", "\n".join(lines))
+        self.assertIn("asked:page", {item["id"] for item in plugin._check_note(event)["forbidden"]})
+
+    def test_shared_origin_survives_origin_copy_and_merge(self):
+        memory = browse.web_memory({"url": "https://example.com/", "said": "sample"}, 1, "trip",
+                                   discretion.make_origin("private:10001"))
+        origin = discretion.origin_of(memory)
+        self.assertEqual(origin["shared_in"], "private:10001")
+        self.assertEqual(discretion.may_recall(discretion.merge([origin, origin]), "group:900001"), discretion.DROP)
 
 
 class Outbound(unittest.IsolatedAsyncioTestCase):
@@ -261,15 +330,22 @@ class Outbound(unittest.IsolatedAsyncioTestCase):
 
 
 class NowLine(unittest.TestCase):
-    def test_private_now_is_anonymized_elsewhere(self):
-        state = {"where": "家", "doing": "帮「阿星」查考试的事", "source": "her",
-                 "place": "private:10001", "start": datetime.fromtimestamp(mixin_selfie.time.time()).isoformat()}
+    def test_private_now_from_set_now_is_generic_elsewhere(self):
         plugin = types.SimpleNamespace(_here=lambda event: event, _browse_names=lambda: ["阿星"])
-        path = mock.Mock()
-        path.read_text.return_value = json.dumps(state, ensure_ascii=False)
-        with mock.patch.object(mixin_selfie, "NOW_PATH", path):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(mixin_selfie, "NOW_PATH", Path(tmp) / "now.json"):
+            mixin_selfie.SelfieMixin._set_now(plugin, "家", "帮阿星查考试", event="private:10001")
             same = mixin_selfie.SelfieMixin._now_line(plugin, "private:10001")
-            group = mixin_selfie.SelfieMixin._now_line(plugin, "group:900001")
-        self.assertIn("阿星", same)
-        self.assertNotIn("阿星", group)
-        self.assertNotIn(state["doing"], group)
+            self.assertIn("考试", same)
+            for here in ("group:900001", "private:10003"):
+                self.assertEqual(mixin_selfie.SelfieMixin._now_line(plugin, here), "此刻：在家，正在跟人私聊。")
+
+
+class EmbeddedAddresses(unittest.TestCase):
+    def test_embedded_private_ipv4_is_refused(self):
+        for ip in ("::127.0.0.1", "::10.0.0.1", "2002:7f00:1::", "2002:c0a8:1::",
+                   "64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b:1::a00:1"):
+            self.assertTrue(browse._bad_address(ip), ip)
+            self.assertFalse(browse.check_url("http://[" + ip + "]/")[0], ip)
+
+    def test_public_nat64_is_allowed(self):
+        self.assertFalse(browse._bad_address("64:ff9b::5db8:d822"))
