@@ -112,11 +112,63 @@ async def _fill_vectors(plugin):
         await asyncio.sleep(2)
 
 
+def _start_relook_worker(plugin):
+    task = getattr(plugin, "_sticker_relook_task", None)
+    if getattr(plugin, "_sticker_relook_stopped", False) or (task is not None and not task.done()):
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    plugin._sticker_relook_task = loop.create_task(_relook_stickers(plugin))
+
+
+async def _relook_stickers(plugin):
+    failed = set()
+    failures = 0
+    while (getattr(plugin, "enabled", False) and getattr(plugin, "stickers_enabled", False)
+           and plugin._llm_allowed("image_caption")):
+        lib = plugin._sticker_lib()
+        candidates = [sid for source in ("old", "self") for sid, row in lib.rows.items()
+                      if row.get("source") == source and row.get("look_version") != 2]
+        if not candidates:
+            return
+        available = [sid for sid in candidates if sid not in failed]
+        if not available:
+            failed.clear()
+            available = candidates
+        sid = available[0]
+        try:
+            provider = plugin._vision_provider_for(None, source="owner_add", fresh=True)
+            if provider is None:
+                raise RuntimeError("vision unavailable")
+            _caption, look = await plugin._look_once(provider, str(lib.path_of(sid)), None)
+            if not look.get("caption") or "meaning" not in look:
+                raise ValueError("incomplete look")
+            async with plugin._sticker_lock():
+                row = lib.rows.get(sid)
+                if row is not None and row.get("source") in ("old", "self") and row.get("look_version") != 2:
+                    lib.update_look(sid, look)
+                    _start_vector_worker(plugin, sid)
+            failures = 0
+            await asyncio.sleep(20)
+        except Exception:
+            failed.add(sid)
+            failures += 1
+            if failures >= 3:
+                plugin._sticker_relook_stopped = True
+                logger.warning("[ams-life] stickers: relook stopped after three failures")
+                return
+            await asyncio.sleep(300)
+
+
 class StickersMixin(PortsMixin):
     def _stickers_on(self) -> bool:
         on = bool(getattr(self, "enabled", False) and getattr(self, "stickers_enabled", False))
         if on:
             _start_vector_worker(self)
+            if getattr(self, "_neutral_model", None) is not None:
+                _start_relook_worker(self)
         return on
 
     def _sticker_lib(self):

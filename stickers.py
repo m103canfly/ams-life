@@ -460,6 +460,21 @@ class Library:
         self._save()
         return sid, ""
 
+    def update_look(self, sid, look):
+        row = self.rows.get(sid)
+        if row is None:
+            return False
+        fields = ("caption", "emotion", "scene", "kind", "personal", "group_meme",
+                  "meaning", "reply_to", "text", "target", "strength", "tags")
+        for key in fields:
+            if key in look:
+                row[key] = look[key]
+            else:
+                row.pop(key, None)
+        row["look_version"] = 2
+        self._save()
+        return True
+
     def set_scope(self, sid, scope) -> bool:
         row = self.rows.get(sid)
         if row is None or not isinstance(scope, str) or scope not in ("all", str(row.get("from_where") or "")):
