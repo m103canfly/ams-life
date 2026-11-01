@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta
 
 try:
-    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, look, mixin_discretion, mixin_turn, redline, turn, weather
+    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, turn, weather
     from .common import DATA_DIR, STATE_DIR
     from . import mixin_selfie as phone
 except ImportError:
@@ -23,6 +23,7 @@ except ImportError:
     import events
     import her_days
     import heybox
+    import interpretation
     import look
     import mixin_discretion
     import mixin_turn
@@ -133,11 +134,13 @@ def parse(raw, choices):
         if not isinstance(value, dict) or value.get('do') not in choices:
             return None
         value = dict(value)
-        for key in ('detail', 'liked_last', 'post', 'look', 'tell_owner'):
+        for key in ('detail', 'liked_last', 'post', 'look', 'tell', 'tell_owner'):
             if value.get(key) is None:
                 value[key] = ''
-        if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look', 'tell_owner')):
+        if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look', 'tell', 'tell_owner')):
             return None
+        # ams-life: the prompt asks for "tell"; an older answer may still say "tell_owner"
+        told = value.get('tell') or value.get('tell_owner') or ''
         used_wishes = value.get('used_wishes', [])
         if not isinstance(used_wishes, list) or any(not isinstance(w, str) for w in used_wishes):
             return None
@@ -149,7 +152,7 @@ def parse(raw, choices):
         low, high = (60, 720) if value['do'] == '睡觉' else (5, 120)
         return dict(value, minutes=max(low, min(high, minutes)), detail=value.get('detail', '')[:40],
                     liked_last=value.get('liked_last', '')[:20], post=value.get('post', '')[:300],
-                    look=value.get('look', '')[:30], tell_owner=value.get('tell_owner', '')[:80],
+                    look=value.get('look', '')[:30], tell_owner=told[:80],
                     used_wishes=used_wishes[:10])
     except (ValueError, TypeError):
         return None
@@ -350,9 +353,10 @@ def materials(plugin, state, item, core, reason, now, choices, outfit):
         if wishes:
             lines.append('想分享的事：' + json.dumps([{'id': wish_ref(w), 'what': w['what']}
                                                 for w in wishes], ensure_ascii=False))
-            lines.append('tell_owner 用到想分享的事时，把用到的 id 写进 used_wishes 数组。')
-        lines.append('主人还没回的有 %d 条。想和主人说什么就在 tell_owner 写一句（最多80字），不想说就空。' %
-                     owner_unanswered(plugin))
+            lines.append('tell 用到想分享的事时，把用到的 id 写进 used_wishes 数组。')
+        called = interpretation.owner_name(plugin.config)
+        lines.append('%s还没回的有 %d 条。想和%s说什么就在 tell 写一句（最多80字），不想说就空。'
+                     % (called, owner_unanswered(plugin), called))
     return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
 
 
@@ -484,10 +488,12 @@ def heybox_impression(raw):
     value = browse._json_object(raw)
     if not isinstance(value, dict) or not isinstance(value.get('thought', ''), str):
         return None
-    if not isinstance(value.get('tell_owner', ''), str):
+    # ams-life: "tell" is the key the prompt asks for; an older answer may say "tell_owner"
+    told = value.get('tell') if isinstance(value.get('tell'), str) else value.get('tell_owner', '')
+    if not isinstance(told, str):
         return None
     return {'thought': value.get('thought', '').strip()[:120],
-            'tell_owner': value.get('tell_owner', '').strip()[:80]}
+            'tell_owner': told.strip()[:80]}
 
 
 async def remember_heybox(plugin, thought, now):
@@ -521,6 +527,15 @@ def heybox_materials(readings):
                     + '\n评论：' + '\n'.join(reading['comments'])[:limit // 4])
         wrapped.append(browse.wrap('小黑盒资料 %d' % (index + 1), material, limit=limit))
     return '\n'.join(wrapped)
+
+
+def heybox_ask_prompt(plugin, readings):
+    """What she is asked after reading: a thought of her own, and a word for him if she wants."""
+    called = interpretation.owner_name(plugin.config)
+    return ('下面是外部资料。写一句自己的心得；若想对%s说，另写一句，不想就空。'
+            '只返回 JSON：{"thought":"心得","tell":""}。\n'
+            '%s还没回的有 %d 条。\n' % (called, called, owner_unanswered(plugin))
+            + heybox_materials(readings))
 
 
 async def browse_heybox(plugin, now):
@@ -570,9 +585,7 @@ async def browse_heybox(plugin, now):
         heybox.mark_seen([ident], now)
     if not readings or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
         return False
-    prompt = ('下面是外部资料。写一句自己的心得；若想对主人说，另写一句，不想就空。'
-              '只返回 JSON：{"thought":"心得","tell_owner":""}。\n'
-              '主人还没回的有 %d 条。\n' % owner_unanswered(plugin) + heybox_materials(readings))
+    prompt = heybox_ask_prompt(plugin, readings)
     value = await plugin._llm_v2_call('heybox', prompt, heybox_impression,
                                        system_prompt=await plugin._persona_text(None))
     if not value or budget(plugin) != 'ok' or plugin._spent_today() >= 8:

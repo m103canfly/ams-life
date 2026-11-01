@@ -20,9 +20,10 @@ forgetting finds them the same way.
 from __future__ import annotations
 import hashlib
 try:
-    from . import adapter_astrbot_turn
+    from . import adapter_astrbot_turn, interpretation
 except ImportError:
     import adapter_astrbot_turn
+    import interpretation
 try:
     from .common import *  # noqa: F401,F403
 except ImportError:
@@ -56,27 +57,47 @@ def _original(text):
                      for line in str(text or "").split("\n"))
 
 
-def _history_original(text):
-    """Mark legacy history once; keep already framed turns as they were saved."""
+# The labels a record we framed ourselves carries: the two the old records used, the new
+# 别人, and the setting's name. Nothing wider: a message that only looks like one of ours
+# must stay unverified. The history check is called without the config, so the phone line
+# keeps the setting's name here.
+FRAMED_LABELS = ("主人", "非主人", "别人")
+_owner_label = interpretation.OWNER_NAME_DEFAULT
+
+
+def _remember_owner_label(plugin) -> str:
+    """Keep the setting's name for the framed-record check, which has no config of its own."""
+    global _owner_label
+    _owner_label = interpretation.owner_name(getattr(plugin, "config", None))
+    return _owner_label
+
+
+def _history_original(text, owner_name=None):
+    """Mark legacy history once; keep already framed turns as they were saved.
+
+    `owner_name`: the setting's name; None uses the name the phone line last wrote."""
     text = str(text or "")
     label = "（历史消息，发言人和时间未核实）"
     if text.startswith(label):
         return label + _original(text[len(label):])
-    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:主人|非主人)）：(?=（原文）)", text)
+    called = interpretation.owner_display_name(_owner_label if owner_name is None else owner_name)
+    labels = "|".join(re.escape(x) for x in FRAMED_LABELS + (called,))
+    framed = re.match(r"^\[\d{2}-\d{2} \d{2}:\d{2}\] [^\r\n：]{1,46}（(?:%s)）：(?=（原文）)" % labels, text)
     if framed:
         return text[:framed.end()] + _original(text[framed.end():])
     return label + _original(text)
 
 
 def _phone_line(plugin, event, line):
+    owner_name = _remember_owner_label(plugin)
     sid = str(line.get("sender_id") or "")
     owner = str((plugin.config or {}).get("owner_qq", "") or "").strip()
     name = HER_NAME if line.get("role") == "assistant" else str(line.get("sender_name") or "某人")
     name = re.sub(r"[\r\n：:]", " ", name).strip()[:40] or "某人"
     if line.get("role") != "assistant" and sid and sid == owner:
-        name += "（主人）"
+        name += "（%s）" % owner_name
     elif line.get("role") != "assistant":
-        name += "（非主人）"
+        name += "（别人）"
     try:
         stamp = time.strftime("%m-%d %H:%M", time.localtime(float(line.get("ts") or time.time())))
     except (ValueError, TypeError, OverflowError, OSError):

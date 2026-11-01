@@ -56,10 +56,11 @@ from collections import Counter
 from pathlib import Path
 
 try:
-    from . import atomic_file, discretion, redline
+    from . import atomic_file, discretion, interpretation, redline
 except ImportError:
     import atomic_file
     import discretion
+    import interpretation
     import redline
 
 DAILY_MIN = 10          # lines in one day that make someone "talks a lot today"
@@ -306,12 +307,13 @@ def check_topic(text, red=redline.hit, judge=judged) -> str:
     return t
 
 
-def check_alias(text, red=redline.hit, judge=judged) -> str:
+def check_alias(text, red=redline.hit, judge=judged, owner_name="") -> str:
     """2-6 Chinese characters or 2-10 plain letters/digits, not over a red line, not how
-    anyone is addressed."""
+    anyone is addressed. `owner_name`: what she calls him, never kept as an alias."""
     t = str(text or "").strip()
     ok = re.fullmatch(r"[一-鿿]{2,6}", t) or re.fullmatch(r"[A-Za-z0-9_]{2,10}", t)
-    return t if ok and t not in GENERIC_ALIASES and not red(t) and not judge(t) else ""
+    generic = GENERIC_ALIASES | {interpretation.owner_display_name(owner_name)}
+    return t if ok and t not in generic and not red(t) and not judge(t) else ""
 
 
 def verify_aliases(proposed, lines, cards, day) -> dict:
@@ -353,8 +355,9 @@ def verify_aliases(proposed, lines, cards, day) -> dict:
     return out
 
 
-def parse_answer(text, codes, red=redline.hit, judge=judged) -> dict:
-    """{qq: {"style", "topics"}} for every code whose answer passed; codes that failed are left out."""
+def parse_answer(text, codes, red=redline.hit, judge=judged, owner_name="") -> dict:
+    """{qq: {"style", "topics"}} for every code whose answer passed; codes that failed are left out.
+    `owner_name`: what she calls him, never kept as an alias."""
     raw = str(text or "")
     start, end = raw.find("{"), raw.rfind("}")
     try:
@@ -369,7 +372,8 @@ def parse_answer(text, codes, red=redline.hit, judge=judged) -> dict:
         style = check_style(item.get("style"), red, judge)
         topics = [t for t in (check_topic(x, red, judge) for x in (item.get("topics") or [])[:MAX_TOPICS * 2])
                   if t][:MAX_TOPICS]
-        aliases = [a for a in (check_alias(x, red, judge) for x in (item.get("aliases") or [])[:MAX_ALIASES * 2])
+        aliases = [a for a in (check_alias(x, red, judge, owner_name)
+                               for x in (item.get("aliases") or [])[:MAX_ALIASES * 2])
                    if a][:MAX_ALIASES]
         if style or topics or aliases:
             out[qq] = {"style": style, "topics": topics, "aliases": aliases}
@@ -527,13 +531,14 @@ def add_day(rec, name, stats, day, red=redline.hit, judge=judged) -> None:
 
 
 async def nightly(store, place, lines, ask, day, registry=None, self_id="", extra_names=None, red=redline.hit,
-                  judge=judged, still_current=None) -> dict:
+                  judge=judged, still_current=None, owner_name="") -> dict:
     """One group, one night. `ask` is an async callable(prompt) -> answer text (the model).
     At most one call per group per day; marked as tried before the call. `extra_names`
     ({qq: names}): more names that become codes in what the model sees -- the owner's, and
     those people go by elsewhere. `red`: text -> the red line it may not cross, or '' (the
     plugin's switch; default: the red lines themselves); `judge` the same for a judgement of
-    a person in what is written down (default: judged)."""
+    a person in what is written down (default: judged). `owner_name`: what she calls him,
+    never kept as an alias."""
     data = store.load(place)
     if data.get("tried") == day:
         return {"skipped": "tried today"}
@@ -566,7 +571,7 @@ async def nightly(store, place, lines, ask, day, registry=None, self_id="", extr
         return {"called": 1, "picked": len(picked), "written": 0, "error": type(exc).__name__}
     if still_current is not None and not still_current():
         return {"called": 1, "picked": len(picked), "written": 0, "skipped": "sources narrowed"}
-    got = parse_answer(answer, codes, red, judge)
+    got = parse_answer(answer, codes, red, judge, owner_name=owner_name)
     names_seen = verify_aliases({qq: item["aliases"] for qq, item in got.items() if item.get("aliases")},
                                 safe_lines, {q: [n for n in ns if n] for q, ns in group_names(safe_lines).items()}, day)
     data = store.load(place)

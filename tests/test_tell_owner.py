@@ -35,7 +35,7 @@ class OwnerMaterialsTest(unittest.TestCase):
                 patch.object(life_loop.her_days, 'Store') as store:
             store.return_value.day.return_value = []
             text = life_loop.materials(plugin, {}, {}, core, 'test', 100, ['休息'], False)
-        self.assertIn('主人还没回的有 3 条', text)
+        self.assertIn('家人还没回的有 3 条', text)
 
 
 class OwnerSendingTest(unittest.IsolatedAsyncioTestCase):

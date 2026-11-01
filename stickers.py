@@ -46,9 +46,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 try:
-    from . import atomic_file
+    from . import atomic_file, interpretation
 except ImportError:
     import atomic_file
+    import interpretation
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_SIDE = 4096
@@ -425,8 +426,10 @@ class Library:
         row = self.rows.get(sid) or {}
         return self.img / str(row.get("file") or "")
 
-    def add(self, data, now, source="self", from_qq="", from_where="", look=None, note="") -> tuple:
-        """(id, '') when kept (or already there), else ('', why). `look`: parse_look's answer."""
+    def add(self, data, now, source="self", from_qq="", from_where="", look=None, note="",
+            owner_name="") -> tuple:
+        """(id, '') when kept (or already there), else ('', why). `look`: parse_look's answer.
+        `owner_name`: what she calls him, for a sticker he gave with no line of its own."""
         if source not in SOURCES:
             return "", "unknown source"
         kind, why = check_image(data)
@@ -441,8 +444,11 @@ class Library:
         if sid in self.rows:
             return sid, ""
         look = look or {}
+        caption = look.get("caption") or note
+        if not caption and source == "owner":   # he gave it with no line: what he is called + 给的
+            caption = interpretation.owner_display_name(owner_name) + "给的"
         row = {"file": "%s.%s" % (sid, kind), "type": kind, "bytes": len(data),
-               "caption": str(look.get("caption") or note or ("主人给的" if source == "owner" else ""))[:120],
+               "caption": str(caption or "")[:120],
                "emotion": str(look.get("emotion") or "")[:12], "scene": str(look.get("scene") or "")[:20],
                "why": str(look.get("why") or "")[:60], "source": source,
                "from_qq": str(from_qq or ""), "from_where": str(from_where or ""),
@@ -662,7 +668,7 @@ def prune_cache(cache, now, gone_people=(), days=DAYS) -> int:
 # ----------------------------------------------------------------------
 SORTS = ("saved", "used", "most", "soon")   # newest kept, last used, most used, going soonest
 PAGE_SIZE = 40
-OLD_LABEL, OWNER_LABEL = "旧小爱", "主人给的"
+OLD_LABEL, OWNER_LABEL = "旧小爱", "主人给的"   # the page's label for what he gave; old captions keep it
 
 
 def place_labels(rows) -> dict:
