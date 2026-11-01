@@ -3,25 +3,31 @@
 """What she calls him: setting owner_name, default 家人. Every name and number here is made up."""
 import asyncio
 import base64
+import json
 import struct
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_basics  # noqa: E402,F401
 
 import app_config  # noqa: E402
+import harness  # noqa: E402
 import impressions  # noqa: E402
 import interpretation  # noqa: E402
 import life_loop  # noqa: E402
+import mixin_impressions  # noqa: E402
 import mixin_phone  # noqa: E402
 import mixin_selfie  # noqa: E402
 import mixin_stickers  # noqa: E402
+import mixin_turn  # noqa: E402
 import stickers  # noqa: E402
+import turn  # noqa: E402
 
 RULE = '别在群里提我的工作'
 NAMED = '阿柚'          # a made-up name: the setting's value in these tests
@@ -163,13 +169,264 @@ class TellBothKeys(unittest.TestCase):
 
 
 class PhoneHistory(unittest.TestCase):
-    def test_old_and_new_labels_are_recognised(self):
-        for label in ('主人', '非主人', '别人', NAMED):
-            framed = '[10-30 21:05] 小雨（%s）：（原文）说了一句' % label
-            self.assertEqual(mixin_phone._history_original(framed), framed)
-        plain = '小雨：说了一句'
-        self.assertTrue(mixin_phone._history_original(plain).startswith(
-            '（历史消息，发言人和时间未核实）'))
+    """Old and new framed records are kept as they are; anything else is marked unverified."""
+
+    HISTORY = '（历史消息，发言人和时间未核实）'
+    LINE = {'ts': 1_793_000_000.0, 'role': 'user', 'sender_id': OWNER_QQ,
+            'sender_name': '小雨', 'text': '你好'}
+
+    def framed(self, label):
+        return '[10-30 21:05] 小雨（%s）：（原文）说了一句' % label
+
+    def test_old_and_new_labels_are_kept(self):
+        for label in ('主人', '非主人', '别人'):
+            self.assertEqual(mixin_phone._history_original(self.framed(label), ''), self.framed(label))
+        self.assertEqual(mixin_phone._history_original(self.framed(NAMED), NAMED), self.framed(NAMED))
+        self.assertEqual(mixin_phone._history_original(self.framed(DEFAULT), ''), self.framed(DEFAULT))
+
+    def test_anything_else_is_marked_unverified(self):
+        text = self.framed('随便谁')
+        self.assertEqual(mixin_phone._history_original(text, NAMED), self.HISTORY + '（原文）' + text)
+        # a name that is not the setting's is not one of our labels either
+        self.assertEqual(mixin_phone._history_original(self.framed(NAMED), ''),
+                         self.HISTORY + '（原文）' + self.framed(NAMED))
+        self.assertTrue(mixin_phone._history_original('小雨：说了一句').startswith(self.HISTORY))
+
+    def test_the_phone_line_keeps_the_name_the_check_has_no_config_for(self):
+        mixin_phone._phone_line(SimpleNamespace(config={'owner_qq': OWNER_QQ, 'owner_name': NAMED}),
+                                None, self.LINE)
+        self.assertEqual(mixin_phone._history_original(self.framed(NAMED)), self.framed(NAMED))
+        mixin_phone._phone_line(SimpleNamespace(config={'owner_qq': OWNER_QQ}), None, self.LINE)
+        self.assertTrue(mixin_phone._history_original(self.framed(NAMED)).startswith(self.HISTORY))
+
+    def tearDown(self):
+        mixin_phone._phone_line(SimpleNamespace(config={'owner_qq': OWNER_QQ}), None, self.LINE)
+
+
+class MemoryPeopleStore:
+    """What impressions.nightly wants of a store, in memory: no files, no data."""
+
+    def __init__(self):
+        self.places, self.names = {}, {}
+
+    def load(self, place):
+        return self.places.setdefault(place, {'people': {}, 'tried': ''})
+
+    def save(self, place, data):
+        self.places[place] = data
+
+    def keep_names(self, qq, names):
+        kept = self.names.setdefault(str(qq), [])
+        kept.extend(n for n in names if n and n not in kept)
+
+
+GROUP = 'group:900001'
+
+
+def day_lines(qq='10003', name='小雨', count=12):
+    start = time.mktime(time.strptime('2026-10-04 20:00:00', '%Y-%m-%d %H:%M:%S'))
+    return [{'ts': start + i * 60, 'role': 'user', 'sender_id': qq, 'sender_name': name,
+             'text': '今天也说两句 %d' % i} for i in range(count)]
+
+
+class NightAliases(unittest.IsolatedAsyncioTestCase):
+    async def test_the_setting_is_never_kept_as_someones_alias(self):
+        store = MemoryPeopleStore()
+        answer = json.dumps({'P1': {'style': '说话很轻', 'aliases': [NAMED, '小雨']}}, ensure_ascii=False)
+
+        async def ask(prompt):
+            return answer
+
+        # keep whatever the night asked to verify, so the alias check alone decides
+        with patch.object(impressions, 'verify_aliases', side_effect=lambda proposed, *a, **k: proposed):
+            result = await impressions.nightly(store, GROUP, day_lines(), ask, '2026-10-04',
+                                               owner_name=NAMED)
+        self.assertEqual(result['written'], 1)
+        aliases = store.load(GROUP)['people']['10003']['aliases']
+        self.assertNotIn(NAMED, aliases)
+        self.assertIn('小雨', aliases)        # the night still keeps the names it may
+
+
+class NightCall(unittest.IsolatedAsyncioTestCase):
+    async def test_the_night_is_given_the_setting(self):
+        plugin = SimpleNamespace(
+            config={'owner_name': NAMED},
+            _impressions_time_reached=lambda now=None: True,
+            _provider_for=AsyncMock(return_value=object()),
+            _model=Mock(),
+            _window_places=lambda: [GROUP],
+            _read_window=lambda place: {'recent': day_lines()},
+            _impression_store=Mock(),
+            _registry=lambda: None,
+            _material_names=lambda place, lines: {},
+            _red_lines_for=Mock(),
+            _judgements_for=Mock())
+        night = AsyncMock(return_value={})
+        with patch.object(mixin_impressions.impressions, 'nightly', night):
+            await mixin_impressions.ImpressionsMixin._maybe_update_impressions(plugin)
+        self.assertEqual(night.call_args.kwargs.get('owner_name'), NAMED)
+
+
+class FakeTurn(mixin_turn.TurnMixin):
+    """The plugin's own turn mixin with only the parts around it: no disk, model or platform.
+
+    Every method it would ask the plugin for answers "nothing"; the code under test is the
+    real _prepare_turn, the path every reply's prompt takes."""
+
+    inject_intent = True
+    memory_dedup_embedding = False
+    global_memory = False
+    self_decide = False
+    reply_in_pieces = False
+    kb_enabled = False
+    proactive_autonomy = False
+    autonomy_loop_enabled = False
+    _neutral_model = None
+
+    def __init__(self, config, rules):
+        self.config, self.rules = dict(config), list(rules)
+
+    def _speaker(self, event):
+        return (str(self.config.get('owner_qq') or ''), '小雨')
+
+    def _for_model(self, text, event):
+        return text
+
+    def _without_gone(self, text, event):
+        return text
+
+    def _message_text(self, event):
+        return '你好'
+
+    def _here(self, event):
+        return GROUP
+
+    def _core(self, event):
+        return MagicMock()
+
+    def _ambient_level(self):
+        return 0.0
+
+    def _window_loops(self, event):
+        return []
+
+    def _window_lines(self, event, n=6):
+        return []
+
+    def _window_replies(self, event, n=6):
+        return []
+
+    def _window_update_loops(self, event, text, core=None):
+        return None
+
+    def _user_record(self, event):
+        return {}
+
+    def _relationship_of(self, record):
+        return None
+
+    def _touch_user(self, event, core=None):
+        return {}
+
+    def _continuity_context(self, *args, **kwargs):
+        return {}
+
+    def _record_continuity_feedback(self, event, feedback):
+        return None
+
+    async def _image_context(self, event):
+        return ''
+
+    async def _voice_context(self, event):
+        return ''
+
+    async def _memory_recall(self, *args, **kwargs):
+        return ''
+
+    def _note_turn(self, *args):
+        return None
+
+    async def _maybe_archive_events(self, *args):
+        return None
+
+    async def _maybe_archive_strong_event(self, *args):
+        return None
+
+    def _self_model_for(self, event):
+        return {}
+
+    def _event_context(self, event):
+        return ''
+
+    async def _maybe_tom_probe(self, *args, **kwargs):
+        return None
+
+    def _notebook_for(self, event):
+        return []
+
+    def _labeled_notebook(self, event):
+        return []
+
+    def _user_view(self, event, user_data):
+        return {}
+
+    def _owner_rules(self):
+        return list(self.rules)
+
+    def _people_lines(self, event):
+        return []
+
+    def _now_line(self, event):
+        return ''
+
+    def _slang_prompt(self, event):
+        return ''
+
+    def _stickers_on(self):
+        return False
+
+    def _check_note(self, event):
+        return {}
+
+    def _note_allowed(self, *args):
+        return None
+
+    def _numbers_out_of_request(self, request, event):
+        return None
+
+    def _continue_job(self, here):
+        return None
+
+    def _check_registry(self, event):
+        return None
+
+    async def _ensure_profile(self, event):
+        return None
+
+    def _is_private_event(self, event):
+        return False
+
+
+class ReplyPrompt(unittest.IsolatedAsyncioTestCase):
+    """The rules line in the prompt a reply is built from, through mixin_turn itself."""
+
+    async def block(self, config):
+        plugin = FakeTurn(config, [RULE])
+        request = turn.TurnRequest(prompt='你好')
+        await plugin._prepare_turn(harness.FakeEvent('你好', sender='10003'), request)
+        await asyncio.sleep(0)     # let the turn's background tasks finish
+        return ''.join(str(part.get('text') or '') for part in request.extra_user_content_parts)
+
+    async def test_the_rules_line_uses_the_setting(self):
+        block = await self.block({'owner_qq': OWNER_QQ, 'owner_name': NAMED})
+        self.assertIn('[%s定的规矩] %s' % (NAMED, RULE), block)
+        self.assertNotIn(DEFAULT, block)
+        self.assertNotIn('主人', block)
+
+    async def test_the_default_is_the_rules_line_without_the_setting(self):
+        block = await self.block({'owner_qq': OWNER_QQ})
+        self.assertIn('[%s定的规矩] %s' % (DEFAULT, RULE), block)
+        self.assertNotIn('主人', block)
 
 
 class HerOwnWords(unittest.IsolatedAsyncioTestCase):

@@ -1,8 +1,9 @@
 # What she calls him: the `owner_name` setting
 
-Status on 2026-11-01: card P2 (审核 v5) is implemented on `dsh-move-p2`, cut from main
-`4e27138`. No commit. The goldens are unchanged. The full suite is not run here; the
-dispatcher runs it outside.
+Status on 2026-11-01: card P2 (审核 v5), rework round 1 after the first review. Implemented
+on `dsh-move-p2`, cut from main `4e27138`. No commit. The goldens are unchanged. Two files
+outside the card's list got one change each (allowed by the review: the two callers below).
+The full suite is not run here; the dispatcher runs it outside.
 
 ## Why
 
@@ -36,9 +37,18 @@ is written into the run folder's `config.json` on the day it is set up.
   `heybox_ask_prompt(plugin, readings)` so it can be checked without a network call; that
   is a module function, not a plugin method.
 - `mixin_phone.py`: the phone line labels the owner with "（<name>）" and everyone else
-  with "（别人）". The old-label regex in `_history_original` accepts the old "（主人）" /
-  "（非主人）" records, "（别人）", and any short label (1–16 characters), because the new
-  label carries a name that is config-dependent and this function has no config.
+  with "（别人）". The old-label regex in `_history_original` is narrowed (review, round 1):
+  it accepts only the old "（主人）" / "（非主人）" records, "（别人）" and the setting's own
+  name, escaped with `re.escape`. Nothing wider, so a message from outside that only looks
+  like one of our framed records is marked "（历史消息，发言人和时间未核实）" as before.
+  That check is called without the config, so `_phone_line` (which has it) keeps the
+  setting's name in a module-level variable, and `_history_original` uses it when no name is
+  given; the function also takes `owner_name` explicitly. The phone line runs before the
+  history is framed in the same turn (`_prepare_turn`), so the name is the current setting's.
+- `impressions.py`: "主人" stays in `GENERIC_ALIASES`; `check_alias` takes `owner_name`
+  and blocks the setting's value as a name, too (the default name "家人" is blocked by
+  default). `nightly` and `parse_answer` take `owner_name` and hand it to `check_alias`, so
+  the night's answer never keeps the setting's name as somebody's alias.
 - `mixin_selfie.py`: "这里只能在和<name>的私聊里记。" and the `remember_day` tool
   description "记下你和<name>之间重要的日子。".
 - `stickers.py`: `Library.add` takes `owner_name`; when the owner gives a picture with no
@@ -47,9 +57,6 @@ is written into the run folder's `config.json` on the day it is set up.
   not migrated (this card does not migrate data).
 - `mixin_stickers.py`: the owner's page-add passes "<name>给的" as the note when he wrote
   none.
-- `impressions.py`: "主人" stays in `GENERIC_ALIASES`; `check_alias` takes `owner_name`
-  and blocks the setting's value as a name, too (the default name "家人" is blocked by
-  default).
 
 ## Behaviour that stays the same
 
@@ -61,14 +68,20 @@ is written into the run folder's `config.json` on the day it is set up.
   change writes none of those into a prompt that a golden records. `git status` shows no
   change under `tests/golden/`.
 
-## Two callers outside this card's file list
+## The two callers the first review named (one change each)
 
 `render_compact` and `check_alias` take the name as an argument (`owner_name=`). Their
-production callers are `mixin_turn.py` (one keyword at the `render_compact` call) and
-`mixin_impressions.py` (pass the setting into `nightly`). Those two files are not in the
-card's list, so they were not changed. Until a follow-up card adds that one call each, those
-two places show the default "家人" and never "主人"; the rest of the places read the setting.
-This is flagged for review.
+production callers were missing it; the review allowed one change in each of those two files,
+and those are the only changes there:
+
+- `mixin_turn.py`: the `render_compact` call passes
+  `interpretation.owner_name(self.config)`, so the block every reply carries says
+  "[<name>定的规矩]" instead of "[家人定的规矩]".
+- `mixin_impressions.py`: the `impressions.nightly` call passes the same, and `nightly` hands
+  it to `parse_answer` and on to `check_alias`; the setting's name is a stopword at night.
+
+`impressions.py` is a file of the card, so `nightly`/`parse_answer` there take the new
+keyword (`""` keeps the old behaviour for every other caller).
 
 ## Old tests updated (only the assertions with the changed wording)
 
@@ -86,43 +99,49 @@ No other old test was changed.
 
 ## New test file
 
-`tests/test_owner_name.py` (16 tests), offline, every name and number in it made up
+`tests/test_owner_name.py` (22 tests), offline, every name and number in it made up
 ("阿柚", 家人, 10001, 10003). It checks: the schema entry and the default; a blank, a
 whitespace-only and a too-long setting giving the default; every place she sees (rules
 line, life materials, Heybox prompt, the private-chat answer and tool description, the
 phone labels, the sticker caption) with the setting empty and set, and that none of them
-says "主人"; the old and new phone-record labels being recognised; `tell` and `tell_owner`
-both parsed; the sticker page passing "<name>给的"; old "主人给的" captions kept; and the
-setting's name being a stopword.
+says "主人"; `tell` and `tell_owner` both parsed; the sticker page passing "<name>给的";
+old "主人给的" captions kept; and the setting's name being a stopword.
 
-## Tests run here, one file at a time
+For rework round 1 it also checks the production callers, without writing a file:
 
-The sandbox this was built in cannot write files below the OS temp directory
-(`PermissionError`, WinError 5), so only tests that do not write can finish here. No
-assertion about the changed wording failed; every error below is that `PermissionError`,
-and the few `test_selfie` failures are tests whose setup could not write its temp data.
+- `_prepare_turn` itself (the real `mixin_turn`, on a stand-in for the plugin whose other
+  methods answer "nothing") puts "[阿柚定的规矩]" into the block a reply is built from, and
+  "[家人定的规矩]" when the setting is empty;
+- `_maybe_update_impressions` gives the setting to `impressions.nightly`;
+- the night's answer does not keep "阿柚" as anyone's alias (a made-up store in memory);
+- the framed-record check keeps （主人）/（非主人）/（别人）/（<the setting's name>） and does
+  not keep （随便谁）; a name that is not the setting's is not a label either; and the phone
+  line keeps the setting's name for that check.
 
-- `python -m unittest tests.test_owner_name`: Ran 16, 14 passed. The 2 sticker-caption
-  tests error on the temp write; the same two were run with the file writes stubbed out
-  (probe only, nothing added) and both passed. One earlier revision had more write-bound
-  tests; those were rewritten to use fakes, so 14 of 16 now run here.
-- `python -m unittest tests.test_tell_owner`: OK (7 tests).
-- `python -m unittest tests.test_message_steps` and `tests.test_incoming_text` (the
-  phone-window files): OK, no errors.
-- `python -m unittest tests.test_basics`: 11 tests, 2 errors (plugin creation writes
+## Tests run here, one file at a time (rework round 1)
+
+The sandbox cannot create the plugin (its first write is `states/` under the OS temp
+directory) and cannot write temp files at all (`PermissionError`, WinError 5). So the
+files that build a plugin or a temp directory cannot finish here; that is the sandbox, not
+the change. No assertion failed in any file that could run. Only the files the review named
+were run.
+
+- `python -m unittest tests.test_owner_name`: Ran 22, 20 passed. The 2 sticker-caption
+  tests error on the temp write (the same two as last round). The new tests all pass,
+  including `_prepare_turn` through the real `mixin_turn` and the night's aliases.
+- `python -m unittest tests.test_turn_tools`: OK (10 tests).
+- `python -m unittest tests.test_basics`: Ran 11, 2 errors (plugin creation writes
   `states/`); the method count (511) and the schema checks pass.
-- `python -m unittest tests.test_life_loop`: 41 tests, 78 errors, all `PermissionError`.
-- `python -m unittest tests.test_selfie`: 46 tests, 67 errors and 9 failures, all from the
-  unwritable temp data dir (`_tool_set_now` returning "不能更新此刻" and the like).
-- `python -m unittest tests.test_stickers`: 22 tests, 11 errors, all `PermissionError`.
-- `python -m unittest tests.test_impressions`: 28 tests, 13 errors, all `PermissionError`.
-- `python -m unittest tests.test_app_config`: the schema classes pass (`RealSchema`,
-  `Defaults`); the temp-file classes cannot finish here (the sandbox blocks temp writes,
-  and the run does not terminate).
-- `python -m unittest tests.test_owner_rules_copy`, `tests.test_reply_provenance`,
-  `tests.test_jailbreak_boundaries`, `tests.test_body_heart`: errors only, all
-  `PermissionError`.
-- `python -m unittest tests.test_golden` and `tests.test_golden_standalone`: cannot run
-  here (temp writes); the goldens were not touched.
+- `python -m unittest tests.test_impressions`: Ran 28, 15 passed, 13 errors, all
+  `PermissionError` from `tempfile` (the same 13 as last round; the `parse_answer` checks
+  pass).
+- `python -m unittest tests.test_owner_rules_copy`: Ran 6, 6 errors, all `PermissionError`
+  (the plugin cannot be created).
+- `python -m unittest tests.test_reply_provenance`: Ran 7, 7 errors, all `PermissionError`
+  (the plugin cannot be created).
+- `python -m unittest tests.test_jailbreak_boundaries`: Ran 7, 14 errors (set-up and
+  tear-down), all `PermissionError`.
+- `python -m unittest tests.test_golden`: Ran 2, 2 errors (the temp directory cannot be
+  made); the goldens were not touched.
 
 The dispatcher runs the full suite and the golden files outside.
