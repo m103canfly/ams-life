@@ -168,6 +168,57 @@ class ReadOnlyTest(unittest.TestCase):
         self.assertNotIn('fake-secret', str(logs.output))
         self.assertEqual(heybox.request('/unexpected', {}, 'fake-device', '', get=fake_open), (None, []))
 
+    def response_logs(self, data):
+        class Response(io.BytesIO):
+            status = 200
+            headers = Message()
+        Response.headers['Set-Cookie'] = 'fictional-cookie-value'
+        def fake_open(req, timeout):
+            return Response(json.dumps(data).encode())
+        with self.assertLogs('ams-life.heybox', level='INFO') as logs:
+            heybox.request('/account/get_qrcode_url/', {}, 'fictional-device-value',
+                           'fictional-request-cookie', get=fake_open, now=100)
+        return logs.output
+
+    def test_failure_message_is_logged(self):
+        logs = self.response_logs({'status': 'failed', 'msg': '参数错误'})
+        self.assertTrue(any('status: failed msg: 参数错误' in line for line in logs))
+        logs = self.response_logs({'status': 'failed', 'message': '请重试'})
+        self.assertTrue(any('msg: 请重试' in line for line in logs))
+
+    def test_failure_message_redacts_sensitive_shapes(self):
+        token = 'abcdef0123456789abcdef'
+        url = 'https://example.invalid/qr?code=fictional'
+        number = '123456789'
+        logs = str(self.response_logs({'status': 'failed', 'msg': f'{token} {url} {number}'}))
+        for value in (token, url, number):
+            self.assertNotIn(value, logs)
+        for value in ('[长串]', '[网址]', '[号码]'):
+            self.assertIn(value, logs)
+
+    def test_failure_does_not_log_response_or_credentials(self):
+        qr = 'fictional-qr-location'
+        logs = str(self.response_logs({'status': 'failed', 'msg': '错误', 'result': {'qr_url': qr}}))
+        for value in (qr, 'fictional-cookie-value', 'fictional-device-value', 'fictional-request-cookie'):
+            self.assertNotIn(value, logs)
+
+    def test_failure_message_removes_controls_and_truncates(self):
+        logs = self.response_logs({'status': 'failed', 'msg': '前\n\x01后' + '字' * 80})
+        warning = next(line for line in logs if 'msg:' in line)
+        self.assertNotIn('\n', warning)
+        self.assertNotIn('\x01', warning)
+        self.assertEqual(warning.split('msg: ', 1)[1], '前后' + '字' * 58)
+
+    def test_failure_message_rejects_non_string(self):
+        logs = str(self.response_logs({'status': 'failed', 'msg': {'secret': 'fictional-value'}}))
+        self.assertIn('[不是一句话]', logs)
+        self.assertNotIn('fictional-value', logs)
+
+    def test_success_does_not_log_message(self):
+        logs = str(self.response_logs({'status': 'ok', 'msg': 'fictional-success-message'}))
+        self.assertNotIn('msg:', logs)
+        self.assertNotIn('fictional-success-message', logs)
+
     def test_local_token_shape_and_fixed_input(self):
         values = iter(['a' * 32, 'b' * 32, 'c' * 32])
         token = heybox.local_token(1700000000, lambda: next(values))
