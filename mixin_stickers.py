@@ -25,6 +25,7 @@ Off unless stickers_enabled (and looking at pictures, image_caption, is on).
 from __future__ import annotations
 
 import base64
+import hashlib
 
 try:
     from .mixin_ports import PortsMixin
@@ -72,8 +73,21 @@ class StickersMixin(PortsMixin):
     async def _look_once(self, provider, ref, event):
         """(caption, look) from one call. Its money goes into the day's as "vision" (the
         provider comes counted from _vision_provider_for)."""
+        data = b""
+        if event is not None:
+            data = await asyncio.to_thread(stickers.fetch_picture, ref)
+            if not data:
+                return "", {}
+            kind, why = stickers.check_image(data)
+            if why:
+                return "", {}
+            mime = "jpeg" if kind == "jpg" else kind
+            ref = "data:image/%s;base64,%s" % (mime, base64.b64encode(data).decode("ascii"))
         reply = await self._model(provider).chat(prompt=stickers.LOOK_PROMPT, images=[ref])
         look = stickers.parse_look(reply.text)
+        if data:
+            look["_picture"] = data
+            look["_picture_sha256"] = hashlib.sha256(data).hexdigest()
         return look.get("caption", ""), look
 
     async def _maybe_keep(self, event, ref, look) -> str:
@@ -86,8 +100,8 @@ class StickersMixin(PortsMixin):
             gone = False
         if not stickers.should_keep(look, sender_gone=gone):
             return ""
-        data = await asyncio.to_thread(stickers.fetch_picture, ref)
-        if not data:
+        data = look.get("_picture")
+        if not isinstance(data, bytes) or not data or hashlib.sha256(data).hexdigest() != look.get("_picture_sha256"):
             return ""
         async with self._sticker_lock():
             if self._job_stale():   # someone deleted meanwhile: nothing of theirs is kept
@@ -158,7 +172,7 @@ class StickersMixin(PortsMixin):
             valence = float(getattr(core, "v", 0.0) or 0.0)
         except Exception:
             valence = 0.0
-        offered = stickers.pick_candidates(lib.rows, now, valence=valence, similarity=near)
+        offered = stickers.pick_candidates(lib.rows, now, valence=valence, similarity=near, place=self._here(event))
         if not offered:
             return ""
         try:
@@ -216,6 +230,9 @@ class StickersMixin(PortsMixin):
         lib = self._sticker_lib()
         row = lib.rows.get(sid)
         if not row:
+            return False
+        if not stickers.may_send(row, place):
+            logger.info("[ams-life] stickers: held back by the scope check")
             return False
         try:
             b64 = base64.b64encode(lib.path_of(sid).read_bytes()).decode("ascii")
@@ -286,6 +303,21 @@ class StickersMixin(PortsMixin):
             return {"status": "error", "message": "读不出表情包（%s）" % type(exc).__name__, "data": {"items": []}}
         data["on"] = self._stickers_on()
         return {"status": "ok", "data": data}
+
+    async def page_sticker_scope(self, body=None):
+        """Publish a sticker everywhere or restore its original place."""
+        b = await self._page_body(body)
+        sid = str(b.get("id") or "").strip()
+        scope = b.get("scope")
+        async with self._sticker_lock():
+            lib = self._sticker_lib()
+            row = lib.rows.get(sid)
+            if row is None or scope not in ("all", "here"):
+                return {"status": "error", "message": "Invalid sticker or scope", "data": {}}
+            target = "all" if scope == "all" else str(row.get("from_where") or "")
+            if not lib.set_scope(sid, target):
+                return {"status": "error", "message": "Invalid scope", "data": {}}
+        return {"status": "ok", "data": {"id": sid, "scope": scope}}
 
     async def page_sticker_image(self, args=None):
         """?id=<sticker>: the picture, as a data URL (only one of hers, by its id)."""

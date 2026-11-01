@@ -13056,6 +13056,7 @@
   "/astrbot_plugin_ams_life/page/stickers/image",
   "/astrbot_plugin_ams_life/page/stickers/delete",
   "/astrbot_plugin_ams_life/page/stickers/add",
+  "/astrbot_plugin_ams_life/page/sticker_scope",
   "/astrbot_plugin_ams_life/page/look"
  ],
  "turns": [

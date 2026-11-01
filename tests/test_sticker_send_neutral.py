@@ -31,7 +31,7 @@ class StickerSendNeutral(unittest.IsolatedAsyncioTestCase):
         self.lib = stickers.Library(self.tmp.name)
         self.lib.img.mkdir()
         (self.lib.img / 'one.png').write_bytes(PNG)
-        self.lib.rows['one'] = {'file': 'one.png', 'uses': 0}
+        self.lib.rows['one'] = {'file': 'one.png', 'uses': 0, 'source': 'old'}
         self.plugin = main.BioCorePlugin.__new__(main.BioCorePlugin)
         self.plugin._sticker_lib = Mock(return_value=self.lib)
         self.plugin._may_speak_in = Mock(return_value=True)
