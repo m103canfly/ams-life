@@ -1,4 +1,21 @@
 {
+  "weather_place": {
+    "description": "写个城市名，只在提示里给她看；空着就只按季节",
+    "type": "string",
+    "default": ""
+  },
+  "weather_lat": {
+    "description": "天气纬度，留空不取天气",
+    "type": "float",
+    "nullable": true,
+    "default": null
+  },
+  "weather_lon": {
+    "description": "天气经度，留空不取天气",
+    "type": "float",
+    "nullable": true,
+    "default": null
+  },
   "photo_enabled": {
     "description": "她的手机：拍照（默认关）",
     "type": "bool",

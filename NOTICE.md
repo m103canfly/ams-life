@@ -41,6 +41,8 @@ Modified source files carry a header line pointing to this file.
 
 ## Third-party code
 
+Weather data is provided by Open-Meteo.com under CC BY 4.0.
+
 The brain map page (`pages/starmap/brain.bundle.js`, and the same file in `pages/dashboard/brain/`) bundles:
 
 - **Galaxy View** 0.6.1 (<https://github.com/longwind1984/galaxy-view>), Copyright (c) 2026 Rick,
