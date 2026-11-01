@@ -81,10 +81,9 @@ class UnseenImageTests(unittest.IsolatedAsyncioTestCase):
                 event = neutral([{'type': 'image', 'data': data}])
                 self.assertNotIn(attention.UNSEEN_IMAGE_NOTE, await self.prompt(event))
 
-    async def test_astrbot_sticker_has_no_note(self):
+    async def test_neutral_sticker_with_url_has_no_note(self):
         data = {'file': 'sticker.png', 'url': 'sticker-ref', 'sub_type': 1}
-        event = astrbot([Image(file=data['file'], url=data['url'])],
-                        [{'type': 'image', 'data': data}])
+        event = neutral([{'type': 'image', 'data': data}])
         self.assertNotIn(attention.UNSEEN_IMAGE_NOTE, await self.prompt(event))
 
     async def test_quoted_sticker_and_mixed_images(self):

@@ -95,7 +95,8 @@ class HerTests(unittest.TestCase):
         self.addCleanup(harness.cleanup_plugin_data, [instance], test_basics.DATA / 'unused')
         self.assertIs(instance.context, context)
         self.assertEqual(instance.config, {})
-        self.assertEqual(len(context.routes), 28)
+        # L1 added two routes and 5e-27 added one.
+        self.assertEqual(len(context.routes), 31)
 
     def test_configuration_matches_astrbot(self):
         config = {'enabled': False, 'self_decide': True, 'global_memory': True,

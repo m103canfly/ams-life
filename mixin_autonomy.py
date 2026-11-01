@@ -209,7 +209,10 @@ class AutonomyMixin(PortsMixin):
                 await asyncio.sleep(AUTONOMY_TICK_SECONDS)
                 if not getattr(self, "enabled", True):
                     break
-                await weather.tick(self.config or {}, STATE_DIR / 'weather.json', logger)
+                try:
+                    await weather.tick(self.config or {}, STATE_DIR / 'weather.json', logger)
+                except Exception as exc:
+                    logger.warning("[ams-life] weather tick failed: %s", type(exc).__name__)
                 try:
                     self._sweep_windows()
                     self._core(None).set_ambient(self._ambient_level())

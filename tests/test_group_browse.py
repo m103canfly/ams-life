@@ -392,6 +392,8 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
             image_service_port = 0
             image_recognition_enabled = True
             image_trigger_words = []
+            def _for_model(self, text, *args, **kwargs): return text
+            def _window_places(self): return []
             def _stickers_on(self): return False
             def _here(self, ev): return ('private:' if ev.private else 'group:') + ev.group
             def _vision_provider_for(self, ev, source='reply'):
@@ -513,16 +515,16 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
         self.p._recent_images['group:900001'][0]['ts'] -= 4
         self.p._group_state()['group:900001'] = {'queue': [], 'pending': [[(ref(1), time.time(), '10001', 'm1')]]}
         result = await self.p._image_context(self.ev('m2', wake=True))
-        self.assertRegex(result, r'他[45]秒前发的图')
+        self.assertRegex(result, r'某人[45]秒前发的图')
         self.assertEqual(self.calls, [ref(1)])
         self.assertEqual(self.p._group_state()['group:900001']['pending'][0], [])
         self.assertEqual(await self.p._image_context(self.ev('m3', wake=True)), '')
 
-    async def test_other_sender_and_other_place_are_isolated(self):
+    async def test_other_place_is_isolated_other_sender_is_seen(self):
         self.p._remember_images(self.ev(sender='10002', images=[ref(1)]))
         self.p._remember_images(self.ev(group='900002', images=[ref(2)]))
-        self.assertEqual(await self.p._image_context(self.ev('m2', wake=True)), '')
-        self.assertEqual(self.calls, [])
+        self.assertIn('发的图', await self.p._image_context(self.ev('m2', wake=True)))
+        self.assertEqual(self.calls, [ref(1)])
 
     async def test_expired_image_is_not_seen(self):
         self.p._remember_images(self.ev(images=[ref(1)]))
@@ -579,7 +581,7 @@ class RecentImageTests(unittest.IsolatedAsyncioTestCase):
             self.p._remember_images(self.ev('m%d' % n, images=[ref(n)]))
         self.assertEqual(len(self.p._recent_images['group:900001']), 10)
         await self.p._image_context(self.ev('next', wake=True))
-        self.assertEqual(self.calls, [ref(11), ref(10), ref(9)])
+        self.assertEqual(self.calls, [ref(11), ref(10)])
 
     async def test_lookback_increments_reply_counter(self):
         import vision

@@ -156,7 +156,7 @@ class OldMedia:
             if not state[place]:
                 del state[place]
         here = self._here(event)
-        sender = str(self._speaker(event)[0] or '')
+        sender, name = (str(value or '') for value in self._speaker(event))
         self_id = str(getattr(getattr(event, 'message_obj', None), 'self_id', '') or '')
         if not here or not sender or sender == self_id or self._job_stale():
             return
@@ -174,7 +174,7 @@ class OldMedia:
         for msg in messages:
             ref = self._image_ref(msg)
             if ref and not any(row['ref'] == ref and row['id'] == (ids[0] if ids else '') for row in rows):
-                rows.append({'ref': ref, 'sender': sender, 'id': ids[0] if ids else '', 'ts': now, 'seen': False})
+                rows.append({'ref': ref, 'sender': sender, 'name': name, 'id': ids[0] if ids else '', 'ts': now, 'seen': False})
         del rows[:-RECENT_IMAGE_LIMIT]
         if not rows:
             state.pop(here, None)
@@ -448,6 +448,7 @@ class SegmentReaders(unittest.IsolatedAsyncioTestCase):
     async def test_old_readers_match_segments_and_effects(self):
         ev = make_event()
         old, new = fake(), fake()
+        new._neutral_model = None
         self.assertEqual(OldBrowse._message_words(ev), mixin_browse.BrowseMixin._message_words(ev))
         for text in ['@A(10003) @Gone(10005)', '@B(abc)']:
             self.assertEqual(OldDiscretion._gone_remover(old, ev)(text),

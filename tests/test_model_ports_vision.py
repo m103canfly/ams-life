@@ -2,10 +2,12 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """Offline vision calls through the model port."""
 import asyncio
+import base64
+import hashlib
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -18,6 +20,8 @@ import main
 import stickers
 from mixin_ports import PortsMixin
 from mixin_stickers import StickersMixin
+
+PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/aWQAAAAASUVORK5CYII=')
 
 
 class Provider:
@@ -49,6 +53,9 @@ class VisionModelPorts(unittest.TestCase):
         self.plugin._model = Mock(wraps=self.plugin._model)
         self.event = harness.FakeEvent('hello')
         self.event._ams_image_refs = ['picture.png']
+        fetch = patch.object(stickers, 'fetch_picture', return_value=PNG)
+        fetch.start()
+        self.addCleanup(fetch.stop)
 
     def test_caption_arguments_and_text(self):
         provider = Provider('  a picture  ')
@@ -65,8 +72,11 @@ class VisionModelPorts(unittest.TestCase):
         standalone._model = Mock(wraps=standalone._model)
         caption, look = asyncio.run(standalone._look_once(provider, 'picture.png', self.event))
         self.assertEqual(caption, 'a sticker')
-        self.assertEqual(look, stickers.parse_look(provider.text))
-        self.assertEqual(provider.calls, [{'prompt': stickers.LOOK_PROMPT, 'image_urls': ['picture.png']}])
+        expected = stickers.parse_look(provider.text)
+        expected.update(_picture=PNG, _picture_sha256=hashlib.sha256(PNG).hexdigest())
+        self.assertEqual(look, expected)
+        self.assertEqual(provider.calls, [{'prompt': stickers.LOOK_PROMPT,
+                                           'image_urls': ['data:image/png;base64,' + base64.b64encode(PNG).decode('ascii')]}])
         standalone._model.assert_called_once_with(provider)
 
     def test_provider_error_is_caught_by_image_context(self):
