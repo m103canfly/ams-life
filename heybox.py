@@ -14,6 +14,7 @@ import re
 import secrets
 import threading
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from http.client import HTTPException
 from http.cookies import SimpleCookie
@@ -43,6 +44,17 @@ PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/',
 LOGIN_PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/'))
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'
 _STATUS_LOCK = threading.RLock()
+_NO_MESSAGE = object()
+
+
+def safe_message(value):
+    if not isinstance(value, str):
+        return '[不是一句话]'
+    value = ''.join(c for c in value if not unicodedata.category(c).startswith('C'))
+    value = re.sub(r'https?://\S+', '[网址]', value, flags=re.IGNORECASE)
+    value = re.sub(r'[A-Za-z0-9_-]{16,}', '[长串]', value)
+    value = re.sub(r'[0-9]{6,}', '[号码]', value)
+    return value[:60]
 
 
 def read_json(path):
@@ -80,7 +92,7 @@ def captcha_paused(now=None):
     return bool(state.get('captcha_locked') or state.get('captcha_date') == day)
 
 
-def handle_status(status, now=None, path=None):
+def handle_status(status, now=None, path=None, message=_NO_MESSAGE):
     day = datetime.fromtimestamp(time.time() if now is None else now).date().isoformat()
     def change(state):
         previous = state.get('captcha_date')
@@ -98,8 +110,11 @@ def handle_status(status, now=None, path=None):
             elif status not in ('show_captcha', 'login', 'relogin', 'lack_token'):
                 state['review_required'] = True
     if status != 'ok':
-        logger.warning('heybox %s status: %s', path or 'status', status if status in
-                       ('show_captcha', 'login', 'relogin', 'lack_token', 'failed') else 'other')
+        safe_status = status if status in ('show_captcha', 'login', 'relogin', 'lack_token', 'failed') else 'other'
+        if message is _NO_MESSAGE:
+            logger.warning('heybox %s status: %s', path or 'status', safe_status)
+        else:
+            logger.warning('heybox %s status: %s msg: %s', path or 'status', safe_status, safe_message(message))
     update_status(change)
     return status == 'ok'
 
@@ -142,7 +157,7 @@ def request(path, params, device_id, cookies, *, get=None, now=None):
         if not isinstance(data, dict):
             logger.warning('heybox %s invalid response', path)
             return None, []
-        if not handle_status(data.get('status'), now, path):
+        if not handle_status(data.get('status'), now, path, data.get('msg', data.get('message'))):
             return None, []
         return data.get('result'), cookies_out
     except (OSError, ValueError, TypeError, HTTPException) as exc:
