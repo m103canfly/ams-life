@@ -148,7 +148,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.p._phone_account('selfie', sent=True)
         req = ProviderRequest()
         self.p._give_phone_tools(req, Event([Image(), Record()]))
-        self.assertEqual(set(req.func_tool.names()), {'take_photo', 'share_screenshot', 'say_aloud', 'set_now'})
+        self.assertEqual(set(req.func_tool.names()), {'take_photo', 'share_screenshot', 'say_aloud', 'set_now', 'set_look'})
         for tool in req.func_tool.tools:
             if tool.name == 'set_now':
                 continue
@@ -161,7 +161,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
             self.p.config = {setting: True}
             req = ProviderRequest()
             self.p._give_phone_tools(req, self.event)
-            self.assertEqual(set(req.func_tool.names()), {'set_now', name})
+            self.assertEqual(set(req.func_tool.names()), {'set_now', name} | ({'set_look'} if setting == 'photo_enabled' else set()))
 
     async def test_one_of_each_tool_per_turn(self):
         self.assertEqual(await self.p._tool_take_photo(self.event, 'snap', '窗外的天空', '家', '看天空', '看看'), phone.PHOTO_QUEUED)
@@ -688,7 +688,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         plugin._ipv4_json = harness.fake_ipv4_json
         await plugin.on_message(self.event)
         await plugin.on_llm_request(self.event, req)
-        self.assertEqual(set(req.func_tool.names()), {'kept', 'take_photo', 'set_now'})
+        self.assertEqual(set(req.func_tool.names()), {'kept', 'take_photo', 'set_now', 'set_look'})
 
     async def test_photo_generation_is_serial_and_waiting_queue_is_bounded(self):
         entered, release = asyncio.Event(), asyncio.Event()

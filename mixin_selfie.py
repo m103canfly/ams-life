@@ -29,7 +29,7 @@ def _image_key(plugin, api):
 
 try:
     from .common import *  # noqa: F401,F403
-    from . import tts, browse, daily, discretion, events, mixin_ports
+    from . import tts, browse, daily, discretion, events, mixin_ports, look
     from . import adapter_astrbot_tools, adapter_astrbot_turn, turn
     from .mixin_ports import PortsMixin
 except ImportError:
@@ -40,6 +40,7 @@ except ImportError:
     import discretion
     import events
     import mixin_ports
+    import look
     import adapter_astrbot_tools
     import adapter_astrbot_turn
     import turn
@@ -49,6 +50,7 @@ SELFIE_DIR = DATA_DIR / "selfie"
 REF_DIR = SELFIE_DIR / "refs"
 SPEND_PATH = STATE_DIR / "spend.json"
 NOW_PATH = STATE_DIR / "now.json"
+LOOK_PATH = STATE_DIR / "look.json"
 PHOTO_QUEUED = "照片和你配的那句会一起发出去，排在你的话后面；正文里别再提照片。"
 LINK_QUEUED = "链接和你配的那句会在你的话后面一起发出去，正文里别再提。"
 SEND_DELAY = 1.5
@@ -62,13 +64,13 @@ SHOT_DIR = DATA_DIR / "browser" / "shots"
 SHOT_RETENTION = 20
 SHOT_NAME = re.compile(r"^ams-browser-[0-9a-f]{32}\.jpg$")
 SELFIE_PROMPT = ("真人质感的手机照片，真实皮肤和光影，有实感、有生活气息，不要动漫画风，不要塑料感，不要摆拍感。\n"
-                 "参考图1是她本人：不管什么角度，脸、发型、头饰都照参考图1，同一个人，不要增减头饰，不要加光环。\n"
-                 "粉色长发，后脑勺高处扎一束很长的高马尾（只有一束，不是双马尾），头顶一小撮呆毛；琥珀色眼睛。\n"
+                 "参考图1是她本人：参考图只管脸型、眼睛（琥珀色，神态）、身高体态和原本的粉色发色，不管发型、发饰和衣服；不要加光环。\n"
+                 "原本的发色是粉色；发型、发饰、衣服照下面“今天的打扮”和“最近的样子”。\n"
                  "这是她自己拿 iPhone 拍的自拍：前置镜头，手臂伸出去那么远，平视或略微俯视，有前置镜头那点广角感；或者对着镜子用 iPhone 拍，画面里看得到她手里的手机。不是别人给她拍的，画面里没有第二个拍照的人。\n"
                  "角度和姿势照下面写的来，不一定正对镜头。光线就是当时的自然光，不精修，不加滤镜。\n"
                  "衣服按场景来，身上没有发光的花纹。竖构图 4:3。\n这张照片：")
 SNAP_PROMPT = ("她自己用 iPhone 随手拍的照片（后置镜头），真实，有生活气息，不是摄影作品，不要精修，不要广告感。\n"
-               "画面里没有人脸，也没有人物正面；最多露出拍照人的一只手或袖口（浅色宽松毛衣袖子，手指纤细）。\n"
+               "画面里没有人脸，也没有人物正面；最多露出拍照人的一只手或袖口（袖子照她今天的打扮，手指纤细）。\n"
                "构图随意，可能有点歪、有点糊，光线就是当时的自然光，有手机照片的噪点。\n"
                "不要出现文字水印、门牌号、车牌、能认出具体地点的招牌。竖构图 3:4。\n拍的是：")
 PHOTO_GUIDE = ("你像普通人一样在家、出门、吃饭，拍照由你自己决定。自拍：新衣发型、节日、出门、心情好、被夸或熟人问近况时可以拍；"
@@ -248,6 +250,12 @@ class SelfieMixin(PortsMixin):
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
             "doing": {"type": "string", "maxLength": 12}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
+            async def set_look(event, today="", change=""):
+                return await look.set_look(self, event, LOOK_PATH, today, change)
+
+            tools.append(turn.TurnTool(name="set_look", description="定今天的打扮，也可以记下样子的变化。" + context,
+                parameters={"type": "object", "properties": {"today": {"type": "string", "maxLength": 30},
+                "change": {"type": "string", "maxLength": 30}}, "required": ["today"]}, handler=set_look))
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
             except Exception:
@@ -295,6 +303,8 @@ class SelfieMixin(PortsMixin):
         queue = self._phone_queue(event)
         if "photo" in queue:
             return "这次已经有了"
+        if self.enabled and self.config.get("photo_enabled") and kind == "selfie" and not look.read_look(LOOK_PATH, datetime.now().date()):
+            return "先用 set_look 定今天的打扮再拍"
         what = str(what or "").strip()
         where, doing, caption = (str(x or "").strip() for x in (where, doing, caption))
         if (not self.enabled or not self.config.get("photo_enabled") or kind not in ("selfie", "snap")
@@ -429,7 +439,19 @@ class SelfieMixin(PortsMixin):
                 if kind == "selfie" and not ref.is_file():
                     logger.info("[ams-life] phone reference missing")
                     return None
-                prompt = (SELFIE_PROMPT if kind == "selfie" else SNAP_PROMPT) + what
+                outfit = look.read_look(LOOK_PATH, datetime.now().date())
+                recent = look.changes(getattr(self, "self_model", {}) or {})
+                if kind == "selfie":
+                    prompt = SELFIE_PROMPT
+                    if outfit:
+                        prompt += "今天的打扮：" + outfit + "\n"
+                    if recent:
+                        prompt += "最近的样子：" + "；".join(str(item["text"]) for item in recent) + "\n"
+                else:
+                    prompt = SNAP_PROMPT
+                    if outfit:
+                        prompt += "她今天穿：" + outfit + "\n"
+                prompt += what
                 for attempt in range(PHOTO_RETRIES):
                     try:
                         if kind == "selfie":
