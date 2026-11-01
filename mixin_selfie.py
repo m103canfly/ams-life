@@ -64,15 +64,16 @@ SHOT_NAME = re.compile(r"^ams-browser-[0-9a-f]{32}\.jpg$")
 SELFIE_PROMPT = ("真人质感的手机照片，真实皮肤和光影，有实感、有生活气息，不要动漫画风，不要塑料感，不要摆拍感。\n"
                  "参考图1是她本人：不管什么角度，脸、发型、头饰都照参考图1，同一个人，不要增减头饰，不要加光环。\n"
                  "粉色长发，后脑勺高处扎一束很长的高马尾（只有一束，不是双马尾），头顶一小撮呆毛；琥珀色眼睛。\n"
-                 "角度和姿势照下面写的来，不用正对镜头，像生活里随手拍的、朋友抓拍的。\n"
+                 "这是她自己拿 iPhone 拍的自拍：前置镜头，手臂伸出去那么远，平视或略微俯视，有前置镜头那点广角感；或者对着镜子用 iPhone 拍，画面里看得到她手里的手机。不是别人给她拍的，画面里没有第二个拍照的人。\n"
+                 "角度和姿势照下面写的来，不一定正对镜头。光线就是当时的自然光，不精修，不加滤镜。\n"
                  "衣服按场景来，身上没有发光的花纹。竖构图 4:3。\n这张照片：")
-SNAP_PROMPT = ("普通人用手机随手拍的照片，真实，有生活气息，不是摄影作品，不要精修，不要广告感。\n"
+SNAP_PROMPT = ("她自己用 iPhone 随手拍的照片（后置镜头），真实，有生活气息，不是摄影作品，不要精修，不要广告感。\n"
                "画面里没有人脸，也没有人物正面；最多露出拍照人的一只手或袖口（浅色宽松毛衣袖子，手指纤细）。\n"
                "构图随意，可能有点歪、有点糊，光线就是当时的自然光，有手机照片的噪点。\n"
                "不要出现文字水印、门牌号、车牌、能认出具体地点的招牌。竖构图 3:4。\n拍的是：")
 PHOTO_GUIDE = ("你像普通人一样在家、出门、吃饭，拍照由你自己决定。自拍：新衣发型、节日、出门、心情好、被夸或熟人问近况时可以拍；"
                "深夜、刚醒没收拾、心情很差或不熟的人索要时不拍，刚醒和极熟的人撒娇可例外。"
-               "自拍的 what 须写清在哪、穿什么、角度姿势、在干什么；变换角度：四分之三侧、低头、回头、对镜、俯拍、朋友抓拍没看镜头。"
+               "自拍是你自己拿 iPhone 拍的（前置，或者对着镜子），what 须写清在哪、穿什么、角度姿势、在干什么；变换角度：四分之三侧、低头、俯拍、对镜。随手拍是你用 iPhone 后置拍眼前的东西。"
                "随手拍吃的、天空风景、猫、招牌、买的东西、游戏、节日装饰；避开别人脸和能认出住处的门牌车牌。")
 SCREEN_GUIDE = ("分享你看过的网页：有趣帖子新闻、讨论中查到的资料、与熟人有关的内容。"
                 "不分享含别人聊天记录、名字或号码的内容，不把私聊的东西发到群里。")
@@ -131,6 +132,20 @@ async def _browser_screenshot(plugin, event, url):
     reply = await mixin_ports.model_for(provider).chat(prompt=interpretation.image_caption_prompt(), images=[str(path)])
     description = interpretation.parse_image_caption(reply.text)
     return (path, description) if description else None
+
+
+async def _prepare_photo(plugin, event, queue):
+    kind, what = queue["photo"][:2]
+    caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
+    queue["photo_path"] = None
+    if not await plugin._phone_clear(event, what) or (caption and not await plugin._phone_clear(event, caption)):
+        return
+    try:
+        queue["photo_path"] = await wait_for(plugin._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
+    except Exception:
+        pass
+    if not queue["photo_path"]:
+        logger.info("[ams-life] photo not ready; reply sent alone")
 
 
 class SelfieMixin(PortsMixin):
@@ -502,19 +517,23 @@ class SelfieMixin(PortsMixin):
             if "photo" in queue:
                 kind, what = queue["photo"][:2]
                 caption = queue["photo"][2] if len(queue["photo"]) > 2 else ""
-                if await self._phone_clear(event, what) and (not caption or await self._phone_clear(event, caption)):
+                if "photo_path" in queue:
+                    path = queue["photo_path"]
+                elif await self._phone_clear(event, what) and (not caption or await self._phone_clear(event, caption)):
                     try:
                         path = await wait_for(self._make_photo(kind, what), timeout=PHOTO_WAIT_SECONDS)
                     except AsyncTimeoutError:
                         logger.info("[ams-life] phone: photo timed out")
                         path = None
-                    if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                        segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
-                        segments.append(events.Segment("image", {"path": str(path)}))
-                        await self._messenger(event, as_event=True).send(here, tuple(segments))
-                        self._phone_account(kind, sent=True)
-                        self._note_she_sent(event, kind)
-                        self._phone_prune("photo")
+                else:
+                    path = None
+                if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
+                    segments = ([events.Segment("text", {"text": caption})] if caption.strip() else [])
+                    segments.append(events.Segment("image", {"path": str(path)}))
+                    await self._messenger(event, as_event=True).send(here, tuple(segments))
+                    self._phone_account(kind, sent=True)
+                    self._note_she_sent(event, kind)
+                    self._phone_prune("photo")
             if "voice" in queue and await self._phone_clear(event, queue["voice"]):
                 if queue.get("voice_tone"):
                     path = await self._make_voice(queue["voice"], tone=queue["voice_tone"])

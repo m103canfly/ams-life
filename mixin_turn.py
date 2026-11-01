@@ -5,7 +5,7 @@ try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
     from .mixin_phone import _expand_forward, _phone_line, _history_original
-    from . import adapter_astrbot_turn, attention, stickers, likeness
+    from . import adapter_astrbot_turn, attention, stickers, likeness, mixin_selfie
 except ImportError:
     from common import *  # noqa: F401,F403
     from body import *  # noqa: F401,F403
@@ -14,6 +14,7 @@ except ImportError:
     import attention
     import stickers
     import likeness
+    import mixin_selfie
 
 
 def _has_non_sticker_image(event):
@@ -411,6 +412,9 @@ class TurnMixin:
                 reply.set_text(_reply)
         if _sticker and not await self._sticker_cleared(event, _sticker):
             _sticker = ""
+        _queue = self._phone_queue(event)
+        if _reply.strip() and "photo" in _queue:
+            await mixin_selfie._prepare_photo(self, event, _queue)
         _then = self._sticker_after(event, _sticker) if _sticker else None
         if _then is not None and not _reply.strip():
             # a sticker and no words: AstrBot sends nothing, the plugin sends the sticker
