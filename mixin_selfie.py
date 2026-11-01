@@ -6,11 +6,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import math
 import re
 import time
 import unicodedata
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import uuid
 from asyncio import CancelledError, TimeoutError as AsyncTimeoutError, shield, wait_for
 from datetime import datetime, timedelta
@@ -53,6 +55,7 @@ NOW_PATH = STATE_DIR / "now.json"
 PHOTO_QUEUED = "照片和你配的那句会一起发出去，排在你的话后面；正文里别再提照片。"
 LINK_QUEUED = "链接和你配的那句会在你的话后面一起发出去，正文里别再提。"
 SEND_DELAY = 1.5
+VOICE_QUEUED = "这句会用语音发出去。正文别再写同样的意思：要么不打字，要么只补一句别的。"
 # Allow a slow image service to finish, but do not hold queued media indefinitely.
 PHOTO_WAIT_SECONDS = 150
 # If earlier text is stuck, later media would arrive without its context.
@@ -146,6 +149,37 @@ def _photo_release(plugin, queue):
 
 def _photo_text(text):
     return "".join(c for c in str(text or "") if not c.isspace() and not unicodedata.category(c).startswith("P"))
+
+
+def _local_embedding(plugin):
+    try:
+        config = plugin._embedding_runtime_config() or {}
+        url = urlsplit(config.get("base_url") or "")
+        return url.scheme.lower() in ("http", "https") and url.hostname in ("127.0.0.1", "localhost", "::1")
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+async def _same_as_voice(plugin, text, voice):
+    left, right = _photo_text(text), _photo_text(voice)
+    if not left or not right:
+        return False
+    if left in right or right in left:
+        return True
+    if _local_embedding(plugin):
+        try:
+            a, b = await plugin._embed_text(text), await plugin._embed_text(voice)
+            if a and b and len(a) == len(b):
+                norm = math.sqrt(sum(x * x for x in a) * sum(x * x for x in b))
+                if norm and math.isfinite(norm):
+                    similarity = sum(x * y for x, y in zip(a, b)) / norm
+                    if math.isfinite(similarity):
+                        return similarity >= 0.80
+        except Exception:
+            pass
+    a = {left[i:i + 2] for i in range(len(left) - 1)}
+    b = {right[i:i + 2] for i in range(len(right) - 1)}
+    return bool(a and b) and len(a & b) / len(a | b) >= 0.35
 
 
 async def _prepare_photo(plugin, event, queue):
@@ -368,7 +402,7 @@ class SelfieMixin(PortsMixin):
         if tone in tts.TONES:
             queue["voice_tone"] = tone
         logger.info("[ams-life] phone voice queued")
-        return "排上了"
+        return VOICE_QUEUED
 
     def _phone_counts(self):
         data = _read_json(SPEND_PATH, {})

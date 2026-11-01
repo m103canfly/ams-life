@@ -172,7 +172,7 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
     async def test_one_of_each_tool_per_turn(self):
         self.assertEqual(await self.p._tool_take_photo(self.event, 'snap', '窗外的天空', '家', '看天空', '看看'), phone.PHOTO_QUEUED)
         self.assertEqual(await self.p._tool_take_photo(self.event, 'selfie', '在家'), '这次已经有了')
-        self.assertEqual(await self.p._tool_say_aloud(self.event, '晚安'), '排上了')
+        self.assertEqual(await self.p._tool_say_aloud(self.event, '晚安'), phone.VOICE_QUEUED)
         self.assertEqual(await self.p._tool_say_aloud(self.event, '早安'), '这次已经有了')
         self.assertEqual(await self.p._tool_share_screenshot(self.event, 'https://example.invalid/page', '看看'), phone.LINK_QUEUED)
         self.assertEqual(await self.p._tool_share_screenshot(self.event, 'https://example.invalid/page', '看看'), '这次已经有了')
