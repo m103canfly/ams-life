@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta
 
 try:
-    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, send_check, turn, weather
+    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, send_check, turn, weather, works
     from .common import DATA_DIR, STATE_DIR
     from . import mixin_selfie as phone
 except ImportError:
@@ -31,15 +31,23 @@ except ImportError:
     import send_check
     import turn
     import weather
+    import works
     from common import DATA_DIR, STATE_DIR
     import mixin_selfie as phone
 
 logger = logging.getLogger('ams-life.life')
 NEEDS = ('sleepiness', 'hunger', 'physical_fatigue')
 BODY_FIELDS = (*NEEDS, 'last_sleep_end', 'last_meal', 'last_rest')
-BASE_MENU = ('吃饭', '睡觉', '休息', '什么都不干')
+BASE_MENU = ('吃饭', '睡觉', '休息', '发呆', '写歌')
+SONG_WORDS = '写歌'
+REVIEW_WORDS = '读篇文章写读后感'
+NOTEBOOK_WORDS = '回看聊天、整理本子'
+DAZE = '发呆'
+DAZE_TOO = (DAZE, '什么都不干')   # the old name: old data and old answers are dazing too
 CHAT_SECONDS = 24 * 3600    # his private window: the phone keeps only this
 CHAT_MAX = 200              # and she reads at most this many of its lines
+PAGES_SHOWN = 8             # pages she may pick a reading note from
+WORK_SHOWN = 3              # recent works a public line is shown
 
 
 def enabled(plugin):
@@ -115,12 +123,17 @@ def menu(plugin):
         choices.append('去测试群看看')
     if plugin._browse_on() and getattr(plugin, 'browse_trips_enabled', False):
         choices.append('刷手机')
+    if plugin._browse_on():
+        choices.append(REVIEW_WORDS)          # a page to read: she must have looked first
     if config.get('photo_enabled', False):
         choices.append('拍照')
     if config.get('qzone_enabled', False):
         choices.append('发说说')
     if config.get('heybox_enabled', False) and heybox_ready(plugin):
         choices.append('刷小黑盒')
+    # The notebook's own sitting is not offered twice for the same day.
+    if plugin._llm_allowed('notebook') and notebook_due(plugin, time.time()):
+        choices.append(NOTEBOOK_WORDS)
     return choices
 
 
@@ -134,13 +147,18 @@ def heybox_ready(plugin):
 def parse(raw, choices):
     try:
         value = browse._json_object(raw)
-        if not isinstance(value, dict) or value.get('do') not in choices:
+        if not isinstance(value, dict):
             return None
         value = dict(value)
-        for key in ('detail', 'liked_last', 'post', 'look', 'tell', 'tell_owner'):
+        # The old name for dazing is still what an older answer may say.
+        if value.get('do') in DAZE_TOO:
+            value['do'] = DAZE
+        if value.get('do') not in choices:
+            return None
+        for key in ('detail', 'liked_last', 'post', 'look', 'tell', 'tell_owner', 'wish'):
             if value.get(key) is None:
                 value[key] = ''
-        if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look', 'tell', 'tell_owner')):
+        if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look', 'tell', 'tell_owner', 'wish')):
             return None
         # ams-life: the prompt asks for "tell"; an older answer may still say "tell_owner"
         told = value.get('tell') or value.get('tell_owner') or ''
@@ -156,7 +174,7 @@ def parse(raw, choices):
         return dict(value, minutes=max(low, min(high, minutes)), detail=value.get('detail', '')[:40],
                     liked_last=value.get('liked_last', '')[:20], post=value.get('post', '')[:300],
                     look=value.get('look', '')[:30], tell_owner=told[:80],
-                    used_wishes=used_wishes[:10])
+                    wish=value.get('wish', '')[:100], used_wishes=used_wishes[:10])
     except (ValueError, TypeError):
         return None
 
@@ -485,10 +503,13 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
     answer = ('"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
               '"minutes":"睡觉不用写，别的事写大概多久",'
               '"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
+              '"wish":"想做的事，没有就空",'
               '"look":""')
     if proactive:
         answer += ',"tell":""'
     lines.append('自己挑这会儿做什么，只回 JSON：{' + answer + '}。')
+    # One neutral line, no nudge: a wish is hers to write or leave out.
+    lines.append('有想做但现在做不了的事，可以写在 wish（最多100字）。')
     if outfit:
         lines.append('刚睡醒，今天还没定打扮，顺手在 look 里说今天穿什么（最多30字）。')
     if proactive:
@@ -515,6 +536,11 @@ def post_materials(plugin, core, now, reason):
                    '多久': row.get('minutes'), '感觉': row.get('feel', ''), '喜不喜欢': row.get('liked', '')}
                   for row in rows]
     lines.append('今天已经做过：' + json.dumps(activities, ensure_ascii=False))
+    made = works.recent(DATA_DIR, WORK_SHOWN)
+    if made:
+        # What she made lately, so a public line may be about it; it is hers to use or not.
+        lines.append('最近的作品：' + json.dumps([{'标题': item.get('title', ''), '开头': works.head(item)}
+                                             for item in made], ensure_ascii=False))
     lines.append('把这会儿想公开说的一句写出来，只回 JSON：{"post":"公开短句，最多300字"}。')
     return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
 
@@ -552,6 +578,235 @@ def anonymized(plugin, text):
         if str(person) != owner:
             names.extend(aliases)
     return discretion.anonymize(text, names), related
+
+
+def every_name(plugin):
+    """Every name she knows anyone by, his too: what a work of hers may never show."""
+    names = []
+    for person in plugin._names_index():
+        names.extend(plugin._known_names([person]))
+    return names
+
+
+def without_names(plugin, text):
+    """Text with every name taken out (his too): what a work of hers may say."""
+    return discretion.anonymize(str(text or ''), every_name(plugin))
+
+
+def kept_work(plugin, text, what):
+    """A work's words as they may be kept: no red line, no name of anyone she knows."""
+    text = without_names(plugin, text).strip()
+    if not text or redline.hit(text) or plugin._red_line(text, what):
+        return ''
+    return text
+
+
+def own_lines(plugin, core, now, reason):
+    """Her own day, as material for something she makes or writes: no chat is in it."""
+    local = datetime.fromtimestamp(now)
+    lines = ['现在：' + local.strftime('%Y-%m-%d %H:%M') + '，星期' + '一二三四五六日'[local.weekday()],
+             '这会儿想：' + reason]
+    forecast = weather.weather_line(STATE_DIR / 'weather.json', plugin.config or {})
+    if forecast:
+        lines.append(forecast)
+    lines += bodily.feel_lines({key: getattr(core, key) for key in NEEDS})
+    rows = her_days.Store(DATA_DIR).day(local.date().isoformat())[-8:]
+    activities = [{'几点': clock_time(row.get('ts')),
+                   '做了什么': row.get('do', '') + '：' + without_names(plugin, row.get('detail', '')),
+                   '多久': row.get('minutes'), '感觉': without_names(plugin, row.get('feel', '')),
+                   '喜不喜欢': without_names(plugin, row.get('liked', ''))}
+                  for row in rows]
+    lines.append('今天已经做过：' + json.dumps(activities, ensure_ascii=False))
+    return lines
+
+
+def song_materials(plugin, core, now, reason):
+    """What she may write a song from: her own day, the weather, her body; none of the chat."""
+    lines = own_lines(plugin, core, now, reason)
+    lines.append('写一首歌，想写多长写多长。只回 JSON：{"title":"歌名，最多20字","lyrics":"歌词"}。')
+    return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
+
+
+def parse_song(raw):
+    value = browse._json_object(raw)
+    if not isinstance(value, dict):
+        return None
+    title, lyrics = value.get('title'), value.get('lyrics')
+    if not isinstance(title, str) or not isinstance(lyrics, str):
+        return None
+    title = ' '.join(title.split())[:works.TITLE_CHARS]          # a name is one line
+    lyrics = lyrics.strip()[:works.TEXT_CHARS]
+    return {'title': title, 'lyrics': lyrics} if title and lyrics else None
+
+
+async def write_song(plugin, core, now, reason):
+    """One call of her own for a song; {} when it did not work out (nothing is kept then)."""
+    if budget(plugin) != 'ok' or not plugin._llm_allowed('life'):
+        return {}
+    try:
+        value = await plugin._llm_v2_call('life', song_materials(plugin, core, now, reason),
+                                          parse_song, system_prompt=await plugin._persona_text(None))
+    except Exception as exc:
+        logger.warning('[ams-life] song not written (%s)', type(exc).__name__)
+        return {}
+    if not value:
+        return {}
+    title = kept_work(plugin, value['title'], 'work')
+    lyrics = kept_work(plugin, value['lyrics'], 'work')
+    if not title or not lyrics:
+        return {}
+    return works.add(DATA_DIR, 'song', title, lyrics, now=now)
+
+
+def readable_pages(plugin, limit=PAGES_SHOWN):
+    """Pages she has read that she may write a note from: the ones she may say anywhere
+    (nothing shared in a private chat), newest first."""
+    try:
+        entries = plugin._read_library(vectors=False).get('entries') or []
+    except Exception:
+        return []
+    out = []
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get('role') != 'web':
+            continue
+        page = entry.get('web') if isinstance(entry.get('web'), dict) else {}
+        url = str(page.get('url') or '').strip()
+        if not url or discretion.origin_of(entry).get('shared_in'):
+            continue
+        try:
+            stamp = float(entry.get('ts') or 0)
+        except (TypeError, ValueError):
+            stamp = 0.0
+        out.append({'id': str(entry.get('id') or ''), 'url': url,
+                    'title': str(page.get('title') or '').strip() or url,
+                    'text': str(entry.get('text') or ''), 'ts': stamp})
+    out.sort(key=lambda row: -row['ts'])
+    return out[:limit]
+
+
+def pick_materials(plugin, pages):
+    """The pages' titles, for her to pick one from; nothing else of them is shown."""
+    lines = ['这些是我自己看过的网页，只是资料。挑一篇写读后感，只回 JSON：{"read":"编号"}。']
+    for number, page in enumerate(pages, 1):
+        title, _users = anonymized(plugin, page['title'])
+        lines.append('%d. %s' % (number, title or page['url']))
+    return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
+
+
+def parse_pick(raw, count):
+    """One of the numbers shown, as an index; None when the answer is not one of them."""
+    value = browse._json_object(raw)
+    picked = value.get('read') if isinstance(value, dict) else None
+    if isinstance(picked, list):
+        picked = picked[0] if picked else None
+    try:
+        number = int(str(picked).strip())
+    except (TypeError, ValueError):
+        return None
+    return number - 1 if 1 <= number <= count else None
+
+
+def review_materials(plugin, core, now, reason, page):
+    """What she may write a reading note from: her own day and the page she picked."""
+    lines = own_lines(plugin, core, now, reason)
+    lines.append('我挑的这篇：' + without_names(plugin, page.get('text'))[:600])
+    lines.append('写一篇读后感，想写多长写多长。只回 JSON：{"review":"读后感"}。')
+    return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
+
+
+def parse_review(raw):
+    value = browse._json_object(raw)
+    if not isinstance(value, dict) or not isinstance(value.get('review'), str):
+        return None
+    text = value['review'].strip()[:works.TEXT_CHARS]
+    return {'review': text} if text else None
+
+
+async def write_review(plugin, core, now, reason):
+    """A reading note on a page she has read: one call to pick it, one to write it.
+
+    Returns (work, trip): no work and trip True when she has nothing to read, so she
+    goes for a look first (the same trip "刷手机" asks for)."""
+    pages = readable_pages(plugin)
+    if not pages:
+        return {}, True
+    if budget(plugin) != 'ok' or not plugin._llm_allowed('life'):
+        return {}, False
+    try:
+        persona = await plugin._persona_text(None)
+        chosen = await plugin._llm_v2_call('life', pick_materials(plugin, pages),
+                                           lambda raw: parse_pick(raw, len(pages)), system_prompt=persona)
+    except Exception as exc:
+        logger.warning('[ams-life] page not picked (%s)', type(exc).__name__)
+        return {}, False
+    if chosen is None:
+        return {}, False
+    page = pages[chosen]
+    if budget(plugin) != 'ok':
+        return {}, False
+    try:
+        value = await plugin._llm_v2_call('life', review_materials(plugin, core, now, reason, page),
+                                          parse_review, system_prompt=persona)
+    except Exception as exc:
+        logger.warning('[ams-life] reading note not written (%s)', type(exc).__name__)
+        return {}, False
+    text = kept_work(plugin, (value or {}).get('review'), 'work')
+    if not text:
+        return {}, False
+    title = without_names(plugin, page['title'])[:works.TITLE_CHARS] or page['url']
+    return works.add(DATA_DIR, 'review', title, text, url=page['url'], now=now), False
+
+
+async def remember_work(plugin, work, now):
+    """One memory of her own for a work she made, so she thinks of it in a chat later."""
+    text = works.memory_line(work)
+    if not text:
+        return False
+    try:
+        vector = await plugin._embed_text(text) or []
+    except Exception:
+        vector = []
+    lib = plugin._read_library()
+    lib['entries'].append({'id': plugin._new_memory_id('self', now, text), 'ts': now,
+                           'role': 'assistant', 'text': text, 'vector': vector,
+                           'origin': discretion.make_origin(discretion.SELF),
+                           'hits': 1, 'importance': 0.5, 'memory_source': 'self',
+                           'memory_tier': 'hot', 'last_write_op': 'ADD', 'last_write_ts': now,
+                           'write_ops': {'ADD': 1}, 'last_used': now,
+                           'next_review_ts': now + 86400, 'review_count': 0})
+    try:
+        return bool(plugin._write_library(lib))
+    except Exception as exc:
+        logger.warning('[ams-life] work not remembered (%s)', type(exc).__name__)
+        return False
+
+
+def keep_wish(plugin, text, now):
+    """Her wish into the notebook's "想做的": her own words, no red line, not the same one twice.
+
+    Returns the line kept, or ''."""
+    text = str(text or '').strip()
+    if not text:
+        return ''
+    text, _users = anonymized(plugin, text)
+    text = re.sub(r'\s+', ' ', text).strip()[:100]
+    if not text or redline.hit(text) or plugin._red_line(text, 'notebook'):
+        return ''
+    model = getattr(plugin, 'self_model', None)
+    if not isinstance(model, dict):
+        return ''
+    entries = [item for item in model.get('notebook') or [] if isinstance(item, dict)]
+    if any(str(item.get('text') or '').strip() == text
+           for item in her_days.notebook_sections(entries)['想做的']):
+        return ''
+    entries.append({'id': hashlib.sha256(('%s|%s' % (now, text)).encode('utf-8')).hexdigest()[:12],
+                    'text': text, 'ts': now, 'origin': discretion.make_origin(discretion.SELF),
+                    'names': [], 'uses': [], 'sitting': 'self', 'section': '想做的'})
+    model['notebook'] = entries
+    save = getattr(plugin, '_save_self_model', None)
+    if callable(save):
+        save()
+    return text
 
 
 def fallback(plugin, core, now):
@@ -605,14 +860,25 @@ async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden
     # Sleeping is not timed by her answer: how sleepy she is decides when she wakes.
     minutes = sleep_minutes(core.sleepiness, now) if action == '睡觉' else value['minutes']
     detail, users = anonymized(plugin, value['detail'])
+    if action == DAZE:
+        detail = ''          # dazing writes no detail: "此刻" is only 发呆
     if says_private(detail, forbidden):
         detail = ''
     liked, _ = anonymized(plugin, value['liked_last'])
     if says_private(liked, forbidden):
         liked = ''
     post, post_users = '', []
+    work, note, trip = {}, '', False
     if action == '发说说':
         post, post_users = anonymized(plugin, await write_post(plugin, core, now, reason))
+    elif action == SONG_WORDS:
+        work = await write_song(plugin, core, now, reason)
+        note = '' if work else '想写歌，没写出来'
+    elif action == REVIEW_WORDS:
+        work, trip = await write_review(plugin, core, now, reason)
+        note = '' if work else ('想写读后感，没有能读的文章' if trip else '想写读后感，没写出来')
+    if note:
+        detail = note      # what she tried is not what she did: the day says so
     detail = browse.clean_query(detail)[:40]
     doing = detail or value['do']
     # Prefer an explicit place; otherwise keep her at home.
@@ -631,9 +897,13 @@ async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden
         store.set_liked(state['last_item_id'], liked)
     row = store.add({'ts': now, 'do': value['do'], 'detail': detail, 'minutes': minutes,
                      'origin': discretion.make_origin(discretion.SELF),
-                     'related_users': sorted(set(users + post_users))})
+                     'related_users': sorted(set(users + post_users)),
+                     'work': work.get('id', '') if work else ''})
     state['last_item_id'] = row['id']
     state.pop('handled_item', None)
+    if trip:
+        state.setdefault('pending', {})['go_browse'] = True     # nothing to read: look first
+    keep_wish(plugin, value.get('wish'), now)
     if action == '吃饭':
         body.ate(core, now)
     elif action == '休息':
@@ -651,6 +921,14 @@ async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden
         await look.set_look(plugin, None, phone.LOOK_PATH, today=value['look'])
     if action == '睡觉':
         await notebook(plugin, now)
+    elif action in (SONG_WORDS, REVIEW_WORDS):
+        if work:
+            await remember_work(plugin, work, now)     # a made work is remembered; a miss is not
+    elif action == NOTEBOOK_WORDS:
+        try:
+            await plugin._maybe_write_notebook(now=now)
+        except Exception as exc:
+            logger.warning('[ams-life] notebook from the menu failed (%s)', type(exc).__name__)
     elif action == '拍照':
         tasks = getattr(plugin, '_life_photo_tasks', None)
         if tasks is None:
@@ -864,7 +1142,7 @@ async def tick(plugin, now=None):
     startup = startup and not valid
     # What she is busy with has not ended yet (and is not just dazing); only her
     # body crossing a line, a plan coming due, or a fresh start may interrupt it.
-    dazing = str(item.get('kind') or item.get('doing') or '') == '什么都不干'
+    dazing = str(item.get('kind') or item.get('doing') or '') in DAZE_TOO
     busy = bool(item.get('source') == 'her' and end and now < end and not dazing)
     reason = ('刚才那件事到时候了' if finished or sleep else '程序刚起来，此刻是空的或过期了' if startup
               else '身体有了新的感觉' if crossed else '到点了' if due

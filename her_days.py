@@ -75,6 +75,7 @@ class Store:
                'do': str(entry.get('do') or '')[:12], 'detail': str(entry.get('detail') or '')[:40],
                'minutes': entry.get('minutes'), 'feel': str(entry.get('feel') or '')[:40],
                'liked': str(entry.get('liked') or '')[:20],
+               'work': str(entry.get('work') or '')[:40],
                'origin': dict(entry.get('origin') or {}, where='self'),
                'related_users': [str(x) for x in (entry.get('related_users') or [])]}
         path = self._path(datetime.datetime.fromtimestamp(ts).date())
