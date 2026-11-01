@@ -417,7 +417,8 @@ class Library:
         self._save_vectors()
 
     def missing_vectors(self, model) -> list:
-        return [sid for sid in self.rows if self.vector_of(sid, model) is None]
+        return [sid for sid, row in self.rows.items()
+                if semantic_text(row) and self.vector_of(sid, model) is None]
 
     def path_of(self, sid) -> Path:
         row = self.rows.get(sid) or {}

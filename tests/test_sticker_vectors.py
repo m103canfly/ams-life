@@ -117,3 +117,26 @@ class StickerVectorWorker(unittest.IsolatedAsyncioTestCase):
             await mixin_stickers._fill_vectors(self.plugin)
         self.assertEqual(sleeps, [300, 2, 2, 2])
         self.assertTrue(all(self.lib.vector_of(sid, 'model') == [1.0] for sid in ids))
+
+    async def test_worker_skips_empty_text(self):
+        empty = self.add(b'a', '')
+        first = self.add(b'b', 'first')
+        second = self.add(b'c', 'second')
+        self.assertEqual(self.lib.missing_vectors('model'), [first, second])
+        with patch.object(mixin_stickers.asyncio, 'sleep', new=AsyncMock()):
+            await mixin_stickers._fill_vectors(self.plugin)
+        self.assertIsNone(self.lib.vector_of(empty, 'model'))
+        self.assertEqual(self.lib.vector_of(first, 'model'), [1.0, 0.0])
+        self.assertEqual(self.lib.vector_of(second, 'model'), [1.0, 0.0])
+        self.assertEqual([call.args[0] for call in self.plugin._embed_text.await_args_list], ['first', 'second'])
+
+    async def test_worker_advances_after_empty_and_failed_embeddings(self):
+        ids = [self.add(bytes([i]), str(i)) for i in range(3)]
+        self.plugin._embed_text.side_effect = [None, RuntimeError('offline'), [1], [1], [1]]
+        sleep = AsyncMock()
+        with patch.object(mixin_stickers.asyncio, 'sleep', new=sleep):
+            await mixin_stickers._fill_vectors(self.plugin)
+        self.assertEqual([call.args[0] for call in self.plugin._embed_text.await_args_list],
+                         ['0', '1', '2', '0', '1'])
+        self.assertEqual([call.args[0] for call in sleep.await_args_list], [300, 300, 2, 2, 2])
+        self.assertTrue(all(self.lib.vector_of(sid, 'model') == [1.0] for sid in ids))

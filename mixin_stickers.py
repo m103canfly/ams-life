@@ -74,20 +74,31 @@ def _start_vector_worker(plugin, sid=None):
 
 
 async def _fill_vectors(plugin):
+    failed = set()
+    last_model = None
     while getattr(plugin, "enabled", False) and getattr(plugin, "stickers_enabled", False):
         lib = plugin._sticker_lib()
         model = _vector_model(plugin)
+        if model != last_model:
+            failed.clear()
+            last_model = model
         missing = lib.missing_vectors(model) if model else []
         if not missing:
             return
+        failed.intersection_update(missing)
+        available = [sid for sid in missing if sid not in failed]
+        if not available:
+            failed.clear()
+            available = missing
         pending = getattr(plugin, "_sticker_vector_pending", [])
-        sid = next((item for item in pending if item in missing), missing[0])
+        sid = next((item for item in pending if item in available), available[0])
         if sid in pending:
             pending.remove(sid)
         words = stickers.semantic_text(lib.rows[sid])
         try:
-            vec = await plugin._embed_text(words) if words else None
+            vec = await plugin._embed_text(words)
             if not vec:
+                failed.add(sid)
                 await asyncio.sleep(300)
                 continue
             async with plugin._sticker_lock():
@@ -95,6 +106,7 @@ async def _fill_vectors(plugin):
                 if row is not None and stickers.semantic_text(row) == words and _vector_model(plugin) == model:
                     lib.set_vector(sid, model, vec)
         except Exception:
+            failed.add(sid)
             await asyncio.sleep(300)
             continue
         await asyncio.sleep(2)
