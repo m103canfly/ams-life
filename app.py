@@ -203,6 +203,14 @@ class App:
                 data = part['data']
                 if part.get('type') == 'reply':
                     quoted = await self._lookup('get_msg', {'message_id': data.get('id')})
+                    if isinstance(quoted, dict):
+                        kind = frame.get('message_type')
+                        field = 'group_id' if kind == 'group' else 'user_id'
+                        place = frame.get(field)
+                        other = quoted.get(field)
+                        if (kind not in ('group', 'private') or quoted.get('message_type') != kind
+                                or place is None or other is None or not str(place) or str(place) != str(other)):
+                            quoted = None
                 elif part.get('type') == 'at' and frame.get('message_type') == 'group':
                     qq = str(data.get('qq') or '')
                     if qq and qq != 'all' and qq not in names:

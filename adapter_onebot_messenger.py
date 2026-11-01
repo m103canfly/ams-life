@@ -15,17 +15,14 @@ the computer.
 from __future__ import annotations
 
 import base64
-import ipaddress
 import os
-import socket
 from pathlib import Path
-from urllib.parse import urlsplit
 
 try:
-    from . import browse, messenger
+    from . import messenger, stickers
 except ImportError:
-    import browse
     import messenger
+    import stickers
 
 MAX_FILE_BYTES = 20 * 1024 * 1024   # one picture or voice she sends
 _PREFIX = "base64://"
@@ -72,40 +69,30 @@ def _file_ref(path, roots) -> str:
     return _PREFIX + base64.b64encode(payload).decode("ascii")
 
 
-def resolve_host(host):
-    """Resolve a host to addresses for a URL image."""
-    return [item[4][0] for item in socket.getaddrinfo(host, None)]
-
-
-def _public_image_url(url) -> bool:
-    if not browse.check_url(url)[0]:
+def _valid_image_base64(value) -> bool:
+    if not isinstance(value, str) or not value.startswith(_PREFIX):
+        return False
+    encoded = value[len(_PREFIX):]
+    if len(encoded) > ((stickers.MAX_BYTES + 2) // 3) * 4:
         return False
     try:
-        addresses = list(resolve_host(urlsplit(url).hostname))
-        if not addresses:
-            return False
-        for address in addresses:
-            ip = ipaddress.ip_address(address.split("%", 1)[0])
-            if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-                ip = ip.ipv4_mapped
-            if not ip.is_global or ip.is_multicast:
-                return False
-        return True
+        data = base64.b64decode(encoded, validate=True)
+        return len(data) <= stickers.MAX_BYTES and bool(stickers.sniff(data))
     except Exception:
         return False
 
 
 def _image_ref(data, roots) -> str:
-    """The image's OneBot reference: base64 for a local file or given data, the url for a url."""
+    """The image's OneBot reference, with no URL fetching by NapCat."""
     if "path" in data:
         return _file_ref(data["path"], roots)
     if "base64" in data:
         given = str(data["base64"])
-        return given if given.startswith(_PREFIX) else _PREFIX + given
-    url = str(data["url"])
-    if not _public_image_url(url):
-        raise ValueError("image url is not public")
-    return url
+        given = given if given.startswith(_PREFIX) else _PREFIX + given
+        if not _valid_image_base64(given):
+            raise ValueError("image data is invalid")
+        return given
+    raise ValueError("image urls are not allowed")
 
 
 def _safe_message(message) -> bool:
@@ -121,6 +108,8 @@ def _safe_message(message) -> bool:
         if part["type"] in ("image", "record"):
             file = data.get("file")
             if not isinstance(file, str) or not file.startswith(_PREFIX):
+                return False
+            if part["type"] == "image" and not _valid_image_base64(file):
                 return False
     return True
 

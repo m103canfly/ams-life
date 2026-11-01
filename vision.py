@@ -72,7 +72,22 @@ def _bytes(ref):
                 return b''
             data = stickers.fetch_picture(ref)
         else:
+            try:
+                from .adapter_onebot_messenger import _inside
+                from .mixin_selfie import SELFIE_DIR, SHOT_DIR
+                from .mixin_stickers import STICKERS_DIR
+            except ImportError:
+                from adapter_onebot_messenger import _inside
+                from mixin_selfie import SELFIE_DIR, SHOT_DIR
+                from mixin_stickers import STICKERS_DIR
+            if ref.startswith('\\'):
+                return b''
             path = Path(ref)
+            if not path.is_absolute() or '..' in path.parts:
+                return b''
+            path = path.resolve()
+            if not any(_inside(path, root.resolve()) for root in (SELFIE_DIR, SHOT_DIR, STICKERS_DIR / 'img')):
+                return b''
             if not path.is_file() or path.stat().st_size > stickers.MAX_BYTES:
                 return b''
             with path.open('rb') as stream:
