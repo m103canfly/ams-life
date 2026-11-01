@@ -219,7 +219,7 @@ class StickersMixin(PortsMixin):
             return False
         bot = getattr(event, "bot", None)
         sent = False
-        if bot is not None and hasattr(bot, "call_action"):
+        if getattr(self, "_neutral_messenger", None) is not None or (bot is not None and hasattr(bot, "call_action")):
             try:
                 action, params = stickers.send_params(place, b64)
                 if stickers.allowed(action, params, place):
