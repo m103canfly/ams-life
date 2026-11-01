@@ -39,6 +39,10 @@
      "enabled": true,
      "provider": "follow_llm"
     },
+    "life": {
+     "enabled": true,
+     "provider": "follow_llm"
+    },
     "memory_summary": {
      "enabled": true,
      "provider": "follow_llm"
@@ -8780,6 +8784,11 @@
       "enabled": true,
       "provider": "follow_llm"
      },
+     "life": {
+      "default_enabled": true,
+      "enabled": true,
+      "provider": "follow_llm"
+     },
      "memory_summary": {
       "default_enabled": true,
       "enabled": true,
@@ -10309,6 +10318,11 @@
     },
     "insight": {
      "default_enabled": false,
+     "enabled": true,
+     "provider": "follow_llm"
+    },
+    "life": {
+     "default_enabled": true,
      "enabled": true,
      "provider": "follow_llm"
     },

@@ -37,9 +37,38 @@ def exerted(core, amount, now):
     core.physical_fatigue = _clip(core.physical_fatigue + max(0.0, float(amount)), 0, 1)
 
 
+def _chosen_needs(core):
+    """Read optional life intervals once per decay."""
+    path = getattr(core, '_life_now_path', None)
+    if path is None:
+        return []
+    intervals = []
+    try:
+        state_path = getattr(core, '_life_state_path', None)
+        state = json.loads(state_path.read_text(encoding='utf-8')) if state_path and state_path.exists() else {}
+        sleep = state.get('sleep', {})
+        if sleep:
+            intervals.append((float(sleep['start']), float(sleep['end']), True))
+        item = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+        if item.get('source') == 'her':
+            start = datetime.fromisoformat(item['start'])
+            sleeping = item.get('kind', item.get('doing')) == '睡觉'
+            if sleeping and item.get('kind') and type(item.get('minutes')) is int:
+                end = start + timedelta(minutes=max(60, min(720, item['minutes'])))
+            else:
+                earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
+                end = min(daily.next_period(earliest - timedelta(microseconds=1)),
+                          start + timedelta(hours=daily.HER_MAX_HOURS))
+            intervals.append((start.timestamp(), end.timestamp(), sleeping))
+    except (OSError, KeyError, TypeError, ValueError, OverflowError):
+        pass
+    return intervals
+
+
 def _advance_needs(core, start, end):
     cursor = datetime.fromtimestamp(start)
     finish = datetime.fromtimestamp(end)
+    chosen = _chosen_needs(core)
     while cursor < finish:
         boundary = daily.next_period(cursor)
         # Split at 06:00 and 23:00 for the night waking rate.
@@ -52,19 +81,34 @@ def _advance_needs(core, start, end):
         _, doing, _ = daily.schedule(cursor, core.energy, core.v, core.stress)
         if '吃' in doing and cursor < midpoint < boundary:
             boundary = midpoint
+        selected = next(((begin, until, asleep) for begin, until, asleep in chosen
+                         if begin <= cursor.timestamp() < until), None)
+        for begin, until, _ in chosen:
+            for stamp in (begin, until):
+                point = datetime.fromtimestamp(stamp)
+                if cursor < point < boundary:
+                    boundary = point
         stop = min(boundary, finish)
         hours = (stop - cursor).total_seconds() / 3600.0
         sleeping = daily.period_start(cursor).hour == 0 or doing == '睡觉'
+        if selected:
+            sleeping = selected[2]
         if sleeping:
             core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
             core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
-            if stop == period_end:
+            if selected and stop.timestamp() == selected[1] and core.last_sleep_end < selected[1]:
+                # The rates above already recovered this interval. Mark only the wake.
+                slept(core, selected[1], selected[1])
+            elif not selected and stop == period_end:
                 core.last_sleep_end = stop.timestamp()
         else:
             rate = 0.10 if cursor.hour >= 23 or cursor.hour < 6 else 0.06
             core.sleepiness = _clip(core.sleepiness + rate * hours, 0, 1)
             core.physical_fatigue = _clip(core.physical_fatigue + 0.02 * hours, 0, 1)
         core.hunger = _clip(core.hunger + 0.08 * hours, 0, 1)
+        if selected:
+            cursor = stop
+            continue
         if '吃' in doing and stop == midpoint and core.last_meal < midpoint.timestamp():
             ate(core, midpoint.timestamp())
         cursor = stop

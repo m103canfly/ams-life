@@ -236,10 +236,16 @@ class App:
         """Stop the 5-minute loop, the OneBot server, the history and the panel; safe to call twice."""
         self._stopped.set()
         try:
-            task = getattr(self.her, '_autonomy_task', None)
-            if task is not None and not task.done():
+            if self.her is not None:
+                import life_loop
+                await life_loop.stop(self.her)
+            tasks = [getattr(self.her, name, None) for name in (
+                '_autonomy_task', '_sticker_vector_task', '_sticker_relook_task', '_image_idle_task')]
+            tasks = [task for task in tasks if task is not None and not task.done()]
+            for task in tasks:
                 task.cancel()
-                await asyncio.gather(task, return_exceptions=True)
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
             if self.onebot is not None:
                 server, self.onebot = self.onebot, None
                 await server.stop()

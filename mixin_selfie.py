@@ -206,6 +206,9 @@ async def _prepare_photo(plugin, event, queue):
 def _her_now_valid(state, now):
     try:
         start = datetime.fromisoformat(state["start"])
+        if (state.get("source") == "her" and state.get("kind") == "睡觉"
+                and type(state.get("minutes")) is int):
+            return start <= now < start + timedelta(minutes=max(60, min(720, state['minutes'])))
         earliest = start + timedelta(minutes=daily.HER_MIN_MINUTES)
         boundary = daily.next_period(earliest - timedelta(microseconds=1))
         return start <= now < min(boundary, start + timedelta(hours=daily.HER_MAX_HOURS))
@@ -214,13 +217,16 @@ def _her_now_valid(state, now):
 
 
 class SelfieMixin(PortsMixin):
-    def _set_now(self, where, doing, now=None, event=None, minutes=None):
+    def _set_now(self, where, doing, now=None, event=None, minutes=None, source=None, kind=None):
         values = [str(value or "").strip() for value in (where, doing)]
         if any(re.search(r"http|www\.|://|@|\d{5,}", value, re.IGNORECASE) for value in values):
             raise ValueError("invalid now text")
         names = self._browse_names()
         where, doing = (browse.clean_query(value, names=names) for value in values)
-        if any(not value or len(value) > 12 for value in (where, doing)):
+        chosen = source == 'her' and kind is not None
+        if chosen:
+            doing = doing[:40]
+        if not where or len(where) > 12 or not doing or len(doing) > (40 if chosen else 12):
             raise ValueError("invalid now text")
         now = now or datetime.fromtimestamp(time.time())
         here = getattr(self, "_here", None)
@@ -228,11 +234,15 @@ class SelfieMixin(PortsMixin):
         previous = _read_json(NOW_PATH, {})
         same = (isinstance(previous, dict) and previous.get("source") == "her"
                 and previous.get("where") == where and previous.get("doing") == doing
+                and not chosen and 'kind' not in previous
                 and _her_now_valid(previous, now))
         state = dict(previous) if same else {"where": where, "doing": doing,
                                               "start": now.isoformat(), "source": "her", "place": place}
         if isinstance(minutes, int) and not isinstance(minutes, bool):
-            state["minutes"] = max(5, min(240, minutes))
+            low, high = (60, 720) if chosen and kind == '睡觉' else (5, 120) if chosen else (5, 240)
+            state["minutes"] = max(low, min(high, minutes))
+        if chosen:
+            state['kind'] = str(kind)
         _write_json(NOW_PATH, state)
 
     def _now_line(self, event):
@@ -246,7 +256,9 @@ class SelfieMixin(PortsMixin):
                 raise ValueError("invalid now state")
             start = datetime.fromisoformat(state["start"]) if state.get("start") else None
             valid = (start is not None and start <= now and state.get("source") in ("her", "schedule")
-                     and all(isinstance(state.get(k), str) and 0 < len(state[k]) <= 20 for k in ("where", "doing")))
+                     and isinstance(state.get('where'), str) and 0 < len(state['where']) <= 20
+                     and isinstance(state.get('doing'), str)
+                     and 0 < len(state['doing']) <= (40 if state.get('kind') else 20))
             if valid and state["source"] == "her":
                 valid = _her_now_valid(state, now)
             elif valid:

@@ -197,6 +197,13 @@ class AutonomyMixin(PortsMixin):
             task = getattr(self, "_autonomy_task", None)
             if task is None or task.done():
                 self._autonomy_task = asyncio.create_task(self._autonomy_loop())
+            # Her's model is assigned later by App; life checks it on each tick.
+            if type(self).__name__ == 'Her':
+                try:
+                    from . import life_loop
+                except ImportError:
+                    import life_loop
+                life_loop.start(self)
         except Exception:
             pass
 

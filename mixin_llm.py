@@ -428,6 +428,12 @@ class LLMMixin(PortsMixin):
     def _notebook_time_reached(self, now=None) -> bool:
         if not self._llm_allowed("notebook"):
             return False
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        if life_loop.enabled(self):
+            return life_loop.notebook_due(self, time.time() if now is None else now)
         local = time.localtime(time.time() if now is None else now)
         try:
             hh, mm = [int(x) for x in str(getattr(self, "notebook_time", "23:30") or "23:30").split(":")[:2]]
@@ -439,6 +445,12 @@ class LLMMixin(PortsMixin):
         """Tonight's record: which sittings were tried (marked before each call) and how
         many changes were made, kept in self_model.json so a restart does not call again."""
         date = time.strftime("%Y-%m-%d", time.localtime(time.time() if now is None else now))
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        if life_loop.enabled(self):
+            date = life_loop.notebook_day(time.time() if now is None else now)
         night = (self.self_model or {}).get("notebook_night")
         if not isinstance(night, dict) or night.get("date") != date:
             night = {"date": date, "tried": [], "changes": 0}
@@ -558,6 +570,14 @@ class LLMMixin(PortsMixin):
             return False
         now = time.time() if now is None else now
         night = self._notebook_night(now)
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        if life_loop.enabled(self):
+            state = life_loop.read_state()
+            state['notebook_done'] = life_loop.notebook_day(now)
+            life_loop.save_state(state)
         core = self._core(None)
         persona = await self._persona_text(None)
         wrote = False
