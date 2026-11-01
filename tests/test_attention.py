@@ -155,11 +155,11 @@ class WhatSheSends(unittest.TestCase):
         self.assertEqual(at.split('嗯【不说】'), ['嗯【不说】'])
         seven = '【下一条】'.join(str(i) for i in range(7))
         parts = at.split(seven)
-        self.assertEqual(len(parts), 5)
-        self.assertEqual(parts[-1], '4 5 6')
+        self.assertEqual(len(parts), 7)
+        self.assertEqual(parts[-1], '6')
 
     def test_newlines_lists_and_code_blocks(self):
-        self.assertEqual(at.split('a\n\nb\nc\nd\ne\nf'), ['a', 'b', 'c', 'd', 'e f'])
+        self.assertEqual(at.split('a\n\nb\nc\nd\ne\nf'), ['a', 'b', 'c', 'd', 'e', 'f'])
         self.assertEqual(at.split('a\n- one\n- two\nb\n```\nx\ny\n```\nc'),
                          ['a', '- one\n- two', 'b', '```\nx\ny\n```', 'c'])
 
@@ -181,7 +181,7 @@ class WhatSheSends(unittest.TestCase):
     def test_choices_are_told_not_ordered(self):
         self.assertIn('【不说】', at.CHOICES_NOTE)
         self.assertNotIn('【下一条】', at.CHOICES_NOTE)
-        self.assertIn('最多 5 条', at.PIECES_NOTE)
+        self.assertIn('最多不超过 10段', at.PIECES_NOTE)
 
 
 
