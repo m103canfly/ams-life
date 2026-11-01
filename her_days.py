@@ -50,12 +50,12 @@ def archive_notebook(root, entries, deleted_at):
             out.write(json.dumps(dict(entry, deleted_at=deleted_at), ensure_ascii=False) + '\n')
 
 
-def forget_notebook_archive(root, person):
+def forget_notebook_archive(root, person='', source_ids=None):
     path = Path(root) / 'notebook_archive.jsonl'
     if not path.exists():
         return 0
     rows = _rows(path)
-    kept = [row for row in rows if not notebook_about(row, person)]
+    kept = [row for row in rows if not notebook_about(row, person, source_ids)]
     if len(kept) != len(rows):
         _write(path, kept)
     return len(rows) - len(kept)

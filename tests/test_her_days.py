@@ -74,6 +74,44 @@ class HerDays(unittest.TestCase):
 
 
 class NotebookArchive(unittest.IsolatedAsyncioTestCase):
+    async def test_forget_message_removes_only_matching_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            origin = {'where': 'group:900001', 'people': ['10003'], 'source_ids': ['msg-1'], 'visibility': 'public'}
+            entries = [{'id': 'n1', 'origin': origin},
+                       {'id': 'n2', 'origin': dict(origin, source_ids=['msg-2'])}]
+            her_days.archive_notebook(root, entries, 42)
+            plugin = test_basics.make_plugin(harness.FakeContext())
+            with patch.object(mixin_discretion, 'DATA_DIR', root):
+                plugin._forget(source_ids=['msg-1'])
+            rows = [json.loads(line) for line in (root / 'notebook_archive.jsonl').read_text(encoding='utf-8').splitlines()]
+            self.assertEqual(rows, [dict(entries[1], deleted_at=42)])
+
+    async def test_existing_overflow_is_archived(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plugin = test_basics.make_plugin(harness.FakeContext())
+            origin = {'where': 'self', 'people': [], 'source_ids': [], 'visibility': 'self'}
+            entries = [{'id': 'n%d' % i, 'text': 'note %d' % i, 'ts': i, 'origin': origin}
+                       for i in range(mixin_llm.NOTEBOOK_MAX + 1)]
+            plugin.self_model['notebook'] = entries.copy()
+            plugin._notebook_time_reached = lambda now: True
+            plugin._notebook_night = lambda now: {'tried': [], 'changes': 0}
+            plugin._notebook_sittings = lambda now: ['group']
+            plugin._notebook_materials = lambda core, sitting, now: []
+            plugin._core = lambda event: None
+            plugin._persona_text = AsyncMock(return_value='')
+            plugin._llm_v2_call = AsyncMock(return_value=[{'op': 'edit', 'no': 1, 'text': 'edited'}])
+            plugin._job_stale = lambda: False
+            plugin._sitting_origin = lambda sitting, materials: origin
+            plugin._save_self_model = lambda: None
+            with patch.object(mixin_llm, 'DATA_DIR', root):
+                self.assertTrue(await plugin._maybe_write_notebook(now=42))
+            self.assertEqual(len(plugin.self_model['notebook']), mixin_llm.NOTEBOOK_MAX)
+            self.assertEqual(plugin.self_model['notebook'][0]['text'], 'edited')
+            archive = json.loads((root / 'notebook_archive.jsonl').read_text(encoding='utf-8'))
+            self.assertEqual(archive, dict(entries[-1], deleted_at=42))
+
     async def test_delete_archives_and_forget_removes_origin(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

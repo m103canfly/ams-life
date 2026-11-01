@@ -866,8 +866,9 @@ class DiscretionMixin:
                 her_days.Store(DATA_DIR).forget(person)
             except Exception as exc:
                 logger.warning('[ams-life] her days delete failed (%s)', type(exc).__name__)
+        if person or ids:
             try:
-                her_days.forget_notebook_archive(DATA_DIR, person)
+                her_days.forget_notebook_archive(DATA_DIR, person, ids)
             except Exception as exc:
                 logger.warning('[ams-life] notebook archive delete failed (%s)', type(exc).__name__)
         store = self._history_store()
