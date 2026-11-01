@@ -127,10 +127,10 @@ class ReplyContextTests(unittest.IsolatedAsyncioTestCase):
         contexts = self.her._reply_context(self.event())
         self.assertEqual(len(contexts), history_store.CONTEXT_ROWS)
         text = '\n'.join(self.contents(contexts))
-        self.assertIn('话049', text)     # the oldest 50 make room for the newest 200
-        self.assertNotIn('话048', text)
+        self.assertIn('话050', text)     # the oldest 50 make room for the newest 200
+        self.assertNotIn('话049', text)
         self.assertIn('话249', text)
-        self.assertLess(text.index('话049'), text.index('话249'))
+        self.assertLess(text.index('话050'), text.index('话249'))
 
     async def test_her_full_words_come_once(self):
         now = time.time()
