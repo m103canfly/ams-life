@@ -24,6 +24,13 @@ HAS_AIOHTTP = importlib.util.find_spec('aiohttp') is not None
 
 
 class EntryTests(unittest.TestCase):
+    def test_panel_llm_selection_requires_complete_custom_settings(self):
+        self.assertIsNone(app.panel_llm_config({'llm': {'source': 'astrbot'}}))
+        self.assertIsNone(app.panel_llm_config({'llm': {'source': 'custom', 'model': 'made-up-model'}}))
+        self.assertEqual(app.panel_llm_config({'llm': {'source': 'custom',
+                         'base_url': 'https://api.deepseek.com/v1', 'model': 'made-up-model'}}),
+                         ('https://api.deepseek.com/v1', 'made-up-model'))
+
     def test_log_data_directory_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'logs' / 'app.log'
