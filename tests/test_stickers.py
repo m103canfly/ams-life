@@ -156,10 +156,10 @@ class TheLibrary(unittest.TestCase):
 
 
 class InAReply(unittest.TestCase):
-    ROWS = {'a': {'caption': '猫笑', 'emotion': '开心', 'last_used': NOW - 3 * DAY, 'uses': 2},
-            'b': {'caption': '狗哭', 'emotion': '难过', 'last_used': NOW - 3 * DAY, 'uses': 1},
-            'c': {'caption': '猫转圈', 'emotion': '开心', 'last_used': NOW - 60, 'uses': 3},      # just sent
-            'd': {'caption': '无表情', 'emotion': '', 'last_used': NOW - DAY, 'uses': 0}}
+    ROWS = {'a': {'caption': '猫笑', 'emotion': '开心', 'last_used': NOW - 3 * DAY, 'uses': 2, 'source': 'old'},
+            'b': {'caption': '狗哭', 'emotion': '难过', 'last_used': NOW - 3 * DAY, 'uses': 1, 'source': 'old'},
+            'c': {'caption': '猫转圈', 'emotion': '开心', 'last_used': NOW - 60, 'uses': 3, 'source': 'old'},      # just sent
+            'd': {'caption': '无表情', 'emotion': '', 'last_used': NOW - DAY, 'uses': 0, 'source': 'old'}}
 
     def test_a_few_offered_by_topic_and_mood_none_just_sent(self):
         near = lambda r: 1.0 if '猫' in r['caption'] else 0.1
