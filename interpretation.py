@@ -314,7 +314,16 @@ def render_compact(core, memory="", events="", notebook=None, user=None,
         if summary.startswith(_prefix):
             summary = summary[len(_prefix):].lstrip("：:，, ")
             break
-    if summary:
+    gap = cont.get("gap_days")
+    if isinstance(gap, int) and gap >= 3:
+        if cont.get("group"):
+            if summary:
+                out.append("[上次聊到] " + summary)
+            out.append("[上次聊到] 好久没见他了（%d 天）" % gap)
+        else:
+            text = "上次跟他说话是 %d 天前" % gap
+            out.append("[上次聊到] " + text + ("；" + summary if summary else ""))
+    elif summary:
         out.append("[上次聊到] " + summary)
     loops = [x for x in (open_loops or []) if isinstance(x, dict)
              and str(x.get("status") or "open") == "open"] if isinstance(open_loops, (list, tuple)) else []

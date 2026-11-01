@@ -49,13 +49,19 @@ try:
 except ImportError:
     from common import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, browse, turn
+    from . import adapter_astrbot_tools, adapter_astrbot_turn, atomic_file, attention, browse, model_client, tool_loop, turn, turn_runner
+    from .mixin_llm import _counted
 except ImportError:
     import adapter_astrbot_tools
     import adapter_astrbot_turn
     import atomic_file
+    import attention
     import browse
+    import model_client
+    import tool_loop
     import turn
+    import turn_runner
+    from mixin_llm import _counted
 
 BROWSE_DIR = DATA_DIR / "browse"
 QUOTA_ATTR = "_ams_browse_quota"
@@ -67,6 +73,83 @@ STATE_PATH = BROWSE_DIR / "state.json"
 TRIP_UMO = "ams-life:browse"   # the "chat" AstrBot's DeepSeek tools are told on a trip (its config: the default)
 FIRST_LINES = 120              # a page read in a reply is kept by its title and this much of its text
 SEEN_ATTR = "_ams_browse_seen_pages"
+
+
+def _trip_budget_left(plugin):
+    cfg = plugin._attention_cfg()
+    return attention.budget(plugin._spent_today(), cfg["soft"], cfg["hard"]) != "hard"
+
+
+class _TripModel(model_client.ModelClient):
+    def __init__(self, plugin, ledger):
+        self.plugin, self.ledger = plugin, ledger
+        self.model = _counted(plugin, "browse", plugin._neutral_model)
+        self.needs_spend = self.model is plugin._neutral_model
+
+    async def chat(self, **kwargs):
+        if not self.ledger.money_left() or not _trip_budget_left(self.plugin):
+            return model_client.ModelReply("", (), {}, "")
+        reply = await self.model.chat(**kwargs)
+        if self.needs_spend:
+            self.plugin._note_spend("browse", reply)
+        self.ledger.add_usage(reply.usage)
+        return reply
+
+
+def _trip_stand_in():
+    """A stand-in for the message her trip tools read: its "chat", no message, and this trip's count."""
+    stand_in = types.SimpleNamespace(unified_msg_origin=TRIP_UMO, message_obj=None)
+    setattr(stand_in, QUOTA_ATTR, browse.Quota.for_trip())
+    return stand_in
+
+
+async def _standalone_trip(plugin, core, now, ledger, trip):
+    stand_in = _trip_stand_in()
+    tools = [turn.TurnTool(name=browse.SEARCH_TOOL, description=SEARCH_DESCRIPTION.split("一次回话")[0],
+                           parameters=SEARCH_PARAMS, handler=plugin._tool_search),
+             turn.TurnTool(name=browse.READ_TOOL, description=READ_DESCRIPTION.split("一次回话")[0],
+                           parameters=READ_PARAMS, handler=plugin._tool_read)]
+    try:
+        persona = await plugin._persona_text(None)
+    except Exception:
+        persona = ""
+    if getattr(plugin, "browser_interactive_enabled", False):
+        logger.info("[ams-life] browse: 新程序的出门还不带互动浏览器")
+    request = types.SimpleNamespace(tools=tools)
+    messages = [{"role": "user", "content": browse.trip_prompt(plugin._browse_topics(),
+                                                                getattr(stand_in, QUOTA_ATTR))}]
+    try:
+        result = await tool_loop.run(_TripModel(plugin, ledger), system=persona or None, messages=messages,
+                                     tools=turn_runner.loop_tools_of(request, stand_in), max_rounds=browse.TRIP_ROUNDS)
+        final = result.text
+    except Exception as exc:
+        logger.warning("[ams-life] browse: a trip round failed (%s)", type(exc).__name__)
+        final = ""
+    return await _finish_trip(plugin, core, stand_in, trip, final, True)
+
+
+async def _finish_trip(plugin, core, stand_in, trip, final, require_seen):
+    seen = [p["url"] for p in getattr(stand_in, READ_ATTR, None) or []]
+    got = browse.parse_trip(final, seen_urls=seen)
+    if require_seen and not seen:
+        got = {"notes": [], "share": []}
+    kept = 0
+    for note in got["notes"]:
+        if await plugin._remember_web(note, trip, browse.SELF_ASKED_IN):
+            kept += 1
+    if got["share"]:
+        wishes = list((plugin.self_model or {}).get("share_wishes") or [])
+        for share in got["share"]:
+            wishes = browse.add_wish(wishes, share, time.time(), trip)
+        plugin.self_model["share_wishes"] = wishes
+        plugin._save_self_model()
+    try:
+        core.boredom = max(0.0, float(core.boredom) - 0.2)
+        core.novelty_need = max(0.0, float(core.novelty_need) - 0.15)
+    except Exception:
+        pass
+    logger.info("[ams-life] browse: a trip, %d pages kept, %d wishes", kept, len(got["share"]))
+    return {"notes": kept, "share": len(got["share"]), "final": bool(final)}
 
 BROWSER_MIN_CHARS = 200
 BROWSER_SCRIPT_PROMPTS = ("请开启 javascript", "请启用 javascript", "请打开 javascript",
@@ -598,6 +681,8 @@ class BrowseMixin:
         """The 5-minute loop: one trip when browse.should_go says so."""
         if not self._browse_on() or not getattr(self, "browse_trips_enabled", False):
             return False
+        if getattr(self, "_neutral_model", None) is not None and not _trip_budget_left(self):
+            return False
         now = time.time()
         core = self._core(None)
         body = {k: float(getattr(core, k, 0.0) or 0.0) for k in browse.BODY_GATE}
@@ -619,8 +704,12 @@ class BrowseMixin:
     async def _browse_trip(self, core, now) -> dict:
         """One trip: model rounds with the two tools, then what she saw and would like to tell."""
         led = self._browse_ledger()
+        if getattr(self, "_neutral_model", None) is not None and (not led.money_left() or not _trip_budget_left(self)):
+            return {}
         led.add(trips=1)
         trip = "trip-%d" % int(now)
+        if getattr(self, "_neutral_model", None) is not None:
+            return await _standalone_trip(self, core, now, led, trip)
         try:
             from astrbot.core.agent.tool import FunctionTool, ToolSet
             provider = await self.context.get_using_provider_async("")
@@ -630,8 +719,7 @@ class BrowseMixin:
         if provider is None:
             return {}
         # a stand-in for the message AstrBot's DeepSeek tools read: its "chat", and this trip's count
-        stand_in = types.SimpleNamespace(unified_msg_origin=TRIP_UMO, message_obj=None)
-        setattr(stand_in, QUOTA_ATTR, browse.Quota.for_trip())
+        stand_in = _trip_stand_in()
         tools = ToolSet([
             FunctionTool(name=browse.SEARCH_TOOL, description=SEARCH_DESCRIPTION.split("一次回话")[0],
                          parameters=SEARCH_PARAMS, handler=self._tool_search),
