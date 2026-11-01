@@ -96,9 +96,15 @@ class _TripModel(model_client.ModelClient):
         return reply
 
 
-async def _standalone_trip(plugin, core, now, ledger, trip):
+def _trip_stand_in():
+    """A stand-in for the message her trip tools read: its "chat", no message, and this trip's count."""
     stand_in = types.SimpleNamespace(unified_msg_origin=TRIP_UMO, message_obj=None)
     setattr(stand_in, QUOTA_ATTR, browse.Quota.for_trip())
+    return stand_in
+
+
+async def _standalone_trip(plugin, core, now, ledger, trip):
+    stand_in = _trip_stand_in()
     tools = [turn.TurnTool(name=browse.SEARCH_TOOL, description=SEARCH_DESCRIPTION.split("一次回话")[0],
                            parameters=SEARCH_PARAMS, handler=plugin._tool_search),
              turn.TurnTool(name=browse.READ_TOOL, description=READ_DESCRIPTION.split("一次回话")[0],
@@ -713,8 +719,7 @@ class BrowseMixin:
         if provider is None:
             return {}
         # a stand-in for the message AstrBot's DeepSeek tools read: its "chat", and this trip's count
-        stand_in = types.SimpleNamespace(unified_msg_origin=TRIP_UMO, message_obj=None)
-        setattr(stand_in, QUOTA_ATTR, browse.Quota.for_trip())
+        stand_in = _trip_stand_in()
         tools = ToolSet([
             FunctionTool(name=browse.SEARCH_TOOL, description=SEARCH_DESCRIPTION.split("一次回话")[0],
                          parameters=SEARCH_PARAMS, handler=self._tool_search),
