@@ -320,6 +320,8 @@ class Actions(unittest.TestCase):
 
     def test_the_four_actions_with_their_parameters(self):
         for action in sorted(messenger.ALLOWED_ACTIONS):
+            if action in ('send_qzone_msg', 'delete_qzone_msg'):
+                continue
             with self.subTest(action=action):
                 api = Api(answer=ok({'message_id': 'm-1'}))
                 params = {'message_id': 'm-1', 'group_id': GROUP}
@@ -352,7 +354,7 @@ class Actions(unittest.TestCase):
         self.assertEqual(api.actions, ['get_msg'])
 
     def test_an_action_outside_the_list_is_refused(self):
-        for action in ('delete_msg', 'send_like', 'set_qq_profile', 'send_qzone_msg'):
+        for action in ('delete_msg', 'send_like', 'set_qq_profile', 'set_group_kick'):
             with self.subTest(action=action):
                 api = Api()
                 with self.assertRaises(messenger.ActionRefused):

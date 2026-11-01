@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 import re
+from difflib import SequenceMatcher
 
 try:
     from . import discretion, everyday_words
@@ -111,7 +112,7 @@ def cosine(a, b) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def check(reply, forbidden, allowed="", common=(), reply_vec=None, leak=LEAK_COSINE, close=CLOSE_COSINE) -> dict:
+def check(reply, forbidden, allowed="", common=(), reply_vec=None, leak=LEAK_COSINE, close=CLOSE_COSINE, user_text="") -> dict:
     """Does `reply` bring up anything of `forbidden`?
 
     forbidden  [{"id", "text" (may be ""), "private": bool, "names": [...], "vec": [...] or None}]: the things
@@ -125,10 +126,19 @@ def check(reply, forbidden, allowed="", common=(), reply_vec=None, leak=LEAK_COS
     out = {"leak": False, "ids": [], "why": {}, "close": [], "top": 0.0}
     if not reply.strip() or not forbidden:
         return out
-    said = pieces(reply)
+    compared = reply
+    if user_text:
+        matches = SequenceMatcher(None, reply, str(user_text), autojunk=False).get_matching_blocks()
+        chars = list(reply)
+        for match in matches:
+            if match.size:
+                chars[match.a:match.a + match.size] = " " * match.size
+        compared = "".join(chars)
+    said = pieces(compared)
     ok = pieces(allowed) | set(common or ()) | _everyday()
     allowed_text = str(allowed or "")
-    hint = bool(_HINT.search(norm(reply)))
+    hint = bool(compared.strip() and (_HINT.search(norm(reply)) or
+                re.search(r"私聊.{0,6}(?:说|讲|提)", norm(reply))))
     for item in forbidden:
         iid = str(item.get("id") or "")
         why = []
@@ -145,7 +155,7 @@ def check(reply, forbidden, allowed="", common=(), reply_vec=None, leak=LEAK_COS
             elif c >= close:
                 out["close"].append((iid, round(c, 3)))
         for name in item.get("names") or []:
-            if mentions(reply, name) and not mentions(allowed_text, name):
+            if mentions(reply, name) and (item.get("strict_names") or not mentions(allowed_text, name)):
                 why.append("name")
                 break
         if why:

@@ -379,11 +379,10 @@ class TurnMixin:
                 parts.append({"type": "text", "text": _compact, "_no_save": True})
             else:
                 turn_request.system_prompt = (_base + "\n\n" + _compact).strip()
-        if _global:
-            self._note_allowed(event, turn_request, _compact)
-            if _offer:   # offered sticker labels are not words said here
-                _note = self._check_note(event)
-                _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
+        self._note_allowed(event, turn_request, _compact)
+        if _offer:
+            _note = self._check_note(event)
+            _note["allowed"] = str(_note.get("allowed") or "").replace(self._for_model(_offer, event), "")
 
     async def _after_reply(self, event, reply):
         """Her reply after the model: kept, checked, shaped and sent. Works through a reply handle only (adapter_astrbot_turn.reply_handle)."""
@@ -426,7 +425,7 @@ class TurnMixin:
             self._phone_queue(event).clear()
             self._stop(event)
             return
-        if getattr(self, "global_memory", False) and _reply.strip():
+        if _reply.strip():
             # step 2: the last look before it is sent; "" = nothing is sent and nothing kept.
             # If the look itself fails, the reply is held back as if it leaked.
             try:
@@ -435,6 +434,7 @@ class TurnMixin:
                 _reply = self._check_failed(event, exc, reply)
             if not _reply:
                 self._phone_queue(event).clear()
+                self._stop(event)
                 return
             # said once more: a mark in the new words is taken out too
             if _reply != _before_check:

@@ -19,10 +19,10 @@ except ImportError:
 
 try:
     from .mixin_ports import PortsMixin
-    from .mixin_discretion import recall_permission, recall_anonymize
+    from .mixin_discretion import recall_permission, recall_anonymize, forbid_dropped
 except ImportError:
     from mixin_ports import PortsMixin
-    from mixin_discretion import recall_permission, recall_anonymize
+    from mixin_discretion import recall_permission, recall_anonymize, forbid_dropped
 
 
 class MemoryMixin(PortsMixin):
@@ -1681,6 +1681,7 @@ class MemoryMixin(PortsMixin):
                             if isinstance(e, dict) and not e.get("deleted")
                             and not (_this_turn_id and str(e.get("id") or "") == _this_turn_id)}
             _foreign = []
+            _dropped = []
             for _where, _entry in ([] if _global else self._cross_session_memory_entries(event)):
                 _etext = str(_entry.get("text") or "").strip()
                 if not _etext or _etext in _known_texts:
@@ -1700,8 +1701,12 @@ class MemoryMixin(PortsMixin):
                     # it would have come up, but it was told in private elsewhere: held back
                     # here (only its id is noted, for the brain map)
                     _held.append((_escore, str(_entry.get("id") or "")))
+                    _dropped.append((_escore, _entry))
                     continue
                 _foreign.append((_escore, _verdict, _entry))
+            for _score, _entry in sorted(_dropped, key=lambda item: item[0], reverse=True)[:2]:
+                forbid_dropped(self, event, "memory", _entry, str(_entry.get("text") or ""),
+                               _entry.get("vector"))
             _foreign.sort(key=lambda item: item[0], reverse=True)
             _numbers = None   # the numbers she knows, looked up once for these lines
             for _escore, _verdict, _entry in _foreign[:2]:

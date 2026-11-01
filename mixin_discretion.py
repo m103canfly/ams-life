@@ -69,6 +69,22 @@ def recall_anonymize(plugin, text, item):
     return plugin._anonymized(str(text or ""), names)
 
 
+def forbid_dropped(plugin, event, kind, item, text, vec=None):
+    """Keep only dropped private sources for the final reply check."""
+    origin = discretion.origin_of(item)
+    sources = origin.get("recall_sources") or [origin]
+    private = [s for s in sources if isinstance(s, dict) and
+               (str(s.get("where") or "").startswith("private:") or
+                (str(s.get("where") or "").startswith("group:") and
+                 s.get("visibility") == discretion.PRIVATE))]
+    if not private:
+        return
+    group_private = all(str(s.get("where") or "").startswith("group:") for s in private)
+    people = list(origin.get("people") or []) + [str(item.get("sender_id") or "")]
+    plugin._forbid(event, kind + ":" + str(item.get("id") or ""), text,
+                   [] if group_private else people, vec)
+
+
 _RELATIONSHIP_PRIVATE_FIELDS = ("transactive_map", "destination_map", "social_world",
                                 "milestones", "we_memory", "annotations")
 
@@ -733,6 +749,7 @@ class DiscretionMixin:
                 continue
             v = recall_permission(self, item, event)
             if v == discretion.DROP:
+                forbid_dropped(self, event, "note", item, str(item.get("text") or ""))
                 continue
             text = str(item.get("text") or "")
             if v == discretion.ANON:

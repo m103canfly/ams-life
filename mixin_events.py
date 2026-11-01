@@ -13,12 +13,12 @@ except ImportError:
     from body import *  # noqa: F401,F403
 try:
     from . import adapter_astrbot_turn, digest, events
-    from .mixin_discretion import recall_permission, recall_anonymize
+    from .mixin_discretion import recall_permission, recall_anonymize, forbid_dropped
 except ImportError:
     import adapter_astrbot_turn
     import digest
     import events
-    from mixin_discretion import recall_permission, recall_anonymize
+    from mixin_discretion import recall_permission, recall_anonymize, forbid_dropped
 
 
 def _source_text(item):
@@ -1267,6 +1267,14 @@ class EventsMixin(PortsMixin):
         archive = self._event_archive(60)
         if getattr(self, "global_memory", False):
             return self._labeled_event_context(event, archive)
+        candidates = [e for e in archive if isinstance(e, dict) and not digest.is_digest(e)][:9]
+        candidates.sort(key=lambda e: float(e.get("importance", 0.0) or 0.0) *
+                        (0.5 + 0.5 * float(e.get("centrality", 0.5) or 0.5)), reverse=True)
+        for ev in candidates[:3]:
+            if recall_permission(self, ev, event) == discretion.DROP:
+                words = "\n".join(str(ev.get(k) or "") for k in
+                                  ("title", "central_details", "event", "meaning_to_her", "reflection"))
+                forbid_dropped(self, event, "event", ev, words, ev.get("event_embedding"))
         events = self._visible_events(event, [e for e in archive if not digest.is_digest(e)])[:9]
         events = sorted(events, key=lambda e: float(e.get("importance", 0.0) or 0.0) *
                         (0.5 + 0.5 * float(e.get("centrality", 0.5) or 0.5)), reverse=True)[:3]
@@ -1320,7 +1328,7 @@ class EventsMixin(PortsMixin):
                         words[1] = str(ev.get("event") or "").strip()
                     self._forbid(event, "event:" + str(ev.get("id") or ""),
                                  "\n".join(x for x in words if x),
-                                 [] if group_private else origin["people"])
+                                 [] if group_private else origin["people"], ev.get("event_embedding"))
             old_count += 1
         labeled = []
         for ev in [e for e in archive if not digest.is_digest(e)]:
@@ -1360,7 +1368,7 @@ class EventsMixin(PortsMixin):
                                  str(ev.get("meaning_to_her") or "").strip()]
                         self._forbid(event, "event:" + str(ev.get("id") or ""),
                                      "\n".join(x for x in words if x),
-                                     [] if group_private else origin["people"])
+                                     [] if group_private else origin["people"], ev.get("event_embedding"))
                     continue
                 lab = self._label_for(ev, event, present=present)
                 if permission == discretion.ANON:
@@ -1382,7 +1390,7 @@ class EventsMixin(PortsMixin):
             if lab["may"] == discretion.NO:   # the last look before sending (send_check)
                 self._forbid(event, "event:" + str(ev.get("id") or ""), "\n".join(x for x in (title, body, meaning) if x),
                              [] if origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
-                             else people)
+                             else people, ev.get("event_embedding"))
             elif lab["may"] == discretion.ANON:
                 self._forbid_names(event, "event:" + str(ev.get("id") or ""), people)
             if body:

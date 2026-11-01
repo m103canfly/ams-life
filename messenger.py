@@ -24,7 +24,7 @@ except ImportError:
 
 # The platform actions she may ask for, and nothing else.
 # fetch_ptt_text reads only: QQ's own speech-to-text for one voice.
-ALLOWED_ACTIONS = frozenset(("get_msg", "get_forward_msg", "send_group_msg", "send_private_msg", "fetch_ptt_text"))
+ALLOWED_ACTIONS = frozenset(("get_msg", "get_forward_msg", "send_group_msg", "send_private_msg", "fetch_ptt_text", "send_qzone_msg", "delete_qzone_msg"))
 # What a message she sends may be made of.
 SEND_TYPES = ("text", "face", "image", "record")
 _IMAGE_KEYS = ("path", "base64", "url")   # an image takes exactly one of these

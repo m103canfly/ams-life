@@ -154,9 +154,9 @@ class PrivateStaysPrivate(unittest.TestCase):
         self.assertTrue(all(not x['names'] for x in r['forbidden']))
         self.assertEqual(r['sent'], '')
 
-    def test_global_memory_off_skips_send_check(self):
+    def test_global_memory_off_runs_send_check(self):
         r = run_case('keep_in_group')
-        self.assertEqual(r['off_calls'], [])
+        self.assertEqual(r['off_calls'], ['allowed', 'look'])
         self.assertEqual(r['off_reply'], '芒果最近好像挺忙的')
 
     def test_narrowing_only_invalidates_the_same_group(self):
