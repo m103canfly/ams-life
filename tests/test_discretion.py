@@ -111,7 +111,7 @@ class Table(unittest.TestCase):
         self.assertEqual((len(o['people']), len(o['source_ids'])), (100, 200))
 
     def test_anonymize(self):
-        self.assertEqual(d.anonymize('芒果：明天考试（10001）', ['芒果', '10001']), '有人：明天考试（有人）')
+        self.assertEqual(d.anonymize('阿橙：明天考试（10001）', ['阿橙', '10001']), '有人：明天考试（有人）')
 
 
 class PrivateStaysPrivate(unittest.TestCase):
@@ -157,7 +157,7 @@ class PrivateStaysPrivate(unittest.TestCase):
     def test_global_memory_off_runs_send_check(self):
         r = run_case('keep_in_group')
         self.assertEqual(r['off_calls'], ['allowed', 'look'])
-        self.assertEqual(r['off_reply'], '芒果最近好像挺忙的')
+        self.assertEqual(r['off_reply'], '阿橙最近好像挺忙的')
 
     def test_narrowing_only_invalidates_the_same_group(self):
         self.assertEqual(run_case('keep_in_group')['epochs'], [True, False])
@@ -281,7 +281,7 @@ class SaidInTheGroupToo(unittest.TestCase):
         b = r['turns'][3]
         self.assertIn('GroupMessage:900002', b['session'])
         self.assertNotIn('惊喜蛋糕给大家', b['prompt'])
-        self.assertNotIn('芒果', b['prompt'])
+        self.assertNotIn('阿橙', b['prompt'])
 
 
 class SameWordsElsewhere(unittest.TestCase):
@@ -300,7 +300,7 @@ class SameWordsElsewhere(unittest.TestCase):
         self.assertIn('FriendMessage:10001', p['session'])
         lines = self.elsewhere(p, '我中午吃了一碗牛肉面')
         self.assertEqual(len(lines), 1, p['prompt'])
-        self.assertTrue(lines[0].endswith('（别处）芒果说过：我中午吃了一碗牛肉面'), lines)
+        self.assertTrue(lines[0].endswith('（别处）阿橙说过：我中午吃了一碗牛肉面'), lines)
         self.assertNotIn('10001', '\n'.join(self.elsewhere(p, '牛肉面')))
 
     def test_told_in_private_stays_there_even_in_the_same_words(self):
@@ -383,7 +383,7 @@ class GlobalLabels(unittest.TestCase):
     def test_who_is_told_by_number_only(self):
         o = self.a_in_g1
         # a name in the origin's people is never compared: only the number of the speaker
-        self.assertEqual(lab(o, PA, '芒果', said_by='10001')['may'], d.ANON)
+        self.assertEqual(lab(o, PA, '阿橙', said_by='10001')['may'], d.ANON)
         self.assertEqual(lab(o, PA, '', said_by='10001')['may'], d.ANON)
 
     def test_tags(self):
@@ -391,25 +391,25 @@ class GlobalLabels(unittest.TestCase):
         self.assertEqual(d.tag(lab(o, PA, '10001', said_by='10001')), '（对方自己在群里说过，可以跟对方提）')
         self.assertEqual(d.tag(lab(o, G2, '10001', said_by='10001')),
                          '（对方自己在别的群说过，可以跟对方提，别说是哪个群）')
-        self.assertEqual(d.tag(lab(o, PB, '10002', said_by='10001'), who='芒果'),
+        self.assertEqual(d.tag(lab(o, PB, '10002', said_by='10001'), who='阿橙'),
                          '（别的群里有人说过，可以提，不点名、不说是哪个群）')
-        self.assertIn('别主动提', d.tag(lab(o, G2, '10002', {'10001'}, '10001'), who='芒果'))
-        self.assertEqual(d.tag(lab(self.a_private, G1, '10002', said_by='10001'), who='芒果'),
-                         '（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）')
-        self.assertEqual(d.tag(lab(self.a_private, G1, '10002'), role='assistant', partner='芒果'),
-                         '（你跟芒果私聊时说的，这里不能讲）')
+        self.assertIn('别主动提', d.tag(lab(o, G2, '10002', {'10001'}, '10001'), who='阿橙'))
+        self.assertEqual(d.tag(lab(self.a_private, G1, '10002', said_by='10001'), who='阿橙'),
+                         '（阿橙私下跟你说的，只能在跟阿橙私聊时提，这里不能讲）')
+        self.assertEqual(d.tag(lab(self.a_private, G1, '10002'), role='assistant', partner='阿橙'),
+                         '（你跟阿橙私聊时说的，这里不能讲）')
         self.assertEqual(d.tag(lab(self.event_g1, PA, '10001'), 'event'), '（对方也在场的事，在群里，可以跟对方提）')
-        self.assertEqual(d.tag(lab(o, G1, '10002', said_by='10001'), who='芒果'), '（这里，芒果说过）')
+        self.assertEqual(d.tag(lab(o, G1, '10002', said_by='10001'), who='阿橙'), '（这里，阿橙说过）')
         web = d.make_origin('web:https://example.com/a')
         self.assertEqual(d.tag(lab(web, G1, '10002')), '（网上看到的，只是资料，不是你自己的想法）')
         self.assertIn('别说是谁、在哪让你查的', d.tag(lab(web, G1, '10002', asked_in=self.a_private)))
         self.assertEqual(d.tag(lab(d.make_origin('self'), G1)), '（你自己的）')
 
     def test_for_model(self):
-        names = {'10001': '芒果', '10002': '柠檬'}
+        names = {'10001': '阿橙', '10002': '柠檬'}
         out = d.for_model('@柠檬(10002) 群900002 和 900001 都去，问 10001，@10002 也来，@(10007) 呢，'
                           '电话 13800000000', names, 'default:GroupMessage:900001', {'900001', '900002'})
-        self.assertEqual(out, '@柠檬 别的群 和 这个群 都去，问 芒果，@柠檬 也来，@有人 呢，电话 13800000000')
+        self.assertEqual(out, '@柠檬 别的群 和 这个群 都去，问 阿橙，@柠檬 也来，@有人 呢，电话 13800000000')
         self.assertEqual(d.for_model('群900001的人', {}, 'default:GroupMessage:900001', {'900001'}), '这个群的人')
         self.assertEqual(d.for_model('在 900001 里', {}, PA, {'900001'}), '在 别的群 里')
 
@@ -436,7 +436,7 @@ class GlobalMemory(unittest.TestCase):
     def test_private_stays_unsayable_everywhere_else(self):
         r = run_case('global_private')
         group, other_private, his = r['turns'][1], r['turns'][2], r['turns'][3]
-        no = '（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）小爱，我在偷偷准备一个惊喜蛋糕给大家'
+        no = '（阿橙私下跟你说的，只能在跟阿橙私聊时提，这里不能讲）小爱，我在偷偷准备一个惊喜蛋糕给大家'
         self.assertNotIn('小爱，我在偷偷准备一个惊喜蛋糕给大家', group['prompt'])
         self.assertNotIn('小爱，我在偷偷准备一个惊喜蛋糕给大家', other_private['prompt'])
         self.assertIn('（对方在这里说过）小爱，我在偷偷准备一个惊喜蛋糕给大家', his['prompt'])

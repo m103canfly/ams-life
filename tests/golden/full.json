@@ -134,7 +134,7 @@
       "m我还是好生气"
      ],
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "senders": [
       "10001"
      ],
@@ -158,7 +158,7 @@
         "m我还是好生气"
        ],
        "sender_id": "10001",
-       "sender_name": "芒果",
+       "sender_name": "阿橙",
        "session": "private:10001",
        "ts": 1793272490.0
       }
@@ -268,7 +268,7 @@
       "m真的受够了！"
      ],
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "senders": [
       "10001",
       "self"
@@ -280,7 +280,7 @@
         "m真的受够了！"
        ],
        "sender_id": "10001",
-       "sender_name": "芒果",
+       "sender_name": "阿橙",
        "session": "private:10001",
        "ts": 1793271870.0
       },
@@ -311,7 +311,7 @@
         "m真的受够了！"
        ],
        "sender_id": "10001",
-       "sender_name": "芒果",
+       "sender_name": "阿橙",
        "session": "private:10001",
        "ts": 1793271870.0
       },
@@ -1186,7 +1186,7 @@
       "m我还是好生气"
      ],
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "senders": [
       "10001"
      ],
@@ -1210,7 +1210,7 @@
         "m我还是好生气"
        ],
        "sender_id": "10001",
-       "sender_name": "芒果",
+       "sender_name": "阿橙",
        "session": "private:10001",
        "ts": 1793272490.0
       }
@@ -1320,7 +1320,7 @@
       "m真的受够了！"
      ],
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "senders": [
       "10001",
       "self"
@@ -1332,7 +1332,7 @@
         "m真的受够了！"
        ],
        "sender_id": "10001",
-       "sender_name": "芒果",
+       "sender_name": "阿橙",
        "session": "private:10001",
        "ts": 1793271870.0
       },
@@ -1363,7 +1363,7 @@
         "m真的受够了！"
        ],
        "sender_id": "10001",
-       "sender_name": "芒果",
+       "sender_name": "阿橙",
        "session": "private:10001",
        "ts": 1793271870.0
       },
@@ -2242,7 +2242,7 @@
      "destabilized_until": 1793012370.0,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.408,
      "encoding_emotion": "neutral",
@@ -2282,7 +2282,7 @@
        "m小爱早呀，今"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793000000.0
      },
@@ -2296,7 +2296,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "stability_days": 1.8,
@@ -2374,7 +2374,7 @@
      "conflict": false,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.402,
      "encoding_emotion": "neutral",
@@ -2412,7 +2412,7 @@
        "m就唱上次那首"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793000090.0
      },
@@ -2422,7 +2422,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
@@ -2509,7 +2509,7 @@
      "destabilized_until": 1793098770.0,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.439,
      "encoding_emotion": "neutral",
@@ -2549,7 +2549,7 @@
        "m明天要考试了"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793011740.0
      },
@@ -2563,7 +2563,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "stability_days": 1.8,
@@ -2642,7 +2642,7 @@
      "conflict": false,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.442,
      "encoding_emotion": "neutral",
@@ -2680,7 +2680,7 @@
        "m你还记得我早"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793011770.0
      },
@@ -2690,7 +2690,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
@@ -2767,7 +2767,7 @@
      "conflict": false,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.369,
      "encoding_emotion": "neutral",
@@ -2806,7 +2806,7 @@
        "m小爱 我考完"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793098170.0
      },
@@ -2816,7 +2816,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 1,
@@ -2893,7 +2893,7 @@
      "conflict": false,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.43,
      "encoding_emotion": "neutral",
@@ -2931,7 +2931,7 @@
        "m小爱 我好难"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793271800.0
      },
@@ -2941,7 +2941,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
@@ -3036,7 +3036,7 @@
      "conflict": false,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.462,
      "encoding_emotion": "sadness",
@@ -3074,7 +3074,7 @@
        "m今天被骂了 "
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793271820.0
      },
@@ -3084,7 +3084,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
@@ -3165,7 +3165,7 @@
      "destabilized_until": 1793272470.0,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.46,
      "encoding_emotion": "sadness",
@@ -3212,7 +3212,7 @@
        "m气死我了！！"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793271840.0
      },
@@ -3226,7 +3226,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "stability_days": 1.8,
@@ -3305,7 +3305,7 @@
      "destabilized_until": 1793273090.0,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.612,
      "encoding_emotion": "anger",
@@ -3345,7 +3345,7 @@
        "m真的受够了！"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793271870.0
      },
@@ -3358,7 +3358,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "stability_days": 1.8,
@@ -3436,7 +3436,7 @@
      "conflict": false,
      "destination": {
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      },
      "encoding_arousal": 0.61,
      "encoding_emotion": "anger",
@@ -3474,7 +3474,7 @@
        "m我还是好生气"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "session": "private:10001",
       "ts": 1793272490.0
      },
@@ -3484,7 +3484,7 @@
      "scope": "user",
      "self_defining": false,
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sensitive": false,
      "sensitivity": 0.0,
      "suppression_count": 0,
@@ -6993,7 +6993,7 @@
      },
      "role": "user",
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "text": "小爱 我好难过 想哭",
      "ts": 1793271800.0
     },
@@ -7026,7 +7026,7 @@
      },
      "role": "user",
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "text": "今天被骂了 真的很委屈",
      "ts": 1793271820.0
     },
@@ -7059,7 +7059,7 @@
      },
      "role": "user",
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "text": "气死我了！！！他凭什么这样说我",
      "ts": 1793271840.0
     },
@@ -7092,7 +7092,7 @@
      },
      "role": "user",
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "text": "真的受够了！！！气死了！！！",
      "ts": 1793271870.0
     },
@@ -7125,7 +7125,7 @@
      },
      "role": "user",
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "text": "我还是好生气！！！凭什么啊！！！",
      "ts": 1793272490.0
     },
@@ -7804,7 +7804,7 @@
    "interactions": 10,
    "last_seen": 1793272490.0,
    "names": [
-    "芒果"
+    "阿橙"
    ],
    "relationship": {
     "absence": {
@@ -7830,7 +7830,7 @@
       "last_ts": 1793271870.0,
       "latest_text": "真的受够了！！！气死了！！！",
       "sender_id": "10001",
-      "sender_name": "芒果"
+      "sender_name": "阿橙"
      }
     },
     "investment": 0.1925,
@@ -8023,7 +8023,7 @@
     "we_memory": []
    },
    "sender_id": "10001",
-   "sender_name": "芒果",
+   "sender_name": "阿橙",
    "sessions": [
     "private:10001"
    ],
@@ -10017,7 +10017,7 @@
        "m真的受够了！"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "senders": [
        "10001",
        "self"
@@ -10029,7 +10029,7 @@
          "m真的受够了！"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793271870.0
        },
@@ -10060,7 +10060,7 @@
          "m真的受够了！"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793271870.0
        },
@@ -10148,7 +10148,7 @@
        "m我还是好生气"
       ],
       "sender_id": "10001",
-      "sender_name": "芒果",
+      "sender_name": "阿橙",
       "senders": [
        "10001"
       ],
@@ -10172,7 +10172,7 @@
          "m我还是好生气"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793272490.0
        }
@@ -10688,7 +10688,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.4563,
@@ -10712,7 +10712,7 @@
          "m小爱早呀，今"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793000000.0
        },
@@ -10763,7 +10763,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.4324,
@@ -10787,7 +10787,7 @@
          "m就唱上次那首"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793000090.0
        },
@@ -10838,7 +10838,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.4955,
@@ -10862,7 +10862,7 @@
          "m明天要考试了"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793011740.0
        },
@@ -10913,7 +10913,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.4745,
@@ -10937,7 +10937,7 @@
          "m你还记得我早"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793011770.0
        },
@@ -10988,7 +10988,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.4431,
@@ -11012,7 +11012,7 @@
          "m小爱 我考完"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793098170.0
        },
@@ -11063,7 +11063,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.4753,
@@ -11087,7 +11087,7 @@
          "m小爱 我好难"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793271800.0
        },
@@ -11138,7 +11138,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.5387,
@@ -11162,7 +11162,7 @@
          "m今天被骂了 "
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793271820.0
        },
@@ -11213,7 +11213,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 1,
        "effective_importance": 0.5809,
@@ -11237,7 +11237,7 @@
          "m气死我了！！"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793271840.0
        },
@@ -11288,7 +11288,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.6508,
@@ -11312,7 +11312,7 @@
          "m真的受够了！"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793271870.0
        },
@@ -11363,7 +11363,7 @@
        "conflict": false,
        "destination": {
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        },
        "effective_assoc": 0,
        "effective_importance": 0.627,
@@ -11387,7 +11387,7 @@
          "m我还是好生气"
         ],
         "sender_id": "10001",
-        "sender_name": "芒果",
+        "sender_name": "阿橙",
         "session": "private:10001",
         "ts": 1793272490.0
        },
@@ -12397,7 +12397,7 @@
         "last_ts": 1793271870.0,
         "latest_text": "真的受够了！！！气死了！！！",
         "sender_id": "10001",
-        "sender_name": "芒果"
+        "sender_name": "阿橙"
        }
       },
       "investment": 0.1925,
@@ -12589,7 +12589,7 @@
       "we_memory": []
      },
      "sender_id": "10001",
-     "sender_name": "芒果",
+     "sender_name": "阿橙",
      "sessions": [
       "private:10001"
      ],
@@ -13155,7 +13155,7 @@
   {
    "clean": "上次那首嘛~",
    "inject": [
-    "[她现在] 心情平平。\n[她跟对方] 认识，常聊今天想听你唱歌、你可以的\n[她想起来的] 芒果说过：小爱早呀，今天想听你唱歌\n[没做完的] 明天要考试了 好紧张\n此刻：在家，正在吃晚饭（从 18:00 开始，已经 49 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
+    "[她现在] 心情平平。\n[她跟对方] 认识，常聊今天想听你唱歌、你可以的\n[她想起来的] 阿橙说过：小爱早呀，今天想听你唱歌\n[没做完的] 明天要考试了 好紧张\n此刻：在家，正在吃晚饭（从 18:00 开始，已经 49 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -13163,7 +13163,7 @@
   {
    "clean": "考得怎么样？",
    "inject": [
-    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识，常聊上次那首嘛、今天想听你唱歌\n[她想起来的] 芒果说过：明天要考试了 好紧张\n[没做完的] 明天要考试了 好紧张\n此刻：在家，正在吃晚饭（从 18:00 开始，已经 49 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
+    "[她现在] 心情平平。各处这会儿都挺安静。\n[她跟对方] 认识，常聊上次那首嘛、今天想听你唱歌\n[她想起来的] 阿橙说过：明天要考试了 好紧张\n[没做完的] 明天要考试了 好紧张\n此刻：在家，正在吃晚饭（从 18:00 开始，已经 49 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -13243,7 +13243,7 @@
   {
    "clean": "先别气坏自己",
    "inject": [
-    "[她现在] 心里有点沉。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 芒果说过：气死我了！！！他凭什么这样说我；她自己说过：我在呢，听着也好难过；（别处）有人说过：太开心了！！！我终于抽到了！！！\n此刻：在外面，正在吃晚饭（从 18:00 开始，已经 1 小时 4 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
+    "[她现在] 心里有点沉。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 阿橙说过：气死我了！！！他凭什么这样说我；她自己说过：我在呢，听着也好难过；（别处）有人说过：太开心了！！！我终于抽到了！！！\n此刻：在外面，正在吃晚饭（从 18:00 开始，已经 1 小时 4 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
@@ -13251,7 +13251,7 @@
   {
    "clean": "我陪着你，真让人生气",
    "inject": [
-    "[她现在] 心里有点沉。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 芒果说过：气死我了！！！他凭什么这样说我；芒果说过：真的受够了！！！气死了！！！；她自己说过：我在呢，听着也好难过\n此刻：在外面，正在吃晚饭（从 18:00 开始，已经 1 小时 14 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
+    "[她现在] 心里有点沉。\n[她跟对方] 认识，常聊小爱、上次那首嘛\n[她想起来的] 阿橙说过：气死我了！！！他凭什么这样说我；阿橙说过：真的受够了！！！气死了！！！；她自己说过：我在呢，听着也好难过\n此刻：在外面，正在吃晚饭（从 18:00 开始，已经 1 小时 14 分钟）。\n你们之间记下的日子：还没有。\n绝大多数时候只写一段（发一条）。只有在确有必要时才可以分段（最多不超过 10段）。一段里别换行。"
    ],
    "session": "default:FriendMessage:10001",
    "system": "你是小爱。"
