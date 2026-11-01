@@ -90,3 +90,28 @@ class VoiceOnce(unittest.IsolatedAsyncioTestCase):
     async def test_tool_returns_voice_instruction(self):
         self.prepare()
         self.assertEqual(await self.her._tool_say_aloud(self.event(), '晚安朋友'), mixin_selfie.VOICE_QUEUED)
+
+    async def test_voice_only_is_kept_and_in_next_turn_history(self):
+        self.prepare()
+        self.her._embed_text = AsyncMock()
+        event = await self.run_voice('窗边很安静', '窗边很安静')
+        rows = self.store.recent('group:900001')
+        self.assertEqual([row['role'] for row in rows], ['user', 'assistant'])
+        self.assertIn(event.incoming.text, rows[0]['content'])
+        self.assertEqual(rows[1]['content'], '[语音] 窗边很安静')
+        self.fake.say('知道了')
+        await turn_runner.run_turn(self.her, self.event())
+        messages = self.fake.requests[-1]['messages']
+        self.assertIn({'role': 'user', 'content': rows[0]['content']}, messages)
+        self.assertIn({'role': 'assistant', 'content': '[语音] 窗边很安静'}, messages)
+
+    async def test_unsent_voice_is_not_kept(self):
+        self.prepare()
+        self.her._embed_text = AsyncMock()
+        self.her._phone_clear.return_value = False
+        await self.run_voice('窗边很安静', '窗边很安静')
+        self.assertEqual(self.store.recent('group:900001'), [])
+        self.her._phone_clear.return_value = True
+        self.sends.fail = True
+        await self.run_voice('窗边很安静', '窗边很安静')
+        self.assertEqual(self.store.recent('group:900001'), [])

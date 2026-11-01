@@ -75,8 +75,9 @@ class HerLookTests(unittest.IsolatedAsyncioTestCase):
         self.plugin._phone_account = Mock()
         self.plugin._phone_price = Mock(return_value=0)
         self.plugin._phone_path = Mock(return_value=self.root / 'photo.png')
-        with patch.object(phone, 'REF_DIR', self.root):
-            await self.plugin._make_photo('selfie', '在家拍照')
+        with patch.object(phone, 'REF_DIR', self.root), patch.object(self.plugin, '_phone_clear', AsyncMock(return_value=True)):
+            await phone._prepare_photo(self.plugin, self.event, self.event._ams_phone_queue)
+            self.assertTrue(self.event._ams_phone_queue['photo_path'])
             prompt = self.plugin._post_selfie.await_args.args[1]
             self.assertIn('今天的打扮：宽松卫衣', prompt)
             self.assertIn('最近的样子：浅蓝色发尾', prompt)

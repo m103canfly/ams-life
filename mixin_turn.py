@@ -475,6 +475,7 @@ class TurnMixin:
                 self._check_note(event)["sent"] = _reply
                 if not _reply.strip():
                     from copy import copy
+                    event._ams_voice_history = {"text": _queue["voice"]}
                     _voice_only_event = copy(event)
                     self._stop(event)
         if _reply.strip() and "photo" in _queue:
@@ -607,8 +608,13 @@ class TurnMixin:
             return
         try:
             if event.is_stopped():
+                pending = getattr(event, "_ams_voice_history", None)
+                if pending is not None:
+                    pending["request"] = turn_request
+                    pending["reply"] = reply
                 return
-            sent = self._check_note(event).get("sent")
+            pending = getattr(event, "_ams_voice_history", None)
+            sent = "[语音] " + pending["text"] if pending is not None else self._check_note(event).get("sent")
             text = sent if sent is not None else reply.text
             if not str(text or "").strip():
                 return

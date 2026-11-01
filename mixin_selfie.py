@@ -324,12 +324,9 @@ class SelfieMixin(PortsMixin):
             parameters={"type": "object", "properties": {"where": {"type": "string", "maxLength": 12},
             "doing": {"type": "string", "maxLength": 12}, "minutes": {"type": "integer", "description": "大概做多久（分钟，5–240）"}}, "required": ["where", "doing"]}, handler=self._tool_set_now)]
         if cfg.get("photo_enabled", False):
-            async def set_look(event, today="", change=""):
-                return await look.set_look(self, event, LOOK_PATH, today, change)
-
             tools.append(turn.TurnTool(name="set_look", description="定今天的打扮，也可以记下样子的变化。" + context,
                 parameters={"type": "object", "properties": {"today": {"type": "string", "maxLength": 30},
-                "change": {"type": "string", "maxLength": 30}}, "required": ["today"]}, handler=set_look))
+                "change": {"type": "string", "maxLength": 30}}, "required": ["today"]}, handler=self._tool_set_look))
             try:
                 recent = [" ".join(str(x.get("text") or "").split())[:60] for x in self._window_replies(event, 3)]
             except Exception:
@@ -372,6 +369,9 @@ class SelfieMixin(PortsMixin):
         if queue is None:
             queue = event._ams_phone_queue = {}
         return queue
+
+    async def _tool_set_look(self, event, today="", change=""):
+        return await look.set_look(self, event, LOOK_PATH, today, change)
 
     async def _tool_take_photo(self, event, kind="", what="", where="", doing="", caption=""):
         queue = self._phone_queue(event)
@@ -688,8 +688,11 @@ class SelfieMixin(PortsMixin):
                 else:
                     path = await self._make_voice(queue["voice"])
                 if path and not (hasattr(event, "is_stopped") and event.is_stopped()):
-                    await self._messenger(event, as_event=True).send(
+                    result = await self._messenger(event, as_event=True).send(
                         here, (events.Segment("record", {"path": str(path)}),))
+                    history = getattr(event, "_ams_voice_history", None)
+                    if history and getattr(result, "ok", False) and "request" in history:
+                        self._keep_turn(event, history["request"], history["reply"])
                     self._phone_account("voice", sent=True)
                     self._note_she_sent(event, "voice")
                     self._phone_prune("voice")

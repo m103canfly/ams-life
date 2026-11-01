@@ -127,7 +127,7 @@ class PhoneTools(unittest.TestCase):
 
     def test_both_routes_make_the_same_tools(self):
         switches = (({'photo_enabled': True, 'screenshot_enabled': True, 'say_aloud_enabled': True},
-                     ['set_now', 'take_photo', 'share_screenshot', 'say_aloud']),
+                     ['set_now', 'set_look', 'take_photo', 'share_screenshot', 'say_aloud']),
                     ({}, ['set_now']),
                     ({'say_aloud_enabled': True}, ['set_now', 'say_aloud']))
         for config, expected in switches:

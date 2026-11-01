@@ -156,7 +156,8 @@ class Split(unittest.TestCase):
         # move 5e-4b: +1 (_keep_turn)
         # L1: +3 (_keep_likeness, page_likeness, page_likeness_rate).
         # move 5e-27: +1 (page_sticker_scope).
-        self.assertEqual(len(methods), 509)
+        # Stable phone tool handler: +1 (_tool_set_look).
+        self.assertEqual(len(methods), 510)
 
     def test_backup_lists_every_module(self):
         import mixin_pages
