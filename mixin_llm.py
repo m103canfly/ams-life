@@ -631,7 +631,7 @@ class LLMMixin(PortsMixin):
             return
         try:
             user_data = self._user_record(event)
-            rel = self._relationship_of(user_data)
+            rel = self._relationship_of(self._user_view(event, user_data))
             marks = [m for m in (rel.get("milestones") or []) if isinstance(m, dict)]
             allowed = [str(m.get("key") or m.get("type") or "") for m in marks
                        if str(m.get("key") or m.get("type") or "")]

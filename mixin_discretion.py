@@ -69,6 +69,53 @@ def recall_anonymize(plugin, text, item):
     return plugin._anonymized(str(text or ""), names)
 
 
+_RELATIONSHIP_PRIVATE_FIELDS = ("transactive_map", "destination_map", "social_world",
+                                "milestones", "we_memory", "annotations")
+
+
+def _relationship_event_sources():
+    """Read all archived event origins without deduplication or maintenance."""
+    try:
+        with EVENT_ARCHIVE_PATH.open(encoding="utf-8") as archive:
+            for line in archive:
+                try:
+                    item = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(item, dict):
+                    yield item
+    except OSError:
+        return
+
+
+def _relationship_text_view(plugin, event, relationship, sources):
+    """Keep legacy entries and entries whose known sources may be recalled here."""
+    index = {}
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        refs = [source.get("id")] + list(discretion.origin_of(source)["source_ids"])
+        for ref in refs:
+            if ref:
+                index.setdefault(str(ref), []).append(source)
+
+    def allowed(item):
+        if not isinstance(item, dict):
+            return True
+        refs = list(item.get("source_ids") or []) + list(item.get("evidence_refs") or [])
+        found = [source for ref in refs for source in index.get(str(ref), [])]
+        return all(recall_permission(plugin, source, event) == discretion.SAY for source in found)
+
+    result = dict(relationship)
+    for key in _RELATIONSHIP_PRIVATE_FIELDS:
+        value = result.get(key)
+        if isinstance(value, list):
+            result[key] = [item for item in value if allowed(item)]
+        elif isinstance(value, dict):
+            result[key] = {name: item for name, item in value.items() if allowed(item)}
+    return result
+
+
 class DiscretionMixin:
     def _narrow_group_sources(self, place, source_ids):
         """Narrow already-written derivatives of the messages preceding a request."""
@@ -846,15 +893,15 @@ class DiscretionMixin:
         return []
 
     def _user_view(self, event, user_data) -> dict:
-        """The speaker's record as shown here: shared memories only in his own private chat.
-
-        Shared ("we") memories carry no origin; outside his private chat they are
-        left out rather than risk repeating something he only said in private.
-        """
+        """Select relationship text for the subject's own private chat only."""
         if not isinstance(user_data, dict):
             return user_data
         sid, _name = self._speaker(event)
-        if self._here(event) == "private:" + str(sid or ""):
+        rel = user_data.get("relationship")
+        if not isinstance(rel, dict):
+            return user_data
+        subject = str(user_data.get("sender_id") or sid or "")
+        if subject and subject == str(sid or "") and self._here(event) == "private:" + subject:
             # Old relationship text has no origin. If it could have been drawn
             # from a group-private message, do not show those text fields here.
             items = list(self._read_library(vectors=False).get("entries") or [])
@@ -864,14 +911,13 @@ class DiscretionMixin:
             restricted = any(discretion.origin_of(x)["where"].startswith("group:")
                              and discretion.origin_of(x)["visibility"] == discretion.PRIVATE
                              and str(sid) in discretion.origin_of(x)["people"] for x in items)
-            rel = user_data.get("relationship")
-            if restricted and isinstance(rel, dict):
-                return dict(user_data, relationship=dict(rel, we_memory=[], transactive_map={}))
-            return user_data
-        rel = user_data.get("relationship")
-        if not isinstance(rel, dict) or not rel.get("we_memory"):
-            return user_data
-        return dict(user_data, relationship=dict(rel, we_memory=[]))
+            sources = items + list(_relationship_event_sources())
+            rel = _relationship_text_view(self, event, rel, sources)
+            if restricted:
+                rel.update(we_memory=[], transactive_map={})
+            return dict(user_data, relationship=rel)
+        return dict(user_data, relationship={k: v for k, v in rel.items()
+                                             if k not in _RELATIONSHIP_PRIVATE_FIELDS})
 
     # ------------------------------------------------------------------
     # Forgetting: delete for real, by person or by source message.
