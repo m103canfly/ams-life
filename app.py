@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import importlib
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import sys
 from pathlib import Path
@@ -52,10 +53,34 @@ class App:
         self.args, self.model = args, model
         self.her = self.history = self.onebot = self.panel = None
         self._stopped = asyncio.Event()
+        self._log_handler = None
+        self._log_level = None
 
     async def start(self):
         """Start everything; {'onebot': port or None, 'panel': port}. A failure stops what started."""
-        root = prepare_data(self.args.data)
+        log_path = getattr(self.args, 'log', None)
+        if log_path and self._log_handler is None:
+            path = Path(log_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            handler = RotatingFileHandler(path, maxBytes=2 * 1024 * 1024, backupCount=5, encoding='utf-8')
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+            root_logger = logging.getLogger()
+            self._log_level = root_logger.level
+            if root_logger.level > logging.INFO:
+                root_logger.setLevel(logging.INFO)
+            root_logger.addHandler(handler)
+            self._log_handler = handler
+        try:
+            root = prepare_data(self.args.data)
+        except DataDirectoryError as error:
+            if self._log_handler is not None:
+                logger.info('%s', error)
+            await self.stop()
+            raise
+        except BaseException:
+            await self.stop()
+            raise
         import app_config
         import persona_file
         import panel_api
@@ -109,6 +134,8 @@ class App:
                 onebot_port = await self.onebot.start()
             else:
                 print('Please fill in the keys in the panel.')
+                if self._log_handler is not None:
+                    logger.info('Please fill in the keys in the panel.')
             panel_api.install_request_shim()
             self.panel = PanelServer(root=ROOT / 'pages', keys=keys,
                                      key_names=('deepseek', 'vision', 'napcat'),
@@ -117,6 +144,8 @@ class App:
                                      start_page='dashboard/')
             panel_port = await self.panel.start()
             print('OneBot port: %s; panel port: %s' % (onebot_port, panel_port))
+            if self._log_handler is not None:
+                logger.info('OneBot port: %s; panel port: %s', onebot_port, panel_port)
             return {'onebot': onebot_port, 'panel': panel_port}
         except BaseException:
             await self.stop()
@@ -167,19 +196,28 @@ class App:
     async def stop(self):
         """Stop the 5-minute loop, the OneBot server, the history and the panel; safe to call twice."""
         self._stopped.set()
-        task = getattr(self.her, '_autonomy_task', None)
-        if task is not None and not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-        if self.onebot is not None:
-            server, self.onebot = self.onebot, None
-            await server.stop()
-        if self.history is not None:
-            history, self.history = self.history, None
-            history.close()
-        if self.panel is not None:
-            panel, self.panel = self.panel, None
-            await panel.stop()
+        try:
+            task = getattr(self.her, '_autonomy_task', None)
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            if self.onebot is not None:
+                server, self.onebot = self.onebot, None
+                await server.stop()
+            if self.history is not None:
+                history, self.history = self.history, None
+                history.close()
+            if self.panel is not None:
+                panel, self.panel = self.panel, None
+                await panel.stop()
+        finally:
+            if self._log_handler is not None:
+                root_logger = logging.getLogger()
+                root_logger.removeHandler(self._log_handler)
+                self._log_handler.close()
+                self._log_handler = None
+                root_logger.setLevel(self._log_level)
+                self._log_level = None
 
 
 async def run(args, model=None):
@@ -204,6 +242,7 @@ def main(argv=None):
     parser.add_argument('--panel-port', type=int, default=0)
     parser.add_argument('--model', default='deepseek-chat')
     parser.add_argument('--history', type=int, default=20)
+    parser.add_argument('--log')
     return asyncio.run(run(parser.parse_args(argv)))
 
 
