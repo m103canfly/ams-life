@@ -111,7 +111,8 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.p.calls), 1)
 
     async def test_private_quiet_once_and_later_messages_delay_it(self):
-        self.chosen(minutes=120)
+        # Only while she is dazing (not busy with a chosen thing) does quiet reach her.
+        self.chosen(action='什么都不干', minutes=120)
         start = self.clock()
         self.p.windows['private:10001'] = [{'role': 'assistant', 'ts': start}]
         await self.tick(5)
@@ -124,7 +125,7 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.p.calls), 1)
 
     async def test_called_group_and_only_that_places_silence(self):
-        self.chosen(minutes=120)
+        self.chosen(action='什么都不干', minutes=120)
         self.p.windows['group:900001'] = [{'role': 'user', 'ts': self.clock()}]
         life.note_called(self.p, SimpleNamespace(place='group:900001', at_me=True))
         await self.tick(9)
@@ -135,7 +136,7 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.p.calls), 1)
 
     async def test_unaddressed_group_never_triggers(self):
-        self.chosen(minutes=120)
+        self.chosen(action='什么都不干', minutes=120)
         self.p.windows['group:900001'] = [{'role': 'user', 'ts': self.clock()}]
         life.note_called(self.p, SimpleNamespace(place='group:900001', at_me=False))
         await self.tick(10)
@@ -242,7 +243,10 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.rows()[1]['liked'], '很好吃')
 
     async def test_sleep_kind_eight_hours_no_interrupt_and_outfit(self):
-        self.p.core.sleepiness = self.p.core.physical_fatigue = .9
+        # At 22:45, 0.678 is eight hours above the night's 0.15 waking line.
+        self.clock.advance(12 * 3600 + 45 * 60)
+        self.p.core.last_tick = self.clock()
+        self.p.core.sleepiness, self.p.core.physical_fatigue = .678, .9
         self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 480}
         await self.tick()
         item = life.current()
@@ -265,16 +269,20 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(look.read_look(phone.LOOK_PATH, self.now().date()), '虚构蓝色上衣')
 
     async def test_sleep_recovery_never_double_counts_and_awake_at_night(self):
+        # At 10:00 with 0.9 she naps 90 minutes; the day's 0.45 line is miles away.
         self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 60}
         self.p.core.sleepiness, self.p.core.physical_fatigue = .9, .8
         await self.tick()
         await self.tick(30)
-        self.assertAlmostEqual(self.p.core.sleepiness, .775)
+        self.assertAlmostEqual(self.p.core.sleepiness, .867)
         self.assertAlmostEqual(self.p.core.physical_fatigue, .75)
         self.p.answer = {'do': '休息', 'detail': '在家里坐着', 'minutes': 5}
         await self.tick(30)
-        self.assertAlmostEqual(self.p.core.sleepiness, .65)
-        self.assertAlmostEqual(self.p.core.physical_fatigue, .7 - .10 * 5 / 60)
+        self.assertAlmostEqual(self.p.core.sleepiness, .834)
+        self.assertAlmostEqual(self.p.core.physical_fatigue, .7)
+        await self.tick(30)
+        self.assertAlmostEqual(self.p.core.sleepiness, .801)
+        self.assertAlmostEqual(self.p.core.physical_fatigue, .65 - .10 * 5 / 60)
         old_wake = self.p.core.last_sleep_end
         await self.tick(1)
         self.assertEqual(self.p.core.last_sleep_end, old_wake)
@@ -283,9 +291,9 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.chosen(action='什么都不干', minutes=120)
         self.p.core.sleepiness = .1
         await self.tick(30)
-        self.assertAlmostEqual(self.p.core.sleepiness, .15)
+        self.assertAlmostEqual(self.p.core.sleepiness, .13)
 
-    async def test_fractional_clock_sleep_eight_hours_marks_integer_wake_once(self):
+    async def test_fractional_clock_nap_twenty_minutes_marks_integer_wake_once(self):
         self.clock.advance(.456789)
         self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 480}
         await self.tick()
@@ -293,7 +301,7 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(type(sleep['start']), int)
         self.assertIs(type(sleep['end']), int)
         self.assertEqual(sleep['start'], int(self.clock()))
-        self.assertEqual(sleep['end'], sleep['start'] + 480 * 60)
+        self.assertEqual(sleep['end'], sleep['start'] + 20 * 60)
         self.assertEqual(datetime.fromisoformat(life.current()['start']).timestamp(), sleep['start'])
         self.clock.advance(sleep['end'] - self.clock() - 1)
         await self.tick()
@@ -321,6 +329,7 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         settled.assert_called_once_with(self.p.core, int(end), int(end))
 
     async def test_sleep_restart_restores_checkpoint_and_recovers_offline_once(self):
+        # At 10:00 with 0.9 she naps 90 minutes, so the restart is still within the sleep.
         self.p.core.sleepiness, self.p.core.physical_fatigue = .9, .8
         self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 120}
         await self.tick()
@@ -328,11 +337,11 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.clock.advance(30 * 60)
         self.p = Person()
         await self.tick()
-        self.assertAlmostEqual(self.p.core.sleepiness, .65)
+        self.assertAlmostEqual(self.p.core.sleepiness, .834)
         self.assertAlmostEqual(self.p.core.physical_fatigue, .7)
-        await self.tick(30)
-        self.assertAlmostEqual(self.p.core.sleepiness, .525)
-        self.assertAlmostEqual(self.p.core.physical_fatigue, .65)
+        await self.tick(20)
+        self.assertAlmostEqual(self.p.core.sleepiness, .812)
+        self.assertAlmostEqual(self.p.core.physical_fatigue, .7 - .10 * 20 / 60)
         self.assertEqual(self.p.calls, [])
 
     async def test_expired_sleep_still_settles_after_now_line_fallback(self):
@@ -344,21 +353,22 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(life.current()['source'], 'schedule')
         self.p.answer = {'do': '吃饭'}
         await self.tick()
-        self.assertEqual(self.p.core.last_sleep_end, start + 3600)
+        self.assertEqual(self.p.core.last_sleep_end, start + 20 * 60)
         self.assertEqual(len(self.p.calls), 2)
 
     async def test_wake_settles_even_after_a_recent_chat_decay(self):
+        # At 10:00 with 0.9 she naps 90 minutes; the chat decays her 15 seconds before waking.
         self.p.core.sleepiness = .9
         self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 60}
         await self.tick()
         start = self.clock()
-        self.clock.advance(3585)
+        self.clock.advance(90 * 60 - 15)
         self.p.core._decay_to_now()
         self.clock.advance(15)
         self.p.answer = {'do': '什么都不干'}
         await self.tick()
-        self.assertEqual(self.p.core.last_sleep_end, start + 3600)
-        self.assertAlmostEqual(self.p.core.sleepiness, .65)
+        self.assertEqual(self.p.core.last_sleep_end, start + 90 * 60)
+        self.assertAlmostEqual(self.p.core.sleepiness, .801)
 
     async def test_chosen_awake_skips_scheduled_meal(self):
         self.clock.advance(2 * 3600)

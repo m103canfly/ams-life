@@ -33,7 +33,7 @@ class BodyNeedsTests(unittest.TestCase):
             core = body.BioCore()
         with patch('time.time', return_value=(start + timedelta(hours=4)).timestamp()):
             core._decay_to_now()
-        self.assertAlmostEqual(core.sleepiness, 0.44)
+        self.assertAlmostEqual(core.sleepiness, 0.34)
         self.assertAlmostEqual(core.hunger, 0.62)
         self.assertAlmostEqual(core.physical_fatigue, 0.18)
         day = next(datetime(2026, 10, 1) + timedelta(days=i) for i in range(31)
@@ -44,7 +44,7 @@ class BodyNeedsTests(unittest.TestCase):
         core.sleepiness, core.physical_fatigue = 0.9, 0.5
         with patch('time.time', return_value=(start + timedelta(hours=2)).timestamp()):
             core._decay_to_now()
-        self.assertAlmostEqual(core.sleepiness, 0.4)
+        self.assertAlmostEqual(core.sleepiness, 0.768)
         self.assertEqual(core.last_sleep_end, (start + timedelta(hours=2)).timestamp())
 
     def test_midnight_preparing_sleep_is_asleep_but_evening_is_awake(self):
@@ -56,7 +56,7 @@ class BodyNeedsTests(unittest.TestCase):
         wake = day + timedelta(hours=7)
         with patch('time.time', return_value=wake.timestamp()):
             core._decay_to_now()
-        self.assertEqual(core.sleepiness, 0)
+        self.assertAlmostEqual(core.sleepiness, 0.438)
         self.assertAlmostEqual(core.physical_fatigue, 0.1)
         self.assertEqual(core.last_sleep_end, wake.timestamp())
 
@@ -66,7 +66,7 @@ class BodyNeedsTests(unittest.TestCase):
         with patch.object(daily, 'schedule', return_value=('家', '准备睡觉', evening)):
             with patch('time.time', return_value=(evening + timedelta(hours=1)).timestamp()):
                 core._decay_to_now()
-        self.assertAlmostEqual(core.sleepiness, 0.26)
+        self.assertAlmostEqual(core.sleepiness, 0.235)
         self.assertEqual(core.last_sleep_end, evening.timestamp())
 
     def test_meal_midpoint_and_later_hunger(self):
@@ -90,7 +90,8 @@ class BodyNeedsTests(unittest.TestCase):
         self.assertEqual((core.hunger, core.last_meal), (0.1, 100))
         core.sleepiness = core.physical_fatigue = 0.5
         body.slept(core, 100, 3700)
-        self.assertEqual((core.sleepiness, core.physical_fatigue, core.last_sleep_end), (0.25, 0.4, 3700))
+        self.assertAlmostEqual(core.sleepiness, 0.434)
+        self.assertEqual((core.physical_fatigue, core.last_sleep_end), (0.4, 3700))
         body.rested(core, 60, 4000)
         self.assertAlmostEqual(core.physical_fatigue, 0.3)
         self.assertEqual(core.last_rest, 4000)
