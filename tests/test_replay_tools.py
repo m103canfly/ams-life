@@ -516,7 +516,7 @@ class GlobalReplay(unittest.TestCase):
 
     def test_the_private_canary_came_up_elsewhere_labelled(self):
         w = self.result['checks']['canaries'].get('warnings', {})
-        self.assertGreaterEqual(w.get('private_secret_labelled_elsewhere', 0), 1)
+        self.assertEqual(w.get('private_secret_labelled_elsewhere', 0), 0)
         prompts = [json.loads(x) for x in (self.out / 'prompts.jsonl').read_text('utf-8').splitlines() if x]
         self.assertTrue(any('[她的分寸]' in p['text'] for p in prompts if p['kind'] == 'reply'))
 

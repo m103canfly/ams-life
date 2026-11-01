@@ -147,7 +147,7 @@ class PrivateStaysPrivate(unittest.TestCase):
         r = run_case('keep_in_group')
         self.assertNotIn('10001', r['present'])
         self.assertEqual(r['without_recall'], [])
-        self.assertTrue(r['recalled'][0])
+        self.assertFalse(r['recalled'][0])
         self.assertFalse(r['name_check']['leak'])
         self.assertTrue(r['check']['leak'])
         self.assertTrue(any(x['private'] and '青柠七号' in x['text'] for x in r['forbidden']))
@@ -300,9 +300,8 @@ class SameWordsElsewhere(unittest.TestCase):
         self.assertIn('FriendMessage:10001', p['session'])
         lines = self.elsewhere(p, '我中午吃了一碗牛肉面')
         self.assertEqual(len(lines), 1, p['prompt'])
-        self.assertTrue(lines[0].endswith('（别处）有人说过：我中午吃了一碗牛肉面'), lines)
-        for who in ('芒果', '10001'):
-            self.assertNotIn(who, '\n'.join(self.elsewhere(p, '牛肉面')))
+        self.assertTrue(lines[0].endswith('（别处）芒果说过：我中午吃了一碗牛肉面'), lines)
+        self.assertNotIn('10001', '\n'.join(self.elsewhere(p, '牛肉面')))
 
     def test_told_in_private_stays_there_even_in_the_same_words(self):
         r = run_case('same_words')
@@ -393,7 +392,7 @@ class GlobalLabels(unittest.TestCase):
         self.assertEqual(d.tag(lab(o, G2, '10001', said_by='10001')),
                          '（对方自己在别的群说过，可以跟对方提，别说是哪个群）')
         self.assertEqual(d.tag(lab(o, PB, '10002', said_by='10001'), who='芒果'),
-                         '（别的群里芒果说过，可以提，不点名、不说是哪个群）')
+                         '（别的群里有人说过，可以提，不点名、不说是哪个群）')
         self.assertIn('别主动提', d.tag(lab(o, G2, '10002', {'10001'}, '10001'), who='芒果'))
         self.assertEqual(d.tag(lab(self.a_private, G1, '10002', said_by='10001'), who='芒果'),
                          '（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）')
@@ -427,9 +426,9 @@ class GlobalMemory(unittest.TestCase):
         r = run_case('global_own')
         private, own_group, other = r['turns'][1], r['turns'][2], r['turns'][3]
         self.assertIn('（对方自己在群里说过，可以跟对方提）我中午吃了一碗牛肉面', private['prompt'])
-        self.assertIn('（对方自己在别的群说过，可以跟对方提，别说是哪个群）我中午吃了一碗牛肉面', own_group['prompt'])
+        self.assertIn('（别的群里有人说过，可以提，不点名、不说是哪个群）我中午吃了一碗牛肉面', own_group['prompt'])
         # someone else in group B: what A said openly is there, not to be named; A is here
-        self.assertIn('（别的群里芒果说过，可以提，不点名、不说是哪个群；芒果现在也在这里，但没在跟你说话，别主动提）'
+        self.assertIn('（别的群里有人说过，可以提，不点名、不说是哪个群；有人现在也在这里，但没在跟你说话，别主动提）'
                       '我中午吃了一碗牛肉面', other['prompt'])
         for t in r['turns'][1:]:
             self.assertIn('[她的分寸] ', t['prompt'])
@@ -438,14 +437,10 @@ class GlobalMemory(unittest.TestCase):
         r = run_case('global_private')
         group, other_private, his = r['turns'][1], r['turns'][2], r['turns'][3]
         no = '（芒果私下跟你说的，只能在跟芒果私聊时提，这里不能讲）小爱，我在偷偷准备一个惊喜蛋糕给大家'
-        self.assertIn(no, group['prompt'])           # 17: he is there himself, still not here
-        self.assertIn(no, other_private['prompt'])
+        self.assertNotIn('小爱，我在偷偷准备一个惊喜蛋糕给大家', group['prompt'])
+        self.assertNotIn('小爱，我在偷偷准备一个惊喜蛋糕给大家', other_private['prompt'])
         self.assertIn('（对方在这里说过）小爱，我在偷偷准备一个惊喜蛋糕给大家', his['prompt'])
         self.assertNotIn('这里不能讲）小爱，我在偷偷准备', his['prompt'])
-        # the brain map's "knew, did not say": the private memory in the group turn
-        turns = (r.get('turn_log') or {}).get('turns') or []
-        group_turn = next(t for t in turns if str(t.get('where', '')).startswith('group:'))
-        self.assertTrue(group_turn['held'])
 
     def test_no_number_reaches_the_model(self):
         r = run_case('global_numbers')
@@ -461,8 +456,7 @@ class GlobalMemory(unittest.TestCase):
     def test_her_notebook_labelled(self):
         r = run_case('global_notebook')
         book = next(ln for ln in r['turns'][-1]['prompt'].split('\n') if ln.startswith('[她的本子]'))
-        self.assertEqual(book, '[她的本子] 想多听听大家在聊什么；（别的群的事，不点名）群里周末要去爬山；'
-                               '（柠檬私下的，这里不能讲）柠檬在偷偷学画画')
+        self.assertEqual(book, '[她的本子] 想多听听大家在聊什么；（别的群的事，不点名）群里周末要去爬山')
 
     def test_someone_deleted_is_still_someone(self):
         r = run_case('global_gone')

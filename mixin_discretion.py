@@ -35,6 +35,40 @@ _EVENT_TEXT_FIELDS = ("title", "event", "central_details", "meaning_to_her", "re
                       "big_summary", "small_summary", "peripheral_details")
 
 
+def recall_permission(plugin, item, event):
+    """Apply prompt recall rules using the stored neutral session list."""
+    def member_of(person, group):
+        if not (person.isascii() and person.isdigit()):
+            return False
+        cache = getattr(event, "_ams_member_of", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            try:
+                event._ams_member_of = cache
+            except (AttributeError, TypeError):
+                pass
+        if person not in cache:
+            try:
+                data = json.loads((USER_DIR / (person + ".json")).read_text(encoding="utf-8"))
+                sessions = data.get("sessions")
+                cache[person] = {discretion.place_of(s) for s in sessions if isinstance(s, str)} if isinstance(sessions, list) else set()
+            except (OSError, ValueError, AttributeError):
+                cache[person] = set()
+        return "group:" + group in cache[person]
+    config = getattr(plugin, "config", {})
+    shared = config.get("shared_groups", []) if isinstance(config, dict) else []
+    return discretion.may_recall(discretion.origin_of(item), plugin._here(event),
+                                 str(plugin._speaker(event)[0] or ""), member_of, shared)
+
+
+def recall_anonymize(plugin, text, item):
+    """Remove names and numeric identifiers before text enters a prompt."""
+    names = discretion.names_in(item)
+    if isinstance(item, dict) and isinstance(item.get("names"), list):
+        names += item["names"]
+    return plugin._anonymized(str(text or ""), names)
+
+
 class DiscretionMixin:
     def _narrow_group_sources(self, place, source_ids):
         """Narrow already-written derivatives of the messages preceding a request."""
@@ -625,7 +659,7 @@ class DiscretionMixin:
         for ev in events or []:
             if not isinstance(ev, dict):
                 continue
-            v = discretion.verdict(discretion.origin_of(ev), here)
+            v = recall_permission(self, ev, event)
             if v == discretion.DROP:
                 continue
             if v == discretion.ANON:
@@ -634,7 +668,7 @@ class DiscretionMixin:
                 ev = dict(ev)
                 for key in _EVENT_TEXT_FIELDS:
                     if ev.get(key):
-                        ev[key] = discretion.anonymize(discretion.hide_numbers(ev[key], numbers), names)
+                        ev[key] = recall_anonymize(self, ev[key], ev)
             out.append(ev)
         return out
 
@@ -650,14 +684,13 @@ class DiscretionMixin:
         for item in (self.self_model or {}).get("notebook") or []:
             if not isinstance(item, dict):
                 continue
-            v = discretion.verdict(discretion.origin_of(item), here)
+            v = recall_permission(self, item, event)
             if v == discretion.DROP:
                 continue
             text = str(item.get("text") or "")
             if v == discretion.ANON:
                 numbers = self._known_numbers() if numbers is None else numbers
-                text = self._anonymized(text, discretion.origin_of(item)["people"] + list(item.get("names") or []),
-                                        numbers)
+                text = recall_anonymize(self, text, item)
             if text:
                 lines.append(text)
         return lines
@@ -764,9 +797,23 @@ class DiscretionMixin:
             if not isinstance(item, dict):
                 continue
             lab = self._label_for(item, event, present=present)
-            if lab["may"] == discretion.HIDE:
+            permission = recall_permission(self, item, event)
+            if permission == discretion.DROP:
+                if lab["may"] == discretion.NO:
+                    text = str(item.get("text") or "")
+                    origin = discretion.origin_of(item)
+                    people = origin["people"]
+                    group_private = origin["where"].startswith("group:") and origin["visibility"] == discretion.PRIVATE
+                    self._forbid(event, "note:" + str(item.get("id") or text[:12]), text,
+                                 [] if group_private else people)
                 continue
+            if permission == discretion.ANON:
+                lab.update(may=discretion.ANON, where_ok=False, yours=False)
+            elif lab["may"] in (discretion.HIDE, discretion.NO, discretion.ANON):
+                lab.update(may=discretion.SAY, where_ok=True)
             text = str(item.get("text") or "")
+            if permission == discretion.ANON:
+                text = recall_anonymize(self, text, item)
             origin = discretion.origin_of(item)
             people = origin["people"]
             if lab["may"] == discretion.NO:   # the last look before sending (send_check)
