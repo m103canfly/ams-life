@@ -8,7 +8,7 @@ try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
     from .mixin_phone import _expand_forward, _phone_line, _history_original
-    from . import adapter_astrbot_turn, attention, stickers, likeness, mixin_selfie
+    from . import adapter_astrbot_turn, attention, stickers, likeness, mixin_selfie, weather
 except ImportError:
     from common import *  # noqa: F401,F403
     from body import *  # noqa: F401,F403
@@ -18,6 +18,7 @@ except ImportError:
     import stickers
     import likeness
     import mixin_selfie
+    import weather
 
 
 def _copies_owner_rule(reply, rules):
@@ -341,11 +342,13 @@ class TurnMixin:
             _compact = (_compact + "\n" + _slang).strip()
         if not _img.replace("[BioCore Image]", "").strip() and _has_non_sticker_image(event):
             _compact = (_compact + "\n[图] " + attention.UNSEEN_IMAGE_NOTE).strip()
+        _weather = weather.weather_line(STATE_DIR / 'weather.json', self.config or {})
         if (self.config or {}).get("photo_enabled", False):
-            _weather = getattr(self, "_weather_line", lambda: "")()
             _outfit = mixin_selfie.look.read_look(mixin_selfie.LOOK_PATH, datetime.now().date())
             _compact = (_compact + "\n" + mixin_selfie.look.look_line(
                 datetime.now().date(), _outfit, getattr(self, "self_model", {}) or {}, _weather)).strip()
+        elif _weather:
+            _compact = (_compact + "\n" + _weather).strip()
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()

@@ -67,10 +67,10 @@ def load(path, schema) -> tuple:
             problems.append('unknown: ' + key)
             continue
         kind = schema[key].get('type')
-        if not _fits(value, kind):
+        if not _fits(value, kind, schema[key].get('nullable', False)):
             problems.append('type: ' + key)
             continue                       # the value is dropped; the default already stands
-        config[key] = float(value) if kind == 'float' else value
+        config[key] = float(value) if kind == 'float' and value is not None else value
     return config, problems
 
 
@@ -121,8 +121,10 @@ def _copy(value):
     return list(value) if isinstance(value, list) else value
 
 
-def _fits(value, kind):
+def _fits(value, kind, nullable=False):
     """Whether a value read from JSON is of the setting's type; a bool is never an int."""
+    if kind == 'float' and nullable and value is None:
+        return True
     if kind == 'bool':
         return type(value) is bool
     if kind == 'int':
@@ -152,9 +154,9 @@ def _checked(config, schema):
     for key, item in schema.items():
         kind = item.get('type')
         value = config[key] if key in config else _default_of(item)
-        if not _fits(value, kind):
+        if not _fits(value, kind, item.get('nullable', False)):
             raise ConfigError('wrong type: ' + key)
-        ordered[key] = float(value) if kind == 'float' else _copy(value)
+        ordered[key] = float(value) if kind == 'float' and value is not None else _copy(value)
     for key, value in config.items():
         if key not in schema:
             ordered[key] = _copy(value)

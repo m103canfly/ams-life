@@ -12,12 +12,13 @@ try:
 except ImportError:
     from body import *  # noqa: F401,F403
 try:
-    from . import adapter_astrbot_turn, discretion, events
+    from . import adapter_astrbot_turn, discretion, events, weather
     from .mixin_ports import PortsMixin
 except ImportError:
     import adapter_astrbot_turn
     import discretion
     import events
+    import weather
     from mixin_ports import PortsMixin
 
 
@@ -208,6 +209,7 @@ class AutonomyMixin(PortsMixin):
                 await asyncio.sleep(AUTONOMY_TICK_SECONDS)
                 if not getattr(self, "enabled", True):
                     break
+                await weather.tick(self.config or {}, STATE_DIR / 'weather.json', logger)
                 try:
                     self._sweep_windows()
                     self._core(None).set_ambient(self._ambient_level())
