@@ -21,6 +21,10 @@ except ImportError:
 
 VISION_MAX_SIDE = 1280
 VISION_MAX_BYTES = 1024 * 1024
+# The image service behind api_config's "image" takes one request at a time, and his other
+# programs use it too. A 429 means it is busy: let the lock go, rest, then try again.
+BUSY_WAITS = (5, 10, 20, 40, 60)
+BUSY_TOTAL_SECONDS = 180
 _pillow_warning_lock = threading.Lock()
 _pillow_warned = False
 
@@ -41,6 +45,22 @@ async def bridge_call(lock, awaitable):
     task = asyncio.create_task(run())
     task.add_done_callback(lambda done: None if done.cancelled() else done.exception())
     return await asyncio.shield(task)
+
+
+async def wait_when_busy(attempt, waited):
+    """Rest after a 429 with the bridge lock released, so her other requests can go first.
+
+    Returns the total waited so far, or None once the three-minute budget is spent (the
+    caller gives up then). Photo requests use the same waits."""
+    delay = BUSY_WAITS[attempt] if attempt < len(BUSY_WAITS) else None
+    if delay is not None and waited + delay > BUSY_TOTAL_SECONDS:
+        delay = None
+    if delay is None:
+        logger.warning('[ams-life] vision service busy (429), gave up after %ds', waited)
+        return None
+    logger.warning('[ams-life] vision service busy (429), retry in %ds', delay)
+    await asyncio.sleep(delay)
+    return waited + delay
 
 
 def _legacy_counts(day):
@@ -219,7 +239,8 @@ class ImageAPI:
                 logger.warning('[ams-life] vision request status %d', 0)
             raise RuntimeError('vision request failed') from None
         lock = bridge_lock(self.plugin)
-        for attempt in range(3):
+        waited = 0
+        for attempt in range(len(BUSY_WAITS) + 1):
             try:
                 await asyncio.wait_for(lock.acquire(), timeout=150)
             except asyncio.TimeoutError:
@@ -228,9 +249,11 @@ class ImageAPI:
             try:
                 return await bridge_call(lock, asyncio.to_thread(request))
             except urllib.error.HTTPError as exc:
-                if exc.code != 429 or attempt == 2:
+                if exc.code != 429:
                     raise RuntimeError('vision request failed') from None
-            await asyncio.sleep(10)
+            waited = await wait_when_busy(attempt, waited)
+            if waited is None:
+                raise RuntimeError('vision request failed') from None
 
 
 class VisionGate:

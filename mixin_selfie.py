@@ -64,7 +64,6 @@ VOICE_QUEUED = "这句会用语音发出去。正文别再写同样的意思：�
 PHOTO_WAIT_SECONDS = 150
 # If earlier text is stuck, later media would arrive without its context.
 REST_WAIT_SECONDS = 60
-PHOTO_RETRIES = 3
 PHOTO_WAITING = 3
 SHOT_DIR = DATA_DIR / "browser" / "shots"
 SHOT_RETENTION = 20
@@ -601,10 +600,11 @@ class SelfieMixin(PortsMixin):
                         prompt += "她今天穿：" + outfit + "\n"
                 prompt += what
                 try:
-                    from .vision import bridge_call, bridge_lock
+                    from .vision import BUSY_WAITS, bridge_call, bridge_lock, wait_when_busy
                 except ImportError:
-                    from vision import bridge_call, bridge_lock
-                for attempt in range(PHOTO_RETRIES):
+                    from vision import BUSY_WAITS, bridge_call, bridge_lock, wait_when_busy
+                waited = 0
+                for attempt in range(len(BUSY_WAITS) + 1):
                     try:
                         bridge = bridge_lock(self)
                         await bridge.acquire()
@@ -624,12 +624,15 @@ class SelfieMixin(PortsMixin):
                         path.write_bytes(blob)
                         return path
                     except urllib.error.HTTPError as exc:
-                        if exc.code != 429 or attempt + 1 == PHOTO_RETRIES:
+                        if exc.code != 429:
                             logger.info("[ams-life] phone photo cancelled: service")
                             return None
-                        await asyncio.sleep(2 ** attempt)
                     except Exception as exc:
                         logger.warning("[ams-life] phone photo failed: %s", type(exc).__name__)
+                        return None
+                    waited = await wait_when_busy(attempt, waited)
+                    if waited is None:
+                        logger.info("[ams-life] phone photo cancelled: service")
                         return None
         finally:
             self._phone_photo_pending -= 1

@@ -592,8 +592,8 @@ class PhoneTests(unittest.IsolatedAsyncioTestCase):
         self.p._post_json = AsyncMock(side_effect=error)
         with patch.object(phone.asyncio, 'sleep', new=AsyncMock()) as sleep:
             self.assertIsNone(await self.p._make_photo('snap', '天空'))
-        self.assertEqual(self.p._post_json.await_count, 3)
-        self.assertEqual([call.args[0] for call in sleep.await_args_list], [1, 2])
+        self.assertEqual(self.p._post_json.await_count, 6)
+        self.assertEqual([call.args[0] for call in sleep.await_args_list], [5, 10, 20, 40, 60])
 
     async def test_429_retry_can_succeed(self):
         error = urllib.error.HTTPError('https://image.invalid/', 429, 'busy', {}, None)
