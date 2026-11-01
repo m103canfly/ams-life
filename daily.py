@@ -23,6 +23,15 @@ HER_MIN_MINUTES = 60
 HER_MAX_HOURS = 3
 
 
+def typical_now(now):
+    hour = period_start(now).hour
+    activities = {
+        0: "睡觉", 7: "起床", 8: "吃早饭", 9: "上课或出门办事",
+        12: "吃午饭", 14: "上课、在家休息或出门办事", 18: "吃晚饭", 20: "在家休息",
+    }
+    return "一般人这个点会" + activities[hour] + "（参考，不用照）。"
+
+
 def period_start(now):
     hour = max(hour for hour, _ in PERIODS if hour <= now.hour)
     return now.replace(hour=hour, minute=0, second=0, microsecond=0)

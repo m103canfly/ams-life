@@ -9,6 +9,65 @@ except ImportError:
     from common import *  # noqa: F401,F403
 import zlib
 import copy
+from datetime import datetime, timedelta
+try:
+    from . import daily
+except ImportError:
+    import daily
+
+
+def ate(core, now):
+    core.hunger = 0.1
+    core.last_meal = float(now)
+
+
+def slept(core, start, end):
+    hours = max(0.0, (float(end) - float(start)) / 3600.0)
+    core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
+    core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
+    core.last_sleep_end = float(end)
+
+
+def rested(core, minutes, now):
+    core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * max(0.0, float(minutes)) / 60.0, 0, 1)
+    core.last_rest = float(now)
+
+
+def exerted(core, amount, now):
+    core.physical_fatigue = _clip(core.physical_fatigue + max(0.0, float(amount)), 0, 1)
+
+
+def _advance_needs(core, start, end):
+    cursor = datetime.fromtimestamp(start)
+    finish = datetime.fromtimestamp(end)
+    while cursor < finish:
+        boundary = daily.next_period(cursor)
+        # Split at 06:00 and 23:00 for the night waking rate.
+        for hour in (6, 23):
+            candidate = cursor.replace(hour=hour, minute=0, second=0, microsecond=0)
+            if cursor < candidate < boundary:
+                boundary = candidate
+        period_end = daily.next_period(cursor)
+        midpoint = daily.period_start(cursor) + (period_end - daily.period_start(cursor)) / 2
+        _, doing, _ = daily.schedule(cursor, core.energy, core.v, core.stress)
+        if '吃' in doing and cursor < midpoint < boundary:
+            boundary = midpoint
+        stop = min(boundary, finish)
+        hours = (stop - cursor).total_seconds() / 3600.0
+        sleeping = daily.period_start(cursor).hour == 0 or doing == '睡觉'
+        if sleeping:
+            core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
+            core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
+            if stop == period_end:
+                core.last_sleep_end = stop.timestamp()
+        else:
+            rate = 0.10 if cursor.hour >= 23 or cursor.hour < 6 else 0.06
+            core.sleepiness = _clip(core.sleepiness + rate * hours, 0, 1)
+            core.physical_fatigue = _clip(core.physical_fatigue + 0.02 * hours, 0, 1)
+        core.hunger = _clip(core.hunger + 0.08 * hours, 0, 1)
+        if '吃' in doing and stop == midpoint and core.last_meal < midpoint.timestamp():
+            ate(core, midpoint.timestamp())
+        cursor = stop
 
 
 # ams-life: habituation compares what was just heard with what was heard a few minutes
@@ -222,6 +281,8 @@ class BioCore:
         self.arousal_decay_minutes = 30.0
         self.social_decay_minutes = 180.0
         self.last_tick = __import__("time").time()
+        self.sleepiness, self.hunger, self.physical_fatigue = 0.2, 0.3, 0.1
+        self.last_sleep_end = self.last_meal = self.last_rest = self.last_tick
         self.ripple = {"upper": 0.0, "lower": 0.0, "overlap": 0.0, "energy": 0.0}
         self.spiking = {"rate": 0.0, "variance": 0.0, "ei": 0.0}
         self._rng = __import__("random").Random()
@@ -229,6 +290,19 @@ class BioCore:
     def load_state(self, d: dict) -> None:
         if not isinstance(d, dict):
             return
+        now = __import__("time").time()
+        for key, default in (("sleepiness", 0.2), ("hunger", 0.3), ("physical_fatigue", 0.1)):
+            try:
+                value = float(d.get(key, default))
+                setattr(self, key, _clip(value, 0, 1) if math.isfinite(value) else default)
+            except (TypeError, ValueError):
+                setattr(self, key, default)
+        for key in ("last_sleep_end", "last_meal", "last_rest"):
+            try:
+                value = float(d.get(key, now))
+                setattr(self, key, value if math.isfinite(value) and value >= 0 else now)
+            except (TypeError, ValueError):
+                setattr(self, key, now)
         for key in ("v", "a", "d", "stress", "energy", "social"):
             if key in d:
                 try:
@@ -1445,6 +1519,7 @@ class BioCore:
             dt_min = 0.0
         if dt_min < 0.5:
             return  # ams-life: last_tick stays, so these seconds count at the next decay
+        _advance_needs(self, now - dt_min * 60.0, now)
         self.last_tick = now
         def factor(halflife):
             try:
@@ -2250,6 +2325,10 @@ class BioCore:
     def snapshot(self) -> dict:
         self._decay_to_now()
         out = {"v": round(self.v, 4), "a": round(self.a, 4),
+                "sleepiness": round(self.sleepiness, 4), "hunger": round(self.hunger, 4),
+                "physical_fatigue": round(self.physical_fatigue, 4),
+                "last_sleep_end": self.last_sleep_end, "last_meal": self.last_meal,
+                "last_rest": self.last_rest,
                 "d": round(self.d, 4), "social": round(self.social, 4),
                 "stress": round(self.stress, 4), "energy": round(self.energy, 4),
                 "seen_need": round(float(getattr(self, "seen_need", 0.3)), 4),
