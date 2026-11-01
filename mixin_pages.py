@@ -3,6 +3,8 @@
 # Copyright (C) 2026 Johnhmzm, AGPL-3.0. Modified by m103canfly since 2026-10-27; see NOTICE.md.
 """BioCorePlugin methods moved out of main.py unchanged: dashboard pages, API defaults, backup/restore, memory pages, status."""
 from __future__ import annotations
+import stat
+import tempfile
 try:
     from .common import *  # noqa: F401,F403
 except ImportError:
@@ -22,6 +24,53 @@ try:
 except ImportError:
     from vision import vision_for_panel
     import mixin_attention
+
+
+def _clear_backup_keys(value):
+    if isinstance(value, dict):
+        return {key: '' if key == 'api_key' else _clear_backup_keys(item)
+                for key, item in value.items()}
+    if isinstance(value, list):
+        return [_clear_backup_keys(item) for item in value]
+    return value
+
+
+def _restore_entries(archive, root):
+    entries = archive.infolist()
+    if len(entries) > 20000:
+        raise ValueError('too many entries')
+    total = 0
+    selected = []
+    seen = set()
+    root = root.resolve()
+    for entry in entries:
+        name = entry.filename
+        parts = (name[:-1] if name.endswith('/') else name).split('/')
+        if (not name or name.startswith('/') or '\\' in name or ':' in name
+                or any(part in ('', '.', '..') for part in parts)
+                or stat.S_ISLNK(entry.external_attr >> 16)):
+            raise ValueError('invalid entry')
+        total += entry.file_size
+        if (entry.file_size > 512 * 1024 ** 2 or total > 2 * 1024 ** 3
+                or (entry.file_size and (not entry.compress_size
+                    or entry.file_size > 100 * entry.compress_size))):
+            raise ValueError('archive limits exceeded')
+        if parts[0] != 'data' or len(parts) < 2:
+            continue
+        rel = parts[1:]
+        dest = root.joinpath(*rel).resolve()
+        if not dest.is_relative_to(root) or dest == root:
+            raise ValueError('entry outside data directory')
+        if entry.is_dir():
+            continue
+        if dest in seen:
+            raise ValueError('duplicate destination')
+        seen.add(dest)
+        if (rel[-1] == 'keys.dat' or rel[-1].startswith(forget_registry.FILE_NAME)
+                or 'logs' in rel[:-1]):
+            continue
+        selected.append((entry, rel))
+    return selected
 
 
 class PagesMixin:
@@ -362,7 +411,7 @@ class PagesMixin:
                          "BioCore model list")
                 register("/astrbot_plugin_ams_life/page/kb_config", self.page_kb_config, ["POST"],
                          "BioCore knowledge base config")
-                register("/astrbot_plugin_ams_life/page/backup", self.page_backup, ["GET"],
+                register("/astrbot_plugin_ams_life/page/backup", self.page_backup, ["POST"],
                          "BioCore core backup")
                 register("/astrbot_plugin_ams_life/page/restore", self.page_restore, ["POST"],
                          "BioCore core restore")
@@ -485,13 +534,21 @@ class PagesMixin:
                 if pages.is_dir():
                     for f in pages.rglob("*"):
                         if f.is_file() and "__pycache__" not in f.parts:
-                            z.write(f, "astrbot_plugin_ams_life/pages/" + str(f.relative_to(pages)))
+                            z.write(f, "astrbot_plugin_ams_life/pages/" + f.relative_to(pages).as_posix())
                 for f in DATA_DIR.rglob("*"):
-                    if f.is_file() and "__pycache__" not in f.parts:
-                        z.write(f, "data/" + str(f.relative_to(DATA_DIR)))
+                    rel = f.relative_to(DATA_DIR)
+                    if (f.is_file() and not any(p in ('__pycache__', 'logs', 'restore_backups', 'likeness')
+                                                for p in rel.parts)
+                            and f.name != 'keys.dat' and f.suffix.lower() != '.tmp'):
+                        name = "data/" + rel.as_posix()
+                        if f.name == 'api_config.json':
+                            config = json.loads(f.read_text(encoding='utf-8'))
+                            z.writestr(name, json.dumps(_clear_backup_keys(config), ensure_ascii=False))
+                        else:
+                            z.write(f, name)
                 info = ("BioCore core backup\n"
                         "Contains plugin code + data/ (persona, memory, states, API config).\n"
-                        "Do not share: api_config.json may contain API keys.\n")
+                        "Keys are not included; refill them in the panel's Keys after restore.\n")
                 z.writestr("BACKUP_INFO.txt", info)
         except Exception as exc:
             logger.warning("[biocore] backup failed: %s", exc)
@@ -515,9 +572,28 @@ class PagesMixin:
             z = zipfile.ZipFile(io.BytesIO(raw))
         except Exception as exc:
             return {"status": "error", "message": "invalid zip: %s" % exc}
-        names = [n for n in z.namelist() if n.startswith("data/") and not n.endswith("/")]
-        if not names:
+        try:
+            entries = _restore_entries(z, DATA_DIR)
+        except (ValueError, OSError, RuntimeError) as exc:
+            z.close()
+            return {"status": "error", "message": "invalid backup: %s" % exc}
+        if not entries:
+            z.close()
             return {"status": "error", "message": "backup has no data/ entries"}
+        try:
+            staging = tempfile.TemporaryDirectory(prefix='ams-restore-', dir=DATA_DIR.parent)
+            stage = Path(staging.name)
+            for entry, rel in entries:
+                dest = stage.joinpath('new', *rel)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(entry) as src, open(dest, 'wb') as out:
+                    shutil.copyfileobj(src, out)
+        except Exception as exc:
+            if 'staging' in locals():
+                staging.cleanup()
+            z.close()
+            return {"status": "error", "message": "restore failed: %s" % exc}
+        z.close()
         # automatic safety backup of current data before overwrite
         try:
             backup_dir = DATA_DIR.parent / "restore_backups"
@@ -533,24 +609,47 @@ class PagesMixin:
         count = 0
         # ams-life: the forget registry in use is never replaced by the backup's (and the
         # vector store is closed while its file may be overwritten)
-        vectors = getattr(self, "_vectors_db", None)
-        if vectors is not None:
-            vectors.close()
-            self._vectors_db = None
+        changed = []
+        created_dirs = []
         try:
-            for name in names:
-                rel = name[len("data/"):]
-                parts = [x for x in rel.split("/") if x not in ("", ".", "..")]
-                if not parts or parts[-1].startswith(forget_registry.FILE_NAME):
-                    continue
-                dest = DATA_DIR.joinpath(*parts)
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                with z.open(name) as src, open(dest, "wb") as out:
-                    shutil.copyfileobj(src, out)
+            vectors = getattr(self, "_vectors_db", None)
+            if vectors is not None:
+                vectors.close()
+                self._vectors_db = None
+            for entry, rel in entries:
+                dest = DATA_DIR.joinpath(*rel)
+                resolved = dest.resolve()
+                root = DATA_DIR.resolve()
+                if not resolved.is_relative_to(root) or resolved == root:
+                    raise ValueError('entry outside data directory')
+                missing = []
+                parent = dest.parent
+                while not parent.exists():
+                    missing.append(parent)
+                    parent = parent.parent
+                for directory in reversed(missing):
+                    directory.mkdir()
+                    created_dirs.append(directory)
+                original = stage.joinpath('old', *rel)
+                existed = dest.exists()
+                if existed:
+                    original.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(dest, original)
+                os.replace(stage.joinpath('new', *rel), dest)
+                changed.append((dest, original, existed))
                 count += 1
         except Exception as exc:
+            for dest, original, existed in reversed(changed):
+                if existed:
+                    os.replace(original, dest)
+                else:
+                    dest.unlink()
+            for directory in reversed(created_dirs):
+                directory.rmdir()
             logger.warning("[biocore] restore failed: %s", exc)
             return {"status": "error", "message": "restore failed: %s" % exc}
+        finally:
+            staging.cleanup()
         try:
             self._load_profile()
             self._load_settings()
