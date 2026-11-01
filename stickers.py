@@ -330,6 +330,17 @@ def may_send(row, place) -> bool:
     return scope == "all" or bool(scope and place and scope == place)
 
 
+def semantic_text(row) -> str:
+    parts = []
+    for key in ("meaning", "tags", "text", "emotion", "scene", "reply_to", "caption"):
+        value = row.get(key)
+        if key == "tags":
+            value = " ".join(str(tag) for tag in value if tag) if isinstance(value, list) else ""
+        if value:
+            parts.append(str(value).strip())
+    return " ".join(part for part in parts if part)[:300]
+
+
 class Library:
     """Her stickers: <folder>/index.json (id -> row) and <folder>/img/<id>.<format>."""
 
@@ -338,11 +349,17 @@ class Library:
         self.img = self.folder / "img"
         self.index_path = self.folder / "index.json"
         self.dropped_path = self.folder / "dropped.json"
+        self.vectors_path = self.folder / "vectors.json"
         try:
             data = json.loads(self.index_path.read_text("utf-8")) if self.index_path.exists() else {}
         except Exception:
             data = {}
         self.rows = data if isinstance(data, dict) else {}
+        try:
+            vectors = json.loads(self.vectors_path.read_text("utf-8")) if self.vectors_path.exists() else {}
+        except Exception:
+            vectors = {}
+        self.vectors = vectors if isinstance(vectors, dict) else {}
         try:
             dropped = json.loads(self.dropped_path.read_text("utf-8")) if self.dropped_path.exists() else []
         except Exception:
@@ -373,6 +390,34 @@ class Library:
         tmp = self.index_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.rows, ensure_ascii=False, indent=1), "utf-8")
         atomic_file.replace(tmp, self.index_path)
+
+    def _save_vectors(self):
+        self.folder.mkdir(parents=True, exist_ok=True)
+        tmp = self.vectors_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.vectors, ensure_ascii=False, indent=1), "utf-8")
+        atomic_file.replace(tmp, self.vectors_path)
+
+    def vector_of(self, sid, model):
+        row = self.rows.get(sid)
+        entry = self.vectors.get(sid)
+        if not isinstance(row, dict) or not isinstance(entry, dict):
+            return None
+        digest = hashlib.sha256(semantic_text(row).encode("utf-8")).hexdigest()[:16]
+        vec = entry.get("v")
+        if entry.get("m") != model or entry.get("h") != digest or not isinstance(vec, list) or not vec:
+            return None
+        return vec
+
+    def set_vector(self, sid, model, vec):
+        row = self.rows.get(sid)
+        if row is None or not vec:
+            return
+        self.vectors[sid] = {"m": model, "h": hashlib.sha256(semantic_text(row).encode("utf-8")).hexdigest()[:16],
+                             "v": [round(float(value), 5) for value in vec]}
+        self._save_vectors()
+
+    def missing_vectors(self, model) -> list:
+        return [sid for sid in self.rows if self.vector_of(sid, model) is None]
 
     def path_of(self, sid) -> Path:
         row = self.rows.get(sid) or {}
@@ -427,6 +472,8 @@ class Library:
         if row is None:
             return False
         self._save()
+        if self.vectors.pop(sid, None) is not None:
+            self._save_vectors()
         try:
             (self.img / str(row.get("file") or "")).unlink()
         except OSError:

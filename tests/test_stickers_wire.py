@@ -13,6 +13,34 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 _CACHE = {}
 
+# Seed the scripted library with the same fake embeddings used by the old offer.
+# The worker is exercised separately; draining its sleeps would delay these cases.
+_CASE_BOOTSTRAP = '''
+import runpy, sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
+import harness
+prepare = harness.prepare
+def prepare_case(*args, **kwargs):
+    clock = prepare(*args, **kwargs)
+    import mixin_stickers, stickers
+    mixin_stickers._start_vector_worker = lambda *args, **kwargs: None
+    add = stickers.Library.add
+    def add_with_vector(lib, *args, **kwargs):
+        sid, why = add(lib, *args, **kwargs)
+        if sid and sys.argv[3] in ('reply', 'off', 'alone', 'fallback', 'forget', 'held', 'missing', 'history'):
+            row = lib.rows[sid]
+            words = ' '.join(row.get(k) for k in ('caption', 'scene', 'emotion') if row.get(k))
+            lib.set_vector(sid, 'fake-embed', harness.fake_vector(words))
+        return sid, why
+    stickers.Library.add = add_with_vector
+    return clock
+harness.prepare = prepare_case
+script = sys.argv[1]
+sys.argv = [script] + sys.argv[2:]
+runpy.run_path(script, run_name='__main__')
+'''
+
 
 def run_case(case):
     if case not in _CACHE:
@@ -21,7 +49,8 @@ def run_case(case):
             data.mkdir()
             env = dict(os.environ, PYTHONHASHSEED='0')
             env.pop('AMS_LIFE_DATA_DIR', None)
-            proc = subprocess.run([sys.executable, str(HERE / 'stickers_cases.py'), str(data), str(out), case],
+            proc = subprocess.run([sys.executable, '-c', _CASE_BOOTSTRAP, str(HERE / 'stickers_cases.py'),
+                                   str(data), str(out), case],
                                   env=env, capture_output=True, text=True, encoding='utf-8', timeout=300)
             if proc.returncode != 0:
                 raise AssertionError('case %s failed:\n%s\n%s' % (case, proc.stdout, proc.stderr))

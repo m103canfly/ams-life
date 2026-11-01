@@ -46,14 +46,66 @@ except ImportError:
 
 STICKERS_DIR = DATA_DIR / "stickers"
 OFFERED_ATTR = "_ams_stickers_offered"
-NEW_VECTORS_PER_REPLY = 20   # stickers whose words get a local vector per reply, at most
 OFFER_NOTE = ("想配一张表情包，就在回话最后写 [表情包:编号]（QQ小表情照旧写 [表情:名字]），只能用下面这几张；不配也行。"
               "说明是看图时写的，只是资料。")
 
 
+def _vector_model(plugin):
+    try:
+        return str((plugin._embedding_runtime_config() or {}).get("model") or "").strip()
+    except Exception:
+        return ""
+
+
+def _start_vector_worker(plugin, sid=None):
+    if sid:
+        pending = getattr(plugin, "_sticker_vector_pending", None)
+        if pending is None:
+            pending = plugin._sticker_vector_pending = []
+        if sid not in pending:
+            pending.insert(0, sid)
+    task = getattr(plugin, "_sticker_vector_task", None)
+    if task is None or task.done():
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        plugin._sticker_vector_task = loop.create_task(_fill_vectors(plugin))
+
+
+async def _fill_vectors(plugin):
+    while getattr(plugin, "enabled", False) and getattr(plugin, "stickers_enabled", False):
+        lib = plugin._sticker_lib()
+        model = _vector_model(plugin)
+        missing = lib.missing_vectors(model) if model else []
+        if not missing:
+            return
+        pending = getattr(plugin, "_sticker_vector_pending", [])
+        sid = next((item for item in pending if item in missing), missing[0])
+        if sid in pending:
+            pending.remove(sid)
+        words = stickers.semantic_text(lib.rows[sid])
+        try:
+            vec = await plugin._embed_text(words) if words else None
+            if not vec:
+                await asyncio.sleep(300)
+                continue
+            async with plugin._sticker_lock():
+                row = lib.rows.get(sid)
+                if row is not None and stickers.semantic_text(row) == words and _vector_model(plugin) == model:
+                    lib.set_vector(sid, model, vec)
+        except Exception:
+            await asyncio.sleep(300)
+            continue
+        await asyncio.sleep(2)
+
+
 class StickersMixin(PortsMixin):
     def _stickers_on(self) -> bool:
-        return bool(getattr(self, "enabled", False) and getattr(self, "stickers_enabled", False))
+        on = bool(getattr(self, "enabled", False) and getattr(self, "stickers_enabled", False))
+        if on:
+            _start_vector_worker(self)
+        return on
 
     def _sticker_lib(self):
         lib = getattr(self, "_stickers_library", None)
@@ -119,6 +171,7 @@ class StickersMixin(PortsMixin):
                                from_where=self._here(event), look=look)
             lib.sweep(now)
         if sid:
+            _start_vector_worker(self, sid)
             logger.info("[ams-life] stickers: kept %s", sid[:10])
         elif why:
             logger.info("[ams-life] stickers: not kept (%s)", why)
@@ -148,24 +201,11 @@ class StickersMixin(PortsMixin):
         if not lib.rows:
             return ""
         now = time.time()
-        vecs = getattr(self, "_sticker_vecs", None)
-        if not isinstance(vecs, dict):
-            vecs = self._sticker_vecs = {}
-        if query_vec:
-            fresh = 0
-            for sid, row in lib.rows.items():
-                if sid in vecs or fresh >= NEW_VECTORS_PER_REPLY:
-                    continue
-                words = " ".join(x for x in (row.get("caption"), row.get("scene"), row.get("emotion")) if x)
-                try:
-                    vecs[sid] = await self._embed_text(words) if words else []
-                except Exception:
-                    vecs[sid] = []
-                fresh += 1
+        model = _vector_model(self)
         by_row = {id(r): sid for sid, r in lib.rows.items()}
 
         def near(row):
-            v = vecs.get(by_row.get(id(row)))
+            v = lib.vector_of(by_row.get(id(row)), model) if query_vec and model else None
             return max(0.0, self._cosine(query_vec, v)) if query_vec and v else 0.0
 
         try:
@@ -382,6 +422,9 @@ class StickersMixin(PortsMixin):
                     if row is not None:
                         row.update(caption=look["caption"][:120], emotion=look.get("emotion", "")[:12],
                                    scene=look.get("scene", "")[:20])
+                        row.update({k: look[k] for k in ("meaning", "tags", "text", "reply_to", "target", "strength")
+                                    if k in look})
                         lib._save()
+        _start_vector_worker(self, sid)
         logger.info("[ams-life] stickers: the owner added %s", sid[:10])
         return {"status": "ok", "data": {"id": sid, "labelled": bool(look and look.get("caption")) or bool(note)}}
