@@ -83,6 +83,15 @@ add_event_differences('$["page_status"]["data"]["events"]', 3, appraisal=True)
 add_event_differences('$["page_status"]["data"]["events"]', 4, appraisal=True, summary=True, sources=(0, 2, 4))
 
 A_B0 = []
+for index, context_count in enumerate((1, 2, 1, 2, 4, 1, 2, 3, 4, 2, 1, 2,
+                                       1, 2, 1, 2, 1, 2, 3, 4, 5, 3, 4, 5)):
+    root = f'$["files"]["likeness/samples-<week>.jsonl"][{index}]'
+    for field in ('id', 'ts', 'place', 'reply'):
+        A_B0.append((root + f'["{field}"]', 'wiring', 'Only the new program keeps reply samples.'))
+    for context_index in range(context_count):
+        for field in ('name', 'sender_id', 'text'):
+            A_B0.append((root + f'["context"][{context_index}]["{field}"]', 'wiring',
+                         'Only the new program keeps reply samples.'))
 for index in range(24):
     A_B0.extend([(f'$["turns"][{index}]["session"]', 'wiring', 'AstrBot sessions and neutral places differ.'),
                  (f'$["sent"][{index}][0]', 'wiring', 'The standalone messenger records the destination.'),
@@ -152,10 +161,17 @@ def compare(mode):
 
 def matches(pattern, path):
     expression = re.escape(pattern).replace(r'\*', r'\d+').replace(re.escape('<day>'), r'\d{4}-\d{2}-\d{2}')
+    expression = expression.replace(re.escape('<week>'), r'\d{4}-W\d{2}')
     return re.fullmatch(expression, path) is not None
 
 
 class PathMatching(unittest.TestCase):
+    def test_likeness_week_placeholder(self):
+        pattern = '$["files"]["likeness/samples-<week>.jsonl"][0]["id"]'
+        self.assertTrue(matches(pattern, '$["files"]["likeness/samples-2026-W44.jsonl"][0]["id"]'))
+        self.assertFalse(matches(pattern, '$["files"]["likeness/samples-2026-W4.jsonl"][0]["id"]'))
+        self.assertFalse(matches(pattern, '$["files"]["likeness/samples-other.jsonl"][0]["id"]'))
+
     def test_spend_date_placeholder(self):
         pattern = '$["files"]["states/spend.json"]["<day>"]["calls"]'
         self.assertTrue(matches(pattern, '$["files"]["states/spend.json"]["2027-01-02"]["calls"]'))

@@ -54,7 +54,7 @@ class CollectedRoutes(unittest.TestCase):
     def test_collects_the_plugin_routes_in_order(self):
         context = harness.FakeContext()
         plugin = test_basics.make_plugin(context)
-        self.assertEqual(len(context.web_routes), 28)
+        self.assertEqual(len(context.web_routes), 30)
         collector = panel_api.RouteCollector()
         original = plugin.context
         plugin.context = collector
@@ -62,7 +62,7 @@ class CollectedRoutes(unittest.TestCase):
             plugin._register_page_api()
         finally:
             plugin.context = original
-        self.assertEqual(len(collector.routes), 28)
+        self.assertEqual(len(collector.routes), 30)
         self.assertEqual([route[0] for route in collector.routes], context.web_routes)
         names = {route[0]: route[1].__name__ for route in collector.routes}
         self.assertEqual(names[panel_api.PREFIX + 'page/status'], 'page_status')

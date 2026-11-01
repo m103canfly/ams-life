@@ -7,9 +7,10 @@ The memory library itself lives in mixin_memory; the table is in discretion.py.
 """
 from __future__ import annotations
 try:
-    from . import adapter_astrbot_turn
+    from . import adapter_astrbot_turn, likeness
 except ImportError:
     import adapter_astrbot_turn
+    import likeness
 try:
     from .common import *  # noqa: F401,F403
 except ImportError:
@@ -855,6 +856,11 @@ class DiscretionMixin:
             self._name_index.pop(person, None)
         self._forget_log.append((person, list(ids)))
         counts = {"memories": 0, "events": 0, "relationship": 0, "notes": 0, "phone": 0, "insights": 0}
+        if person:
+            try:
+                likeness.Store(DATA_DIR).forget(person)
+            except Exception as exc:
+                logger.warning('[ams-life] likeness delete failed (%s)', type(exc).__name__)
         store = self._history_store()
         if store is not None:
             counts["history"] = 0
