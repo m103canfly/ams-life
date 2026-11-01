@@ -962,5 +962,12 @@ input:hover,select:hover,textarea:hover{border-color:var(--muted)}
 .key-edit{display:flex;align-items:center;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 .key-edit input{width:240px;max-width:100%;min-height:36px;box-sizing:border-box;padding:0 10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font:var(--fs-body) Bahnschrift,"Segoe UI",sans-serif;outline:none}
 .key-edit input:focus{border-color:var(--accent)}
+.heybox{margin-top:14px;padding-top:4px;border-top:1px solid var(--line)}
+.hb-row small{white-space:normal}
+.hb-state.on{color:var(--accent);font-weight:600}
+.hb-qr{margin:10px 0 4px}
+.hb-code{display:block;width:216px;height:216px;max-width:100%;border:1px solid var(--line)}
+.hb-tip{font-size:var(--fs-note);color:var(--ink);margin:4px 0 0;min-height:1.2em}
+.heybox .hb-msg{text-align:left}
 .key-msg{flex-basis:100%;text-align:right;font-size:var(--fs-note);color:var(--muted);min-height:1.2em}
 @media (max-width:640px){.key-row{flex-direction:column;align-items:stretch}.key-edit{justify-content:flex-start}.key-edit input{flex:1 1 180px;width:auto}.key-msg{text-align:left}}
