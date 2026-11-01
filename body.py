@@ -96,9 +96,9 @@ def _advance_needs(core, start, end):
         if sleeping:
             core.sleepiness = _clip(core.sleepiness - 0.25 * hours, 0, 1)
             core.physical_fatigue = _clip(core.physical_fatigue - 0.10 * hours, 0, 1)
-            if selected and stop.timestamp() == selected[1] and core.last_sleep_end < selected[1]:
+            if selected and int(stop.timestamp()) >= int(selected[1]) and core.last_sleep_end < int(selected[1]):
                 # The rates above already recovered this interval. Mark only the wake.
-                slept(core, selected[1], selected[1])
+                slept(core, int(selected[1]), int(selected[1]))
             elif not selected and stop == period_end:
                 core.last_sleep_end = stop.timestamp()
         else:

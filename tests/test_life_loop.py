@@ -65,7 +65,8 @@ class Person(phone.SelfieMixin):
     async def _persona_text(self, event): return 'A fictional persona.'
     async def _llm_v2_call(self, kind, prompt, parser, **kwargs):
         self.calls.append((kind, prompt))
-        return parser(json.dumps(self.answer, ensure_ascii=False))
+        raw = self.answer if isinstance(self.answer, str) else json.dumps(self.answer, ensure_ascii=False)
+        return parser(raw)
 
 
 class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
@@ -156,10 +157,65 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.p.core.hunger = .75
         await self.tick(1)
         self.assertEqual(len(self.p.calls), 1)
+        self.assertTrue(life.read_state()['crossed_pending'])
         self.p.answer['minutes'] = 5
         self.chosen(minutes=5)
         await self.tick(5)
         self.assertEqual(len(self.p.calls), 2)
+        self.assertFalse(life.read_state().get('crossed_pending'))
+
+    async def test_crossing_during_cooldown_waits_then_thinks_once(self):
+        await self.tick()
+        self.p.core.hunger = .75
+        await self.tick(1)
+        self.assertTrue(life.read_state()['crossed_pending'])
+        await self.tick(8)
+        self.assertEqual(len(self.p.calls), 1)
+        self.assertTrue(await self.tick(1))
+        self.assertEqual(len(self.p.calls), 2)
+        self.assertIn('身体有了新的感觉', self.p.calls[-1][1])
+        self.assertFalse(life.read_state().get('crossed_pending'))
+        await self.tick(10)
+        self.assertEqual(len(self.p.calls), 2)
+
+    async def test_crossing_during_cooldown_survives_restart(self):
+        await self.tick()
+        self.p.core.hunger = .75
+        await self.tick(1)
+        self.p = Person()
+        await self.tick(9)
+        self.assertEqual(len(self.p.calls), 1)
+        self.assertIn('身体有了新的感觉', self.p.calls[0][1])
+        self.assertFalse(life.read_state().get('crossed_pending'))
+
+    async def test_materials_exclude_identifiers_and_keep_activity_fields(self):
+        self.chosen(minutes=120, detail='在家里看树')
+        item = life.current()
+        item.update(place='group:900001', origin={'people': ['20002']}, id='metadata-only-now')
+        phone._write_json(phone.NOW_PATH, item)
+        her_days.Store(self.root).add({'id': 'metadata-only-day', 'ts': self.clock() - 1800,
+                                      'do': '休息', 'detail': '窗边看树，记下10003', 'minutes': 15,
+                                      'feel': '轻松', 'liked': '很喜欢', 'related_users': ['10001'],
+                                      'origin': {'people': ['20002'], 'source_ids': ['metadata-only-source']}})
+        life.save_state(dict(life.read_state(), crossed_pending=True))
+        await self.tick()
+        prompt = self.p.calls[0][1]
+        for hidden in ('900001', '10001', '10003', '20002', 'place', 'origin', 'related_users',
+                       'metadata-only-now', 'metadata-only-day', 'metadata-only-source'):
+            self.assertNotIn(hidden, prompt)
+        for shown in ('家里', '在家里看树', '10:00', '09:30', '休息', '15', '轻松', '很喜欢'):
+            self.assertIn(shown, prompt)
+
+    async def test_fenced_json_numeric_minutes_and_null_text_are_accepted(self):
+        self.p.answer = '```json\n' + json.dumps({'do': '休息', 'detail': '在家里坐着',
+                                                'minutes': '30', 'liked_last': None,
+                                                'post': None, 'look': None}, ensure_ascii=False) + '\n```'
+        with self.assertNoLogs('ams-life.life', level='WARNING'):
+            self.assertTrue(await self.tick())
+        self.assertEqual(len(self.p.calls), 1)
+        self.assertEqual(life.current()['minutes'], 30)
+        self.assertEqual(self.rows()[0]['do'], '休息')
+        self.assertEqual(life.read_state()['today']['count'], 1)
 
     async def test_menu_disabled_choices_and_invalid_answer_warning(self):
         self.p.answer['do'] = '拍照'
@@ -228,6 +284,41 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.p.core.sleepiness = .1
         await self.tick(30)
         self.assertAlmostEqual(self.p.core.sleepiness, .15)
+
+    async def test_fractional_clock_sleep_eight_hours_marks_integer_wake_once(self):
+        self.clock.advance(.456789)
+        self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 480}
+        await self.tick()
+        sleep = life.read_state()['sleep']
+        self.assertIs(type(sleep['start']), int)
+        self.assertIs(type(sleep['end']), int)
+        self.assertEqual(sleep['start'], int(self.clock()))
+        self.assertEqual(sleep['end'], sleep['start'] + 480 * 60)
+        self.assertEqual(datetime.fromisoformat(life.current()['start']).timestamp(), sleep['start'])
+        self.clock.advance(sleep['end'] - self.clock() - 1)
+        await self.tick()
+        self.assertEqual(len(self.p.calls), 1)
+        self.p.answer = {'do': '吃饭', 'detail': '在家里吃饭'}
+        with patch.object(body, 'slept', wraps=body.slept) as settled:
+            await self.tick(1 / 60)
+            self.assertEqual(self.p.core.last_sleep_end, sleep['end'])
+            settled.assert_called_once_with(self.p.core, sleep['end'], sleep['end'])
+            await self.tick(1)
+            self.assertEqual(settled.call_count, 1)
+        self.assertEqual(len(self.p.calls), 2)
+
+    async def test_legacy_fractional_sleep_deadline_marks_wake(self):
+        self.clock.advance(.456789)
+        self.p.core.last_tick = self.clock()
+        self.chosen(action='睡觉', minutes=480, detail='在床上睡觉')
+        start = self.clock()
+        end = start + 480 * 60
+        life.save_state(dict(life.read_state(), sleep={'start': start, 'end': end}))
+        self.clock.advance(480 * 60 + 1)
+        with patch.object(body, 'slept', wraps=body.slept) as settled:
+            self.p.core._decay_to_now()
+        self.assertEqual(self.p.core.last_sleep_end, int(end))
+        settled.assert_called_once_with(self.p.core, int(end), int(end))
 
     async def test_sleep_restart_restores_checkpoint_and_recovers_offline_once(self):
         self.p.core.sleepiness, self.p.core.physical_fatigue = .9, .8
@@ -345,6 +436,24 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(her_days.Store(self.root).forget('10001'), 1)
         self.assertEqual(self.rows(), [])
 
+    async def test_owner_name_is_kept_and_other_names_are_anonymized(self):
+        self.p.config.update(owner_qq='10001', qzone_enabled=True)
+        self.p.answer = {'do': '发说说', 'detail': '陪虚构小甲和虚构小乙看树',
+                         'post': '虚构小甲说虚构小乙喜欢树', 'minutes': 5}
+        with patch('qzone.post', new_callable=AsyncMock) as post:
+            await self.tick()
+        row = self.rows()[0]
+        self.assertIn('虚构小甲', row['detail'])
+        self.assertNotIn('虚构小乙', row['detail'])
+        self.assertEqual(row['related_users'], ['10001', '10003'])
+        self.assertIn('虚构小甲', post.await_args.args[1])
+        self.assertNotIn('虚构小乙', post.await_args.args[1])
+        self.p.answer = {'do': '休息', 'liked_last': '虚构小甲喜欢虚构小乙选的树'}
+        await self.tick(5)
+        liked = self.rows()[1]['liked']
+        self.assertIn('虚构小甲', liked)
+        self.assertNotIn('虚构小乙', liked)
+
     async def test_due_table_once(self):
         self.chosen(minutes=120)
         life.save_state(dict(life.read_state(), due=[{'id': 'alarm1', 'ts': self.clock() + 600}]))
@@ -393,6 +502,17 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.p._notebook_time_reached(evening - 60))
         self.p.config['life_loop_enabled'] = True
         self.assertFalse(self.p._notebook_time_reached(evening))
+
+    async def test_notebook_sleep_before_three_am_writes_previous_evening_once(self):
+        self.clock.advance(15 * 3600)
+        evening = (self.now() - timedelta(days=1)).date().isoformat()
+        self.p.answer = {'do': '睡觉', 'detail': '在床上睡觉', 'minutes': 480}
+        await self.tick()
+        self.p._maybe_write_notebook.assert_awaited_once()
+        state = life.read_state()
+        self.assertEqual(state['notebook_sleep'], evening)
+        self.assertEqual(state['notebook_done'], evening)
+        self.assertFalse(life.notebook_due(self.p, self.now().replace(hour=3).timestamp()))
 
     async def test_photo_background_and_post_uses_own_photo_today(self):
         self.p.config.update(photo_enabled=True, qzone_enabled=True)
@@ -467,9 +587,17 @@ class LifeLoopTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ParserTests(unittest.TestCase):
+    def test_null_text_fields_are_empty(self):
+        value = life.parse(json.dumps({'do': '休息', 'detail': None, 'liked_last': None,
+                                       'post': None, 'look': None}), life.BASE_MENU)
+        self.assertEqual([value[key] for key in ('detail', 'liked_last', 'post', 'look')], [''] * 4)
+
     def test_minutes_bounds_and_bad_json(self):
         for action, value, expected in (('睡觉', 10, 60), ('睡觉', 999, 720),
                                         ('休息', 1, 5), ('休息', 999, 120)):
             self.assertEqual(life.parse(json.dumps({'do': action, 'minutes': value}), life.BASE_MENU)['minutes'], expected)
-        for raw in ('no json', '[]', '{"do":"休息","minutes":true}', '{"do":"休息","detail":{}}'):
+        for text, expected in ((' 30 ', 30), ('999', 120), ('1', 5)):
+            self.assertEqual(life.parse(json.dumps({'do': '休息', 'minutes': text}), life.BASE_MENU)['minutes'], expected)
+        for raw in ('no json', '[]', '{"do":"休息","minutes":true}', '{"do":"休息","detail":{}}',
+                    '{"do":"休息","minutes":"soon"}'):
             self.assertIsNone(life.parse(raw, life.BASE_MENU))

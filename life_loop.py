@@ -113,12 +113,18 @@ def menu(plugin):
 
 def parse(raw, choices):
     try:
-        value = json.loads(raw)
+        value = browse._json_object(raw)
         if not isinstance(value, dict) or value.get('do') not in choices:
             return None
+        value = dict(value)
+        for key in ('detail', 'liked_last', 'post', 'look'):
+            if value.get(key) is None:
+                value[key] = ''
         if any(not isinstance(value.get(k, ''), str) for k in ('detail', 'liked_last', 'post', 'look')):
             return None
         minutes = value.get('minutes', 30)
+        if isinstance(minutes, str):
+            minutes = int(minutes)
         if type(minutes) is not int:
             return None
         low, high = (60, 720) if value['do'] == '睡觉' else (5, 120)
@@ -203,10 +209,20 @@ def due_events(state, now):
             and row.get('id') and isinstance(row.get('ts'), (int, float)) and row['ts'] <= now]
 
 
+def clock_time(stamp):
+    try:
+        local = datetime.fromisoformat(stamp) if isinstance(stamp, str) else datetime.fromtimestamp(stamp)
+        return local.strftime('%H:%M')
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ''
+
+
 def materials(plugin, state, item, core, reason, now, choices, outfit):
     local = datetime.fromtimestamp(now)
+    activity = {'在哪': item.get('where', ''), '在干什么': item.get('doing', ''),
+                '几点开始': clock_time(item.get('start')), '打算多久': item.get('minutes')}
     lines = ['现在：' + local.strftime('%Y-%m-%d %H:%M') + '，星期' + '一二三四五六日'[local.weekday()],
-             '此刻：' + json.dumps(item, ensure_ascii=False), '这会儿想：' + reason]
+             '此刻：' + json.dumps(activity, ensure_ascii=False), '这会儿想：' + reason]
     forecast = weather.weather_line(STATE_DIR / 'weather.json', plugin.config or {})
     if forecast:
         lines.append(forecast)
@@ -215,25 +231,30 @@ def materials(plugin, state, item, core, reason, now, choices, outfit):
                  (max(0, int((now - core.last_sleep_end) / 60)),
                   datetime.fromtimestamp(core.last_meal).strftime('%H:%M')))
     rows = her_days.Store(DATA_DIR).day(local.date().isoformat())[-8:]
-    lines.append('今天已经做过：' + json.dumps(rows, ensure_ascii=False))
+    activities = [{'几点': clock_time(row.get('ts')), '做了什么': row.get('do', '') + '：' + row.get('detail', ''),
+                   '多久': row.get('minutes'), '感觉': row.get('feel', ''), '喜不喜欢': row.get('liked', '')}
+                  for row in rows]
+    lines.append('今天已经做过：' + json.dumps(activities, ensure_ascii=False))
     lines.append('菜单：' + '、'.join(choices))
     lines.append('自己挑这会儿做什么，只回 JSON：{"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
                  '"minutes":30,"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
                  '"post":"公开短句，最多300字，不需要就空","look":""}。')
     if outfit:
         lines.append('刚睡醒，今天还没定打扮，顺手在 look 里说今天穿什么（最多30字）。')
-    return '\n'.join(lines)
+    return re.sub(r'\d{5,}', '[号码]', '\n'.join(lines))
 
 
 def anonymized(plugin, text):
     index = plugin._names_index()
+    owner = str((plugin.config or {}).get('owner_qq') or '').strip()
     related = []
     names = []
     for person in index:
         aliases = plugin._known_names([person])
         if discretion.anonymize(text, aliases) != text:
             related.append(str(person))
-        names.extend(aliases)
+        if str(person) != owner:
+            names.extend(aliases)
     return discretion.anonymize(text, names), related
 
 
@@ -283,6 +304,8 @@ async def photo(plugin, detail):
 
 async def apply_choice(plugin, value, core, now, outfit):
     state = read_state()
+    action = value['do']
+    started = int(now) if action == '睡觉' else now
     detail, users = anonymized(plugin, value['detail'])
     post, post_users = anonymized(plugin, value['post'])
     liked, _ = anonymized(plugin, value['liked_last'])
@@ -291,7 +314,7 @@ async def apply_choice(plugin, value, core, now, outfit):
     # Prefer an explicit place; otherwise keep her at home.
     match = re.search(r'(?:^|[，,；;])在([^，,；;。]{1,12})(?:[，,；;。]|$)', detail)
     where = browse.clean_query(match.group(1)) if match else '家里'
-    plugin._set_now(where or '家里', doing, now=datetime.fromtimestamp(now), minutes=value['minutes'],
+    plugin._set_now(where or '家里', doing, now=datetime.fromtimestamp(started), minutes=value['minutes'],
                     source='her', kind=value['do'])
     store = her_days.Store(DATA_DIR)
     if liked and state.get('last_item_id'):
@@ -301,14 +324,14 @@ async def apply_choice(plugin, value, core, now, outfit):
                      'related_users': sorted(set(users + post_users))})
     state['last_item_id'] = row['id']
     state.pop('handled_item', None)
-    action = value['do']
     if action == '吃饭':
         body.ate(core, now)
     elif action == '休息':
         body.rested(core, value['minutes'], now)
     elif action == '睡觉':
-        state['sleep'] = {'start': now, 'end': now + value['minutes'] * 60}
-        if datetime.fromtimestamp(now).hour >= 18:
+        state['sleep'] = {'start': int(started), 'end': int(started + value['minutes'] * 60)}
+        hour = datetime.fromtimestamp(now).hour
+        if hour >= 18 or hour < 3:
             state['notebook_sleep'] = notebook_day(now)
     elif action in ('去测试群看看', '刷手机'):
         state.setdefault('pending', {})['group_browse' if action == '去测试群看看' else 'go_browse'] = True
@@ -367,6 +390,9 @@ async def tick(plugin, now=None):
     previous = state.get('last_body', {})
     needs = {key: float(getattr(core, key)) for key in NEEDS}
     crossed = any(previous.get(key, needs[key]) < .7 <= needs[key] for key in NEEDS)
+    if crossed:
+        state['crossed_pending'] = True
+    crossed = bool(state.get('crossed_pending'))
     state['last_body'] = needs
     quiet = quiet_chats(plugin, state, now)
     due = due_events(state, now)
@@ -394,6 +420,7 @@ async def tick(plugin, now=None):
         save_state(state)
         return False
     state['last_think_ts'] = now
+    state.pop('crossed_pending', None)
     state['today']['count'] += 1
     state['handled_item'] = token
     for here, exchange in quiet:
