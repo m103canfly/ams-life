@@ -75,6 +75,12 @@ class Phone(phone.SelfieMixin):
         self._check_reply = AsyncMock(return_value={'leak': False})
         self.browse_enabled = True
 
+    @staticmethod
+    def _check_note(event):
+        if not hasattr(event, '_ams_check'):
+            event._ams_check = {'forbidden': [], 'allowed': '', 'req': None, 'sent': None}
+        return event._ams_check
+
     def _browse_on(self):
         return self.enabled and self.browse_enabled
 
