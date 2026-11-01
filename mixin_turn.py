@@ -406,10 +406,6 @@ class TurnMixin:
                 self._browse_after_reply(event, reply)
             except Exception as exc:
                 logger.warning("[ams-life] browse: not counted (%s)", type(exc).__name__)
-            try:   # and the pages she read, as web memories (who asked kept apart)
-                await self._browse_keep_reply(event)
-            except Exception as exc:
-                logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
         self._continue_job(self._here(event))
         self._check_registry(event)  # her reply to someone she may not keep is not kept either
         core = self._core(event)
@@ -425,6 +421,11 @@ class TurnMixin:
             _sticker = ""
         if getattr(self, "self_decide", False) and attention.silent(_reply) \
                 and not (_sticker and attention.SILENT not in _reply):   # a sticker alone is not silence
+            if self._browse_on():
+                try:
+                    await self._browse_keep_reply(event)
+                except Exception as exc:
+                    logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
             # step 2 (甲): she chose to say nothing (【不说】): nothing is sent, nothing kept
             logger.info("[ams-life] attention: she said nothing")
             self._check_note(event).update(sent="", outcome="silent")
@@ -438,6 +439,11 @@ class TurnMixin:
                 _reply = await self._look_at_reply(event, reply, _reply)
             except Exception as exc:
                 _reply = self._check_failed(event, exc, reply)
+            if self._browse_on():
+                try:
+                    await self._browse_keep_reply(event)
+                except Exception as exc:
+                    logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
             if not _reply:
                 self._phone_queue(event).clear()
                 self._stop(event)
@@ -449,6 +455,11 @@ class TurnMixin:
             _reply, _again = self._sticker_named(event, reply, _reply)
             _sticker = _sticker or (_again if self._stickers_on() else "")
             self._check_note(event)["sent"] = _reply
+        elif self._browse_on():
+            try:
+                await self._browse_keep_reply(event)
+            except Exception as exc:
+                logger.warning("[ams-life] browse: pages not kept (%s)", type(exc).__name__)
         if getattr(self, "self_decide", False):
             if attention.silent(_reply) and not (_sticker and attention.SILENT not in _reply):
                 self._check_note(event).update(sent="", outcome="silent")

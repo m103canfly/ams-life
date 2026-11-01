@@ -103,8 +103,8 @@ class OnlyGivenAddresses(unittest.TestCase):
 
     def test_with_global_memory_nothing_private_goes_out(self):
         r = run_case('leak')
-        self.assertEqual(r['search_leak'], '这个不能搜。')
-        self.assertEqual(r['read_leak'], '这个不能搜。')      # even an address the message gave
+        self.assertEqual(r['search_leak'], '这个不能拿去搜。')
+        self.assertEqual(r['read_leak'], '这个不能拿去搜。')      # even an address the message gave
         self.assertTrue(r['search_ok'].startswith('下面是网页上的资料'))
         self.assertEqual(r['calls'], [{'query': '猫咖', 'count': 5}])   # only the harmless one went out
 
@@ -131,8 +131,9 @@ class Kept(unittest.TestCase):
             self.assertTrue(w['text'].startswith('一页：正文'))
             self.assertNotIn('找到啦', w['text'])                        # her reply is not in it
             self.assertNotIn('（资料完）', w['text'])
-            self.assertEqual(w['origin']['where'], 'web:' + w['url'])     # the page: public
+            self.assertEqual(w['origin']['where'], 'web:' + w['url'])
             self.assertEqual(w['origin']['people'], [])
+            self.assertNotIn('shared_in', w['origin'])
             self.assertEqual((w['asked_in']['where'], w['asked_in']['people']), ('group:900001', ['10001']))
 
     def test_who_asked_deleted_the_page_stays_who_asked_is_the_mark(self):

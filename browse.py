@@ -89,6 +89,16 @@ def _bad_address(text) -> bool:
         return False
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip in ipaddress.ip_network("64:ff9b:1::/48"):
+            return True
+        embedded = []
+        if int(ip) >> 32 == 0 or ip in ipaddress.ip_network("64:ff9b::/96"):
+            embedded.append(ipaddress.IPv4Address(int(ip) & 0xffffffff))
+        if ip.sixtofour is not None:
+            embedded.append(ip.sixtofour)
+        if any(not address.is_global or address.is_multicast for address in embedded):
+            return True
     return not ip.is_global or ip.is_multicast
 
 
@@ -408,15 +418,18 @@ def parse_trip(raw, seen_urls=()) -> dict:
 # ----------------------------------------------------------------------
 # What she keeps of it
 # ----------------------------------------------------------------------
-def web_memory(note, now, trip, asked_in=None) -> dict:
-    """The part of a memory that comes from the web (the plugin adds id, vector...): the page
-    is public (origin web:<url>); who had her look it up (asked_in) is kept apart."""
+def web_memory(note, now, trip, asked_in=None, origin=None) -> dict:
+    """A web origin, with a recall boundary for privately supplied links."""
     url = str(note.get("url") or "")
     title = str(note.get("title") or "").strip()
     text = ("%s：%s（%s）" % (title, str(note.get("said") or "").strip(), url)) if title else \
         "%s（%s）" % (str(note.get("said") or "").strip(), url)
+    shared = origin or asked_in or SELF_ASKED_IN
+    web_origin = {"where": "web:" + url, "people": [], "source_ids": [str(trip)], "visibility": "public"}
+    if str(shared.get("where") or "").startswith("private:"):
+        web_origin["shared_in"] = str(shared["where"])
     return {"text": text[:MEMORY_CHARS], "role": "web",
-            "origin": {"where": "web:" + url, "people": [], "source_ids": [str(trip)], "visibility": "public"},
+            "origin": web_origin,
             "asked_in": dict(asked_in or SELF_ASKED_IN),
             "web": {"url": url, "title": title[:80], "seen_at": float(now), "trip": str(trip)}}
 

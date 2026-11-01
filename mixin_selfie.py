@@ -163,7 +163,7 @@ async def _browser_screenshot(plugin, event, url):
     try:
         SHOT_DIR.mkdir(parents=True, exist_ok=True)
         target = SHOT_DIR / ("ams-browser-" + uuid.uuid4().hex + ".jpg")
-        path = await real_browser.screenshot(url, lambda address: browse.check_url(address, mixin_browse.resolve_host),
+        path = await real_browser.screenshot(url, lambda address: browse.check_url(address),
                                              target, on_block=lambda n: led.add(browser_blocked_requests=n))
     finally:
         led.add(**({"browser_shots": 1} if path else {"browser_shots_failed": 1}))
@@ -307,6 +307,11 @@ class SelfieMixin(PortsMixin):
                 state = {"where": where, "doing": doing, "start": start.isoformat(), "source": "schedule"}
                 _write_json(NOW_PATH, state)
             elapsed = int((now - start).total_seconds() // 60)
+            place = discretion.place_of(state.get("place"))
+            here = getattr(self, "_here", None)
+            here = here(event) if here else adapter_astrbot_turn.incoming_of(event).place
+            if place.startswith("private:") and place != discretion.place_of(here):
+                return "此刻：在%s，正在跟人私聊。" % state["where"]
             duration = "%d 小时 %d 分钟" % divmod(elapsed, 60) if elapsed >= 60 else "%d 分钟" % elapsed
             line = "此刻：在%s，正在%s（从 %s 开始，已经 %s）。" % (state["where"], state["doing"], start.strftime("%H:%M"), duration)
             minutes = state.get("minutes")

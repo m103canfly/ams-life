@@ -1,10 +1,13 @@
 """Offline browser and wiring checks: no browser, model or network."""
 import asyncio
 import ast
+import concurrent.futures
 import json
+import signal
 import socket
 import sys
 import tempfile
+import threading
 import types
 import unittest
 from pathlib import Path
@@ -12,7 +15,9 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'tests'))
 sys.path.insert(0, str(ROOT / 'tests' / 'stubs'))
+import test_basics  # noqa: E402,F401
 import browse
 import mixin_browse
 import mixin_selfie
@@ -32,8 +37,7 @@ def resolver(host, port):
 
 
 def check(url):
-    return browse.check_url(url, lambda host: [resolver(host, None)[0][4][0]] if host in
-                            ('example.com', 'private.example.com') else [])
+    return browse.check_url(url)
 
 
 class Route:
@@ -46,13 +50,19 @@ class Route:
     async def abort(self):
         self.result = 'abort'
 
+    async def continue_(self):
+        self.result = 'continue'
+
     async def fetch(self, **kwargs):
         self.fetch_args = kwargs
         return self.response
 
-    async def fulfill(self, response):
+    def transfer(self):
+        return self.response
+
+    async def fulfill(self, response=None, **kwargs):
         self.result = 'fulfill'
-        self.fulfilled_response = response
+        self.fulfilled_response = response or FakeResponse(self.request.url, kwargs['status'], kwargs['headers'])
 
 
 class FakeResponse:
@@ -88,13 +98,21 @@ class FakePage:
         self.ctx.goto_args = kwargs
         self.ctx.goto_url = url
         self.ctx.main_route = Route(url, status=self.ctx.main_route_status)
+        self.ctx.active_route = self.ctx.main_route
         await self.ctx.route_handler(self.ctx.main_route)
         if self.ctx.main_route.result == 'abort':
             return None
         for route in self.ctx.routes:
+            self.ctx.active_route = route
             await self.ctx.route_handler(route)
         for address in self.ctx.responses:
-            self.ctx.handlers['response'](FakeResponse(address) if isinstance(address, str) else address)
+            response = FakeResponse(address) if isinstance(address, str) else address
+            route = Route(response.url, status=response.status)
+            route.response = response
+            self.ctx.active_route = route
+            await self.ctx.route_handler(route)
+            if route.result == 'abort':
+                return None
         if self.ctx.popup:
             self.ctx.handlers['page'](self.ctx.popup)
         if self.ctx.dialog:
@@ -102,7 +120,8 @@ class FakePage:
         self.url = self.ctx.final_url or url
         if self.ctx.fail:
             raise TimeoutError()
-        return self.ctx.main_response
+        return (self.ctx.main_route.fulfilled_response if self.ctx.main_response is self.ctx.default_response
+                else self.ctx.main_response)
 
     async def wait_for_load_state(self, state, **kwargs):
         self.ctx.settle_args = (state, kwargs)
@@ -145,11 +164,21 @@ class FakeContext:
         self.html, self.content_calls = '<html>page</html>', 0
         self.request = FakeRequest()
         self.main_response = FakeResponse()
+        self.default_response = self.main_response
         self.main_route_status = 200
         self.settle_timeout, self.settled_body = False, None
         self.popup = self.dialog = None
         self.closed = self.fail = False
         self.page = FakePage(self)
+
+    def transfer(self, url, address, headers, proxy=None, deadline=None):
+        self.request.calls.append((url, {'address': address, 'proxy': proxy}))
+        response = self.request.responses.get(url)
+        if response is None:
+            route = getattr(self, 'active_route', None)
+            response = route.transfer() if route and route.request.url == url else FakeResponse(url)
+        response.disposed = True
+        return response.status, response.headers, b'fictional response'
 
     async def route(self, pattern, handler):
         self.pattern, self.route_handler = pattern, handler
@@ -197,13 +226,54 @@ class FakePlaywright:
         self.closed = True
 
 
-class Browser(unittest.TestCase):
+class Offline(unittest.TestCase):
     def setUp(self):
+        # Windows' asyncio wake-up socketpair uses loopback. No test needs it:
+        # fake transports run inline and never wake the loop from another thread.
+        async def inline(fn, *args, **kwargs):
+            return fn(*args, **kwargs)
+        patcher = mock.patch.object(asyncio, 'to_thread', new=inline)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        if sys.platform == 'win32':
+            def make_pipe(loop):
+                loop._ssock = mock.Mock()
+                loop._csock = mock.Mock()
+                loop._csock.fileno.return_value = -1
+            patcher = mock.patch.object(asyncio.ProactorEventLoop, '_make_self_pipe', new=make_pipe)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+            patcher = mock.patch.object(signal, 'set_wakeup_fd', return_value=-1)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+            for name in ('_close_self_pipe', '_write_to_self', '_loop_self_reading'):
+                patcher = mock.patch.object(asyncio.ProactorEventLoop, name, return_value=None)
+                patcher.start()
+                self.addCleanup(patcher.stop)
+        for target, name in ((socket, 'getaddrinfo'), (socket, 'create_connection'),
+                             (socket.socket, 'connect'), (socket.socket, 'connect_ex')):
+            patcher = mock.patch.object(target, name, side_effect=AssertionError('real network is forbidden'))
+            guard = patcher.start()
+            self.addCleanup(patcher.stop)
+            self.addCleanup(guard.assert_not_called)
+
+
+class Browser(Offline):
+    def setUp(self):
+        super().setUp()
         proxy_patch = mock.patch.object(real_browser, 'getproxies', return_value={})
         proxy_patch.start()
         self.addCleanup(proxy_patch.stop)
+        bypass_patch = mock.patch.object(real_browser, 'proxy_bypass', return_value=False)
+        bypass_patch.start()
+        self.addCleanup(bypass_patch.stop)
+        async def inline_fetch(url, headers, check):
+            return real_browser._fetch_checked(url, headers, check)
+        fetch_patch = mock.patch.object(real_browser, '_fetch_page', new=inline_fetch)
+        fetch_patch.start()
+        self.addCleanup(fetch_patch.stop)
 
-    def run_browser(self, fake, shot=None, on_block=None, extractor=None):
+    def run_browser(self, fake, shot=None, on_block=None, extractor=None, url=URL):
         api = types.ModuleType('playwright.async_api')
         api.async_playwright = lambda: fake
         api.TimeoutError = TimeoutError
@@ -211,9 +281,12 @@ class Browser(unittest.TestCase):
         package.__path__ = []
         with mock.patch.dict(sys.modules, {'playwright': package, 'playwright.async_api': api,
                                            'trafilatura': extractor}), \
-             mock.patch.object(real_browser.socket, 'getaddrinfo', side_effect=resolver):
-            task = (real_browser.screenshot(URL, check, shot, on_block=on_block) if shot is not None else
-                    real_browser.read_page(URL, check, on_block=on_block))
+             mock.patch.object(real_browser, '_resolve_addresses', side_effect=lambda host: [resolver(host, None)[0][4][0]]), \
+             mock.patch.object(real_browser, '_pinned_get', side_effect=fake.context.transfer), \
+             mock.patch.object(Route, 'fetch', side_effect=AssertionError('browser fetch is forbidden')), \
+             mock.patch.object(FakeRequest, 'get', side_effect=AssertionError('browser request is forbidden')):
+            task = (real_browser.screenshot(url, check, shot, on_block=on_block) if shot is not None else
+                    real_browser.read_page(url, check, on_block=on_block))
             return asyncio.run(task)
 
     def test_shared_launch_closes_resources_when_setup_fails(self):
@@ -229,14 +302,15 @@ class Browser(unittest.TestCase):
                    'no': 'localhost; .example.test'}
         with mock.patch.object(real_browser, 'getproxies', return_value=proxies):
             self.assertIsNotNone(self.run_browser(fake))
-        self.assertEqual(fake.context_args['proxy'], {'server': proxies['https'],
-                                                      'bypass': 'localhost,.example.test'})
+        self.assertNotIn('proxy', fake.context_args)
+        self.assertEqual(fake.context.request.calls[0][1]['proxy'], proxies['https'])
 
     def test_context_uses_http_proxy_or_omits_proxy(self):
         fake = FakePlaywright()
         with mock.patch.object(real_browser, 'getproxies', return_value={'http': 'http://proxy.example.test'}):
             self.assertIsNotNone(self.run_browser(fake))
-        self.assertEqual(fake.context_args['proxy'], {'server': 'http://proxy.example.test'})
+        self.assertNotIn('proxy', fake.context_args)
+        self.assertEqual(fake.context.request.calls[0][1]['proxy'], 'http://proxy.example.test')
         fake = FakePlaywright()
         self.assertIsNotNone(self.run_browser(fake))
         self.assertNotIn('proxy', fake.context_args)
@@ -253,6 +327,28 @@ class Browser(unittest.TestCase):
         with mock.patch.object(real_browser, 'getproxies', side_effect=OSError('unavailable')):
             self.assertIsNotNone(self.run_browser(fake))
         self.assertNotIn('proxy', fake.context_args)
+
+    def test_unsupported_proxy_logs_only_protocol_and_never_connects(self):
+        fake = FakePlaywright()
+        proxy = 'socks5://fictional-user:fictional-password@proxy.invalid'
+        with mock.patch.object(real_browser, 'getproxies', return_value={'https': proxy}), \
+             self.assertLogs(real_browser.logger, level='INFO') as logs:
+            self.assertIsNone(self.run_browser(fake))
+        text = '\n'.join(logs.output)
+        self.assertIn('unsupported proxy protocol (socks5)', text)
+        for secret in (proxy, 'fictional-user', 'fictional-password', 'proxy.invalid'):
+            self.assertNotIn(secret, text)
+        self.assertEqual(fake.context.request.calls, [])
+        self.assertEqual(fake.context.main_route.result, 'abort')
+
+    def test_no_proxy_uses_checked_ip_without_proxy(self):
+        fake = FakePlaywright()
+        with mock.patch.object(real_browser, 'getproxies', return_value={
+                'https': 'http://proxy.invalid', 'no': 'example.com'}), \
+             mock.patch.object(real_browser, 'proxy_bypass', return_value=True) as bypass:
+            self.assertIsNotNone(self.run_browser(fake))
+        bypass.assert_called_once_with('example.com')
+        self.assertEqual(fake.context.request.calls, [(URL, {'address': PUBLIC, 'proxy': None})])
 
     def test_proxy_address_is_not_logged_on_browser_error(self):
         fake = FakePlaywright()
@@ -287,7 +383,7 @@ class Browser(unittest.TestCase):
         fake = FakePlaywright()
         original = asyncio.to_thread
         async def slow_thread(*args, **kwargs):
-            if args[0] is real_browser._strict_url:
+            if args[0] is real_browser._fetch_checked:
                 return await original(*args, **kwargs)
             await asyncio.sleep(1)
         with mock.patch.object(real_browser, 'EXTRACT_SECONDS', 0.01), \
@@ -350,7 +446,8 @@ class Browser(unittest.TestCase):
         self.assertEqual(self.run_browser(fake)['text'], 'readable words')
         self.assertEqual(fake.launch_args, {'channel': 'msedge', 'headless': True, 'chromium_sandbox': True,
                                             'args': ['--disable-features=DnsOverHttps',
-                                                     '--force-webrtc-ip-handling-policy=disable_non_proxied_udp']})
+                                                     '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+                                                     '--host-resolver-rules=MAP * ~NOTFOUND']})
         self.assertEqual(fake.context_args, {'accept_downloads': False, 'permissions': [], 'service_workers': 'block',
                                              'ignore_https_errors': False, 'bypass_csp': False})
         self.assertEqual(fake.context.pattern, '**/*')
@@ -365,14 +462,14 @@ class Browser(unittest.TestCase):
                                Route('https://missing.example.com/')]
         self.run_browser(fake)
         self.assertEqual([r.result for r in fake.context.routes],
-                         ['fulfill', 'fulfill', 'abort', 'abort', 'abort', 'abort'])
+                         ['fulfill', 'abort', 'abort', 'abort', 'abort', 'abort'])
 
     def test_subrequest_fetch_error_is_counted_and_page_is_read(self):
         class Error(Exception):
             pass
         fake = FakePlaywright()
         route = Route('https://example.com/image')
-        route.fetch = mock.AsyncMock(side_effect=Error('fictional connection failure'))
+        route.transfer = mock.Mock(side_effect=Error('fictional connection failure'))
         fake.context.routes = [route]
         counts = []
         with self.assertLogs(real_browser.logger, level='INFO') as logs:
@@ -387,11 +484,11 @@ class Browser(unittest.TestCase):
     def test_main_request_fetch_error_returns_no_page(self):
         class Error(Exception):
             pass
-        async def fail_fetch(route, **kwargs):
+        def fail_fetch(route):
             raise Error('fictional connection failure')
         fake = FakePlaywright()
         counts = []
-        with mock.patch.object(Route, 'fetch', new=fail_fetch):
+        with mock.patch.object(Route, 'transfer', new=fail_fetch):
             self.assertIsNone(self.run_browser(fake, on_block=counts.append))
         self.assertEqual(fake.context.main_route.result, 'abort')
         self.assertEqual(counts, [1])
@@ -401,7 +498,7 @@ class Browser(unittest.TestCase):
             pass
         fake = FakePlaywright()
         route = Route('https://example.com/image')
-        route.fetch = mock.AsyncMock(side_effect=Error('fetch detail'))
+        route.transfer = mock.Mock(side_effect=Error('fetch detail'))
         route.abort = mock.AsyncMock(side_effect=Error('abort detail'))
         fake.context.routes = [route]
         counts = []
@@ -416,11 +513,11 @@ class Browser(unittest.TestCase):
 
     def test_subrequest_fulfill_timeout_and_programming_error_are_contained(self):
         for phase, error in (('fulfill', TimeoutError('fictional timeout')),
-                             ('fetch', TypeError('fictional coding error'))):
+                             ('transfer', TypeError('fictional coding error'))):
             with self.subTest(phase=phase):
                 fake = FakePlaywright()
                 route = Route('https://example.com/resource')
-                setattr(route, phase, mock.AsyncMock(side_effect=error))
+                setattr(route, phase, (mock.Mock if phase == 'transfer' else mock.AsyncMock)(side_effect=error))
                 fake.context.routes = [route]
                 counts = []
                 with self.assertLogs(real_browser.logger, level='INFO') as logs:
@@ -452,7 +549,7 @@ class Browser(unittest.TestCase):
         self.assertIsNone(self.run_browser(fake, on_block=counts.append))
         self.assertEqual([url for url, _ in fake.context.request.calls], [URL])
         self.assertEqual(counts, [1])
-        self.assertFalse(hasattr(fake.context, 'goto_url'))
+        self.assertEqual(fake.context.main_route.result, 'abort')
         self.assertTrue(fake.context.closed and fake.closed)
         fake = FakePlaywright()
         fake.context.request.responses[URL] = FakeResponse(URL, 302, {'location': target})
@@ -469,10 +566,10 @@ class Browser(unittest.TestCase):
         result = self.run_browser(fake)
         self.assertEqual(result['url'], target)
         self.assertEqual([url for url, _ in fake.context.request.calls], [URL, target])
-        self.assertTrue(all(kw['max_redirects'] == 0 for _, kw in fake.context.request.calls))
-        self.assertEqual(fake.context.goto_url, target)
+        self.assertTrue(all(kw['address'] == PUBLIC for _, kw in fake.context.request.calls))
+        self.assertEqual(fake.context.goto_url, URL)
         self.assertEqual(fake.context.main_route.result, 'fulfill')
-        self.assertEqual(fake.context.main_route.fetch_args['max_redirects'], 0)
+        self.assertIsNone(fake.context.main_route.fetch_args)
 
     def test_main_redirect_limit_and_loop(self):
         for redirects in (real_browser.MAX_HOPS, real_browser.MAX_HOPS + 1):
@@ -484,10 +581,10 @@ class Browser(unittest.TestCase):
                 result = self.run_browser(fake)
                 if redirects == real_browser.MAX_HOPS:
                     self.assertEqual(result['url'], urls[-1])
-                    self.assertEqual(fake.context.goto_url, urls[-1])
+                    self.assertEqual(fake.context.goto_url, URL)
                 else:
                     self.assertIsNone(result)
-                    self.assertFalse(hasattr(fake.context, 'goto_url'))
+                    self.assertEqual(fake.context.main_route.result, 'abort')
                 self.assertEqual(len(fake.context.request.calls), real_browser.MAX_HOPS + 1)
         fake = FakePlaywright()
         fake.context.request.responses[URL] = FakeResponse(URL, 302, {'location': URL})
@@ -496,7 +593,7 @@ class Browser(unittest.TestCase):
         fake = FakePlaywright()
         fake.context.request.responses[URL] = FakeResponse(URL, 302)
         self.assertIsNone(self.run_browser(fake))
-        self.assertFalse(hasattr(fake.context, 'goto_url'))
+        self.assertEqual(fake.context.main_route.result, 'abort')
 
     def test_route_fetch_aborts_redirects_and_fulfills_other_responses(self):
         fake = FakePlaywright()
@@ -506,13 +603,18 @@ class Browser(unittest.TestCase):
         self.assertEqual([r.result for r in fake.context.routes], ['abort', 'fulfill', 'fulfill', 'abort'])
         self.assertEqual(counts, [2])
         for route in fake.context.routes[:3]:
-            self.assertEqual(route.fetch_args['max_redirects'], 0)
+            self.assertIsNone(route.fetch_args)
             self.assertTrue(route.response.disposed)
         self.assertIsNone(fake.context.routes[-1].fetch_args)
 
     def test_route_source_never_continues_unchecked(self):
-        source = (ROOT / 'real_browser.py').read_text('utf-8')
-        self.assertNotIn('.continue_', source)
+        async def exercise():
+            for url, result in (('data:text/plain,sample', 'continue'), ('blob:https://example.com/id', 'continue'),
+                                ('ws://example.com/', 'abort'), ('javascript:example', 'abort')):
+                route = Route(url)
+                await real_browser._pinned_route(route, lambda reason: None, [0])
+                self.assertEqual(route.result, result)
+        asyncio.run(exercise())
 
     def test_main_route_redirect_after_preflight_is_aborted(self):
         fake = FakePlaywright()
@@ -520,7 +622,7 @@ class Browser(unittest.TestCase):
         counts = []
         self.assertIsNone(self.run_browser(fake, on_block=counts.append))
         self.assertEqual(fake.context.main_route.result, 'abort')
-        self.assertEqual(fake.context.main_route.fetch_args['max_redirects'], 0)
+        self.assertIsNone(fake.context.main_route.fetch_args)
         self.assertEqual(counts, [1])
 
     def test_webrtc_disabled_and_local_network_protection_preserved(self):
@@ -573,6 +675,18 @@ class Browser(unittest.TestCase):
         fake = FakePlaywright()
         fake.context.final_url = 'chrome-error://chromewebdata/'
         self.assertIsNone(self.run_browser(fake))
+
+    def test_fragment_does_not_hide_fetched_document(self):
+        for address in (URL, URL + '#section'):
+            fake = FakePlaywright()
+            fake.context.final_url = URL + '#another-section'
+            self.assertEqual(self.run_browser(fake, url=address)['text'], 'readable words')
+
+    def test_response_encoding_is_removed_before_fulfill(self):
+        fake = FakePlaywright()
+        fake.context.request.responses[URL] = FakeResponse(URL, headers={'Content-Encoding': 'gzip'})
+        self.assertIsNotNone(self.run_browser(fake))
+        self.assertNotIn('Content-Encoding', fake.context.main_route.fulfilled_response.headers)
 
     def test_networkidle_timeout_still_reads_page(self):
         fake = FakePlaywright()
@@ -710,7 +824,10 @@ class Browser(unittest.TestCase):
             return await asyncio.gather(real_browser.read_page(URL, check), real_browser.screenshot(URL, check, path))
         with tempfile.TemporaryDirectory() as tmp, \
              mock.patch.dict(sys.modules, {'playwright': package, 'playwright.async_api': api}), \
-             mock.patch.object(real_browser.socket, 'getaddrinfo', side_effect=resolver):
+             mock.patch.object(real_browser, '_resolve_addresses', side_effect=lambda host: [resolver(host, None)[0][4][0]]), \
+             mock.patch.object(real_browser, '_pinned_get', side_effect=lambda *args: active[-1].context.transfer(*args)), \
+             mock.patch.object(Route, 'fetch', side_effect=AssertionError('browser fetch is forbidden')), \
+             mock.patch.object(FakeRequest, 'get', side_effect=AssertionError('browser request is forbidden')):
             results = asyncio.run(exercise(Path(tmp) / 'shot.jpg'))
         self.assertEqual(maximum, [1, 1])
         self.assertTrue(all(results))
@@ -727,7 +844,235 @@ class Browser(unittest.TestCase):
                 self.assertNotIn(word, source, str(path))
 
 
-class Wiring(unittest.TestCase):
+class Transport(Offline):
+    def connection(self):
+        conn = mock.MagicMock()
+        conn.sock = object()
+        conn.getresponse.return_value.status = 200
+        conn.getresponse.return_value.getheaders.return_value = [('Content-Type', 'text/plain')]
+        conn.getresponse.return_value.read1.side_effect = [b'fictional page', b'']
+        return conn
+
+    def test_http_proxy_connect_and_absolute_request(self):
+        for scheme in ('https', 'http'):
+            with self.subTest(scheme=scheme):
+                conn, tls = self.connection(), mock.MagicMock()
+                sock = mock.MagicMock()
+                conn.host, conn.port = '127.0.0.1', 80
+                # A local proxy is allowed; only the target page is checked.
+                proxy = 'http://fictional-user:fictional-password@127.0.0.1'
+                with mock.patch.object(real_browser, 'getproxies', return_value={'https': proxy}), \
+                     mock.patch.object(real_browser, 'proxy_bypass', return_value=False), \
+                     mock.patch.object(real_browser, '_resolve_addresses', side_effect=lambda host: [PUBLIC if host == 'example.com' else '127.0.0.1']), \
+                     mock.patch.object(real_browser.http.client, 'HTTPConnection', return_value=conn) as connect, \
+                     mock.patch.object(real_browser.socket, 'socket', return_value=sock), \
+                     mock.patch.object(real_browser.ssl, 'create_default_context', return_value=tls):
+                    result = real_browser._fetch_checked(scheme + '://example.com/page#fragment', {}, check)
+                connect.assert_called_once_with('127.0.0.1', 80, timeout=real_browser.OPEN_SECONDS)
+                sock.connect.assert_called_once_with(('127.0.0.1', 80))
+                self.assertEqual(result[0], 200)
+                outgoing = conn.request.call_args.kwargs['headers']
+                self.assertEqual(outgoing['Host'], 'example.com')
+                if scheme == 'https':
+                    conn.set_tunnel.assert_called_once()
+                    self.assertEqual(conn.set_tunnel.call_args.args, ('example.com', 443))
+                    self.assertIn('Proxy-Authorization', conn.set_tunnel.call_args.kwargs['headers'])
+                    self.assertNotIn('Proxy-Authorization', outgoing)
+                    self.assertEqual(tls.wrap_socket.call_args.kwargs['server_hostname'], 'example.com')
+                    self.assertEqual(conn.request.call_args.args, ('GET', '/page'))
+                else:
+                    conn.set_tunnel.assert_not_called()
+                    self.assertIn('Proxy-Authorization', outgoing)
+                    self.assertEqual(conn.request.call_args.args, ('GET', 'http://example.com/page'))
+                conn.close.assert_called_once()
+
+    def test_direct_connection_uses_numeric_socket_host_and_tls_name(self):
+        conn, sock, tls = self.connection(), mock.MagicMock(), mock.MagicMock()
+        with mock.patch.object(real_browser.http.client, 'HTTPConnection', return_value=conn), \
+             mock.patch.object(real_browser.socket, 'socket', return_value=sock), \
+             mock.patch.object(real_browser.ssl, 'create_default_context', return_value=tls):
+            real_browser._pinned_get(URL, PUBLIC, {'Host': 'wrong.invalid', 'Proxy-Authorization': 'fictional',
+                                                  'accept-encoding': 'gzip, br'})
+        sock.connect.assert_called_once_with((PUBLIC, 443))
+        self.assertEqual(conn.request.call_args.kwargs['headers']['Host'], 'example.com')
+        self.assertNotIn('Proxy-Authorization', conn.request.call_args.kwargs['headers'])
+        self.assertEqual(conn.request.call_args.kwargs['headers']['Accept-Encoding'], 'identity')
+        self.assertNotIn('accept-encoding', conn.request.call_args.kwargs['headers'])
+        self.assertEqual(tls.wrap_socket.call_args.kwargs['server_hostname'], 'example.com')
+        conn.close.assert_called_once()
+
+    def test_tls_failure_and_oversize_response_close_connection(self):
+        for failure in ('tls', 'body'):
+            with self.subTest(failure=failure):
+                conn, sock, tls = self.connection(), mock.MagicMock(), mock.MagicMock()
+                if failure == 'tls':
+                    tls.wrap_socket.side_effect = RuntimeError('fictional TLS failure')
+                else:
+                    conn.getresponse.return_value.read1.side_effect = [b'x' * (real_browser.HTML_MAX_BYTES + 1)]
+                with mock.patch.object(real_browser.http.client, 'HTTPConnection', return_value=conn), \
+                     mock.patch.object(real_browser.socket, 'socket', return_value=sock), \
+                     mock.patch.object(real_browser.ssl, 'create_default_context', return_value=tls):
+                    with self.assertRaises((RuntimeError, ValueError)):
+                        real_browser._pinned_get(URL, PUBLIC, {})
+                conn.close.assert_called_once()
+
+    def test_other_checked_addresses_are_tried_without_resolving_again(self):
+        with mock.patch.object(real_browser, '_resolve_addresses', return_value=[PUBLIC, '8.8.8.8']) as resolve, \
+             mock.patch.object(real_browser, '_proxy_for', return_value=None), \
+             mock.patch.object(real_browser, '_pinned_get', side_effect=[OSError('fictional refusal'), (200, {}, b'ok')]) as fetch:
+            self.assertEqual(real_browser._fetch_checked(URL, {}, check)[0], 200)
+        resolve.assert_called_once_with('example.com')
+        self.assertEqual([call.args[1] for call in fetch.call_args_list], [PUBLIC, '8.8.8.8'])
+        self.assertIs(fetch.call_args_list[0].args[4], fetch.call_args_list[1].args[4])
+
+    def test_deadline_closes_socket_during_slow_headers(self):
+        closed = threading.Event()
+        conn, sock = self.connection(), mock.MagicMock()
+        sock.shutdown.side_effect = lambda *args: closed.set()
+        def headers():
+            if not closed.wait(1):
+                raise AssertionError('deadline did not close socket')
+            raise OSError('fictional closed socket')
+        conn.getresponse.side_effect = headers
+        with mock.patch.object(real_browser, 'OPEN_SECONDS', 0.03), \
+             mock.patch.object(real_browser.http.client, 'HTTPConnection', return_value=conn), \
+             mock.patch.object(real_browser.socket, 'socket', return_value=sock):
+            with self.assertRaises(OSError):
+                real_browser._pinned_get('http://example.com/', PUBLIC, {})
+        self.assertTrue(closed.is_set())
+        conn.close.assert_called_once()
+
+
+def run_offline_loop(coro, default_executor=None):
+    """Poll worker completions without a Windows loopback wake-up socket."""
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        if default_executor is not None:
+            loop.set_default_executor(default_executor)
+        def pulse():
+            loop.call_later(0.005, pulse)
+        pulse()
+        return loop.run_until_complete(coro)
+    finally:
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.run_until_complete(loop.shutdown_default_executor())
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
+class FetchLimits(Offline):
+    def test_slow_body_expires_without_using_default_pool_or_queuing(self):
+        entered, closed = threading.Event(), threading.Event()
+        sock, conn = mock.MagicMock(), mock.MagicMock()
+        reads = []
+        sock.shutdown.side_effect = lambda *args: closed.set()
+        conn.close.side_effect = lambda: closed.set()
+        response = types.SimpleNamespace(status=200, getheaders=lambda: [], close=lambda: None)
+        def read(size):
+            reads.append(size)
+            if closed.wait(0.005):
+                raise OSError('fictional closed socket')
+            return b'x'
+        response.read1 = read
+        def headers():
+            entered.set()
+            return response
+        conn.getresponse.side_effect = headers
+
+        async def exercise():
+            route = Route()
+            task = asyncio.create_task(real_browser._pinned_route(route, lambda reason: None, [0]))
+            for _ in range(200):
+                if entered.is_set():
+                    break
+                await asyncio.sleep(0.001)
+            self.assertTrue(entered.is_set())
+            loop = asyncio.get_running_loop()
+            self.assertEqual(await asyncio.wait_for(loop.run_in_executor(None, lambda: 'default ready'), 0.2), 'default ready')
+            self.assertFalse(task.done())
+            refused = Route()
+            await real_browser._pinned_route(refused, lambda reason: None, [0])
+            self.assertEqual(refused.result, 'abort')
+            self.assertFalse(task.done())
+            self.assertEqual(conn.getresponse.call_count, 1)
+            await asyncio.wait_for(task, 2)
+            self.assertEqual(route.result, 'abort')
+            self.assertTrue(closed.is_set())
+            self.assertGreater(len(reads), 1)
+            for _ in range(200):
+                if slots.acquire(blocking=False):
+                    slots.release()
+                    break
+                await asyncio.sleep(0.001)
+            else:
+                self.fail('page worker was not released')
+
+        slots = threading.BoundedSemaphore(1)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool, \
+             concurrent.futures.ThreadPoolExecutor(max_workers=1) as default_pool, \
+             mock.patch.object(real_browser, '_fetch_pool', pool), \
+             mock.patch.object(real_browser, '_fetch_slots', slots), \
+             mock.patch.object(real_browser, 'OPEN_SECONDS', 0.4), \
+             mock.patch.object(real_browser, '_resolve_addresses', return_value=[PUBLIC]), \
+             mock.patch.object(real_browser, '_proxy_for', return_value=None), \
+             mock.patch.object(real_browser.http.client, 'HTTPConnection', return_value=conn), \
+             mock.patch.object(real_browser.socket, 'socket', return_value=sock), \
+             mock.patch.object(real_browser.ssl, 'create_default_context') as tls:
+            tls.return_value.wrap_socket.return_value = sock
+            run_offline_loop(exercise(), default_pool)
+
+    def test_fifth_simultaneous_fetch_is_rejected_by_real_admission_limit(self):
+        release = threading.Event()
+        entered = []
+        lock = threading.Lock()
+        def fetch(url, headers, check, job):
+            with lock:
+                entered.append(url)
+            if not release.wait(5):
+                raise AssertionError('fake fetch was not released')
+            return 200, {}, b'fictional page', url
+
+        async def exercise():
+            routes = [Route(URL + '?request=' + str(index)) for index in range(5)]
+            tasks = [asyncio.create_task(real_browser._pinned_route(route, lambda reason: None, [0]))
+                     for route in routes[:4]]
+            try:
+                for _ in range(200):
+                    with lock:
+                        ready = len(entered) == 4
+                    if ready:
+                        break
+                    await asyncio.sleep(0.005)
+                self.assertTrue(ready)
+                fifth = asyncio.create_task(real_browser._pinned_route(routes[4], lambda reason: None, [0]))
+                tasks.append(fifth)
+                await asyncio.wait_for(asyncio.shield(fifth), 0.2)
+                self.assertEqual(routes[4].result, 'abort')
+                self.assertTrue(all(not task.done() for task in tasks[:4]))
+                with lock:
+                    self.assertEqual(len(entered), 4)
+            finally:
+                release.set()
+                if len(tasks) == 5 and not tasks[-1].done():
+                    tasks[-1].cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+            self.assertEqual([route.result for route in routes[:4]], ['fulfill'] * 4)
+
+        # Keep the real admission semaphore: replacing it with an unlimited one
+        # must make the fifth request queue here and fail the assertion above.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool, \
+             mock.patch.object(real_browser, '_fetch_pool', pool), \
+             mock.patch.object(real_browser, '_fetch_checked', side_effect=fetch):
+            run_offline_loop(exercise())
+
+
+class Wiring(Offline):
     def test_default_switch_is_off(self):
         schema = json.loads((ROOT / '_conf_schema.json').read_text('utf-8'))
         self.assertFalse(schema['browser_enabled']['default'])
@@ -816,7 +1161,7 @@ class Wiring(unittest.TestCase):
                                                    'browser_shots_failed', 'browser_blocked_requests')], [1, 1, 1, 2, 7])
 
 
-class ScreenshotWiring(unittest.TestCase):
+class ScreenshotWiring(Offline):
     def test_retention_only_removes_own_old_jpegs(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(mixin_selfie, 'SHOT_DIR', Path(tmp)):
             folder = Path(tmp)
