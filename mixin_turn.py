@@ -5,7 +5,7 @@ try:
     from .common import *  # noqa: F401,F403
     from .body import *  # noqa: F401,F403
     from .mixin_phone import _expand_forward, _phone_line, _history_original
-    from . import adapter_astrbot_turn, attention, stickers, mixin_selfie
+    from . import adapter_astrbot_turn, attention, stickers, likeness, mixin_selfie
 except ImportError:
     from common import *  # noqa: F401,F403
     from body import *  # noqa: F401,F403
@@ -13,6 +13,7 @@ except ImportError:
     import adapter_astrbot_turn
     import attention
     import stickers
+    import likeness
     import mixin_selfie
 
 
@@ -492,6 +493,44 @@ class TurnMixin:
             _queue.clear()
         except Exception:
             pass
+
+    def _keep_likeness(self, event, reply) -> None:
+        """Keep only a successfully sent reply in the new program."""
+        try:
+            place = self._here(event)
+            if not self._private_allowed(event) or not self._message_may_speak(event):
+                return
+            if place.startswith('private:'):
+                owner = str((getattr(self, 'config', None) or {}).get('owner_qq') or '').strip()
+                if not owner or str(self._speaker(event)[0]) != owner:
+                    return
+            elif not place.startswith('group:'):
+                return
+            incoming = adapter_astrbot_turn.incoming_of(event)
+            if not incoming.sender_id or not self._may_keep([incoming.sender_id], place, time.time(),
+                                                             [incoming.message_id] if incoming.message_id else []):
+                return
+            sent = self._check_note(event).get('sent')
+            text = str(sent if sent is not None else reply.text or '').strip()
+            if not text:
+                return
+            lines = []
+            recent = self._read_window(place).get('recent', [])
+            for row in recent:
+                if row.get('role') != 'user':
+                    continue
+                sid = str(row.get('sender_id') or '')
+                if not sid or not self._may_keep([sid], place, row.get('ts'), [row.get('msg_id')] if row.get('msg_id') else []):
+                    continue
+                lines.append({'sender_id': sid, 'name': str(row.get('sender_name') or ''),
+                              'text': str(row.get('text') or '')})
+            if not any(row.get('role') == 'user' and str(row.get('msg_id') or '') == incoming.message_id
+                       for row in recent if incoming.message_id):
+                lines.append({'sender_id': str(incoming.sender_id), 'name': str(incoming.sender_name or ''),
+                              'text': str(incoming.text or '')})
+            likeness.Store(DATA_DIR).add(place, text, lines[-5:])
+        except Exception as exc:
+            logger.warning('[ams-life] likeness not kept (%s)', type(exc).__name__)
 
     def _keep_turn(self, event, turn_request, reply) -> None:
         """The new program's history (AstrBot keeps its own): this turn's line from the person and
