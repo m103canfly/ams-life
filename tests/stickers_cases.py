@@ -1,7 +1,7 @@
 """Scripted runs for test_stickers_wire (step 2, 丙: her stickers in the plugin); prints a JSON result.
 Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/stickers_cases.py <empty data dir> <out.json> <case>
-All made up: group 900001, the owner 10009, Mango 10001, Lemon 10002; the pictures are a few bytes
+All made up: group 900001, the owner 10009, Orange 10001, Lemon 10002; the pictures are a few bytes
 made here; the model, NapCat's client and QQ's picture server are stand-ins. No network.
 """
 import asyncio
@@ -97,7 +97,7 @@ class Bot:
 
 
 class Event(harness.FakeEvent):
-    def __init__(self, text, sender='10001', name='芒果', group=A, wake=False, raw_images=(), bot=None):
+    def __init__(self, text, sender='10001', name='阿橙', group=A, wake=False, raw_images=(), bot=None):
         super().__init__(text, sender=sender, name=name, group=group)
         self.is_at_or_wake_command = wake
         self.stopped = False
@@ -438,7 +438,7 @@ def run():
             out['calls_next_day'] = len(calls)
             out['panel_after_next'] = go(plugin.page_status())['data']['vision']
     elif CASE == 'forget':
-        cache = {'k1': stickers.cache_entry('https://gchat.qpic.cn/m.png', {'caption': '芒果的图'}, '10001', 'group:' + A, now),
+        cache = {'k1': stickers.cache_entry('https://gchat.qpic.cn/m.png', {'caption': '阿橙的图'}, '10001', 'group:' + A, now),
                  'k2': stickers.cache_entry('https://gchat.qpic.cn/l.png', {'caption': '柠檬的图'}, '10002', 'group:' + A, now)}
         (DATA / 'image_cache.json').write_text(json.dumps(cache, ensure_ascii=False), 'utf-8')
         got = loop.run_until_complete(plugin.page_forget_person('10001'))

@@ -815,7 +815,7 @@ class TripPlugin(mixin_browse.BrowseMixin):
         self.ledger, self.self_model, self.checked, self.notes = ledger, {}, [], []
 
     def _browse_ledger(self): return self.ledger
-    def _browse_names(self): return ['Mango']
+    def _browse_names(self): return ['Orange']
     def _browse_topics(self): return ['fictional topic']
     async def _persona_text(self, event): return ''
     async def _may_go_out(self, event, words):
@@ -863,7 +863,7 @@ class TripIntegration(unittest.IsolatedAsyncioTestCase):
         action = mixin_browse.INTERACTIVE_TOOL
         calls = [(browse.SEARCH_TOOL, {'query': 'topic'}),
                  (action, {'action': 'open', 'url': URL}),
-                 (action, {'action': 'type', 'n': 2, 'text': 'Mango 900001 hello'}),
+                 (action, {'action': 'type', 'n': 2, 'text': 'Orange 900001 hello'}),
                  (action, {'action': 'type', 'n': 2, 'text': 'blocked'}),
                  (action, {'action': 'click', 'n': 1}),
                  (action, {'action': 'read'}), (action, {'action': 'finish'})]

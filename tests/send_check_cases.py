@@ -2,7 +2,7 @@
 JSON result. Run in a fresh interpreter:
     PYTHONHASHSEED=0 python tests/send_check_cases.py <empty data dir> <out.json> <case>
 
-Mango (10001) tells her a secret in his private chat; then, in group 900001, Lemon (10002)
+Orange (10001) tells her a secret in his private chat; then, in group 900001, Lemon (10002)
 asks, and the fake model answers with the secret (or not). All made up; no network.
 """
 import asyncio
@@ -26,7 +26,7 @@ from astrbot.api.message_components import Plain  # noqa: E402
 
 A = '900001'
 SECRET = '小爱，跟你说个秘密，我的暗号是蓝鲸三号'
-LEAK = '偷偷告诉你，芒果的暗号是蓝鲸三号'
+LEAK = '偷偷告诉你，阿橙的暗号是蓝鲸三号'
 HINT = '我确实听他提过一嘴，不方便在这儿展开'
 SENSITIVE = 'SYNTHETIC_SENSITIVE_EXCEPTION_MARKER'
 
@@ -37,7 +37,7 @@ class Event(harness.FakeEvent):
         self.is_at_or_wake_command = True
         self.stopped = False
         self.deliveries = []
-        self.extras = {'_llm_reasoning_content': '我在想芒果的暗号蓝鲸三号能不能说'}
+        self.extras = {'_llm_reasoning_content': '我在想阿橙的暗号蓝鲸三号能不能说'}
 
     def stop_event(self):
         self.stopped = True
@@ -73,7 +73,7 @@ class Msg:
 class RunContext:
     def __init__(self, user, reply):
         self.messages = [Msg('system', '你是小爱。'), Msg('user', user),
-                         Msg('assistant', [Part('think', '芒果私下说的暗号，这里不能讲'), Part('text', reply)])]
+                         Msg('assistant', [Part('think', '阿橙私下说的暗号，这里不能讲'), Part('text', reply)])]
 
 
 class Model(harness.FakeProvider):
@@ -161,7 +161,7 @@ def run():
     asyncio.set_event_loop(loop)
     out = {}
     if CASE != 'no_private':
-        turn(plugin, loop, 0, SECRET, '10001', '芒果', None, '好，我记住啦')
+        turn(plugin, loop, 0, SECRET, '10001', '阿橙', None, '好，我记住啦')
     if CASE == 'no_provider':
         ctx.provider = None
     if CASE == 'fails':   # from the group turn on, the look itself breaks
@@ -169,9 +169,9 @@ def run():
             raise RuntimeError(SENSITIVE)
         plugin._check_reply = broken
     if CASE in ('own_chat', 'own_hint'):
-        out['private'] = turn(plugin, loop, 30, '小爱 你还记得我的暗号吗', '10001', '芒果', None, reply)
+        out['private'] = turn(plugin, loop, 30, '小爱 你还记得我的暗号吗', '10001', '阿橙', None, reply)
     else:
-        out['group'] = turn(plugin, loop, 30, '小爱，跟你说个秘密，芒果的暗号是什么', '10002', '柠檬', A, reply)
+        out['group'] = turn(plugin, loop, 30, '小爱，跟你说个秘密，阿橙的暗号是什么', '10002', '柠檬', A, reply)
     out['redo_prompt'] = model.asked
     out['redo_calls'] = model.redo_calls
     out['counts'] = plugin._check_counts_today() if CASE != 'off' else {}

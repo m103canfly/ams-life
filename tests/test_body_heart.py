@@ -27,7 +27,7 @@ def tearDownModule():
 
 
 QQ = ('10001', '10002', '10003', '10004', '10005', '20002')
-NAMES = ('柠檬', '阿星', '芒果', '桃子', '路人')
+NAMES = ('柠檬', '阿星', '阿橙', '桃子', '路人')
 # words that tell the model how to reply (the old plan= / hint= / [BC-Return] lines)
 INSTRUCTIONS = ('回复', '先接住', '先按', '别解释', '别报', '接就好', '不要', '<bc>', 'BC-Return', 'BC-Note',
                 'plan', 'hint', '应该')
@@ -196,7 +196,7 @@ class TellingTheMouth(unittest.TestCase):
         self.assertIn('柠檬说过', r['same_group'])
         self.assertIn('阿星说过', r['same_group'])
         self.assertIn('（别处）有人说过', r['other_group'])
-        self.assertIn('芒果说过', r['private'])
+        self.assertIn('阿橙说过', r['private'])
         for name in NAMES:  # another group hears what, never who
             self.assertNotIn(name, r['other_group'])
         for prompt in (r['same_group'], r['other_group']):  # the private surprise stays private
@@ -264,8 +264,8 @@ class OldState(unittest.TestCase):
         self.assertEqual(sm['consistency'], [])
         self.assertEqual((sm['narrative'], sm['narrative_items'], sm['notebook']), ('', [], []))
         self.assertNotIn('diary', sm)
-        self.assertNotIn('芒果在准备惊喜', repr(sm))
-        self.assertEqual(r['kept_self']['narrative'], '芒果在准备惊喜')
+        self.assertNotIn('阿橙在准备惊喜', repr(sm))
+        self.assertEqual(r['kept_self']['narrative'], '阿橙在准备惊喜')
         self.assertNotIn('一个会持续受聊天影响', r['prompt'])
 
 
@@ -304,7 +304,7 @@ class Notebook(unittest.TestCase):
         r = run_case('notebook')
         self.assertEqual(r['sittings'], ['group', 'private:10001', 'private:10007'])
         group = r['prompts']['group']
-        for word in ('蛋糕', '搬家', '芒果', '小鹿'):
+        for word in ('蛋糕', '搬家', '阿橙', '小鹿'):
             self.assertNotIn(word, group)
         self.assertIn('爬山', group)
         self.assertNotIn('搬家', r['prompts']['private:10001'])  # nor one chat's sitting another's
@@ -312,9 +312,9 @@ class Notebook(unittest.TestCase):
     def test_a_private_sittings_entries_stay_in_that_chat(self):
         r = run_case('notebook')
         book = {x['text']: x for x in r['notebook']}
-        for text in ('朋友在准备一个甜甜的秘密', '芒果在准备惊喜蛋糕，要保密'):
+        for text in ('朋友在准备一个甜甜的秘密', '阿橙在准备惊喜蛋糕，要保密'):
             self.assertEqual(book[text]['origin']['where'], 'private:10001')
-            self.assertIn(text, r['private_mango'])
+            self.assertIn(text, r['private_orange'])
             for prompt in (r['group_a'], r['group_b'], r['private_deer']):
                 self.assertNotIn(text, prompt)
         self.assertEqual(book['周末大家要去爬山']['origin']['where'], 'group:900001')
@@ -333,7 +333,7 @@ class Notebook(unittest.TestCase):
         r = run_case('notebook')
         marks = {x['text']: x['private_mark'] for x in r['notebook']}
         self.assertEqual(marks, {'周末大家要去爬山': False, '朋友在准备一个甜甜的秘密': False,
-                                 '芒果在准备惊喜蛋糕，要保密': True})
+                                 '阿橙在准备惊喜蛋糕，要保密': True})
 
     def test_her_body_alone_is_hers_anywhere(self):
         r = run_case('notebook_body')

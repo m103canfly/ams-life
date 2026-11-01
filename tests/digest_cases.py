@@ -43,7 +43,7 @@ class Model(harness.FakeProvider):
                     {'title': 'P1说了蓝莓计划', 'what': 'P1跟她说起蓝莓计划的安排', 'who': ['P1'], 'lines': [1, 2]}]},
                     ensure_ascii=False))
             return harness.FakeResponse(json.dumps({'events': [
-                # P1 is 柠檬 (spoke first), P2 芒果; Q codes are people only mentioned
+                # P1 is 柠檬 (spoke first), P2 阿橙; Q codes are people only mentioned
                 {'title': 'P1约周末打副本', 'what': 'P1约大家周末一起打副本，P2说要来', 'who': ['P1', 'P2'],
                  'lines': [1, 2]},
                 {'title': '有人在聊抽卡', 'what': '几个人在聊今天抽卡的运气', 'who': ['P1']},       # no lines
@@ -87,10 +87,10 @@ def events():
 
 def chat():
     turn('周末一起打副本吗', '10002', '柠檬', group=G1, msg_id='g1')
-    turn('我来我来 @柠檬', '10001', '芒果', group=G1, msg_id='g2')
+    turn('我来我来 @柠檬', '10001', '阿橙', group=G1, msg_id='g2')
     turn('今天抽卡又歪了', '10002', '柠檬', group=G1, msg_id='g3')
-    turn('阿星今天没来', '10001', '芒果', group=G1, msg_id='g4')
-    turn('我的手机号是13812345678', '10001', '芒果', group=G1, msg_id='g5')
+    turn('阿星今天没来', '10001', '阿橙', group=G1, msg_id='g4')
+    turn('我的手机号是13812345678', '10001', '阿橙', group=G1, msg_id='g5')
     turn('我是阿星，我家的猫叫团子', '10003', '阿星', group=G1, msg_id='g6')
     turn('我跟你说个秘密 我在弄蓝莓计划', '10004', '桃子', reply='好呀', msg_id='p1')
     turn('蓝莓计划下周开始', '10004', '桃子', msg_id='p2')
@@ -175,7 +175,7 @@ if CASE == 'reply':
     add_event('柠檬的生日聚会', '柠檬请大家去她家过生日', 'group:' + G1, ['10002'], digest_kind=False, importance=0.9)
     add_event('柠檬约周末打副本', '柠檬约大家周末一起打副本', 'group:' + G1, ['10002', '10001'])
     add_event('大家聊抽卡', '几个人在聊今天抽卡的运气', 'group:' + G1, ['10002', '10001'])
-    add_event('芒果的副本攻略', '芒果分享了周末副本的打法', 'group:' + G1, ['10001'])
+    add_event('阿橙的副本攻略', '阿橙分享了周末副本的打法', 'group:' + G1, ['10001'])
     add_event('副本开荒', '大家约好周末副本开荒', 'group:' + G1, ['10001'])
     add_event('桃子也想打副本', '桃子说周末也想打副本', 'group:' + G2, ['10004'])
     for name, text in (('related', '周末的副本几点开始'), ('unrelated', '你好呀')):
@@ -211,7 +211,7 @@ if CASE == 'merge_gone':
 if CASE == 'gone_names':
     turn('大家好', '10003', '阿星', group=G1, msg_id='g0')
     turn('周末打副本 阿星来不来', '10002', '柠檬', group=G1, msg_id='g1')
-    turn('好呀', '10001', '芒果', group=G1, msg_id='g2')
+    turn('好呀', '10001', '阿橙', group=G1, msg_id='g2')
     result['phone_before_delete'] = phone('group:' + G1)
     result['deleted'] = loop.run_until_complete(plugin.page_forget_person('10003'))   # the owner, from the panel
     result['phone_at_once'] = phone('group:' + G1)
@@ -232,7 +232,7 @@ if CASE == 'gone_names':
     result['events'] = [e.get('event') for e in events()]
     plugin = new_plugin()                                          # a restart: nothing in memory
     clock.now = LATE + 600
-    turn('阿星呢', '10001', '芒果', group=G1, msg_id='g4')
+    turn('阿星呢', '10001', '阿橙', group=G1, msg_id='g4')
     result['phone_after_restart'] = phone('group:' + G1)
     result['registry_has_name'] = '阿星'.encode('utf-8') in (DATA / forget_registry.FILE_NAME).read_bytes()
 
@@ -268,7 +268,7 @@ if CASE == 'everywhere':
     # what the reviewer did (made-up): others speak of him to her; then the owner deletes him
     turn('大家好', '10003', '阿星', group=G1, msg_id='w0')
     ask('小爱 阿星周末想去打副本 你也来吗', '10002', '柠檬', group=G1, reply='好呀', msg_id='w1')
-    ask('小爱 记得阿星说的那个副本吗', '10001', '芒果', group=G1, reply='记得', msg_id='w2')
+    ask('小爱 记得阿星说的那个副本吗', '10001', '阿橙', group=G1, reply='记得', msg_id='w2')
     # an event about it, of 柠檬's alone: its key names him, and a key merged into it too
     add_event('柠檬约阿星打副本', '柠檬约阿星周末一起打副本', 'default:GroupMessage:' + G1, ['10002'],
               digest_kind=False, merged_event_keys=['阿星的副本局'])
@@ -284,10 +284,10 @@ if CASE == 'everywhere':
     result['framed_at_once'] = [(e.get('title'), e.get('event')) for e in plugin._event_archive(100, read_only=True)
                                 if e.get('id') == 'framed']
     result['framed_somebody'] = files_with('「某人」', archive=False) + files_with('「有人」', archive=False)
-    result['prompt'] = ask('小爱 周末的副本谁去', '10001', '芒果', group=G1, reply='还不知道', msg_id='w3')
+    result['prompt'] = ask('小爱 周末的副本谁去', '10001', '阿橙', group=G1, reply='还不知道', msg_id='w3')
     result['after_a_turn'] = files_with('阿星', archive=False)
     plugin = new_plugin()                                      # a restart
-    result['prompt_after_restart'] = ask('小爱 副本几点开始', '10001', '芒果', group=G1, reply='八点', msg_id='w4')
+    result['prompt_after_restart'] = ask('小爱 副本几点开始', '10001', '阿橙', group=G1, reply='八点', msg_id='w4')
     result['after_restart'] = files_with('阿星', archive=False)
     result['archives'] = files_with('阿星', archive=True)
 
@@ -296,11 +296,11 @@ if CASE == 'everyday':
     turn('我也来', '10006', '周末', group=G1, msg_id='e0')
     turn('周末一起打副本', '10002', '柠檬', group=G1, msg_id='e1')
     turn('@周末 来不来', '10002', '柠檬', group=G1, msg_id='e2')
-    turn('周末说他不来', '10001', '芒果', group=G1, msg_id='e3')
+    turn('周末说他不来', '10001', '阿橙', group=G1, msg_id='e3')
     loop.run_until_complete(plugin.page_forget_person('10006'))
     result['at_once'] = phone('group:' + G1)
     plugin = new_plugin()
-    turn('周末去哪玩', '10001', '芒果', group=G1, msg_id='e4')
+    turn('周末去哪玩', '10001', '阿橙', group=G1, msg_id='e4')
     turn('周末：我也不来了', '10002', '柠檬', group=G1, msg_id='e5')
     result['after_restart'] = phone('group:' + G1)[-2:]
 

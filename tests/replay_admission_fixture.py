@@ -20,7 +20,7 @@ def prepare_with_admission(*args, **kwargs):
 
     def init_with_admission(self, context, config=None):
         config = dict(config or {})
-        config.update(owner_qq=fake.MANGO, reply_groups=[fake.G_SMALL])
+        config.update(owner_qq=fake.ORANGE, reply_groups=[fake.G_SMALL])
         original_init(self, context, config=config)
 
     main.BioCorePlugin.__init__ = init_with_admission
