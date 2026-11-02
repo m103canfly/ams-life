@@ -10,11 +10,12 @@ import time
 from datetime import datetime, timedelta
 
 try:
-    from . import atomic_file, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, send_check, turn, weather, works
+    from . import atomic_file, attention, bodily, body, browse, daily, discretion, events, her_days, heybox, interpretation, look, mixin_discretion, mixin_turn, redline, send_check, turn, weather, works
     from .common import DATA_DIR, STATE_DIR
     from . import mixin_selfie as phone
 except ImportError:
     import atomic_file
+    import attention
     import bodily
     import body
     import browse
@@ -39,6 +40,14 @@ logger = logging.getLogger('ams-life.life')
 NEEDS = ('sleepiness', 'hunger', 'physical_fatigue')
 BODY_FIELDS = (*NEEDS, 'last_sleep_end', 'last_meal', 'last_rest')
 BASE_MENU = ('吃饭', '睡觉', '休息', '发呆', '写歌')
+# card E2: while her hands are full, the menu offers going on with what she had in them
+CONTINUE_WORDS = '接着做刚才的'
+# how long a line for him may be: when he spoke first, a little more than a nudge
+TELL_MAX = 80
+TELL_MAX_OWNER = 300
+# the marks on her own state: a thing put down for another, and two later looks at him
+MARK_DUE_MAX = 20          # the due table keeps at most this many rows
+ASLEEP_MARK = '（你睡着时）'
 # What the things on the menu can show her, and what they cannot, in the words of the
 # code that does them: she is not left looking for a door that is not there.
 SEES = {
@@ -126,7 +135,8 @@ def consume(plugin, name):
     return picked and enabled(plugin) and budget(plugin) == 'ok'
 
 
-def menu(plugin):
+def menu(plugin, now=None):
+    now = time.time() if now is None else float(now)
     config = plugin.config or {}
     choices = list(BASE_MENU)
     if getattr(plugin, 'browse_groups_enabled', False):
@@ -142,9 +152,19 @@ def menu(plugin):
     if config.get('heybox_enabled', False) and heybox_ready(plugin):
         choices.append('刷小黑盒')
     # The notebook's own sitting is not offered twice for the same day.
-    if plugin._llm_allowed('notebook') and notebook_due(plugin, time.time()):
+    if plugin._llm_allowed('notebook') and notebook_due(plugin, now):
         choices.append(NOTEBOOK_WORDS)
+    # Card E2: she may go on with the thing in her hands, and only while it is still hers.
+    if hands_full(current(), now):
+        choices.append(CONTINUE_WORDS)
     return choices
+
+
+def hands_full(item, now):
+    """Something she chose is in her hands and has not run its time (dazing is not work)."""
+    kind = str(item.get('kind') or item.get('doing') or '')
+    end = item_end(item)
+    return bool(item.get('source') == 'her' and end and now < end and kind not in DAZE_TOO)
 
 
 def heybox_ready(plugin):
@@ -154,7 +174,7 @@ def heybox_ready(plugin):
                 and not status.get('login_required') and not status.get('review_required'))
 
 
-def parse(raw, choices):
+def parse(raw, choices, tell_max=TELL_MAX):
     try:
         value = browse._json_object(raw)
         if not isinstance(value, dict):
@@ -183,7 +203,7 @@ def parse(raw, choices):
         low, high = (60, 720) if value['do'] == '睡觉' else (5, 120)
         return dict(value, minutes=max(low, min(high, minutes)), detail=value.get('detail', '')[:40],
                     liked_last=value.get('liked_last', '')[:20], post=value.get('post', '')[:300],
-                    look=value.get('look', '')[:30], tell_owner=told[:80],
+                    look=value.get('look', '')[:30], tell_owner=told[:int(tell_max)],
                     wish=value.get('wish', '')[:100], used_wishes=used_wishes[:10])
     except (ValueError, TypeError):
         return None
@@ -303,6 +323,82 @@ def due_events(state, now):
             and row.get('id') and isinstance(row.get('ts'), (int, float)) and row['ts'] <= now]
 
 
+def due_line(row):
+    """One due row in her words: what she meant to do, and when she meant it."""
+    kind = str(row.get('kind') or '')
+    if kind == attention.MARK_OWNER_LATER:
+        return '之前想过会儿再找他：%s（%s 那会儿想的）' % (
+            str(row.get('why') or ''), clock_time(row.get('set_at')) or clock_time(row.get('ts')))
+    if kind == attention.MARK_OWNER_REPLY_LATER:
+        return '他 %s 找过你，你说过会儿再回' % (
+            clock_time(row.get('set_at')) or clock_time(row.get('ts')))
+    return '到点了'
+
+
+def due_reason(rows):
+    """The words a due table is called in with: every row that has come due, once."""
+    lines = [due_line(row) for row in rows or () if isinstance(row, dict)]
+    return '；'.join(line for line in lines if line)
+
+
+def put_down_reason(row, item):
+    """The words a thing she put down is called in with: what matters, and what she has in hand."""
+    why = str(row.get('why') or '')
+    doing = str(item.get('doing') or '')
+    end = clock_time(item_end(item))
+    if doing and end:
+        return ('聊天里有件事你觉得要紧：%s。你手上在做：%s，打算到 %s。急不急你自己掂量。'
+                % (why, doing, end))
+    return '聊天里有件事你觉得要紧：%s。急不急你自己掂量。' % why
+
+
+def mark_id(kind, now, why=''):
+    """An id for one mark of hers: the same words at the same moment are the same mark."""
+    payload = json.dumps([str(kind), str(why or ''), float(now)], ensure_ascii=False)
+    return 'mark:' + hashlib.sha256(payload.encode('utf-8')).hexdigest()[:12]
+
+
+def note_mark(plugin, kind, why, minutes, here, now=None):
+    """What she wrote for herself in a reply and did not send.
+
+    A thing put down for something that matters more is kept as the newest one; a later
+    look at him or a later answer to him goes into the due table. Nothing at all is kept
+    while the life loop is off. A why with a name in it is kept without the name; one that
+    crosses a red line drops the mark."""
+    if not enabled(plugin):
+        return False
+    now = time.time() if now is None else float(now)
+    kind = str(kind or '')
+    if kind not in (attention.MARK_PUT_DOWN, attention.MARK_OWNER_LATER,
+                    attention.MARK_OWNER_REPLY_LATER):
+        return False
+    why, _ = anonymized(plugin, str(why or ''))
+    why = ' '.join(why.split())
+    if kind in (attention.MARK_PUT_DOWN, attention.MARK_OWNER_LATER):
+        if not why or redline.hit(why) or plugin._red_line(why, 'life'):
+            return False
+        why = why[:attention.MARK_WHY_MAX]
+    if kind != attention.MARK_PUT_DOWN:
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            return False
+        if not 1 <= minutes <= attention.MARK_MINUTES_MAX:
+            return False
+    state = read_state()
+    ident = mark_id(kind, now, why)
+    if kind == attention.MARK_PUT_DOWN:
+        state['put_down'] = {'id': ident, 'why': why, 'ts': now, 'here': str(here or '')}
+    else:
+        row = {'id': ident, 'ts': now + minutes * 60, 'kind': kind, 'set_at': now}
+        if why:
+            row['why'] = why
+        rows = [item for item in state.get('due') or [] if isinstance(item, dict)]
+        state['due'] = (rows + [row])[-MARK_DUE_MAX:]
+    save_state(state)
+    return True
+
+
 def clock_time(stamp):
     try:
         local = datetime.fromisoformat(stamp) if isinstance(stamp, str) else datetime.fromtimestamp(stamp)
@@ -333,6 +429,35 @@ def owner_place(plugin):
     return 'private:' + owner if owner else ''
 
 
+def owner_waiting(plugin):
+    """His private chat: his last line is one she has not answered yet."""
+    place = owner_place(plugin)
+    if not place:
+        return False
+    try:
+        rows = plugin._read_window(place).get('recent') or []
+    except Exception:
+        return False
+    for row in reversed(rows):
+        if not isinstance(row, dict):
+            continue
+        if row.get('role') == 'user':
+            return True
+        if row.get('role') == 'assistant':
+            return False
+    return False
+
+
+def owner_first(state, now, plugin):
+    """He spoke first: his last private line is unanswered, or an "answer him later" has come due.
+
+    Answering him is not speaking up on her own, so the tell is given for it either way."""
+    if owner_waiting(plugin):
+        return True
+    return any(isinstance(row, dict) and row.get('kind') == attention.MARK_OWNER_REPLY_LATER
+               for row in due_events(state, now))
+
+
 def owner_chat(plugin, now):
     """His private window: the last 24 hours, at most 200 lines, oldest first."""
     place = owner_place(plugin)
@@ -356,8 +481,11 @@ def owner_chat(plugin, now):
     return out[-CHAT_MAX:]
 
 
-def chat_view(plugin, rows):
-    """The chat as she reads it, and the same lines as what may not be said elsewhere."""
+def chat_view(plugin, rows, asleep=None):
+    """The chat as she reads it, and the same lines as what may not be said elsewhere.
+
+    `asleep`: the hours she slept, (start, end); what he said in them is marked as such,
+    so that waking up she knows which lines came while she was not there."""
     called = interpretation.owner_name(getattr(plugin, 'config', None))
     lines, forbidden = [], []
     for index, row in enumerate(rows or ()):
@@ -365,11 +493,15 @@ def chat_view(plugin, rows):
         if not text:
             continue
         try:
-            stamp = datetime.fromtimestamp(float(row.get('ts', 0) or 0)).strftime('%m-%d %H:%M')
+            when = float(row.get('ts', 0) or 0)
+            stamp = datetime.fromtimestamp(when).strftime('%m-%d %H:%M')
         except (TypeError, ValueError, OverflowError, OSError):
-            stamp = ''
+            when, stamp = 0.0, ''
         who = '她' if row.get('role') == 'assistant' else called
-        lines.append((stamp + ' ' if stamp else '') + who + '：' + text)
+        line = (stamp + ' ' if stamp else '') + who + '：' + text
+        if asleep and row.get('role') != 'assistant' and asleep[0] <= when < asleep[1]:
+            line += ASLEEP_MARK      # said while she was asleep: she never saw it
+        lines.append(line)
         forbidden.append({'id': 'chat:%d' % index, 'text': text, 'private': True,
                           'names': [], 'vec': None})
     return lines, forbidden
@@ -443,11 +575,13 @@ def wish_ref(wish):
     return ''.join(chr(97 + (byte >> 4)) + chr(97 + (byte & 15)) for byte in digest)
 
 
-async def tell_owner(plugin, text, now, wishes):
+async def tell_owner(plugin, text, now, wishes, owner_first=False):
     config = plugin.config or {}
     owner = str(config.get('owner_qq') or '').strip()
     text = str(text or '').strip()
-    if (not config.get('proactive_owner_enabled', False) or not owner or not text
+    # Card E2: he spoke first, so answering him is not speaking up on her own: the switch
+    # may be off for this one. Money, sleep, the leak check and the red lines are the same.
+    if (not (config.get('proactive_owner_enabled', False) or owner_first) or not owner or not text
             or budget(plugin) != 'ok' or plugin._spent_today() >= 8):
         return False
     sleep = read_state().get('sleep', {})
@@ -516,7 +650,8 @@ def mood_line(core):
     return '心情：' + brief if brief else ''
 
 
-def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None):
+def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None,
+              he_first=None, woke=None, due_rows=()):
     local = datetime.fromtimestamp(now)
     called = interpretation.owner_name(getattr(plugin, 'config', None))
     activity = {'在哪': item.get('where', ''), '在干什么': item.get('doing', ''),
@@ -538,9 +673,15 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
                    '多久': length_shown(row), '感觉': row.get('feel', ''), '喜不喜欢': row.get('liked', '')}
                   for row in rows]
     lines.append('今天已经做过：' + json.dumps(activities, ensure_ascii=False))
-    shown, _forbidden = chat_view(plugin, owner_chat(plugin, now) if chat is None else chat)
+    shown, _forbidden = chat_view(plugin, owner_chat(plugin, now) if chat is None else chat, asleep=woke)
     lines.append('最近跟他聊的（近24小时，最多200条）：')
     lines += shown or ['最近没聊']
+    if woke:
+        # Card E2: the first thinking after a sleep, so that she may make up for what she missed.
+        lines.append('你睡着的时候：%s 到 %s 在睡觉。' % (clock_time(woke[0]), clock_time(woke[1])))
+        missed = [row for row in due_rows or () if isinstance(row, dict)
+                  and row.get('kind') == attention.MARK_OWNER_REPLY_LATER]
+        lines += [due_line(row) for row in missed]
     wanted = notebook_wishes(plugin, now)
     if wanted:
         lines.append('我最近想做的：' + '；'.join(wanted))
@@ -549,20 +690,27 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
     if sees:
         lines.append('这些事能做到什么：' + ' '.join(sees))
     proactive = bool((plugin.config or {}).get('proactive_owner_enabled', False))
+    if he_first is None:
+        he_first = owner_first(state, now, plugin)
+    # card E2: when he spoke first, answering him is not speaking up on her own: the tell is
+    # given with the switch off too, and it may be longer.
+    tell_shown = proactive or he_first
     answer = ('"do":"菜单里的一样","detail":"具体干什么/在哪，最多40字",'
               '"minutes":"睡觉不用写，别的事写大概多久",'
               '"liked_last":"刚才那件喜不喜欢，最多20字，没有就空",'
               '"wish":"想做的事，没有就空",'
               '"look":""')
-    if proactive:
+    if tell_shown:
         answer += ',"tell":""'
     lines.append('自己挑这会儿做什么，只回 JSON：{' + answer + '}。')
     # One neutral line, no nudge: a wish is hers to write or leave out.
     lines.append('有想做但现在做不了的事，可以写在 wish（最多100字）。')
     if outfit:
         lines.append('刚睡醒，今天还没定打扮，顺手在 look 里说今天穿什么（最多30字）。')
+    if tell_shown:
+        lines.append('要是想跟%s说点什么就写在 tell，不写也行（最多%d字）。'
+                     % (called, TELL_MAX_OWNER if he_first else TELL_MAX))
     if proactive:
-        lines.append('要是想跟%s说点什么就写在 tell，不写也行（最多80字）。' % called)
         wishes = owner_wishes(plugin, now)
         if wishes:
             lines.append('想分享的事：' + json.dumps([{'id': wish_ref(w), 'what': w['what']}
@@ -911,6 +1059,18 @@ async def photo(plugin, detail):
 async def apply_choice(plugin, value, core, now, outfit, *, reason='', forbidden=()):
     state = read_state()
     action = value['do']
+    if action == CONTINUE_WORDS:
+        # Card E2: she goes on with the thing in her hands. Nothing new is written, nothing
+        # is put down; handled_item goes so that its own end calls her again.
+        liked, _ = anonymized(plugin, value['liked_last'])
+        if says_private(liked, forbidden):
+            liked = ''
+        if liked and state.get('last_item_id'):
+            her_days.Store(DATA_DIR).set_liked(state['last_item_id'], liked)
+        state.pop('handled_item', None)
+        keep_wish(plugin, value.get('wish'), now)
+        save_state(state)
+        return
     # The thing in her hands, before this choice takes its place: if it is hers and has
     # not run its time, the day says how far it got, not only how long it was meant to be.
     put_down = put_down_after(current(), now)
@@ -1312,6 +1472,8 @@ async def tick(plugin, now=None):
         return False
     if sleep and now >= sleep['end']:
         state['woke_date'] = datetime.fromtimestamp(sleep['end']).date().isoformat()
+        # The sleep that just ended: the first thinking after it says what she missed.
+        state['woke_sleep'] = {'start': sleep['start'], 'end': sleep['end']}
         state.pop('sleep', None)
     local = datetime.fromtimestamp(now)
     if state.get('today', {}).get('date') != local.date().isoformat():
@@ -1325,6 +1487,12 @@ async def tick(plugin, now=None):
     state['last_body'] = needs
     quiet = quiet_chats(plugin, state, now)
     due = due_events(state, now)
+    put_down = state.get('put_down') if isinstance(state.get('put_down'), dict) else {}
+    # Card E2: every thing she put down calls her once; the same one never twice.
+    if put_down and (not put_down.get('id') or state.get('handled_put_down') == put_down.get('id')):
+        put_down = {}
+    woke = state.get('woke_sleep') if isinstance(state.get('woke_sleep'), dict) else None
+    he_first = owner_first(state, now, plugin)
     token = item.get('start', '')
     finished = bool(item.get('source') == 'her' and end and now >= end and state.get('handled_item') != token)
     startup = not getattr(plugin, '_life_start_checked', False)
@@ -1335,17 +1503,32 @@ async def tick(plugin, now=None):
     startup = startup and not valid
     # What she is busy with has not ended yet (and is not just dazing); only her
     # body crossing a line, a plan coming due, or a fresh start may interrupt it.
-    dazing = str(item.get('kind') or item.get('doing') or '') in DAZE_TOO
-    busy = bool(item.get('source') == 'her' and end and now < end and not dazing)
-    reason = ('刚才那件事到时候了' if finished or sleep else '程序刚起来，此刻是空的或过期了' if startup
-              else '身体有了新的感觉' if crossed else '到点了' if due
-              else '跟人聊完了，那个地方静下来了' if quiet and not busy else '')
+    busy = hands_full(item, now)
+    # Card E2, in this order: the end of a thing or a waking, a fresh start, a thing she put
+    # down for another, a new feeling of her body, a plan come due, then a quiet stretch.
+    put_down_called = False
+    if finished or sleep:
+        reason = '刚才那件事到时候了'
+    elif startup:
+        reason = '程序刚起来，此刻是空的或过期了'
+    elif put_down:
+        reason, put_down_called = put_down_reason(put_down, item), True
+    elif crossed:
+        reason = '身体有了新的感觉'
+    elif due:
+        reason = due_reason(due)
+    elif quiet and not busy:
+        reason = '跟人聊完了，那个地方静下来了'
+    else:
+        reason = ''
     if gate == 'soft':
         fallback(plugin, core, now)
         state['pending'] = {'group_browse': False, 'go_browse': False}
         save_state(state)
         return False
-    cooldown = not (finished or startup or sleep) and now - state.get('last_think_ts', 0) < 600
+    # A thing put down and a plan come due do not wait for the 600 seconds, as an end does.
+    cooldown = not (finished or startup or sleep or put_down or due) \
+        and now - state.get('last_think_ts', 0) < 600
     if not reason or cooldown or state['today']['count'] >= 48:
         save_state(state)
         return False
@@ -1357,15 +1540,22 @@ async def tick(plugin, now=None):
     state.pop('crossed_pending', None)
     state['today']['count'] += 1
     state['handled_item'] = token
+    if put_down_called:
+        state['handled_put_down'] = put_down.get('id')
+    if woke:
+        state.pop('woke_sleep', None)
     for here, exchange in quiet:
         state['quiet_seen'][here] = exchange
     state['due'] = [row for row in state.get('due', []) if row not in due]
     save_state(state)
-    choices = menu(plugin)
+    choices = menu(plugin, now)
     outfit = state.get('woke_date') == local.date().isoformat() and not look.read_look(phone.LOOK_PATH, local.date())
     chat = owner_chat(plugin, now)
-    prompt = materials(plugin, state, item, core, reason, now, choices, outfit, chat=chat)
-    value = await plugin._llm_v2_call('life', prompt, lambda raw: parse(raw, choices),
+    sleep_hours = (woke['start'], woke['end']) if woke else None
+    prompt = materials(plugin, state, item, core, reason, now, choices, outfit, chat=chat,
+                       he_first=he_first, woke=sleep_hours, due_rows=due)
+    tell_max = TELL_MAX_OWNER if he_first else TELL_MAX
+    value = await plugin._llm_v2_call('life', prompt, lambda raw: parse(raw, choices, tell_max=tell_max),
                                       system_prompt=await plugin._persona_text(None))
     if not value:
         logger.warning('[ams-life] life choice ignored: invalid or unavailable answer')
@@ -1374,7 +1564,7 @@ async def tick(plugin, now=None):
         return False
     if value.get('tell_owner'):
         wishes = [w for w in owner_wishes(plugin, now) if wish_ref(w) in value.get('used_wishes', [])]
-        await tell_owner(plugin, value['tell_owner'], now, wishes)
+        await tell_owner(plugin, value['tell_owner'], now, wishes, owner_first=he_first)
     action = value['do']
     if action == '睡觉':
         await automatic_heybox(plugin, now, 'sleep')
