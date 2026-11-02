@@ -269,10 +269,39 @@ class AttentionMixin:
         self._note_tie(sid, called_her=bool(why), private=private)
         st = self._window_state(here)
         now = time.time()
-        night = attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        # Card E2s: with the life loop on, one sleep decides (her own); with it off, the clock.
+        by_the_loop = life_loop.enabled(self)
+        night = not by_the_loop and attention.is_night(now, cfg["night_start"], cfg["night_end"])
+        asleep = life_loop.asleep(self, now) if by_the_loop else False
         if getattr(self, "mood_events_enabled", False):
             self._mood_clock(now)
-        if night:
+        if asleep:
+            if not why:
+                self._hear_mood(event)
+                return None   # asleep she never speaks up herself
+            owner = bool(cfg["owner"]) and sid == cfg["owner"]
+            familiar = self._familiarity(sid)
+            weight = attention.wake_weight(familiar, owner=owner)
+            calls = [c for c in attention.wake_calls(st.get("night_calls")) if now - c[0] < 3600] + [(now, weight)]
+            st["night_calls"] = calls
+            self._save_attention()
+            core = self._core(None)
+            woken = attention.wake_check(calls, float(getattr(core, "sleepiness", 0.0) or 0.0), now)
+            if woken:
+                self._woken_at = now   # (乙: woken up, a bit cross)
+                if getattr(self, "mood_events_enabled", False):
+                    core.mood_event("woken")
+                life_loop.wake_up(self, now)
+            else:
+                # Card E2s: the calls she slept through are kept for her first thinking awake.
+                life_loop.note_missed(self, here, attention.wake_tier(familiar), now)
+                self._stop(event)
+                return None
+        elif night:
             if not why:
                 self._hear_mood(event)
                 return None   # at night she never speaks up herself

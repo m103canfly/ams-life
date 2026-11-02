@@ -149,8 +149,16 @@ class GroupBrowseMixin:
         if not getattr(self, 'browse_groups_enabled', False):
             return 'none', ''
         cfg = self._attention_cfg()
+        try:
+            from . import life_loop
+        except ImportError:
+            import life_loop
+        # Card E2s: with the life loop on, her own sleep decides; with it off, the clock.
         # Until the mood block supplies its tiredness interpretation, only night rules it out.
-        if attention.is_night(now, cfg['night_start'], cfg['night_end']):
+        if life_loop.enabled(self):
+            if life_loop.asleep(self, now):
+                return 'none', ''
+        elif attention.is_night(now, cfg['night_start'], cfg['night_end']):
             return 'none', ''
         quiet = (now - float(getattr(self, '_group_last_reply', 0) or 0)) / 60
         if quiet < 5:

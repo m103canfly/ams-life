@@ -47,6 +47,7 @@ TELL_MAX = 80
 TELL_MAX_OWNER = 300
 # the marks on her own state: a thing put down for another, and two later looks at him
 MARK_DUE_MAX = 20          # the due table keeps at most this many rows
+MISSED_MAX = 20            # the calls she slept through keep at most this many rows
 ASLEEP_MARK = '（你睡着时）'
 # What the things on the menu can show her, and what they cannot, in the words of the
 # code that does them: she is not left looking for a door that is not there.
@@ -230,6 +231,22 @@ def sleeping(item):
     return item.get('source') == 'her' and item.get('kind', item.get('doing')) == '睡觉'
 
 
+def asleep(plugin, now=None):
+    """Is she asleep now: the sleep she chose, or the sleeping thing in her hands.
+
+    This is the one place the reply side asks whether she is asleep. With the life loop
+    off it says no, and the reply side keeps its own night by the clock."""
+    if not enabled(plugin):
+        return False
+    now = time.time() if now is None else float(now)
+    state = read_state()
+    sleep = state.get('sleep') if isinstance(state.get('sleep'), dict) else {}
+    if sleep and now < float(sleep.get('end', 0) or 0):
+        return True
+    item = current()
+    return bool(sleeping(item) and now < item_end(item))
+
+
 def put_down_after(item, now):
     """Minutes she gave a thing of her own before another took its place: None when it
     is not one she chose from the menu, is only dazing, is sleeping, or has already run
@@ -268,6 +285,35 @@ def sleep_minutes(sleepiness, now):
                      else (NAP_WAKE_LINE, NAP_MAX_MINUTES))
     hours = max(0.0, float(sleepiness) - line) / body.SLEEPINESS_FALL_SLEEP
     return max(SLEEP_MIN_MINUTES, min(longest, int(round(hours * 60.0))))
+
+
+def wake_up(plugin, now=None):
+    """A call wakes her: her sleep and the sleeping thing end now.
+
+    The next tick then goes the way a waking goes: her body settles how long she slept, and
+    she thinks once with the reason that she was woken. Nothing is done with the loop off."""
+    if not enabled(plugin):
+        return False
+    now = time.time() if now is None else float(now)
+    state = read_state()
+    sleep = state.get('sleep') if isinstance(state.get('sleep'), dict) else {}
+    item = current()
+    if not ((sleep and now < float(sleep.get('end', 0) or 0))
+            or (sleeping(item) and now < item_end(item))):
+        return False
+    if sleep:
+        state['sleep'] = dict(sleep, end=int(now))
+    # The waking's own reason, read by the next tick: it says she was called awake.
+    state['woken_by_call'] = now
+    save_state(state)
+    if sleeping(item) and now < item_end(item):
+        try:
+            start = datetime.fromisoformat(item['start']).timestamp()
+            item['minutes'] = max(1, int((now - start) // 60))
+            phone._write_json(phone.NOW_PATH, item)
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
+            logger.warning('[ams-life] the sleeping thing was not ended')
+    return True
 
 
 def note_called(plugin, event):
@@ -649,6 +695,49 @@ def mood_line(core):
     return '心情：' + brief if brief else ''
 
 
+def note_missed(plugin, here, tier, now=None):
+    """One call she slept through: where, when, and how well she knows whoever called.
+
+    No words and no account numbers are kept."""
+    if not enabled(plugin):
+        return False
+    now = time.time() if now is None else float(now)
+    state = read_state()
+    rows = [row for row in state.get('missed') or [] if isinstance(row, dict)]
+    rows.append({'place': str(here or ''), 'ts': now, 'tier': str(tier or '')})
+    state['missed'] = rows[-MISSED_MAX:]
+    save_state(state)
+    return True
+
+
+def missed_lines(rows):
+    """The calls she slept through, as her first thinking after waking reads them.
+
+    A place is numbered (群1, 私聊1), never named by its own key or account number, and it
+    says only how many called and how well she knows each; nothing that was said is here."""
+    order, calls = [], {}
+    for row in rows or ():
+        if not isinstance(row, dict):
+            continue
+        place = str(row.get('place') or '')
+        if place not in calls:
+            calls[place] = []
+            order.append(place)
+        calls[place].append(str(row.get('tier') or '不认识'))
+    lines, group_no, private_no = [], 0, 0
+    for place in order:
+        tiers = calls[place]
+        if place.startswith('group:'):
+            group_no += 1
+            label = '群%d' % group_no
+        else:
+            private_no += 1
+            label = '私聊%d' % private_no
+        who = '，'.join('一个' + tier + '的' for tier in tiers)
+        lines.append('%s 有人叫了你 %d 次（%s）' % (label, len(tiers), who))
+    return lines
+
+
 def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None,
               he_first=None, woke=None, due_rows=()):
     local = datetime.fromtimestamp(now)
@@ -678,9 +767,11 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
     if woke:
         # Card E2: the first thinking after a sleep, so that she may make up for what she missed.
         lines.append('你睡着的时候：%s 到 %s 在睡觉。' % (clock_time(woke[0]), clock_time(woke[1])))
-        missed = [row for row in due_rows or () if isinstance(row, dict)
-                  and row.get('kind') == attention.MARK_OWNER_REPLY_LATER]
-        lines += [due_line(row) for row in missed]
+        # Card E2s: the calls she slept through, in her own words: no place number, nothing said.
+        lines += missed_lines(state.get('missed'))
+        later = [row for row in due_rows or () if isinstance(row, dict)
+                 and row.get('kind') == attention.MARK_OWNER_REPLY_LATER]
+        lines += [due_line(row) for row in later]
     wanted = notebook_wishes(plugin, now)
     if wanted:
         lines.append('我最近想做的：' + '；'.join(wanted))
@@ -1399,6 +1490,9 @@ async def tick(plugin, now=None):
     he_first = owner_first(state, now, plugin)
     token = item.get('start', '')
     finished = bool(item.get('source') == 'her' and end and now >= end and state.get('handled_item') != token)
+    # Card E2s: a call woke her; the reason of this thinking says so. Kept until she thinks,
+    # as the waking itself is, so a hold of the day's money does not lose the reason.
+    woken_by_call = bool(state.get('woken_by_call')) and bool(finished or sleep)
     startup = not getattr(plugin, '_life_start_checked', False)
     plugin._life_start_checked = True
     valid = bool(item.get('source') == 'her' and phone._her_now_valid(item, local))
@@ -1412,7 +1506,7 @@ async def tick(plugin, now=None):
     # down for another, a new feeling of her body, a plan come due, then a quiet stretch.
     put_down_called = False
     if finished or sleep:
-        reason = '刚才那件事到时候了'
+        reason = '被叫醒了' if woken_by_call else '刚才那件事到时候了'
     elif startup:
         reason = '程序刚起来，此刻是空的或过期了'
     elif put_down:
@@ -1444,6 +1538,7 @@ async def tick(plugin, now=None):
     state.pop('crossed_pending', None)
     state['today']['count'] += 1
     state['handled_item'] = token
+    state.pop('woken_by_call', None)     # card E2s: the reason of a waking is read once
     if put_down_called:
         state['handled_put_down'] = put_down.get('id')
     if woke:
@@ -1458,6 +1553,11 @@ async def tick(plugin, now=None):
     sleep_hours = (woke['start'], woke['end']) if woke else None
     prompt = materials(plugin, state, item, core, reason, now, choices, outfit, chat=chat,
                        he_first=he_first, woke=sleep_hours, due_rows=due)
+    if woke:
+        # Card E2s: the calls she slept through have been shown to her; they are told once.
+        fresh = read_state()
+        if fresh.pop('missed', None) is not None:
+            save_state(fresh)
     tell_max = TELL_MAX_OWNER if he_first else TELL_MAX
     value = await plugin._llm_v2_call('life', prompt, lambda raw: parse(raw, choices, tell_max=tell_max),
                                       system_prompt=await plugin._persona_text(None))
