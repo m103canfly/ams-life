@@ -251,13 +251,20 @@ class TurnMixin:
                 _query_vec = await self._embed_text(text)
             except Exception:
                 _query_vec = None
+        _reaction = None
         if text:
+            # ams-life K1: what this one sentence stirred in her, read off the core right
+            # after observe() (core.last_impulse). It is not the difference in v/stress
+            # before and after: that difference is mostly the hours of decay and the pull
+            # back toward her own baseline. The trust in this person follows the impulse
+            # (see _touch_user).
             # the trust in this person is passed in for this call only (no global trust)
             core.observe(text, embedding=_query_vec,
                          relationship=self._relationship_of(self._user_record(event)))
+            _reaction = getattr(core, "last_impulse", None)
             # ams-life: open loops are matched, merged and closed in this window only.
             self._window_update_loops(event, text, core)
-        _user_data = self._touch_user(event, core)
+        _user_data = self._touch_user(event, core, reaction=_reaction)
         # Task-15: readiness is computed by L1 only when autonomy is enabled;
         # remember private sessions and start the P0-1 generator lazily.
         if (getattr(self, "proactive_autonomy", False)

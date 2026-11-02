@@ -248,6 +248,9 @@ class BioCore:
         self.talked = 0.0           # having talked a lot: every reply adds, it fades over hours
         self.ambient = 0.0          # how lively the chats around her are (message times only)
         self._partner_trust = None  # trust in the person she is answering, during one observe()
+        # ams-life K1: what this one sentence itself stirred in her, read by the turn
+        # after observe(). Temporary only: cleared every observe() and never saved.
+        self.last_impulse = None
         self._derive()
         self.ticks = 0
         self.labels = {"emotion": "neutral", "intent": "hold", "expression": "normal",
@@ -882,6 +885,7 @@ class BioCore:
     def observe(self, text: str, embedding=None, relationship=None) -> None:
         """A message that woke her. ams-life: `relationship` is the record of the person
         she is answering; its trust is used during this call and not kept."""
+        self.last_impulse = None
         try:
             state = (relationship or {}).get("state") if isinstance(relationship, dict) else None
             self._partner_trust = _clip(float((state or {}).get("trust", 0.5) or 0.5), 0, 1)
@@ -989,6 +993,10 @@ class BioCore:
             a_delta *= _hab * _sens
             d_delta *= _hab * _sens
             social_delta *= _hab * _sens
+            # ams-life K1: this sentence's own impulse, after habituation and
+            # sensitization. It is what she felt hearing it; the decay, momentum,
+            # reflection, opponent and noise below are not this sentence.
+            self.last_impulse = {"v": v_delta}
             if _item:
                 # Repeated equivalent stimulus: boredom rises, novelty need rises.
                 self.boredom = _clip(self.boredom + (0.05 + 0.03 * min(3.0, _count)) * (1.0 - self.boredom), 0.0, 1.0)

@@ -328,7 +328,7 @@ class FakeTurn(mixin_turn.TurnMixin):
     def _relationship_of(self, record):
         return None
 
-    def _touch_user(self, event, core=None):
+    def _touch_user(self, event, core=None, reaction=None):
         return {}
 
     def _continuity_context(self, *args, **kwargs):
