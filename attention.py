@@ -7,7 +7,7 @@ no I/O, no model, no AstrBot. The plugin keeps the state (mixin_attention.py).
   chat; and someone taking up what she just said (she spoke in this window a moment ago, to him).
   Called: the model is always asked (unless the two safety nets or the night say no).
 - Not called (groups only): the plugin scores the last message of a stretch (topic, people she
-  knows, how much she said here lately, a quarrel, how long she has been quiet here) and asks the
+  knows, how much she said here lately, how long she has been quiet here) and asks the
   model only over the threshold of the level the owner picks (less / normal / more).
 - Night (01:00-08:25 by default): called once she does not answer; called NIGHT_WAKE_CALLS times
   within NIGHT_WAKE_MINUTES she is woken, and answers until nobody called her for
@@ -147,16 +147,13 @@ def note_tie(tie, now=None, called_her=False, private=False) -> dict:
 # ------------------------------------------------------------------
 # not called: a score and a threshold
 # ------------------------------------------------------------------
-def score(topic=0.0, known=0.0, her_recent=0, quarrel=False, quiet_minutes=0.0) -> float:
+def score(topic=0.0, known=0.0, her_recent=0, quiet_minutes=0.0) -> float:
     """How much the last message of a stretch draws her in (no model). topic: how close it is to
     what she keeps (cosine, 0..1); known: the most familiar of who spoke (0..1); her_recent: her
-    lines here in the last 10 minutes; quarrel: people are fighting; quiet_minutes: since she
-    last spoke here."""
+    lines here in the last 10 minutes; quiet_minutes: since she last spoke here."""
     s = 0.45 * max(0.0, min(1.0, float(topic))) + 0.25 * max(0.0, min(1.0, float(known)))
     s += 0.15 * min(1.0, max(0.0, float(quiet_minutes)) / 120.0)
     s -= 0.20 * min(1.0, max(0, int(her_recent)) / 3.0)
-    if quarrel:
-        s -= 0.20
     return round(s, 4)
 
 

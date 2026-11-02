@@ -112,6 +112,16 @@ def run():
             return 0.9
         plugin._score = high
         out['high'] = one(Event('那个游戏出新角色了', sender='10002', name='柠檬'))
+    elif CASE == 'no_quarrel':
+        # the same stretch of the group, only the words differ: one sentence has the words the
+        # lexicon calls a quarrel, the other has not. The topic is pinned to the same vector, so
+        # a score that still looked at the words would be the only thing that could differ.
+        async def same_vector(text):
+            return harness.fake_vector('同一段群聊')
+
+        plugin._embed_text = same_vector
+        out['with_words'] = loop.run_until_complete(plugin._score(Event('你生气也没用，我很难过')))
+        out['without_words'] = loop.run_until_complete(plugin._score(Event('今天天气不错')))
     elif CASE == 'named':
         out['named'] = one(Event('小爱，周末去哪玩', sender='10002', name='柠檬'))
         out['not_a_call'] = one(Event('看到她我心里小爱乱撞', sender='10002', name='柠檬'))
