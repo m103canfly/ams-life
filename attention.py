@@ -32,6 +32,17 @@ GROUP_HOUR_MAX = 30
 MAX_MESSAGES = 10
 SILENT = "【不说】"
 NEXT = "【下一条】"
+# the three marks she may write for herself at the end of a reply: never sent, never kept
+# as words of hers; what they say goes to her own loop (life_loop.note_mark)
+PUT_DOWN = "放下手上的"
+OWNER_LATER = "过会儿再找他"
+OWNER_REPLY_LATER = "过会儿再回"
+MARK_NAMES = (PUT_DOWN, OWNER_LATER, OWNER_REPLY_LATER)
+MARK_PUT_DOWN = "put_down"                 # what she put down for something that matters more
+MARK_OWNER_LATER = "owner_later"           # she means to look him up herself, in a while
+MARK_OWNER_REPLY_LATER = "owner_reply_later"   # she means to answer him, in a while
+MARK_WHY_MAX = 40
+MARK_MINUTES_MAX = 1440
 
 # QQ's own small faces she may use, by name (the ids are QQ's: to be checked after install)
 FACES = {"惊讶": 0, "撇嘴": 1, "色": 2, "发呆": 3, "得意": 4, "流泪": 5, "害羞": 6, "睡": 8, "大哭": 9,
@@ -48,6 +59,11 @@ _STOPS = r"\s，,。.！!？?：:、~～"
 CHOICES_NOTE = ("你可以自己挑怎么回：不想回就只写%s；可以只回一个QQ小表情（写成[表情:名字]，名字有：%s）；"
                 "可以一句短的；也可以正经回一段。"
                 % (SILENT, "、".join(FACES)))
+# the three marks, in the words she is given (never sent: they are hers, not his)
+MARKS_NOTE = "这件事要是比你手上在做的要紧，可以在最后写【%s：为什么】。" % PUT_DOWN
+MARKS_NOTE_OWNER = ("手上有事、不想马上回，可以先回一句、也可以什么都不回，写【%s：大概几分钟】；"
+                    "想过会儿再找他，写【%s：大概几分钟，为什么】。这些不会发出去，不需要就别写。"
+                    % (OWNER_REPLY_LATER, OWNER_LATER))
 UNSEEN_IMAGE_NOTE = "这条消息里有图，但这次你没看清图里是什么：照实说没看清，别猜，也别当成之前那张。"
 
 
@@ -197,6 +213,65 @@ def budget(spent, soft=8.0, hard=10.0) -> str:
     """"ok", "soft" (only the owner's private chat), "hard" (nothing at all)."""
     spent = float(spent or 0)
     return "hard" if spent >= float(hard) else "soft" if spent >= float(soft) else "ok"
+
+
+# ------------------------------------------------------------------
+# the three marks she writes for herself
+# ------------------------------------------------------------------
+_MARK_HEAD = re.compile("【\\s*(?:%s)" % "|".join(MARK_NAMES))
+_MARK_BODY = re.compile(r"^\s*(%s)\s*[:：]\s*(.*?)\s*$" % "|".join(MARK_NAMES), re.S)
+_MARK_MINUTES = re.compile(r"^\s*(\d{1,4})\s*$")
+
+
+def _mark_of(inner):
+    """One mark from what is between its brackets: {kind, why, minutes}, or None when miswritten."""
+    match = _MARK_BODY.match(str(inner or ""))
+    if not match:
+        return None
+    name, rest = match.group(1), match.group(2)
+    if name == PUT_DOWN:
+        why = " ".join(rest.split())
+        if not why or len(why) > MARK_WHY_MAX:
+            return None
+        return {"kind": MARK_PUT_DOWN, "why": why, "minutes": 0}
+    count, _, why = rest.partition("，") if "，" in rest else rest.partition(",")
+    minutes = _MARK_MINUTES.match(count)
+    if not minutes or not 1 <= int(minutes.group(1)) <= MARK_MINUTES_MAX:
+        return None
+    why = " ".join(why.split())
+    if name == OWNER_REPLY_LATER:
+        if why:      # this one carries no why: miswritten, so not taken
+            return None
+        return {"kind": MARK_OWNER_REPLY_LATER, "why": "", "minutes": int(minutes.group(1))}
+    if not why or len(why) > MARK_WHY_MAX:
+        return None
+    return {"kind": MARK_OWNER_LATER, "why": why, "minutes": int(minutes.group(1))}
+
+
+def take_marks(text, private=False):
+    """Cut the marks she wrote for herself out of her words: (clean words, marks).
+
+    The marks are never sent and never kept as words of hers. One written badly (no
+    closing bracket, minutes outside 1-1440, too long a why) is cut out too, and is not
+    taken. 【过会儿再找他】 and 【过会儿再回】 count only in his private chat: anywhere else
+    they are cut out as if she had not written them."""
+    text = str(text or "")
+    pieces, marks, at = [], [], 0
+    for head in _MARK_HEAD.finditer(text):
+        if head.start() < at:
+            continue
+        close = text.find("】", head.end())
+        if close < 0:
+            # never closed: the rest is cut out, and nothing of it is taken
+            end, mark = len(text), None
+        else:
+            end, mark = close + 1, _mark_of(text[head.start() + 1:close])
+        pieces.append(text[at:head.start()])
+        if mark is not None and (private or mark["kind"] == MARK_PUT_DOWN):
+            marks.append(mark)
+        at = end
+    pieces.append(text[at:])
+    return "".join(pieces), marks
 
 
 # ------------------------------------------------------------------

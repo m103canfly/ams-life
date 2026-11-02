@@ -52,6 +52,21 @@ def _one_line_history(contexts):
                     part["text"] = " ".join(attention.split(part["text"], most=10**6))
 
 
+def _owner_private(plugin, here) -> bool:
+    """His own private chat, the one she may write her marks about him in."""
+    owner = str((getattr(plugin, "config", None) or {}).get("owner_qq") or "").strip()
+    return bool(owner) and str(here or "") == "private:" + owner
+
+
+def _life_loop():
+    """life_loop, asked for when a reply brings marks for it (it imports this module)."""
+    try:
+        from . import life_loop
+    except ImportError:
+        import life_loop
+    return life_loop
+
+
 def _has_non_sticker_image(event):
     """Whether this message or its quote contains an image other than a QQ sticker."""
     segments = adapter_astrbot_turn.incoming_of(event).segments
@@ -358,6 +373,11 @@ class TurnMixin:
         if getattr(self, "self_decide", False):
             # step 2 (甲): what she may pick (nothing, a face, a short line, an answer, several)
             _compact = (_compact + "\n[她可以] " + attention.CHOICES_NOTE).strip()
+            # card E2: the three marks she may write for herself and not send (put a thing
+            # down for something that matters more, look him up later, answer him later)
+            _compact = (_compact + "\n[她可以] " + attention.MARKS_NOTE).strip()
+            if _owner_private(self, self._here(event)):
+                _compact = (_compact + "\n[她可以] " + attention.MARKS_NOTE_OWNER).strip()
         if getattr(self, "reply_in_pieces", True):
             _compact = (_compact + "\n" + attention.PIECES_NOTE).strip()
         _offer = ""
@@ -413,6 +433,22 @@ class TurnMixin:
         # ams-life: no state tag is asked for any more. If the model writes one anyway
         # it is cut out (whether it parses or not) and what it says is not used.
         _reply = reply.map_words(interpretation.strip_state_tags)
+        # card E2: the three marks she writes for herself are cut out here, before the
+        # sticker, 【不说】 and the look: never sent, never kept, never in the window. What
+        # they say goes to her own loop, whether the words go out or not.
+        _marks_here = self._here(event)
+        _words = _reply
+        _reply, _marks = attention.take_marks(_reply, private=_owner_private(self, _marks_here))
+        if _reply != _words and hasattr(reply, "set_text"):
+            reply.set_text(_reply)   # her words without the marks, for the platform too
+        if _marks:
+            try:
+                _loop = _life_loop()
+                for _mark in _marks:
+                    _loop.note_mark(self, _mark.get("kind", ""), _mark.get("why", ""),
+                                    _mark.get("minutes", 0), _marks_here, time.time())
+            except Exception as exc:
+                logger.warning("[ams-life] her marks not kept (%s)", type(exc).__name__)
         # step 2 (丙): the sticker she named ([表情包:n], only an offered one), sent after her words. Marks
         # are taken out with stickers off too: her history may hold [表情包：标签] from before
         _sticker_source = _reply
