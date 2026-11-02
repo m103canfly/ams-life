@@ -119,12 +119,17 @@ class Familiarity(unittest.TestCase):
 
 class Score(unittest.TestCase):
     def test_what_draws_her_in(self):
-        base = at.score(0.5, 0.5, 0, False, 30)
-        self.assertGreater(at.score(0.9, 0.5, 0, False, 30), base)        # closer to what she keeps
-        self.assertGreater(at.score(0.5, 0.9, 0, False, 30), base)        # people she knows
-        self.assertLess(at.score(0.5, 0.5, 3, False, 30), base)           # she said a lot here lately
-        self.assertLess(at.score(0.5, 0.5, 0, True, 30), base)            # a quarrel
-        self.assertGreater(at.score(0.5, 0.5, 0, False, 240), base)       # quiet here a long while
+        base = at.score(0.5, 0.5, 0, 30)
+        self.assertGreater(at.score(0.9, 0.5, 0, 30), base)         # closer to what she keeps
+        self.assertGreater(at.score(0.5, 0.9, 0, 30), base)         # people she knows
+        self.assertLess(at.score(0.5, 0.5, 3, 30), base)            # she said a lot here lately
+        self.assertGreater(at.score(0.5, 0.5, 0, 240), base)        # quiet here a long while
+
+    def test_the_score_takes_no_quarrel(self):
+        # four numbers: topic, known, her lines lately, quiet minutes. A fifth (the old flag)
+        # is refused; a fight is no longer a reason to be asked less.
+        with self.assertRaises(TypeError):
+            at.score(0.5, 0.5, 0, True, 30)
 
     def test_levels(self):
         self.assertGreater(at.threshold('less'), at.threshold('normal'))
@@ -254,6 +259,12 @@ class InThePlugin(unittest.TestCase):
         r = run_case('not_called')
         self.assertEqual((r['low']['stopped'], r['low']['requests']), (False, []))
         self.assertEqual(len(r['high']['requests']), 1)
+
+    def test_the_words_of_a_quarrel_do_not_lower_the_score(self):
+        r = run_case('no_quarrel')
+        # the same stretch, the same everything else: one sentence has the words the lexicon
+        # calls a quarrel, one has not, and the score is the same
+        self.assertEqual(r['with_words'], r['without_words'])
 
     def test_her_name_calls_her(self):
         r = run_case('named')

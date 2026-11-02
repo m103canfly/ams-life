@@ -361,7 +361,7 @@ class AttentionMixin:
         last, _to = self._last_reply_here(here)
         quiet = (now - last) / 60.0 if last else 600.0
         text = adapter_astrbot_turn.incoming_of(event).text
-        topic, quarrel = 0.0, False
+        topic = 0.0
         try:
             vec = await self._embed_text(text) if text.strip() else None
             if vec:
@@ -370,12 +370,7 @@ class AttentionMixin:
                 topic = max([self._cosine(vec, e["vector"]) for e in entries] or [0.0])
         except Exception:
             topic = 0.0
-        try:
-            v_d, a_d, _d, _s, hits = self._core(None)._lexicon_deltas(text)
-            quarrel = bool(hits) and v_d < -0.15 and a_d > 0.05
-        except Exception:
-            quarrel = False
-        return attention.score(topic, known, her, quarrel, quiet)
+        return attention.score(topic, known, her, quiet)
 
     async def _ask_for_reply(self, event):
         """A request for a reply to this message, in its conversation (her persona, the history,
