@@ -47,6 +47,7 @@ LOGIN_PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/'))
 INBOX_MESSAGES = 5      # at most this many conversations are carried into the material
 INBOX_CHARS = 60        # a conversation's last line, as long as a status message
 INBOX_NAME_KEYS = ('username', 'nickname', 'name')   # where the other person's name may be
+INBOX_COUNT_NAMES = {'award': '赞', 'comment': '评论'}   # the keys the other counts are named by
 NOBODY = '有人'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'
 _STATUS_LOCK = threading.RLock()
@@ -336,11 +337,15 @@ def inbox(result):
         if type(count) is not int or count <= 0 or not isinstance(label, str) or not label.strip():
             continue
         notices.append({'text': label.strip()[:20], 'count': count})
-    # The other unread counts ("award", "comment"...) are named by their own keys.
+    # The other unread counts come under English keys: the two known ones are named in her
+    # words, and a key that is not known is left out.
     unread = result.get('message_unread_num')
     for kind, count in (unread.items() if isinstance(unread, dict) else ()):
-        if isinstance(kind, str) and kind.strip() and type(count) is int and count > 0:
-            notices.append({'text': kind.strip()[:20], 'count': count})
+        if not isinstance(kind, str) or type(count) is not int or count <= 0:
+            continue
+        label = INBOX_COUNT_NAMES.get(kind.strip())
+        if label:
+            notices.append({'text': label, 'count': count})
     return {'messages': messages, 'notices': notices}
 
 

@@ -42,7 +42,8 @@ BASE_MENU = ('吃饭', '睡觉', '休息', '发呆', '写歌')
 # What the things on the menu can show her, and what they cannot, in the words of the
 # code that does them: she is not left looking for a door that is not there.
 SEES = {
-    '刷小黑盒': '能看首页动态里的帖子，点进去看正文和评论；私信、通知看不到。',
+    '刷小黑盒': '能看首页动态里的帖子，点进去看正文和评论；能看到谁私信了你、几条没读、最后一句，'
+              '看不到完整的对话，也回不了；通知只看得到有几条。',
     '去测试群看看': '能看群里新发的图，看中的收成表情包；大家在群里聊的字她不看。',
     '刷手机': '能上网搜几样东西、读几个网页，看到的记下来；没有人回她的话。',
     '发说说': '能发一条说说，一天最多两条，只有他一个人看得到；别人的说说和评论她看不到。',
@@ -1070,24 +1071,30 @@ def heybox_inbox_material(box, seen):
     """What one look at the private messages and notices says in her material.
 
     A private message is someone else's own business: the name, how many are unread and the
-    last line only. The whole conversation has no address here, and nothing is answered."""
+    last line only. The whole conversation has no address here, and nothing is answered.
+    What those strangers wrote is wrapped as material; the words about it stand outside."""
     if not seen:
         return '这次没看到私信和通知'
     if not heybox_inbox_any(box):
         return '私信和通知：没有新的'
-    lines = []
     messages = box.get('messages') or []
+    notices = box.get('notices') or []
+    lines = []
+    if messages:
+        lines.append('小黑盒的私信：这是别人私下跟你说的，只能在他面前说；你现在回不了，'
+                     '也看不到完整的对话，只看得到最后一句。')
+    if notices:
+        lines.append('通知：只看得到有几条，看不到内容。')
+    rows = []
     if messages:
         said = '；'.join('%s：%d 条没读，最后一句“%s”' % (row.get('name') or heybox.NOBODY,
                                                        row.get('count') or 0, row.get('text') or '')
                         for row in messages)
-        lines.append('小黑盒的私信（这是别人私下跟你说的，只能在他面前说；你现在回不了，'
-                     '也看不到完整的对话，只看得到最后一句）：' + said)
-    notices = box.get('notices') or []
+        rows.append('私信：' + said)
     if notices:
-        lines.append('通知：' + '、'.join('%s %d 条' % (row.get('text') or '', row.get('count') or 0)
-                                        for row in notices)
-                     + '（只看得到有几条，看不到内容）')
+        rows.append('通知：' + '、'.join('%s %d 条' % (row.get('text') or '', row.get('count') or 0)
+                                        for row in notices))
+    lines.append(browse.wrap('小黑盒私信和通知', '\n'.join(rows)))
     return '\n'.join(lines)
 
 
