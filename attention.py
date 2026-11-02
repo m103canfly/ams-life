@@ -9,9 +9,11 @@ no I/O, no model, no AstrBot. The plugin keeps the state (mixin_attention.py).
 - Not called (groups only): the plugin scores the last message of a stretch (topic, people she
   knows, how much she said here lately, how long she has been quiet here) and asks the
   model only over the threshold of the level the owner picks (less / normal / more).
-- Night (01:00-08:25 by default): called once she does not answer; called NIGHT_WAKE_CALLS times
-  within NIGHT_WAKE_MINUTES she is woken, and answers until nobody called her for
-  NIGHT_SLEEP_AGAIN_MINUTES. Never speaks up herself at night.
+- Night (01:00-08:25 by default), only while the life loop is off: called once she does not
+  answer; called NIGHT_WAKE_CALLS times within NIGHT_WAKE_MINUTES she is woken, and answers until
+  nobody called her for NIGHT_SLEEP_AGAIN_MINUTES. Never speaks up herself at night. With the life
+  loop on her own sleep decides (life_loop.asleep), and a call is weighed against how sleepy she
+  is and who called her (wake_check).
 - Two safety nets, no fixed limits otherwise: about 30 messages an hour in one group; money a
   day (10 yuan; near it only the owner's private chat; over it nothing).
 - What she sends is hers to pick (the owner, 10-29: 6): 【不说】 (nothing), a QQ face, a short line,
@@ -28,6 +30,18 @@ CONTINUE_SECONDS = 180          # someone takes up what she said: within 3 minut
 NIGHT_WAKE_CALLS = 3
 NIGHT_WAKE_MINUTES = 10
 NIGHT_SLEEP_AGAIN_MINUTES = 20
+# Being called while asleep (card E2s). One call weighs OWNER_WAKE for him and
+# STRANGER_WAKE + FAMILIAR_WAKE * familiarity for anyone else, and its weight fades as
+# exp(-(now - when) / WAKE_FADE). She wakes when the sum reaches
+# WAKE_BASE + WAKE_SLEEPY * sleepiness. A lower WAKE_BASE or WAKE_SLEEPY, or a longer
+# WAKE_FADE, wakes her more easily; a higher WAKE_SLEEPY makes how sleepy she is matter more.
+WAKE_FADE = 600.0               # seconds: one call's weight is down to 1/e after ten minutes
+WAKE_BASE = 0.7                 # the force needed when she is not sleepy at all
+WAKE_SLEEPY = 0.9               # more sleepiness needs this much more force
+OWNER_WAKE = 1.0
+STRANGER_WAKE = 0.3
+FAMILIAR_WAKE = 0.7
+WAKE_TIERS = ((0.6, "很熟"), (0.3, "一般"))     # how well she knows whoever called
 GROUP_HOUR_MAX = 30
 MAX_MESSAGES = 10
 SILENT = "【不说】"
@@ -118,6 +132,54 @@ def night_gate(calls, now, awake_until=0.0, wake_calls=NIGHT_WAKE_CALLS, wake_mi
     if len(recent) >= wake_calls:
         return True, True, now + sleep_again * 60
     return False, False, 0.0
+
+
+# ------------------------------------------------------------------
+# called while asleep (card E2s: how sleepy she is, and who calls)
+# ------------------------------------------------------------------
+def wake_weight(familiarity, owner=False) -> float:
+    """How much one call rouses her: his call is 1.0, anyone else's by how well she knows them."""
+    if owner:
+        return OWNER_WAKE
+    return round(STRANGER_WAKE + FAMILIAR_WAKE * max(0.0, min(1.0, float(familiarity))), 4)
+
+
+def wake_tier(familiarity) -> str:
+    """How well she knows whoever called, in three steps; nothing of who it was is kept."""
+    f = max(0.0, min(1.0, float(familiarity)))
+    for line, name in WAKE_TIERS:
+        if f >= line:
+            return name
+    return "不认识"
+
+
+def wake_calls(raw) -> list:
+    """The calls kept for this window as (when, how much) pairs.
+
+    An older save kept only the times there; those read as a full call, and fade by their age."""
+    out = []
+    for item in raw or ():
+        try:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                out.append((float(item[0]), float(item[1])))
+            else:
+                out.append((float(item), 1.0))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def wake_check(calls, sleepiness, now) -> bool:
+    """Is she roused by these calls? `calls`: (when, how much) pairs, this one included.
+
+    Every call's weight fades as exp(-(now - when) / WAKE_FADE); the sum must reach
+    WAKE_BASE + WAKE_SLEEPY * sleepiness. The sleepier she is, the harder it is, and being
+    called once does not add up to a waking for long."""
+    now = float(now)
+    need = WAKE_BASE + WAKE_SLEEPY * max(0.0, min(1.0, float(sleepiness)))
+    force = sum(float(weight) * math.exp(-max(0.0, now - float(when)) / WAKE_FADE)
+                for when, weight in wake_calls(calls))
+    return force >= need
 
 
 # ------------------------------------------------------------------
