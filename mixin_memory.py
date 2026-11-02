@@ -431,9 +431,17 @@ class MemoryMixin(PortsMixin):
             d["entries"] = [e for e in lib["entries"]
                             if isinstance(e, dict) and discretion.origin_of(e)["where"] == here]
             if isinstance(d, dict) and isinstance(d.get("entries"), list):
-                d["entries"] = [e for e in d["entries"]
-                                if isinstance(e, dict)
-                                and self._usable_memory_text(str(e.get("text", "")))]
+                # ams-life: an entry whose words may not be used (empty, a system
+                # prompt) is kept aside, not dropped: _save_memory puts it back as it
+                # was, so saving this place's view never loses someone's memory.
+                usable, aside = [], []
+                for e in d["entries"]:
+                    if self._usable_memory_text(str(e.get("text", ""))):
+                        usable.append(e)
+                    else:
+                        aside.append(e)
+                d["entries"] = usable
+                d["_unusable_entries"] = aside
                 try:
                     for entry in d["entries"]:
                         entry.setdefault("inhibition", 0.0)
@@ -499,14 +507,17 @@ class MemoryMixin(PortsMixin):
             doc["schema_version"] = MEMORY_SCHEMA_VERSION
             here = self._here(event)
             mine = [e for e in (doc.get("entries") or []) if isinstance(e, dict)]
+            # ams-life: the entries _load_memory kept aside go back exactly as they were
+            aside = [e for e in (doc.get("_unusable_entries") or []) if isinstance(e, dict)]
             for e in mine:
                 if not isinstance(e.get("origin"), dict):
                     o = discretion.origin_of(e, here)
                     e["origin"] = o if o["where"] else discretion.make_origin(here, o["people"], o["source_ids"])
             lib = self._read_library()
             lib["entries"] = [e for e in lib["entries"]
-                              if not (isinstance(e, dict) and discretion.origin_of(e)["where"] == here)] + mine
-            lib["rooms"][here] = {k: v for k, v in doc.items() if k not in ("entries", "schema_version")}
+                              if not (isinstance(e, dict) and discretion.origin_of(e)["where"] == here)] + mine + aside
+            lib["rooms"][here] = {k: v for k, v in doc.items()
+                                  if k not in ("entries", "schema_version", "_unusable_entries")}
             self._write_library(lib)
         except Exception as exc:
             logger.warning("[biocore] memory save failed: %s", exc)
@@ -755,21 +766,21 @@ class MemoryMixin(PortsMixin):
         return bool(compression.get("enabled")), threshold, limit
 
     def _trim_memory(self, doc, core=None):
+        """Settle the order of these memories by time; nothing is cut for room.
+
+        ams-life: she keeps every memory (the owner, 11-02). The old cut kept the
+        last 80 entries, or the last 200 unsummarized ones while compression was
+        on, and the vector of a cut entry went with it. There is no cap here: how
+        often a memory is read is decided by its tier (memory_meta.memory_tier),
+        not by dropping old ones.
+        """
         entries = doc.get("entries")
         if not isinstance(entries, list):
             entries = []
             doc["entries"] = entries
         if not entries:
             return
-        enabled, threshold, summary_limit = self._memory_thresholds(core)
-        if not enabled:
-            entries[:] = entries[-80:]
-            return
-        # Keep summarized originals for provenance; only trim active entries.
-        _archived = [e for e in entries if e.get("summarized")]
-        _active = [e for e in entries if not e.get("summarized")]
-        _active = _active[-200:]
-        entries[:] = sorted(_archived + _active, key=lambda e: float(e.get("ts", 0) or 0))
+        entries[:] = sorted(entries, key=lambda e: float(e.get("ts", 0) or 0))
 
     def _schedule_consolidation(self, event, core=None):
         enabled, threshold, _ = self._memory_thresholds(core)
@@ -1318,6 +1329,14 @@ class MemoryMixin(PortsMixin):
         now = time.time()
         _just_restabilized = set()
         _working_set = doc.get("working_set") if isinstance(doc.get("working_set"), list) else []
+        # ams-life: work out every entry's tier again on every recall instead of
+        # trusting the one stored when it was written. A memory kept for a year is
+        # not hot any more, so its old tier cannot hold a read slot against a new
+        # one. The rule is memory_meta.memory_tier's own (nothing new here); the
+        # worked-out tier is written back with the doc, so the panel shows it too.
+        for e in entries:
+            if isinstance(e, dict):
+                e["memory_tier"] = memory_meta.memory_tier(e, now)
         for e in entries:
             if e.get("summarized") or e.get("deleted"):
                 continue
