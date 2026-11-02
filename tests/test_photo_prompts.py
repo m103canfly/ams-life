@@ -25,6 +25,21 @@ class PhotoPromptTests(unittest.IsolatedAsyncioTestCase):
         for angle in ('四分之三侧', '低头', '俯拍', '对镜'):
             self.assertIn(angle, phone.PHOTO_GUIDE)
 
+    def test_selfie_prompt_asks_for_no_beauty_filter(self):
+        for phrase in ('不美颜', '不磨皮', '毛孔', '真头发', '不戴任何发饰'):
+            self.assertIn(phrase, phone.SELFIE_PROMPT)
+
+    def test_selfie_prompt_reference_ignores_hair_color(self):
+        self.assertNotIn('原本的粉色发色', phone.SELFIE_PROMPT)
+        for phrase in ('不管发色', '发色是染的粉色'):
+            self.assertIn(phrase, phone.SELFIE_PROMPT)
+
+    def test_selfie_prompt_keeps_old_self_taken_phrases(self):
+        for phrase in ('自己拿 iPhone', '前置镜头', '对着镜子', '没有第二个拍照的人'):
+            self.assertIn(phrase, phone.SELFIE_PROMPT)
+        for phrase in ('高马尾', '呆毛', '发型、头饰都照参考图1'):
+            self.assertNotIn(phrase, phone.SELFIE_PROMPT)
+
     def test_snap_starts_with_rear_camera(self):
         self.assertTrue(phone.SNAP_PROMPT.startswith('她自己用 iPhone 随手拍的照片（后置镜头）'))
 

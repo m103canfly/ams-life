@@ -42,7 +42,7 @@ class HerLookTests(unittest.IsolatedAsyncioTestCase):
     def test_prompt_base(self):
         for phrase in ('高马尾', '呆毛', '发型、头饰都照参考图1'):
             self.assertNotIn(phrase, phone.SELFIE_PROMPT)
-        self.assertIn('参考图只管脸型、眼睛（琥珀色，神态）、身高体态和原本的粉色发色', phone.SELFIE_PROMPT)
+        self.assertIn('参考图只管脸型、眼睛（琥珀色，神态）、身高体态，不管发色、发型、发饰和衣服', phone.SELFIE_PROMPT)
 
     async def test_set_look_retention_and_reload(self):
         self.assertEqual(await self.set_look('在家穿宽松卫衣，头发随便扎了个丸子', '挑染了一小撮浅蓝色发尾'), '记下了')
