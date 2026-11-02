@@ -238,21 +238,15 @@ class TurnMixin:
                 _query_vec = None
         _reaction = None
         if text:
-            # ams-life K1: what she felt while hearing it, i.e. how observe() moves her.
-            # The trust in this person follows that change (see _touch_user).
-            try:
-                _pre_v = float(getattr(core, "v", 0.0) or 0.0)
-                _pre_stress = float(getattr(core, "stress", 0.0) or 0.0)
-            except Exception:
-                _pre_v, _pre_stress = 0.0, 0.0
+            # ams-life K1: what this one sentence stirred in her, read off the core right
+            # after observe() (core.last_impulse). It is not the difference in v/stress
+            # before and after: that difference is mostly the hours of decay and the pull
+            # back toward her own baseline. The trust in this person follows the impulse
+            # (see _touch_user).
             # the trust in this person is passed in for this call only (no global trust)
             core.observe(text, embedding=_query_vec,
                          relationship=self._relationship_of(self._user_record(event)))
-            try:
-                _reaction = {"v": float(getattr(core, "v", 0.0) or 0.0) - _pre_v,
-                             "stress": float(getattr(core, "stress", 0.0) or 0.0) - _pre_stress}
-            except Exception:
-                _reaction = None
+            _reaction = getattr(core, "last_impulse", None)
             # ams-life: open loops are matched, merged and closed in this window only.
             self._window_update_loops(event, text, core)
         _user_data = self._touch_user(event, core, reaction=_reaction)

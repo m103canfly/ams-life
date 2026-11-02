@@ -13,12 +13,15 @@ except ImportError:
     from body import *  # noqa: F401,F403
 
 
-# ams-life K1: the trust in one person follows what she really felt while hearing that
-# person. It is the rise and fall inside this one exchange, not a global number, and an
-# ordinary sentence leaves it alone.
-TRUST_V_SCALE = 0.25         # a v change this big counts as full evidence, one way or the other
-TRUST_STRESS_SCALE = 0.25    # the same for a rise in stress
-TRUST_STRESS_WEIGHT = 0.6    # a rise in stress counts as bad evidence of this weight
+# ams-life K1: the trust in one person follows what this sentence itself stirred in her
+# (core.last_impulse), not the difference in v/stress before and after observe(). That
+# difference is mostly the hours of decay and the pull back toward her own baseline, so it
+# measured the clock rather than the words. On the old code at v=0.8, stress=0.1, a plain
+# line "今天天气还行" read as dv=-0.36 (e=-1) half an hour later, dv=-0.23 (e=-0.92) after
+# _decay_to_now(), and "谢谢你，你真好，最喜欢你了" at v=0.2 read as dv=+0.012 (dead zone).
+# So whoever spoke to her while she was happy lost trust. The impulse is only the word
+# lists' v_delta after habituation and sensitization.
+TRUST_V_SCALE = 0.2          # an impulse this big counts as full evidence, one way or the other
 TRUST_DEADBAND = 0.12        # below this the sentence was ordinary: trust does not move
 TRUST_RATE = 0.30            # how much of the evidence is taken in, when learning is off
 TRUST_MIN = 0.05             # even after the worst words, some trust is left
@@ -196,20 +199,14 @@ class PeopleMixin:
                 d["sessions"] = (_sessions[-19:] + [_session_key])[-20:]
             try:
                 _old_trust = float(d.get("trust", 0.5) or 0.5)
-                # ams-life K1: what she felt while hearing this person, from observe().
+                # ams-life K1: what this sentence itself stirred in her, from observe().
                 _e = None
                 if isinstance(reaction, dict):
                     try:
                         _dv = float(reaction.get("v", 0.0) or 0.0)
                     except Exception:
                         _dv = 0.0
-                    try:
-                        _ds = float(reaction.get("stress", 0.0) or 0.0)
-                    except Exception:
-                        _ds = 0.0
-                    _e = (max(-1.0, min(1.0, _dv / TRUST_V_SCALE))
-                          - max(0.0, min(1.0, _ds / TRUST_STRESS_SCALE)) * TRUST_STRESS_WEIGHT)
-                    _e = max(-1.0, min(1.0, _e))
+                    _e = max(-1.0, min(1.0, _dv / TRUST_V_SCALE))
                 if _e is None or abs(_e) < TRUST_DEADBAND:
                     # an ordinary sentence: the trust in this person does not move
                     d["trust"] = _old_trust

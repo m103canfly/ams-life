@@ -2,12 +2,14 @@
 # ams-life (AGPL-3.0); see NOTICE.md.
 """The trust in a person follows what she felt while hearing that person.
 
-The step under test is `_touch_user` with the reaction `_prepare_turn` measures around
-`core.observe`: {'v': change in v, 'stress': change in stress}. This person's record is
+The step under test is `_touch_user` with the reaction `_prepare_turn` reads off the core
+right after `core.observe`: the impulse this one sentence itself made (`core.last_impulse`,
+{'v': ...}), not the difference in v/stress before and after. This person's record is
 kept in a dict, so no test data is written and nothing of hers is touched.
 """
 import json
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -15,6 +17,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_basics  # noqa: E402,F401
 
+import body  # noqa: E402
 import memory_meta  # noqa: E402
 import mixin_people  # noqa: E402
 
@@ -177,6 +180,58 @@ class TrustFollowsHerTests(unittest.TestCase):
         self.touch('10002', reaction={'v': -0.25, 'stress': 0.20})
         self.assertGreater(self.trust_of('10001'), 0.5)
         self.assertLess(self.trust_of('10002'), 0.5)
+
+    def react(self, text, v=0.0, hours_ago=0.0):
+        """The real observe() on a fresh core in this mood; its impulse is the reaction."""
+        core = body.BioCore()
+        core.v = v
+        core.last_tick = time.time() - float(hours_ago) * 3600.0
+        core.observe(text)
+        return core, core.last_impulse
+
+    def test_10_an_ordinary_line_moves_no_trust_whatever_her_mood(self):
+        # the old difference before/after read the hours of decay and the pull back to her
+        # baseline as her reaction: at v=0.8 a plain line read as dv=-0.36 after half an
+        # hour, still dv=-0.23 right after _decay_to_now(); two hours is further off still
+        for v in (0.8, -0.6):
+            core, reaction = self.react('今天天气还行', v=v, hours_ago=2)
+            self.assertIsNone(reaction)
+            self.set_trust('10001', 0.5)
+            self.touch('10001', core=core, reaction=reaction)
+            self.assertEqual(self.trust_of('10001'), 0.5)
+
+    def test_11_the_same_good_words_lift_trust_at_either_mood(self):
+        gains = {}
+        for v in (0.8, -0.6):
+            core, reaction = self.react('谢谢你，你真好，最喜欢你了', v=v, hours_ago=2)
+            self.assertIsNotNone(reaction)
+            self.assertGreater(reaction['v'], 0)
+            self.set_trust('10001', 0.5)
+            self.touch('10001', core=core, reaction=reaction)
+            gains[v] = self.trust_of('10001') - 0.5
+        self.assertGreater(gains[0.8], 0)
+        self.assertGreater(gains[-0.6], 0)
+        self.assertAlmostEqual(gains[0.8], gains[-0.6], places=3)
+
+    def test_12_the_same_bad_words_sink_trust_at_either_mood(self):
+        for v in (0.8, -0.6):
+            core, reaction = self.react('你真讨厌，快滚', v=v, hours_ago=2)
+            self.assertIsNotNone(reaction)
+            self.assertLess(reaction['v'], 0)
+            self.set_trust('10001', 0.5)
+            self.touch('10001', core=core, reaction=reaction)
+            self.assertLess(self.trust_of('10001'), 0.5)
+
+    def test_13_the_impulse_is_not_saved_with_her_state(self):
+        core, reaction = self.react('谢谢你，你真好，最喜欢你了', v=0.2)
+        self.assertIsNotNone(reaction)
+        saved = core.snapshot()
+        self.assertNotIn('last_impulse', saved)
+        self.assertNotIn('last_impulse', json.dumps(saved, ensure_ascii=False))
+        # a state file that carried one would not restore it either
+        fresh = body.BioCore()
+        fresh.load_state(dict(saved, last_impulse={'v': 0.9}))
+        self.assertIsNone(fresh.last_impulse)
 
 
 if __name__ == '__main__':

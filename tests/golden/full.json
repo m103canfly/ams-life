@@ -2130,7 +2130,7 @@
      "hits": 1,
      "id": "2815637aa1cd",
      "image_caption": "",
-     "importance": 0.48066027414606294,
+     "importance": 0.4806602035356633,
      "inhibition": 0.0,
      "last_used": 1793271350.0,
      "last_write_op": "ADD",
@@ -2193,7 +2193,7 @@
      "encoding_valence": -0.07,
      "hits": 1,
      "id": "c3d64eee532e",
-     "importance": 0.43259424673145663,
+     "importance": 0.43259418318209697,
      "inhibition": 0.0,
      "last_used": 1793271350.0,
      "next_review_ts": 1793357750.0,
@@ -2903,7 +2903,7 @@
      "hits": 1,
      "id": "f99415312532",
      "image_caption": "",
-     "importance": 0.47647420752236286,
+     "importance": 0.4764741820281983,
      "inhibition": 0.0,
      "last_used": 1793271800.0,
      "last_write_op": "ADD",
@@ -2970,7 +2970,7 @@
      "encoding_valence": -0.074,
      "hits": 1,
      "id": "d5e9100403d4",
-     "importance": 0.46985178677012657,
+     "importance": 0.4698517638253785,
      "inhibition": 0.0,
      "last_recall": 1793271870.0,
      "last_recall_regulation": "express",
@@ -3046,7 +3046,7 @@
      "hits": 1,
      "id": "c3dc72426bd5",
      "image_caption": "",
-     "importance": 0.539987587356881,
+     "importance": 0.5399875681525024,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "last_write_op": "ADD",
@@ -3109,7 +3109,7 @@
      "encoding_valence": -0.273,
      "hits": 1,
      "id": "69e8b991e8a2",
-     "importance": 0.49476382862119284,
+     "importance": 0.49476381133725217,
      "inhibition": 0.0,
      "last_used": 1793271820.0,
      "legacy_backfilled": true,
@@ -3175,7 +3175,7 @@
      "hits": 1,
      "id": "6fcefbf2ab75",
      "image_caption": "",
-     "importance": 0.5823680692409511,
+     "importance": 0.5823680549820681,
      "inhibition": 0.0,
      "last_recall": 1793271870.0,
      "last_recall_regulation": "express",
@@ -3252,7 +3252,7 @@
      "encoding_valence": -0.379,
      "hits": 1,
      "id": "816a9609616e",
-     "importance": 0.546338762316856,
+     "importance": 0.5463387494838613,
      "inhibition": 0.0,
      "last_used": 1793271840.0,
      "legacy_backfilled": true,
@@ -3315,7 +3315,7 @@
      "hits": 1,
      "id": "27c13fc68348",
      "image_caption": "",
-     "importance": 0.6523003754361565,
+     "importance": 0.6523003642964044,
      "inhibition": 0.0,
      "last_recall": 1793272490.0,
      "last_recall_regulation": "express",
@@ -3384,7 +3384,7 @@
      "encoding_valence": -0.402,
      "hits": 1,
      "id": "f0d084291b8a",
-     "importance": 0.5759701187236635,
+     "importance": 0.5759701087155394,
      "inhibition": 0.0,
      "last_used": 1793271870.0,
      "legacy_backfilled": true,
@@ -3446,7 +3446,7 @@
      "hits": 1,
      "id": "52162a18315f",
      "image_caption": "",
-     "importance": 0.628432334784978,
+     "importance": 0.6284323281954524,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "last_write_op": "ADD",
@@ -3509,7 +3509,7 @@
      "encoding_valence": -0.429,
      "hits": 1,
      "id": "4c899b2e38b3",
-     "importance": 0.6015943932184068,
+     "importance": 0.6015943873068779,
      "inhibition": 0.0,
      "last_used": 1793272490.0,
      "next_review_ts": 1793358890.0,
@@ -4209,7 +4209,7 @@
      "hits": 1,
      "id": "0d3ef692223c",
      "image_caption": "",
-     "importance": 0.47779450209892665,
+     "importance": 0.4777945087986795,
      "inhibition": 0.0,
      "last_used": 1793271380.0,
      "last_write_op": "ADD",
@@ -4272,7 +4272,7 @@
      "encoding_valence": 0.078,
      "hits": 1,
      "id": "2013f682b019",
-     "importance": 0.45139005188903397,
+     "importance": 0.4513900579188116,
      "inhibition": 0.0,
      "last_used": 1793271380.0,
      "legacy_backfilled": true,
@@ -4335,7 +4335,7 @@
      "hits": 1,
      "id": "812c96d53379",
      "image_caption": "",
-     "importance": 0.5105486090158652,
+     "importance": 0.5105486106587523,
      "inhibition": 0.0,
      "last_recall": 1793272890.0,
      "last_recall_regulation": "express",
@@ -4405,7 +4405,7 @@
      "encoding_valence": 0.124,
      "hits": 1,
      "id": "4afa9e5c9817",
-     "importance": 0.4664574981142786,
+     "importance": 0.4664574995928771,
      "inhibition": 0.0,
      "last_used": 1793271400.0,
      "legacy_backfilled": true,
@@ -4467,7 +4467,7 @@
      "hits": 1,
      "id": "570efb8958d6",
      "image_caption": "",
-     "importance": 0.6290115123699569,
+     "importance": 0.6290115077998102,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "last_write_op": "ADD",
@@ -4530,7 +4530,7 @@
      "encoding_valence": -0.335,
      "hits": 1,
      "id": "0fecc1318983",
-     "importance": 0.5661965853866533,
+     "importance": 0.5661965812721322,
      "inhibition": 0.0,
      "last_used": 1793272890.0,
      "legacy_backfilled": true,
@@ -4593,7 +4593,7 @@
      "hits": 1,
      "id": "dd2efe219da9",
      "image_caption": "",
-     "importance": 0.6323252740734329,
+     "importance": 0.6323252701646443,
      "inhibition": 0.0,
      "last_recall": 1793276520.0,
      "last_recall_regulation": "none",
@@ -4668,7 +4668,7 @@
      "hits": 1,
      "id": "a96519791895",
      "image_caption": "",
-     "importance": 0.5105886871760189,
+     "importance": 0.5105886859550981,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "last_write_op": "ADD",
@@ -4731,7 +4731,7 @@
      "encoding_valence": -0.157,
      "hits": 1,
      "id": "5729e514586d",
-     "importance": 0.46087069131141,
+     "importance": 0.46087069020347793,
      "inhibition": 0.0,
      "last_used": 1793276520.0,
      "next_review_ts": 1793362920.0,
@@ -7508,22 +7508,22 @@
     }
    ],
    "homeostasis": {
-    "L_int": 0.0225,
+    "L_int": 0.0222,
     "action": {
      "mode": "engage",
      "reason": "baseline",
-     "strength": 0.5484
+     "strength": 0.5482
     },
     "drives": {
      "curiosity": 0.82,
      "seen": 0.045,
-     "social": 0.5941
+     "social": 0.5927
     },
-    "readiness": 0.4819,
+    "readiness": 0.4816,
     "set_points": {
      "curiosity": 0.811306,
      "seen": 0.082736,
-     "social": 0.573179
+     "social": 0.572483
     },
     "setpoint_ticks": 24,
     "tick": 24,
@@ -7551,11 +7551,11 @@
      "regulation_q": {
       "express": {
        "n": 3,
-       "sum_pe": 0.25917061224944504
+       "sum_pe": 0.2591706085050379
       },
       "label_emotion": {
        "n": 1,
-       "sum_pe": 0.10215934420614686
+       "sum_pe": 0.10215934237015803
       }
      }
     },
@@ -7660,10 +7660,10 @@
     "daily_cap": 3,
     "enabled": true,
     "gain": 1.0,
-    "impulse": 0.2007,
-    "impulse_ema": 0.2144,
+    "impulse": 0.2055,
+    "impulse_ema": 0.2275,
     "last_sent_ts": 0.0,
-    "max_chars": 96,
+    "max_chars": 97,
     "noise_seed": 7,
     "quiet_hours": [
      0,
@@ -7673,12 +7673,12 @@
     "sent_count": 0,
     "sent_day": "",
     "sources": {
-     "attachment_safe": 0.4473,
+     "attachment_safe": 0.441,
      "autonomy_gain": 1.0,
-     "closeness": 0.5613,
-     "closeness_effective": 0.5271,
-     "drive_dev": 0.0225,
-     "echo_trace": 0.2273,
+     "closeness": 0.5481,
+     "closeness_effective": 0.516,
+     "drive_dev": 0.0222,
+     "echo_trace": 0.2269,
      "noise": {
       "attention": 0.0,
       "energy": 0.0,
@@ -7687,16 +7687,16 @@
       "valence": 0.0
      },
      "stress_load": 0.1549,
-     "trust": 0.524
+     "trust": 0.5
     },
-    "threshold": 0.7557,
+    "threshold": 0.7517,
     "updated_ts": 1793276520.0
    },
    "reflection": {
-    "a": 0.06160537143295148,
-    "d": 0.021821949139828285,
+    "a": 0.061605369845586073,
+    "d": 0.02182194836444818,
     "social": 0,
-    "v": -0.07721005980349405
+    "v": -0.07721005889109708
    },
    "refusal_readiness": 0.103,
    "regulation": "none",
@@ -7717,10 +7717,10 @@
     }
    },
    "ripple": {
-    "energy": 0.136,
+    "energy": 0.134,
     "lower": 0.168,
-    "overlap": 0.105,
-    "upper": 0.105
+    "overlap": 0.1,
+    "upper": 0.1
    },
    "sec": {
     "coping_potential": 0.5,
@@ -7776,7 +7776,7 @@
     }
    ],
    "spiking": {
-    "ei": 0.357,
+    "ei": 0.35,
     "rate": 0.049,
     "variance": 0.0229
    },
@@ -7816,9 +7816,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3289,
-     "avoidant": 0.2615,
-     "safe": 0.4096
+     "anxious": 0.3506,
+     "avoidant": 0.2815,
+     "safe": 0.3679
     },
     "calibration": {
      "sources": {}
@@ -7850,49 +7850,49 @@
        "ts": 1793000090.0
       },
       {
-       "conflict": 0.2937,
+       "conflict": 0.3174,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793011740.0
       },
       {
-       "conflict": 0.2913,
+       "conflict": 0.315,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793011770.0
       },
       {
-       "conflict": 0.2806,
+       "conflict": 0.3007,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793098170.0
       },
       {
-       "conflict": 0.2827,
+       "conflict": 0.3085,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271800.0
       },
       {
-       "conflict": 0.335,
+       "conflict": 0.3725,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271820.0
       },
       {
-       "conflict": 0.3521,
+       "conflict": 0.3959,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271840.0
       },
       {
-       "conflict": 0.3631,
+       "conflict": 0.415,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271870.0
       },
       {
-       "conflict": 0.3586,
+       "conflict": 0.4174,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793272490.0
@@ -7906,11 +7906,11 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.4413,
-     "conflict": 0.3586,
-     "predictability": 1.0,
+     "closeness": 0.3335,
+     "conflict": 0.4174,
+     "predictability": 0.954,
      "repair": 0.0,
-     "trust": 0.335
+     "trust": 0.139
     },
     "trajectory": [
      {
@@ -7930,67 +7930,67 @@
       "ts": 1793000090.0
      },
      {
-      "closeness": 0.5243,
-      "conflict": 0.2937,
-      "predictability": 0.936,
+      "closeness": 0.4808,
+      "conflict": 0.3174,
+      "predictability": 0.778,
       "repair": 0.0,
-      "trust": 0.468,
+      "trust": 0.389,
       "ts": 1793011740.0
      },
      {
-      "closeness": 0.5256,
-      "conflict": 0.2913,
+      "closeness": 0.4822,
+      "conflict": 0.315,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.468,
+      "trust": 0.389,
       "ts": 1793011770.0
      },
      {
-      "closeness": 0.5292,
-      "conflict": 0.2806,
-      "predictability": 0.976,
+      "closeness": 0.4923,
+      "conflict": 0.3007,
+      "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.456,
+      "trust": 0.389,
       "ts": 1793098170.0
      },
      {
-      "closeness": 0.5036,
-      "conflict": 0.2827,
-      "predictability": 0.898,
+      "closeness": 0.4563,
+      "conflict": 0.3085,
+      "predictability": 0.86,
       "repair": 0.0,
-      "trust": 0.405,
+      "trust": 0.319,
       "ts": 1793271800.0
      },
      {
-      "closeness": 0.4615,
-      "conflict": 0.335,
-      "predictability": 0.88,
+      "closeness": 0.3928,
+      "conflict": 0.3725,
+      "predictability": 0.802,
       "repair": 0.0,
-      "trust": 0.345,
+      "trust": 0.22,
       "ts": 1793271820.0
      },
      {
-      "closeness": 0.4472,
-      "conflict": 0.3521,
-      "predictability": 0.98,
+      "closeness": 0.3669,
+      "conflict": 0.3959,
+      "predictability": 0.938,
       "repair": 0.0,
-      "trust": 0.335,
+      "trust": 0.189,
       "ts": 1793271840.0
      },
      {
-      "closeness": 0.4366,
-      "conflict": 0.3631,
-      "predictability": 1.0,
+      "closeness": 0.3414,
+      "conflict": 0.415,
+      "predictability": 0.946,
       "repair": 0.0,
-      "trust": 0.335,
+      "trust": 0.162,
       "ts": 1793271870.0
      },
      {
-      "closeness": 0.4413,
-      "conflict": 0.3586,
-      "predictability": 1.0,
+      "closeness": 0.3335,
+      "conflict": 0.4174,
+      "predictability": 0.954,
       "repair": 0.0,
-      "trust": 0.335,
+      "trust": 0.139,
       "ts": 1793272490.0
      }
     ],
@@ -8027,7 +8027,7 @@
    "sessions": [
     "private:10001"
    ],
-   "trust": 0.335
+   "trust": 0.139
   },
   "users/10002.json": {
    "absence": {
@@ -8053,9 +8053,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3068,
-     "avoidant": 0.244,
-     "safe": 0.4492
+     "anxious": 0.3023,
+     "avoidant": 0.2388,
+     "safe": 0.4589
     },
     "calibration": {
      "sources": {}
@@ -8095,25 +8095,25 @@
        "ts": 1793000690.0
       },
       {
-       "conflict": 0.2566,
+       "conflict": 0.2548,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793000790.0
       },
       {
-       "conflict": 0.273,
+       "conflict": 0.2691,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793098470.0
       },
       {
-       "conflict": 0.2426,
+       "conflict": 0.2267,
        "phase": "stable",
-       "repair": 0.062,
+       "repair": 0.142,
        "ts": 1793271380.0
       },
       {
-       "conflict": 0.2411,
+       "conflict": 0.2252,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271400.0
@@ -8127,11 +8127,11 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5663,
-     "conflict": 0.2411,
+     "closeness": 0.5955,
+     "conflict": 0.2252,
      "predictability": 1.0,
      "repair": 0.0,
-     "trust": 0.518
+     "trust": 0.571
     },
     "trajectory": [
      {
@@ -8143,35 +8143,35 @@
       "ts": 1793000690.0
      },
      {
-      "closeness": 0.5374,
-      "conflict": 0.2566,
-      "predictability": 0.988,
+      "closeness": 0.5407,
+      "conflict": 0.2548,
+      "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.494,
+      "trust": 0.5,
       "ts": 1793000790.0
      },
      {
-      "closeness": 0.5414,
-      "conflict": 0.273,
-      "predictability": 0.986,
+      "closeness": 0.5486,
+      "conflict": 0.2691,
+      "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.487,
+      "trust": 0.5,
       "ts": 1793098470.0
      },
      {
-      "closeness": 0.5645,
-      "conflict": 0.2426,
-      "predictability": 0.938,
-      "repair": 0.062,
-      "trust": 0.518,
+      "closeness": 0.5936,
+      "conflict": 0.2267,
+      "predictability": 0.858,
+      "repair": 0.142,
+      "trust": 0.571,
       "ts": 1793271380.0
      },
      {
-      "closeness": 0.5663,
-      "conflict": 0.2411,
+      "closeness": 0.5955,
+      "conflict": 0.2252,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.518,
+      "trust": 0.571,
       "ts": 1793271400.0
      }
     ],
@@ -8204,7 +8204,7 @@
    "sessions": [
     "group:900001"
    ],
-   "trust": 0.518
+   "trust": 0.571
   },
   "users/10003.json": {
    "absence": {
@@ -8230,9 +8230,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3101,
-     "avoidant": 0.2425,
-     "safe": 0.4473
+     "anxious": 0.3138,
+     "avoidant": 0.2452,
+     "safe": 0.441
     },
     "calibration": {
      "sources": {}
@@ -8266,25 +8266,25 @@
     "repair_state": {
      "evidence": [
       {
-       "conflict": 0.2544,
+       "conflict": 0.252,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793000730.0
       },
       {
-       "conflict": 0.2988,
+       "conflict": 0.3015,
        "phase": "stable",
-       "repair": 0.034,
+       "repair": 0.0,
        "ts": 1793272890.0
       },
       {
-       "conflict": 0.288,
+       "conflict": 0.2952,
        "phase": "stable",
-       "repair": 0.03,
+       "repair": 0.0,
        "ts": 1793272920.0
       },
       {
-       "conflict": 0.2689,
+       "conflict": 0.2761,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793276520.0
@@ -8298,43 +8298,43 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5613,
-     "conflict": 0.2689,
+     "closeness": 0.5481,
+     "conflict": 0.2761,
      "predictability": 1.0,
      "repair": 0.0,
-     "trust": 0.524
+     "trust": 0.5
     },
     "trajectory": [
      {
-      "closeness": 0.536,
-      "conflict": 0.2544,
+      "closeness": 0.5404,
+      "conflict": 0.252,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.492,
+      "trust": 0.5,
       "ts": 1793000730.0
      },
      {
-      "closeness": 0.5387,
-      "conflict": 0.2988,
-      "predictability": 0.966,
-      "repair": 0.034,
-      "trust": 0.509,
+      "closeness": 0.5337,
+      "conflict": 0.3015,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793272890.0
      },
      {
-      "closeness": 0.5479,
-      "conflict": 0.288,
-      "predictability": 0.97,
-      "repair": 0.03,
-      "trust": 0.524,
+      "closeness": 0.5347,
+      "conflict": 0.2952,
+      "predictability": 1.0,
+      "repair": 0.0,
+      "trust": 0.5,
       "ts": 1793272920.0
      },
      {
-      "closeness": 0.5613,
-      "conflict": 0.2689,
+      "closeness": 0.5481,
+      "conflict": 0.2761,
       "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.524,
+      "trust": 0.5,
       "ts": 1793276520.0
      }
     ],
@@ -8380,7 +8380,7 @@
    "sessions": [
     "group:900001"
    ],
-   "trust": 0.524
+   "trust": 0.5
   },
   "users/10004.json": {
    "absence": {
@@ -8406,9 +8406,9 @@
     },
     "annotations": [],
     "attachment": {
-     "anxious": 0.3125,
-     "avoidant": 0.2474,
-     "safe": 0.4401
+     "anxious": 0.3204,
+     "avoidant": 0.2568,
+     "safe": 0.4227
     },
     "calibration": {
      "sources": {}
@@ -8434,19 +8434,19 @@
        "ts": 1793004390.0
       },
       {
-       "conflict": 0.2711,
+       "conflict": 0.2933,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793004510.0
       },
       {
-       "conflict": 0.267,
+       "conflict": 0.2877,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271330.0
       },
       {
-       "conflict": 0.2711,
+       "conflict": 0.2888,
        "phase": "stable",
        "repair": 0.0,
        "ts": 1793271350.0
@@ -8460,11 +8460,11 @@
     "schema_version": 2,
     "social_world": [],
     "state": {
-     "closeness": 0.5352,
-     "conflict": 0.2711,
-     "predictability": 0.98,
+     "closeness": 0.5027,
+     "conflict": 0.2888,
+     "predictability": 1.0,
      "repair": 0.0,
-     "trust": 0.468
+     "trust": 0.409
     },
     "trajectory": [
      {
@@ -8476,27 +8476,27 @@
       "ts": 1793004390.0
      },
      {
-      "closeness": 0.5381,
-      "conflict": 0.2711,
-      "predictability": 0.966,
+      "closeness": 0.4974,
+      "conflict": 0.2933,
+      "predictability": 0.818,
       "repair": 0.0,
-      "trust": 0.483,
+      "trust": 0.409,
       "ts": 1793004510.0
      },
      {
-      "closeness": 0.5397,
-      "conflict": 0.267,
-      "predictability": 0.99,
+      "closeness": 0.5017,
+      "conflict": 0.2877,
+      "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.478,
+      "trust": 0.409,
       "ts": 1793271330.0
      },
      {
-      "closeness": 0.5352,
-      "conflict": 0.2711,
-      "predictability": 0.98,
+      "closeness": 0.5027,
+      "conflict": 0.2888,
+      "predictability": 1.0,
       "repair": 0.0,
-      "trust": 0.468,
+      "trust": 0.409,
       "ts": 1793271350.0
      }
     ],
@@ -8516,7 +8516,7 @@
    "sessions": [
     "group:900002"
    ],
-   "trust": 0.468
+   "trust": 0.409
   },
   "users/10005.json": {
    "absence": {
@@ -9246,22 +9246,22 @@
        }
       ],
       "homeostasis": {
-       "L_int": 0.0225,
+       "L_int": 0.0222,
        "action": {
         "mode": "engage",
         "reason": "baseline",
-        "strength": 0.5484
+        "strength": 0.5482
        },
        "drives": {
         "curiosity": 0.82,
         "seen": 0.045,
-        "social": 0.5941
+        "social": 0.5927
        },
-       "readiness": 0.4819,
+       "readiness": 0.4816,
        "set_points": {
         "curiosity": 0.811306,
         "seen": 0.082736,
-        "social": 0.573179
+        "social": 0.572483
        },
        "setpoint_ticks": 24,
        "tick": 24,
@@ -9289,11 +9289,11 @@
         "regulation_q": {
          "express": {
           "n": 3,
-          "sum_pe": 0.25917061224944504
+          "sum_pe": 0.2591706085050379
          },
          "label_emotion": {
           "n": 1,
-          "sum_pe": 0.10215934420614686
+          "sum_pe": 0.10215934237015803
          }
         }
        },
@@ -9398,10 +9398,10 @@
        "daily_cap": 3,
        "enabled": true,
        "gain": 1.0,
-       "impulse": 0.2007,
-       "impulse_ema": 0.2144,
+       "impulse": 0.2055,
+       "impulse_ema": 0.2275,
        "last_sent_ts": 0.0,
-       "max_chars": 96,
+       "max_chars": 97,
        "noise_seed": 7,
        "quiet_hours": [
         0,
@@ -9411,12 +9411,12 @@
        "sent_count": 0,
        "sent_day": "",
        "sources": {
-        "attachment_safe": 0.4473,
+        "attachment_safe": 0.441,
         "autonomy_gain": 1.0,
-        "closeness": 0.5613,
-        "closeness_effective": 0.5271,
-        "drive_dev": 0.0225,
-        "echo_trace": 0.2273,
+        "closeness": 0.5481,
+        "closeness_effective": 0.516,
+        "drive_dev": 0.0222,
+        "echo_trace": 0.2269,
         "noise": {
          "attention": 0.0,
          "energy": 0.0,
@@ -9425,16 +9425,16 @@
          "valence": 0.0
         },
         "stress_load": 0.1549,
-        "trust": 0.524
+        "trust": 0.5
        },
-       "threshold": 0.7557,
+       "threshold": 0.7517,
        "updated_ts": 1793276520.0
       },
       "reflection": {
-       "a": 0.06160537143295148,
-       "d": 0.021821949139828285,
+       "a": 0.061605369845586073,
+       "d": 0.02182194836444818,
        "social": 0,
-       "v": -0.07721005980349405
+       "v": -0.07721005889109708
       },
       "refusal_readiness": 0.103,
       "regulation": "none",
@@ -9455,10 +9455,10 @@
        }
       },
       "ripple": {
-       "energy": 0.136,
+       "energy": 0.134,
        "lower": 0.168,
-       "overlap": 0.105,
-       "upper": 0.105
+       "overlap": 0.1,
+       "upper": 0.1
       },
       "sec": {
        "coping_potential": 0.5,
@@ -9514,7 +9514,7 @@
        }
       ],
       "spiking": {
-       "ei": 0.357,
+       "ei": 0.35,
        "rate": 0.049,
        "variance": 0.0229
       },
@@ -12213,9 +12213,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3101,
-       "avoidant": 0.2425,
-       "safe": 0.4473
+       "anxious": 0.3138,
+       "avoidant": 0.2452,
+       "safe": 0.441
       },
       "calibration": {
        "sources": {}
@@ -12249,25 +12249,25 @@
       "repair_state": {
        "evidence": [
         {
-         "conflict": 0.2544,
+         "conflict": 0.252,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793000730.0
         },
         {
-         "conflict": 0.2988,
+         "conflict": 0.3015,
          "phase": "stable",
-         "repair": 0.034,
+         "repair": 0.0,
          "ts": 1793272890.0
         },
         {
-         "conflict": 0.288,
+         "conflict": 0.2952,
          "phase": "stable",
-         "repair": 0.03,
+         "repair": 0.0,
          "ts": 1793272920.0
         },
         {
-         "conflict": 0.2689,
+         "conflict": 0.2761,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793276520.0
@@ -12280,43 +12280,43 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5613,
-       "conflict": 0.2689,
+       "closeness": 0.5481,
+       "conflict": 0.2761,
        "predictability": 1.0,
        "repair": 0.0,
-       "trust": 0.524
+       "trust": 0.5
       },
       "trajectory": [
        {
-        "closeness": 0.536,
-        "conflict": 0.2544,
+        "closeness": 0.5404,
+        "conflict": 0.252,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.492,
+        "trust": 0.5,
         "ts": 1793000730.0
        },
        {
-        "closeness": 0.5387,
-        "conflict": 0.2988,
-        "predictability": 0.966,
-        "repair": 0.034,
-        "trust": 0.509,
+        "closeness": 0.5337,
+        "conflict": 0.3015,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793272890.0
        },
        {
-        "closeness": 0.5479,
-        "conflict": 0.288,
-        "predictability": 0.97,
-        "repair": 0.03,
-        "trust": 0.524,
+        "closeness": 0.5347,
+        "conflict": 0.2952,
+        "predictability": 1.0,
+        "repair": 0.0,
+        "trust": 0.5,
         "ts": 1793272920.0
        },
        {
-        "closeness": 0.5613,
-        "conflict": 0.2689,
+        "closeness": 0.5481,
+        "conflict": 0.2761,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.524,
+        "trust": 0.5,
         "ts": 1793276520.0
        }
       ],
@@ -12362,7 +12362,7 @@
      "sessions": [
       "group:900001"
      ],
-     "trust": 0.524
+     "trust": 0.5
     },
     {
      "belief_state": {
@@ -12383,9 +12383,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3289,
-       "avoidant": 0.2615,
-       "safe": 0.4096
+       "anxious": 0.3506,
+       "avoidant": 0.2815,
+       "safe": 0.3679
       },
       "calibration": {
        "sources": {}
@@ -12417,49 +12417,49 @@
          "ts": 1793000090.0
         },
         {
-         "conflict": 0.2937,
+         "conflict": 0.3174,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793011740.0
         },
         {
-         "conflict": 0.2913,
+         "conflict": 0.315,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793011770.0
         },
         {
-         "conflict": 0.2806,
+         "conflict": 0.3007,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793098170.0
         },
         {
-         "conflict": 0.2827,
+         "conflict": 0.3085,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271800.0
         },
         {
-         "conflict": 0.335,
+         "conflict": 0.3725,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271820.0
         },
         {
-         "conflict": 0.3521,
+         "conflict": 0.3959,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271840.0
         },
         {
-         "conflict": 0.3631,
+         "conflict": 0.415,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271870.0
         },
         {
-         "conflict": 0.3586,
+         "conflict": 0.4174,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793272490.0
@@ -12472,11 +12472,11 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.4413,
-       "conflict": 0.3586,
-       "predictability": 1.0,
+       "closeness": 0.3335,
+       "conflict": 0.4174,
+       "predictability": 0.954,
        "repair": 0.0,
-       "trust": 0.335
+       "trust": 0.139
       },
       "trajectory": [
        {
@@ -12496,67 +12496,67 @@
         "ts": 1793000090.0
        },
        {
-        "closeness": 0.5243,
-        "conflict": 0.2937,
-        "predictability": 0.936,
+        "closeness": 0.4808,
+        "conflict": 0.3174,
+        "predictability": 0.778,
         "repair": 0.0,
-        "trust": 0.468,
+        "trust": 0.389,
         "ts": 1793011740.0
        },
        {
-        "closeness": 0.5256,
-        "conflict": 0.2913,
+        "closeness": 0.4822,
+        "conflict": 0.315,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.468,
+        "trust": 0.389,
         "ts": 1793011770.0
        },
        {
-        "closeness": 0.5292,
-        "conflict": 0.2806,
-        "predictability": 0.976,
+        "closeness": 0.4923,
+        "conflict": 0.3007,
+        "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.456,
+        "trust": 0.389,
         "ts": 1793098170.0
        },
        {
-        "closeness": 0.5036,
-        "conflict": 0.2827,
-        "predictability": 0.898,
+        "closeness": 0.4563,
+        "conflict": 0.3085,
+        "predictability": 0.86,
         "repair": 0.0,
-        "trust": 0.405,
+        "trust": 0.319,
         "ts": 1793271800.0
        },
        {
-        "closeness": 0.4615,
-        "conflict": 0.335,
-        "predictability": 0.88,
+        "closeness": 0.3928,
+        "conflict": 0.3725,
+        "predictability": 0.802,
         "repair": 0.0,
-        "trust": 0.345,
+        "trust": 0.22,
         "ts": 1793271820.0
        },
        {
-        "closeness": 0.4472,
-        "conflict": 0.3521,
-        "predictability": 0.98,
+        "closeness": 0.3669,
+        "conflict": 0.3959,
+        "predictability": 0.938,
         "repair": 0.0,
-        "trust": 0.335,
+        "trust": 0.189,
         "ts": 1793271840.0
        },
        {
-        "closeness": 0.4366,
-        "conflict": 0.3631,
-        "predictability": 1.0,
+        "closeness": 0.3414,
+        "conflict": 0.415,
+        "predictability": 0.946,
         "repair": 0.0,
-        "trust": 0.335,
+        "trust": 0.162,
         "ts": 1793271870.0
        },
        {
-        "closeness": 0.4413,
-        "conflict": 0.3586,
-        "predictability": 1.0,
+        "closeness": 0.3335,
+        "conflict": 0.4174,
+        "predictability": 0.954,
         "repair": 0.0,
-        "trust": 0.335,
+        "trust": 0.139,
         "ts": 1793272490.0
        }
       ],
@@ -12593,7 +12593,7 @@
      "sessions": [
       "private:10001"
      ],
-     "trust": 0.335
+     "trust": 0.139
     },
     {
      "belief_state": {
@@ -12614,9 +12614,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3068,
-       "avoidant": 0.244,
-       "safe": 0.4492
+       "anxious": 0.3023,
+       "avoidant": 0.2388,
+       "safe": 0.4589
       },
       "calibration": {
        "sources": {}
@@ -12656,25 +12656,25 @@
          "ts": 1793000690.0
         },
         {
-         "conflict": 0.2566,
+         "conflict": 0.2548,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793000790.0
         },
         {
-         "conflict": 0.273,
+         "conflict": 0.2691,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793098470.0
         },
         {
-         "conflict": 0.2426,
+         "conflict": 0.2267,
          "phase": "stable",
-         "repair": 0.062,
+         "repair": 0.142,
          "ts": 1793271380.0
         },
         {
-         "conflict": 0.2411,
+         "conflict": 0.2252,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271400.0
@@ -12687,11 +12687,11 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5663,
-       "conflict": 0.2411,
+       "closeness": 0.5955,
+       "conflict": 0.2252,
        "predictability": 1.0,
        "repair": 0.0,
-       "trust": 0.518
+       "trust": 0.571
       },
       "trajectory": [
        {
@@ -12703,35 +12703,35 @@
         "ts": 1793000690.0
        },
        {
-        "closeness": 0.5374,
-        "conflict": 0.2566,
-        "predictability": 0.988,
+        "closeness": 0.5407,
+        "conflict": 0.2548,
+        "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.494,
+        "trust": 0.5,
         "ts": 1793000790.0
        },
        {
-        "closeness": 0.5414,
-        "conflict": 0.273,
-        "predictability": 0.986,
+        "closeness": 0.5486,
+        "conflict": 0.2691,
+        "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.487,
+        "trust": 0.5,
         "ts": 1793098470.0
        },
        {
-        "closeness": 0.5645,
-        "conflict": 0.2426,
-        "predictability": 0.938,
-        "repair": 0.062,
-        "trust": 0.518,
+        "closeness": 0.5936,
+        "conflict": 0.2267,
+        "predictability": 0.858,
+        "repair": 0.142,
+        "trust": 0.571,
         "ts": 1793271380.0
        },
        {
-        "closeness": 0.5663,
-        "conflict": 0.2411,
+        "closeness": 0.5955,
+        "conflict": 0.2252,
         "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.518,
+        "trust": 0.571,
         "ts": 1793271400.0
        }
       ],
@@ -12764,7 +12764,7 @@
      "sessions": [
       "group:900001"
      ],
-     "trust": 0.518
+     "trust": 0.571
     },
     {
      "belief_state": {
@@ -12785,9 +12785,9 @@
       },
       "annotations": [],
       "attachment": {
-       "anxious": 0.3125,
-       "avoidant": 0.2474,
-       "safe": 0.4401
+       "anxious": 0.3204,
+       "avoidant": 0.2568,
+       "safe": 0.4227
       },
       "calibration": {
        "sources": {}
@@ -12813,19 +12813,19 @@
          "ts": 1793004390.0
         },
         {
-         "conflict": 0.2711,
+         "conflict": 0.2933,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793004510.0
         },
         {
-         "conflict": 0.267,
+         "conflict": 0.2877,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271330.0
         },
         {
-         "conflict": 0.2711,
+         "conflict": 0.2888,
          "phase": "stable",
          "repair": 0.0,
          "ts": 1793271350.0
@@ -12838,11 +12838,11 @@
       },
       "social_world": [],
       "state": {
-       "closeness": 0.5352,
-       "conflict": 0.2711,
-       "predictability": 0.98,
+       "closeness": 0.5027,
+       "conflict": 0.2888,
+       "predictability": 1.0,
        "repair": 0.0,
-       "trust": 0.468
+       "trust": 0.409
       },
       "trajectory": [
        {
@@ -12854,27 +12854,27 @@
         "ts": 1793004390.0
        },
        {
-        "closeness": 0.5381,
-        "conflict": 0.2711,
-        "predictability": 0.966,
+        "closeness": 0.4974,
+        "conflict": 0.2933,
+        "predictability": 0.818,
         "repair": 0.0,
-        "trust": 0.483,
+        "trust": 0.409,
         "ts": 1793004510.0
        },
        {
-        "closeness": 0.5397,
-        "conflict": 0.267,
-        "predictability": 0.99,
+        "closeness": 0.5017,
+        "conflict": 0.2877,
+        "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.478,
+        "trust": 0.409,
         "ts": 1793271330.0
        },
        {
-        "closeness": 0.5352,
-        "conflict": 0.2711,
-        "predictability": 0.98,
+        "closeness": 0.5027,
+        "conflict": 0.2888,
+        "predictability": 1.0,
         "repair": 0.0,
-        "trust": 0.468,
+        "trust": 0.409,
         "ts": 1793271350.0
        }
       ],
@@ -12894,7 +12894,7 @@
      "sessions": [
       "group:900002"
      ],
-     "trust": 0.468
+     "trust": 0.409
     },
     {
      "belief_state": {
