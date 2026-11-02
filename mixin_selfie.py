@@ -313,8 +313,19 @@ class SelfieMixin(PortsMixin):
             if place.startswith("private:") and place != discretion.place_of(here):
                 return "此刻：在%s，正在跟人私聊。" % state["where"]
             duration = "%d 小时 %d 分钟" % divmod(elapsed, 60) if elapsed >= 60 else "%d 分钟" % elapsed
-            line = "此刻：在%s，正在%s（从 %s 开始，已经 %s）。" % (state["where"], state["doing"], start.strftime("%H:%M"), duration)
             minutes = state.get("minutes")
+            done = ""
+            # A thing she chose, with a length of its own: when she means to be done with it.
+            # The day's schedule has no end of hers, so it says nothing.
+            if (state["source"] == "her" and isinstance(minutes, int) and not isinstance(minutes, bool)
+                    and minutes >= 1):
+                try:
+                    done = datetime.fromtimestamp(start.timestamp() + minutes * 60).strftime("%H:%M")
+                except (OverflowError, OSError, ValueError):
+                    done = ""
+            line = "此刻：在%s，正在%s（从 %s 开始，已经 %s%s）。" % (
+                state["where"], state["doing"], start.strftime("%H:%M"), duration,
+                "，打算到 " + done if done else "")
             if state["source"] == "her" and isinstance(minutes, int) and not isinstance(minutes, bool) and elapsed > minutes:
                 line += "这件事按说已经做完了，现在干什么由你定。"
             return line
