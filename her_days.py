@@ -98,17 +98,31 @@ class Store:
                 break
         return rows[:n]
 
-    def set_liked(self, id, text):
+    def _set_field(self, id, field, value):
+        """One field of one row, found by id; False when no row has that id."""
         if not self.root.exists():
             return False
         for path in sorted(self.root.glob('????-??-??.jsonl'), reverse=True):
             rows = _rows(path)
             for row in rows:
                 if row.get('id') == id:
-                    row['liked'] = str(text or '')[:20]
+                    row[field] = value
                     _write(path, rows)
                     return True
         return False
+
+    def set_liked(self, id, text):
+        return self._set_field(id, 'liked', str(text or '')[:20])
+
+    def set_detail(self, id, text):
+        """What she actually did, in place of what she meant to do."""
+        return self._set_field(id, 'detail', str(text or '')[:40])
+
+    def set_stopped(self, id, minutes):
+        """How many minutes she gave it before putting it down; its minutes stays the plan."""
+        if type(minutes) is not int or minutes < 0:
+            return False
+        return self._set_field(id, 'stopped_after', minutes)
 
     def forget(self, person):
         person = str(person or '')
