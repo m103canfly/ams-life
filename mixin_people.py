@@ -13,6 +13,18 @@ except ImportError:
     from body import *  # noqa: F401,F403
 
 
+# ams-life K1: the trust in one person follows what she really felt while hearing that
+# person. It is the rise and fall inside this one exchange, not a global number, and an
+# ordinary sentence leaves it alone.
+TRUST_V_SCALE = 0.25         # a v change this big counts as full evidence, one way or the other
+TRUST_STRESS_SCALE = 0.25    # the same for a rise in stress
+TRUST_STRESS_WEIGHT = 0.6    # a rise in stress counts as bad evidence of this weight
+TRUST_DEADBAND = 0.12        # below this the sentence was ordinary: trust does not move
+TRUST_RATE = 0.30            # how much of the evidence is taken in, when learning is off
+TRUST_MIN = 0.05             # even after the worst words, some trust is left
+TRUST_MAX = 0.95             # and after the best ones there is still room above
+
+
 class PeopleMixin:
     def _load_self_model(self) -> dict:
         # ams-life step 1-2: her heart is only what she writes herself. Nothing is
@@ -150,7 +162,7 @@ class PeopleMixin:
                 break
         return relationship_meta.merge_we_memory([], out)
 
-    def _touch_user(self, event, core=None) -> dict:
+    def _touch_user(self, event, core=None, reaction=None) -> dict:
         try:
             sid, name = self._speaker(event)
             USER_DIR.mkdir(parents=True, exist_ok=True)
@@ -183,14 +195,37 @@ class PeopleMixin:
                 _sessions = [str(x) for x in _sessions if str(x) and canonical_session_key(x) != _session_key]
                 d["sessions"] = (_sessions[-19:] + [_session_key])[-20:]
             try:
-                _ct = float(getattr(core, "trust", 0.5)) if core is not None else 0.5
                 _old_trust = float(d.get("trust", 0.5) or 0.5)
-                if core is not None and getattr(core, "bio_learning", False):
-                    # Nassar 2010 adaptive alpha for the trust EMA.
-                    _alpha = memory_meta.nassar_alpha(_ct - _old_trust)
+                # ams-life K1: what she felt while hearing this person, from observe().
+                _e = None
+                if isinstance(reaction, dict):
+                    try:
+                        _dv = float(reaction.get("v", 0.0) or 0.0)
+                    except Exception:
+                        _dv = 0.0
+                    try:
+                        _ds = float(reaction.get("stress", 0.0) or 0.0)
+                    except Exception:
+                        _ds = 0.0
+                    _e = (max(-1.0, min(1.0, _dv / TRUST_V_SCALE))
+                          - max(0.0, min(1.0, _ds / TRUST_STRESS_SCALE)) * TRUST_STRESS_WEIGHT)
+                    _e = max(-1.0, min(1.0, _e))
+                if _e is None or abs(_e) < TRUST_DEADBAND:
+                    # an ordinary sentence: the trust in this person does not move
+                    d["trust"] = _old_trust
                 else:
-                    _alpha = 0.30
-                d["trust"] = round(_old_trust + _alpha * (_ct - _old_trust), 3)
+                    if core is not None and getattr(core, "bio_learning", False):
+                        # Nassar 2010 adaptive alpha, on this exchange's evidence.
+                        _rate = memory_meta.nassar_alpha(_e)
+                    else:
+                        _rate = TRUST_RATE
+                    if _e > 0:
+                        # near 1 it is harder to gain trust
+                        _new_trust = _old_trust + _rate * _e * (1.0 - _old_trust)
+                    else:
+                        # and near 0 it is harder to lose what is left
+                        _new_trust = _old_trust + _rate * _e * _old_trust
+                    d["trust"] = round(max(TRUST_MIN, min(TRUST_MAX, _new_trust)), 3)
             except Exception:
                 d["trust"] = d.get("trust", 0.5)
             try:
