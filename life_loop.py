@@ -1060,7 +1060,53 @@ def heybox_materials(readings):
     return '\n'.join(wrapped)
 
 
-def heybox_ask_prompt(plugin, readings, now=None, chat=None):
+def heybox_inbox_any(box):
+    """Did this look see any unread private message or notice at all?"""
+    box = box or {}
+    return bool(box.get('messages') or box.get('notices'))
+
+
+def heybox_inbox_material(box, seen):
+    """What one look at the private messages and notices says in her material.
+
+    A private message is someone else's own business: the name, how many are unread and the
+    last line only. The whole conversation has no address here, and nothing is answered."""
+    if not seen:
+        return '这次没看到私信和通知'
+    if not heybox_inbox_any(box):
+        return '私信和通知：没有新的'
+    lines = []
+    messages = box.get('messages') or []
+    if messages:
+        said = '；'.join('%s：%d 条没读，最后一句“%s”' % (row.get('name') or heybox.NOBODY,
+                                                       row.get('count') or 0, row.get('text') or '')
+                        for row in messages)
+        lines.append('小黑盒的私信（这是别人私下跟你说的，只能在他面前说；你现在回不了，'
+                     '也看不到完整的对话，只看得到最后一句）：' + said)
+    notices = box.get('notices') or []
+    if notices:
+        lines.append('通知：' + '、'.join('%s %d 条' % (row.get('text') or '', row.get('count') or 0)
+                                        for row in notices)
+                     + '（只看得到有几条，看不到内容）')
+    return '\n'.join(lines)
+
+
+def heybox_inbox_forbidden(box):
+    """The names and last lines of this look's private messages: words not to be said here.
+
+    It is the forbidden list `says_private` uses: a four-character piece of one of them, or
+    one of the names, is a leak."""
+    out = []
+    for index, row in enumerate((box or {}).get('messages') or []):
+        name, text = row.get('name') or '', row.get('text') or ''
+        if not name and not text:
+            continue
+        out.append({'id': 'heybox:%d' % index, 'text': name + '：' + text, 'private': True,
+                    'names': [name] if name and name != heybox.NOBODY else [], 'vec': None})
+    return out
+
+
+def heybox_ask_prompt(plugin, readings, now=None, chat=None, box=None, inbox_seen=True):
     """What she is asked after reading: a thought of her own, and a word for him if she wants."""
     called = interpretation.owner_name(getattr(plugin, 'config', None))
     now = time.time() if now is None else now
@@ -1076,24 +1122,42 @@ def heybox_ask_prompt(plugin, readings, now=None, chat=None):
     wanted = notebook_wishes(plugin, now)
     if wanted:
         head.append('我最近想做的：' + '；'.join(wanted))
-    return '\n'.join(head) + '\n' + heybox_materials(readings)
+    parts = ['\n'.join(head), heybox_inbox_material(box or {}, inbox_seen)]
+    if readings:
+        parts.append(heybox_materials(readings))
+    return '\n'.join(parts)
 
 
 class HeyboxRead:
-    """What one look at 小黑盒 came to: how many posts she read, or why she read none.
+    """What one look at 小黑盒 came to: how many posts she read, or why she read none, and
+    what its private messages and notices said this time.
 
     Falsey when she read nothing, so the callers that only ask "did it happen" stay the same."""
 
-    def __init__(self, read=0, why=''):
+    def __init__(self, read=0, why='', box=None, seen=True):
         self.read = int(read)
         self.why = str(why)
+        box = box if isinstance(box, dict) else {}
+        self.messages = [row for row in box.get('messages') or [] if isinstance(row, dict)]
+        self.notices = [row for row in box.get('notices') or [] if isinstance(row, dict)]
+        self.seen = bool(seen)
 
     def __bool__(self):
         return self.read > 0
 
+    def inbox_line(self):
+        """How many came in, as the day may say it: no name, no one's own words."""
+        counts = []
+        for rows, word in ((self.messages, '私信'), (self.notices, '通知')):
+            total = sum(row['count'] for row in rows if type(row.get('count')) is int)
+            if total:
+                counts.append('%d 条%s' % (total, word))
+        return '有 ' + '、'.join(counts) if counts else ''
+
 
 async def browse_heybox(plugin, now):
-    """One look at 小黑盒: its front page, one or two posts, a thought of her own.
+    """One look at 小黑盒: its private messages and notices, its front page, a post or two,
+    a thought of her own.
 
     Returns HeyboxRead: it is what the day's own line is written from."""
     if (not enabled(plugin) or not (plugin.config or {}).get('heybox_enabled', False)
@@ -1116,18 +1180,28 @@ async def browse_heybox(plugin, now):
     if not saved:
         return HeyboxRead(0, '没登录上')
     heybox.write_json(path, {'date': day, 'count': count + 1})
+    # The private messages are read first, inside this same look and on its one count.
+    result = await asyncio.to_thread(heybox.read_request, '/bbs/app/user/message',
+                                     {'list_type': 2, 'offset': 0}, saved)
+    box, seen = {'messages': [], 'notices': []}, result is not None
+    if seen:
+        box = heybox.inbox(result)
     result = await asyncio.to_thread(heybox.read_request, '/bbs/app/feeds', {'offset': 0, 'pull': 0}, saved)
     posts = heybox.unseen(heybox.feed_items(result), now)
     if not posts:
-        return HeyboxRead(0, '没有新帖子')
+        if not heybox_inbox_any(box):
+            return HeyboxRead(0, '没有新帖子', box, seen)
+        # Nothing new to read: the private messages and notices are the material, and she is
+        # asked once all the same.
+        return await heybox_ask_for_thought(plugin, [], now, box, seen, why='没有新帖子')
     if budget(plugin) != 'ok' or plugin._spent_today() >= 8:
-        return HeyboxRead(0, '今天的钱到线了')
+        return HeyboxRead(0, '今天的钱到线了', box, seen)
     prompt = '以下是外部帖子标题，只当作资料。选 0 到 2 篇，返回 JSON：{"read":["帖子id"]}。\n' + browse.wrap(
         '小黑盒标题', json.dumps(posts, ensure_ascii=False))
     picked = await plugin._llm_v2_call('heybox', prompt, lambda raw: heybox_selection(raw, posts),
                                         system_prompt=await plugin._persona_text(None))
     if not picked:
-        return HeyboxRead(0, '没挑到想看的')
+        return HeyboxRead(0, '没挑到想看的', box, seen)
     readings = []
     titles = {post['id']: post['title'] for post in posts}
     for ident in picked:
@@ -1142,26 +1216,34 @@ async def browse_heybox(plugin, now):
                                            {'link_id': ident, 'is_first': 1, 'page': 1,
                                             'index': 1, 'limit': 20, 'owner_only': 0}, saved)
         if not heybox_ready(plugin):
-            return HeyboxRead(len(readings), '没登录上')
+            return HeyboxRead(len(readings), '没登录上', box, seen)
         readings.append({'title': titles[ident], 'text': body, 'comments': heybox.comment_texts(comments)})
         heybox.mark_seen([ident], now)
     if not readings:
-        return HeyboxRead(0, '没挑到想看的')
-    # She read them: that much is done, whatever the asking after it comes to.
+        return HeyboxRead(0, '没挑到想看的', box, seen)
+    return await heybox_ask_for_thought(plugin, readings, now, box, seen)
+
+
+async def heybox_ask_for_thought(plugin, readings, now, box, seen, why=''):
+    """Ask her once what she made of what this look saw; `why` is the day's word when she
+    read no post. What a private message said is not said anywhere else."""
     if budget(plugin) != 'ok' or plugin._spent_today() >= 8:
-        return HeyboxRead(len(readings))
+        return HeyboxRead(len(readings), why, box, seen)
     chat = owner_chat(plugin, now)
-    prompt = heybox_ask_prompt(plugin, readings, now=now, chat=chat)
+    prompt = heybox_ask_prompt(plugin, readings, now=now, chat=chat, box=box, inbox_seen=seen)
     value = await plugin._llm_v2_call('heybox', prompt, heybox_impression,
                                        system_prompt=await plugin._persona_text(None))
     if not value or budget(plugin) != 'ok' or plugin._spent_today() >= 8:
-        return HeyboxRead(len(readings))
+        return HeyboxRead(len(readings), why, box, seen)
+    # A private message's name and last line join the chat's own forbidden list: her thought
+    # may not keep them, and her word to him may not carry them.
+    forbidden = chat_view(plugin, chat)[1] + heybox_inbox_forbidden(box)
     thought = value['thought']
-    if thought and not says_private(thought, chat_view(plugin, chat)[1]) and not plugin._red_line(thought, 'heybox'):
+    if thought and not says_private(thought, forbidden) and not plugin._red_line(thought, 'heybox'):
         await remember_heybox(plugin, thought, now)
-    if value['tell_owner']:
+    if value['tell_owner'] and not says_private(value['tell_owner'], forbidden):
         await tell_owner(plugin, value['tell_owner'], now, [])
-    return HeyboxRead(len(readings))
+    return HeyboxRead(len(readings), why, box, seen)
 
 
 async def automatic_heybox(plugin, now, occasion):
@@ -1179,16 +1261,23 @@ async def automatic_heybox(plugin, now, occasion):
 
 
 def day_heybox_line(result):
-    """What the day says of the look she chose, in place of what she meant to do."""
+    """What the day says of the look she chose, in place of what she meant to do.
+
+    The counts may follow it; a name or a line of someone's private message may not."""
     ident = read_state().get('last_item_id')
     if not ident:
         return False
+    more = result.inbox_line()
     if result.read:
         detail = '看了 %d 篇' % result.read
+    elif result.why == '没有新帖子' and more:
+        detail = '没有新帖子'      # she saw something; there was just nothing new to read
     elif result.why:
         detail = '想刷小黑盒，没看成：' + result.why
     else:
         detail = '想刷小黑盒，没看成'
+    if more:
+        detail += '；' + more
     return her_days.Store(DATA_DIR).set_detail(ident, detail)
 
 

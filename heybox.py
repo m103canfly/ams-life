@@ -40,8 +40,14 @@ SIGN_OFFSET = 1
 APP = 'heybox'
 # Verify the token shape and signing settings on the first real request.
 PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/',
-                   '/bbs/app/feeds', '/bbs/app/link/tree'))
+                   '/bbs/app/feeds', '/bbs/app/link/tree', '/bbs/app/user/message'))
 LOGIN_PATHS = frozenset(('/account/get_qrcode_url/', '/account/qr_state/'))
+# The private messages and notices: only the unread counts, the other person's name and the
+# last line are read; the conversation itself has no address here and is not asked for.
+INBOX_MESSAGES = 5      # at most this many conversations are carried into the material
+INBOX_CHARS = 60        # a conversation's last line, as long as a status message
+INBOX_NAME_KEYS = ('username', 'nickname', 'name')   # where the other person's name may be
+NOBODY = '有人'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'
 _STATUS_LOCK = threading.RLock()
 _NO_MESSAGE = object()
@@ -289,6 +295,53 @@ def comment_texts(result):
         rows = []
     return [text_only(row.get('text') or row.get('content') or '') for row in rows[:20]
             if isinstance(row, dict)]
+
+
+def inbox_name(user_a):
+    """The other person's name, from the keys the read's payload may use; "有人" if none.
+
+    The trial read did not show which key holds the nickname, so the three plausible ones
+    are tried in turn; a value that is not a non-empty string is skipped."""
+    if not isinstance(user_a, dict):
+        return NOBODY
+    for key in INBOX_NAME_KEYS:
+        value = user_a.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:20]
+    return NOBODY
+
+
+def inbox(result):
+    """The unread private messages and notices one look saw; nothing else is kept.
+
+    Returns {"messages": [{"name", "count", "text"}], "notices": [{"text", "count"}]}.
+    Only what has an unread count is carried. A field that is missing or of the wrong type
+    skips that row instead of raising."""
+    messages, notices = [], []
+    if not isinstance(result, dict):
+        return {'messages': messages, 'notices': notices}
+    rows = result.get('messages')
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or type(row.get('count')) is not int or row['count'] <= 0:
+            continue
+        messages.append({'name': inbox_name(row.get('user_a')), 'count': row['count'],
+                         'text': safe_message(text_only(row.get('text')))[:INBOX_CHARS]})
+        if len(messages) == INBOX_MESSAGES:
+            break
+    header = result.get('header')
+    for row in header if isinstance(header, list) else []:
+        if not isinstance(row, dict):
+            continue
+        count, label = row.get('count'), row.get('text')
+        if type(count) is not int or count <= 0 or not isinstance(label, str) or not label.strip():
+            continue
+        notices.append({'text': label.strip()[:20], 'count': count})
+    # The other unread counts ("award", "comment"...) are named by their own keys.
+    unread = result.get('message_unread_num')
+    for kind, count in (unread.items() if isinstance(unread, dict) else ()):
+        if isinstance(kind, str) and kind.strip() and type(count) is int and count > 0:
+            notices.append({'text': kind.strip()[:20], 'count': count})
+    return {'messages': messages, 'notices': notices}
 
 
 class Login:
