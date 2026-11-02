@@ -507,6 +507,14 @@ def length_shown(row):
     return minutes
 
 
+def mood_line(core):
+    """The mood she is in at this moment, in the words a reply uses; '' when none.
+
+    It is read from the same core, now: nothing is cached and nothing is made up."""
+    brief = str(interpretation.body_brief(core) or '').strip()
+    return '心情：' + brief if brief else ''
+
+
 def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None):
     local = datetime.fromtimestamp(now)
     called = interpretation.owner_name(getattr(plugin, 'config', None))
@@ -518,6 +526,9 @@ def materials(plugin, state, item, core, reason, now, choices, outfit, chat=None
     if forecast:
         lines.append(forecast)
     lines += bodily.feel_lines({key: getattr(core, key) for key in NEEDS})
+    mood = mood_line(core)
+    if mood:
+        lines.append(mood)
     lines.append('醒了多久：%d 分钟；上一顿：%s' %
                  (max(0, int((now - core.last_sleep_end) / 60)),
                   datetime.fromtimestamp(core.last_meal).strftime('%H:%M')))
@@ -568,6 +579,9 @@ def post_materials(plugin, core, now, reason):
     if forecast:
         lines.append(forecast)
     lines += bodily.feel_lines({key: getattr(core, key) for key in NEEDS})
+    mood = mood_line(core)
+    if mood:
+        lines.append(mood)
     rows = her_days.Store(DATA_DIR).day(local.date().isoformat())[-8:]
     activities = [{'几点': clock_time(row.get('ts')), '做了什么': row.get('do', '') + '：' + row.get('detail', ''),
                    '多久': length_shown(row), '感觉': row.get('feel', ''), '喜不喜欢': row.get('liked', '')}
@@ -647,6 +661,9 @@ def own_lines(plugin, core, now, reason):
     if forecast:
         lines.append(forecast)
     lines += bodily.feel_lines({key: getattr(core, key) for key in NEEDS})
+    mood = mood_line(core)
+    if mood:
+        lines.append(mood)
     rows = her_days.Store(DATA_DIR).day(local.date().isoformat())[-8:]
     activities = [{'几点': clock_time(row.get('ts')),
                    '做了什么': row.get('do', '') + '：' + without_names(plugin, row.get('detail', '')),
