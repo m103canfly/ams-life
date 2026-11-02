@@ -109,7 +109,7 @@ class HonestHandsTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('刷小黑盒', choices)
             text = self.materials(choices)
             self.assertIn('这些事能做到什么', text)
-            self.assertIn('私信、通知看不到', text)
+            self.assertIn('能看到谁私信了你', text)
             self.p.config['heybox_enabled'] = False
             choices = life.menu(self.p)
             self.assertNotIn('刷小黑盒', choices)
@@ -127,7 +127,7 @@ class HonestHandsTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(heybox, 'feed_items', return_value=[]), \
                 patch.object(heybox, 'unseen', return_value=[]):
             self.assertTrue(await self.tick())
-        self.assertIn('私信、通知看不到', self.p.calls[0][1])
+        self.assertIn('能看到谁私信了你', self.p.calls[0][1])
         self.assertEqual(self.rows()[0]['detail'], '想刷小黑盒，没看成：没有新帖子')
 
     # 3. six looks today already: the day says why
