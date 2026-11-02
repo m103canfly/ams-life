@@ -203,6 +203,15 @@ class ReplyMarksTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.p.window, [])
         self.assertFalse((self.root / 'states' / 'life.json').exists())
 
+    # 16. a why of 45 characters is stored as its first 40, not dropped
+    async def test_16_a_long_why_is_stored_up_to_40(self):
+        why = '为' * 45
+        await self.reply('好的【%s：%s】' % (attention.PUT_DOWN, why))
+        self.assertEqual(self.p.sent, ['好的'])
+        self.assertEqual(self.state()['put_down']['why'], '为' * 40)
+        await self.reply('好的【%s：30，%s】' % (attention.OWNER_LATER, why))
+        self.assertEqual(self.state()['due'][0]['why'], '为' * 40)
+
 
 class Person(phone.SelfieMixin):
     """The few things life_loop wants from the plugin; a queue of answers, no network."""
@@ -447,10 +456,28 @@ class MarkWordsTests(unittest.TestCase):
     def test_the_note_says_what_she_may_write(self):
         self.assertEqual(attention.MARKS_NOTE,
                          '这件事要是比你手上在做的要紧，可以在最后写【放下手上的：为什么】。')
-        self.assertIn('【过会儿再回：大概几分钟】', attention.MARKS_NOTE_OWNER)
-        self.assertIn('【过会儿再找他：大概几分钟，为什么】', attention.MARKS_NOTE_OWNER)
+        self.assertIn('【过会儿再回：30】（30 是大概几分钟）', attention.MARKS_NOTE_OWNER)
+        self.assertIn('【过会儿再找他：30，为什么】', attention.MARKS_NOTE_OWNER)
         self.assertIn('这些不会发出去，不需要就别写。', attention.MARKS_NOTE_OWNER)
         self.assertNotIn('过会儿', attention.MARKS_NOTE)
+
+    def test_the_minutes_she_naturally_writes_are_read(self):
+        for written in ('30', '30分钟', '30 分钟', '大概30分钟', '大约30分钟', '约30分'):
+            self.assertEqual(attention.take_marks('好的【过会儿再回：%s】' % written, private=True)[1],
+                             [{'kind': 'owner_reply_later', 'why': '', 'minutes': 30}])
+        clean, marks = attention.take_marks('好的【过会儿再找他：30分钟，想问问他吃饭没】', private=True)
+        self.assertEqual(clean, '好的')
+        self.assertEqual(marks, [{'kind': 'owner_later', 'why': '想问问他吃饭没', 'minutes': 30}])
+        for text in ('【过会儿再回：0】', '【过会儿再回：1441】'):
+            self.assertEqual(attention.take_marks(text, private=True)[1], [])
+
+    def test_a_long_why_is_read_up_to_40(self):
+        why = '为' * 45
+        clean, marks = attention.take_marks('好的【放下手上的：%s】' % why)
+        self.assertEqual(clean, '好的')
+        self.assertEqual(marks, [{'kind': 'put_down', 'why': '为' * 40, 'minutes': 0}])
+        self.assertEqual(attention.take_marks('好的【过会儿再找他：30，%s】' % why, private=True)[1],
+                         [{'kind': 'owner_later', 'why': '为' * 40, 'minutes': 30}])
 
     def test_the_marks_are_cut_out_and_read(self):
         clean, marks = attention.take_marks('好的【放下手上的：他要我看电脑】')
@@ -463,9 +490,9 @@ class MarkWordsTests(unittest.TestCase):
                          [{'kind': 'owner_reply_later', 'why': '', 'minutes': 20}])
         # outside his private chat the two about him count as not written
         self.assertEqual(attention.take_marks('好的【过会儿再回：20】')[1], [])
-        # minutes out of range, a why too long, or no closing bracket: cut out, not taken
+        # minutes out of range, an empty why, or no closing bracket: cut out, not taken
         for text in ('【过会儿再回：0】', '【过会儿再回：1441】',
-                     '【放下手上的：' + '为' * 41 + '】', '【放下手上的：没有右括号'):
+                     '【放下手上的：】', '【过会儿再找他：30，】', '【放下手上的：没有右括号'):
             self.assertEqual(attention.take_marks(text, private=True)[1], [])
 
 
